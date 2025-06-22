@@ -530,6 +530,9 @@ for raw_file in new_files:
         if not similarity['similar']:
             scene_count += 1
         
+        # Update previous_image for next iteration - THIS MUST HAPPEN REGARDLESS OF BIRD DETECTION
+        previous_image = img.copy()
+        
         # Get predictions from Mask-RCNN
         masks, pred_boxes, pred_class, pred_score = mask_rcnn.get_prediction(img)
         if masks is None or pred_boxes is None or pred_class is None or pred_score is None:
@@ -614,12 +617,8 @@ for raw_file in new_files:
 
         # Save the results to the database
         export_path = os.path.join(export_directory, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-        crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
-        # reduce jpeg quality to 85%
+        crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")        # reduce jpeg quality to 85%
         
-        # Update the previous image before resizing
-        previous_image = img.copy()
-
         # resize export image to max dimension of 1200
         img = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))  # Resize to max dimension of 1200
         cv2.imwrite(export_path, cv2.cvtColor(img,cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])  # Convert RGB to BGR for OpenCV

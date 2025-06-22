@@ -3,6 +3,7 @@ torch>=2.4.1
 torchvision>=0.19.1
 tensorflow>=2.19.0
 onnxruntime-directml>=1.22.0
+# Note: if using MacOS, may need to install onnxruntime instead of onnxruntime-directml
 numpy>=2.1.3
 
 # Computer Vision
