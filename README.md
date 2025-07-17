@@ -187,6 +187,8 @@ The `.kestrel` folder will require an additional 1MB of disk space for every ~10
 
 Contributions are welcome! Please feel free to submit pull requests, report bugs, or suggest features.
 
+Donations are welcome. Please donate via [PayPal/Card](https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A)
+
 ## ❓ Contact Me
 Direct questions or comments to [support@projectkestrel.org](mailto:support@projectkestrel.org)
 
