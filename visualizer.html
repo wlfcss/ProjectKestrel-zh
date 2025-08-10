@@ -135,6 +135,13 @@
     /* Final override: allow wrapping in meta rows (was nowrap earlier) */
     .meta { white-space: normal; }
     .meta > * { min-width: 0; }
+
+    /* Rating stars */
+    .stars { display: flex; gap: 4px; align-items: center; user-select: none; }
+    .star { font-size: 16px; line-height: 1; cursor: pointer; color: #2a3040; transition: color .12s ease; }
+    .star.filled.auto { color: #6aa0ff; }
+    .star.filled.manual { color: #f5c542; }
+    .star:hover { color: #8fb6ff; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
@@ -326,6 +333,16 @@
     for (const r of rows) if (!('scene_name' in r)) r.scene_name = '';
   }
 
+  // Ensure rating columns exist and default values are set
+  function ensureRatingColumns() {
+    if (!header.includes('rating')) header.push('rating');
+    if (!header.includes('rating_origin')) header.push('rating_origin');
+    for (const r of rows) {
+      if (!('rating' in r)) r.rating = '';
+      if (!('rating_origin' in r)) r.rating_origin = '';
+    }
+  }
+
   function aggregateScenes(minSpeciesConf, searchTerm, sortBy) {
     const groups = new Map();
     for (const r of rows) {
@@ -373,6 +390,53 @@
     });
 
     return sorted;
+  }
+
+  function getRating(row) {
+    const n = parseInt(row?.rating, 10);
+    return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+  }
+  function getOrigin(row) {
+    const s = String(row?.rating_origin || '').toLowerCase();
+    return s === 'manual' ? 'manual' : (s === 'auto' ? 'auto' : '');
+  }
+  function setRating(row, val, origin = 'manual') {
+    const v = String(Math.max(0, Math.min(5, parseInt(val, 10) || 0)));
+    const newOrigin = origin;
+    const changed = (row.rating || '') !== v || (row.rating_origin || '') !== newOrigin;
+    if (changed) {
+      row.rating = v;
+      row.rating_origin = newOrigin;
+      dirty = true; el('#saveCsv').disabled = false;
+    }
+  }
+  function createStarBar(row) {
+    const wrap = document.createElement('div');
+    wrap.className = 'stars';
+
+    function render(tempVal = null) {
+      const val = tempVal != null ? tempVal : getRating(row);
+      const origin = tempVal != null ? 'manual' : getOrigin(row);
+      Array.from(wrap.children).forEach((st, i) => {
+        const filled = i < val;
+        st.classList.toggle('filled', filled);
+        st.classList.toggle('manual', filled && origin === 'manual');
+        st.classList.toggle('auto', filled && origin !== 'manual');
+      });
+    }
+
+    for (let i = 1; i <= 5; i++) {
+      const s = document.createElement('span');
+      s.className = 'star';
+      s.textContent = '★';
+      s.title = 'Click to set rating';
+      s.addEventListener('mouseenter', () => render(i));
+      s.addEventListener('mouseleave', () => render());
+      s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
+      wrap.appendChild(s);
+    }
+    render();
+    return wrap;
   }
 
   function updateStatusBar(sceneList) {
@@ -479,6 +543,11 @@
         const body = document.createElement('div'); body.className='body';
         body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename||'')}"><b>${escapeHtml(r.filename||'')}</b></div>
           <div class="meta"><span class="truncate" title="${escapeHtml(r.species||'Unknown')}">${escapeHtml(r.species||'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
+        
+        // Add rating stars
+        const stars = createStarBar(r);
+        body.appendChild(stars);
+
         card.appendChild(body);
 
         // New: double-click to open in editor
@@ -492,9 +561,14 @@
           else { pv.innerHTML = '<span class="muted">No preview</span>'; }
           const info = el('#previewInfo');
           if (info) {
+            const rn = getRating(r);
+            const ro = getOrigin(r);
+            const starsTxt = '★★★★★'.slice(0, rn) + '☆☆☆☆☆'.slice(0, Math.max(0, 5-rn));
+            const originTxt = rn ? (ro === 'manual' ? 'manual' : 'auto') : '';
             info.innerHTML = `
               <div><b>${escapeHtml(r.filename||'')}</b></div>
               <div class="meta"><span title="Species confidence">${escapeHtml(r.species||'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
+              <div class="meta"><span>Rating: ${starsTxt} ${originTxt?`(${originTxt})`:''}</span></div>
             `;
           }
         });
@@ -538,6 +612,7 @@
     header = parsed.meta.fields || [];
     rows = (parsed.data||[]).map(r => ({ ...r, scene_count: r.scene_count }));
     ensureSceneNameColumn();
+    ensureRatingColumns();
     dirty = false; el('#saveCsv').disabled = true;
     await renderScenes();
   }
@@ -562,10 +637,13 @@
 
   async function saveCsv() {
     if (!csvFileHandle) { alert('No CSV opened.'); return; }
-    // Keep header order; ensure scene_name exists
+    // Keep header order; ensure extra columns exist
     ensureSceneNameColumn();
+    ensureRatingColumns();
     const cols = header.slice();
     if (!cols.includes('scene_name')) cols.push('scene_name');
+    if (!cols.includes('rating')) cols.push('rating');
+    if (!cols.includes('rating_origin')) cols.push('rating_origin');
 
     const lines = [];
     lines.push(cols.join(','));
@@ -714,6 +792,7 @@
           header = parsed.meta.fields || [];
           rows = parsed.data || [];
           ensureSceneNameColumn();
+          ensureRatingColumns();
           await renderScenes();
           setStatus('CSV loaded (limited features)');
         };
