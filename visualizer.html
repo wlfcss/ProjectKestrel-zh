@@ -168,6 +168,11 @@
           <input id="toggleNameScenes" type="checkbox" />
           <span class="muted">Name scenes</span>
         </label>
+        <!-- New: filter scenes to only those with my manual-rated photos -->
+        <label class="inline" title="Show only scenes that contain images I rated manually">
+          <input id="filterScenesManualRated" type="checkbox" />
+          <span class="muted">Only my rated scenes</span>
+        </label>
         <button id="saveCsv" disabled>Save Changes</button>
       </div>
       <div id="status" class="status">Idle</div>
@@ -197,6 +202,11 @@
           <button id="applySceneName">Apply</button>
         </div>
         <div class="detail" id="sceneMeta">—</div>
+        <!-- New: filter to show only images with manual ratings -->
+        <label class="inline" title="Show only images with manual ratings">
+          <input id="filterManualRated" type="checkbox" />
+          <span class="muted">Only my rated photos</span>
+        </label>
         <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
         <div class="detail" id="previewInfo">—</div>
         <div class="footer">
@@ -242,6 +252,8 @@
   let header = [];               // CSV header fields
   let scenes = [];               // Aggregated scene objects
   let dirty = false;             // Track unsaved edits
+  // Track which scene dialog is open for refreshing filters
+  let currentSceneId = null;
 
   const el = (sel) => document.querySelector(sel);
   const sceneGrid = el('#sceneGrid');
@@ -343,6 +355,9 @@
     }
   }
 
+  // Helper: is this image manually rated (>0 stars)?
+  function isManualRated(r) { return getRating(r) > 0 && getOrigin(r) === 'manual'; }
+
   function aggregateScenes(minSpeciesConf, searchTerm, sortBy) {
     const groups = new Map();
     for (const r of rows) {
@@ -408,6 +423,8 @@
       row.rating = v;
       row.rating_origin = newOrigin;
       dirty = true; el('#saveCsv').disabled = false;
+      // If filter is active, refresh the image grid so items appear/disappear accordingly
+      if (typeof window.refreshSceneFilter === 'function') window.refreshSceneFilter();
     }
   }
   function createStarBar(row) {
@@ -447,22 +464,29 @@
     setStatus(`Showing ${totalScenes} scenes with ${totalImages} images${totalScenes<allScenes?` (filtered from ${allScenes})`:''}${dirtyMark}`);
   }
 
-  // Render: Scenes
+  // Render: Scenes (fix ordering by appending synchronously; load images async)
   async function renderScenes() {
     const minC = parseFloat(el('#speciesConf').value)||0;
     const search = el('#search').value;
     const sortBy = el('#sortBy').value;
+    const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
+
     scenes = aggregateScenes(minC, search, sortBy);
-    updateStatusBar(scenes);
+
+    // Apply scene-level manual-rated filter without mutating global scenes
+    const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
+
+    updateStatusBar(visibleScenes);
 
     sceneGrid.innerHTML = '';
 
-    // Incremental render for responsiveness
+    // Incremental render for responsiveness and consistent ordering
     const batch = 24;
-    for (let i=0; i<scenes.length; i+=batch) {
-      const slice = scenes.slice(i, i+batch);
+    for (let i=0; i<visibleScenes.length; i+=batch) {
+      const slice = visibleScenes.slice(i, i+batch);
       const frag = document.createDocumentFragment();
-      await Promise.all(slice.map(async (s) => {
+      // Synchronous DOM append in desired order
+      for (const s of slice) {
         const card = document.createElement('article');
         card.className = 'card';
         card.dataset.sceneId = s.id;
@@ -472,8 +496,11 @@
         const img = document.createElement('img');
         img.alt = s.representative?.filename || '';
         img.loading = 'lazy';
-        const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path);
-        if (url) img.src = url; else { img.alt = 'No preview'; }
+        // Set src asynchronously to keep order stable
+        (async () => {
+          const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path);
+          if (url) img.src = url;
+        })();
         th.appendChild(img);
         card.appendChild(th);
 
@@ -509,48 +536,40 @@
 
         card.addEventListener('click', () => openSceneDialog(s.id));
         frag.appendChild(card);
-      }));
+      }
       sceneGrid.appendChild(frag);
       await sleep(16);
     }
   }
 
-  // Render: Scene dialog
-  async function openSceneDialog(sceneId) {
-    const scene = scenes.find(s => String(s.id) === String(sceneId));
-    if (!scene) return;
-
-    el('#sceneName').value = scene.sceneName || '';
-    el('#sceneMeta').innerHTML = `
-      <div><b>Scene ${scene.id}</b></div>
-      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
-      <div style="margin-top:6px">Species: ${scene.species.length? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
-    `;
-
-    imageGrid.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    const batch = 48;
-    // Reset preview info placeholder on open
+  // Render images inside the scene dialog, honoring the manual-rated filter and stable ordering
+  function renderSceneImages(scene) {
     const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
-    for (let i=0; i<scene.images.length; i+=batch) {
-      const slice = scene.images.slice(i, i+batch);
-      await Promise.all(slice.map(async (r) => {
+    imageGrid.innerHTML = '';
+    const showManualOnly = !!el('#filterManualRated')?.checked;
+    const images = showManualOnly ? scene.images.filter(isManualRated) : scene.images;
+
+    const batch = 48;
+    for (let i = 0; i < images.length; i += batch) {
+      const slice = images.slice(i, i + batch);
+      const frag = document.createDocumentFragment();
+      // Append synchronously in order; load preview images asynchronously
+      for (const r of slice) {
         const card = document.createElement('article'); card.className='card';
         const th = document.createElement('div'); th.className='thumb';
         const img = document.createElement('img'); img.alt = r.filename||''; img.loading='lazy';
-        const url = await getBlobUrlForPath(r.export_path || r.crop_path);
-        if (url) img.src = url; th.appendChild(img); card.appendChild(th);
+        (async () => {
+          const url = await getBlobUrlForPath(r.export_path || r.crop_path);
+          if (url) img.src = url;
+        })();
+        th.appendChild(img); card.appendChild(th);
         const body = document.createElement('div'); body.className='body';
         body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename||'')}"><b>${escapeHtml(r.filename||'')}</b></div>
           <div class="meta"><span class="truncate" title="${escapeHtml(r.species||'Unknown')}">${escapeHtml(r.species||'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
-        
-        // Add rating stars
         const stars = createStarBar(r);
         body.appendChild(stars);
-
         card.appendChild(body);
 
-        // New: double-click to open in editor
         card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
 
         card.addEventListener('mouseenter', async () => {
@@ -563,17 +582,15 @@
           if (info) {
             const rn = getRating(r);
             const ro = getOrigin(r);
-            const starsTxt = '★★★★★'.slice(0, rn) + '☆☆☆☆☆'.slice(0, Math.max(0, 5-rn));
-            const originTxt = rn ? (ro === 'manual' ? 'manual' : 'auto') : '';
+            const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
             info.innerHTML = `
               <div><b>${escapeHtml(r.filename||'')}</b></div>
               <div class="meta"><span title="Species confidence">${escapeHtml(r.species||'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
-              <div class="meta"><span>Rating: ${starsTxt} ${originTxt?`(${originTxt})`:''}</span></div>
+              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5-rn)} ${originTxt?`(${originTxt})`:''}</span></div>
             `;
           }
         });
 
-        // Path helpers
         card.title = [
           `File: ${r.filename}`,
           `Species: ${r.species} (${fmt3(r.species_confidence)})`,
@@ -581,10 +598,41 @@
         ].join('\n');
 
         frag.appendChild(card);
-      }));
+      }
       imageGrid.appendChild(frag);
-      await sleep(16);
     }
+  }
+
+  // Allow other code to refresh the scene images when filter or ratings change
+  window.refreshSceneFilter = function(){
+    const chk = el('#filterManualRated');
+    if (chk && chk.checked && currentSceneId != null) {
+      const sc = scenes.find(s => String(s.id) === String(currentSceneId));
+      if (sc) renderSceneImages(sc);
+    }
+  };
+
+  // Render: Scene dialog
+  async function openSceneDialog(sceneId) {
+    const scene = scenes.find(s => String(s.id) === String(sceneId));
+    if (!scene) return;
+    currentSceneId = scene.id;
+
+    el('#sceneName').value = scene.sceneName || '';
+    el('#sceneMeta').innerHTML = `
+      <div><b>Scene ${scene.id}</b></div>
+      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
+      <div style="margin-top:6px">Species: ${scene.species.length? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
+    `;
+
+    // Initialize filter checkbox from settings and wire change handler
+    const filterCb = el('#filterManualRated');
+    if (filterCb) {
+      try { filterCb.checked = !!getSetting('onlyManualRated', false); } catch {}
+      filterCb.onchange = () => { const s = loadSettings(); s.onlyManualRated = !!filterCb.checked; saveSettings(s); renderSceneImages(scene); };
+    }
+
+    renderSceneImages(scene);
 
     // Hook up actions
     el('#applySceneName').onclick = () => applySceneName(scene.id, el('#sceneName').value);
@@ -814,6 +862,17 @@
     try { t.checked = !!getSetting('inlineSceneName', false); } catch {}
     t.addEventListener('change', () => {
       const s = loadSettings(); s.inlineSceneName = !!t.checked; saveSettings(s);
+      renderScenes();
+    });
+  })();
+
+  // Initialize toolbar toggle for scene-level manual-rated filter
+  (function initScenesManualFilter(){
+    const t = document.getElementById('filterScenesManualRated');
+    if (!t) return;
+    try { t.checked = !!getSetting('onlyManualRatedScenes', false); } catch {}
+    t.addEventListener('change', () => {
+      const s = loadSettings(); s.onlyManualRatedScenes = !!t.checked; saveSettings(s);
       renderScenes();
     });
   })();
