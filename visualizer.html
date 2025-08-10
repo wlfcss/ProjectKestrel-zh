@@ -157,6 +157,10 @@
           <option value="imageCount">Sort by Image Count</option>
           <option value="sceneId">Sort by Scene ID</option>
         </select>
+        <label class="inline" title="Show scene name editor on cards">
+          <input id="toggleNameScenes" type="checkbox" />
+          <span class="muted">Name scenes</span>
+        </label>
         <button id="saveCsv" disabled>Save Changes</button>
       </div>
       <div id="status" class="status">Idle</div>
@@ -436,7 +440,7 @@
         body.appendChild(title);
         body.appendChild(meta);
         body.appendChild(chips);
-        body.appendChild(nameRow);
+        if (document.getElementById('toggleNameScenes')?.checked) body.appendChild(nameRow);
         card.appendChild(body);
 
         card.addEventListener('click', () => openSceneDialog(s.id));
@@ -722,6 +726,18 @@
   el('#search').addEventListener('input', () => renderScenes());
   el('#speciesConf').addEventListener('change', () => renderScenes());
   el('#sortBy').addEventListener('change', () => renderScenes());
+
+  // Initialize toolbar toggle for inline scene naming
+  (function initNameScenesToggle(){
+    const t = document.getElementById('toggleNameScenes');
+    if (!t) return;
+    // Load saved preference
+    try { t.checked = !!getSetting('inlineSceneName', false); } catch {}
+    t.addEventListener('change', () => {
+      const s = loadSettings(); s.inlineSceneName = !!t.checked; saveSettings(s);
+      renderScenes();
+    });
+  })();
 
   // Init
   setStatus('Open your photo folder (the one that contains .kestrel) or open kestrel_database.csv');
