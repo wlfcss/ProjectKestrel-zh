@@ -173,6 +173,8 @@
           <input id="filterScenesManualRated" type="checkbox" />
           <span class="muted">Only my rated scenes</span>
         </label>
+        <!-- New: open merge scenes dialog -->
+        <button id="openMerge">Merge scenes…</button>
         <button id="saveCsv" disabled>Save Changes</button>
       </div>
       <div id="status" class="status">Idle</div>
@@ -241,6 +243,34 @@
         <button id="settingsSave" class="primary">Save</button>
       </div>
       <div class="notice">Run the local bridge to enable launching editors: backend/editor_bridge.py</div>
+    </div>
+  </dialog>
+
+  <!-- Merge scenes dialog -->
+  <dialog id="mergeDlg">
+    <div class="settings" style="width:min(720px,96vw)">
+      <h3 style="margin:0">Merge Scenes</h3>
+      <div class="row" style="align-items:flex-start">
+        <label style="margin-top:6px">Select scenes</label>
+        <div style="flex:1; max-height: 320px; overflow:auto; border:1px solid #1f2533; border-radius:10px; padding:8px; background:#10131a">
+          <!-- Adjust grid to include a thumbnail column -->
+          <div id="mergeList" style="display:grid; grid-template-columns: 120px 1fr auto; gap:6px; align-items:center"></div>
+        </div>
+      </div>
+      <div class="row">
+        <label>Target</label>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <label class="inline"><input type="radio" name="mergeTargetMode" value="min" checked> <span class="muted">Smallest selected ID</span></label>
+          <label class="inline"><input type="radio" name="mergeTargetMode" value="manual"> <span class="muted">ID:</span>
+            <input id="mergeTargetId" type="number" style="width:120px" />
+          </label>
+        </div>
+      </div>
+      <div class="detail" id="mergeSummary">Select at least two scenes to merge.</div>
+      <div class="row" style="justify-content:flex-end; margin-top: 4px; gap:8px">
+        <button id="mergeCancel">Cancel</button>
+        <button id="mergeApply" class="primary" disabled>Merge</button>
+      </div>
     </div>
   </dialog>
 
@@ -678,8 +708,10 @@
 
   function csvEscape(val) {
     if (val == null) return '';
-    let s = String(val);
-    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    const s = String(val);
+    if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
     return s;
   }
 
@@ -875,6 +907,117 @@
       const s = loadSettings(); s.onlyManualRatedScenes = !!t.checked; saveSettings(s);
       renderScenes();
     });
+  })();
+
+  // Merge scenes feature
+  function computeAllScenesForMerge(){
+    // Group rows by scene_count; keep simple stats and representative
+    const groups = new Map();
+    for (const r of rows) {
+      const id = r.scene_count;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(r);
+    }
+    const list = [];
+    for (const [id, arr] of groups) {
+      // pick representative by max quality
+      let rep = arr[0];
+      for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
+      const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+      const name = (arr.find(a => (a.scene_name||'').trim().length)?.scene_name || '').trim();
+      list.push({ id, imageCount: arr.length, maxQuality: maxQ, sceneName: name, repPath: (rep.export_path||rep.crop_path||''), repFilename: rep.filename||'' });
+    }
+    // Sort numerically by id where possible
+    return list.sort((a,b)=> parseNumber(a.id) - parseNumber(b.id));
+  }
+
+  // Fix: robustly close scene dialog before opening merge dialog
+  function openMergeDialog(){
+    const dlg = document.getElementById('mergeDlg');
+    const listEl = document.getElementById('mergeList');
+    const summary = document.getElementById('mergeSummary');
+    const applyBtn = document.getElementById('mergeApply');
+    const targetInput = document.getElementById('mergeTargetId');
+    const modeRadios = Array.from(document.querySelectorAll('input[name="mergeTargetMode"]'));
+
+    const sceneList = computeAllScenesForMerge();
+    listEl.innerHTML = '';
+
+    const sel = new Set();
+
+    function updateSummary(){
+      const ids = Array.from(sel);
+      const n = ids.length;
+      const targetMode = modeRadios.find(r=>r.checked)?.value || 'min';
+      const targetId = targetMode === 'manual' && targetInput.value ? String(targetInput.value) : (n? String(ids.map(x=>parseNumber(x)).sort((a,b)=>a-b)[0]) : '');
+      const totalImgs = sceneList.filter(s=>ids.includes(String(s.id))).reduce((acc,s)=>acc+s.imageCount,0);
+      summary.textContent = n<2 ? 'Select at least two scenes to merge.' : `Merging ${n} scenes into Scene ${targetId} (${totalImgs} images).`;
+      applyBtn.disabled = n < 2 || !targetId;
+    }
+
+    // Build rows: [thumb] [checkbox + title] [count]
+    for (const s of sceneList) {
+      const row = document.createElement('div');
+      row.style.display = 'contents';
+
+      // Thumb cell
+      const cThumb = document.createElement('div');
+      const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.style.aspectRatio = '16/10';
+      const img = document.createElement('img'); img.alt = s.repFilename || 'No preview'; img.loading = 'lazy';
+      (async () => { const url = await getBlobUrlForPath(s.repPath); if (url) img.src = url; })();
+      thumb.appendChild(img); cThumb.appendChild(thumb);
+
+      // Title + checkbox cell
+      const cTitle = document.createElement('div');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.id = String(s.id); cb.style.marginRight = '8px';
+      cb.addEventListener('change', ()=>{ if (cb.checked) sel.add(cb.dataset.id); else sel.delete(cb.dataset.id); updateSummary(); });
+      const title = document.createElement('span'); title.textContent = `Scene ${s.id}${s.sceneName?` — ${s.sceneName}`:''}`; title.title = title.textContent;
+      cTitle.appendChild(cb); cTitle.appendChild(title);
+
+      // Count cell
+      const cCount = document.createElement('div'); cCount.className='muted'; cCount.style.textAlign='right'; cCount.textContent = `${s.imageCount} images`;
+
+      row.appendChild(cThumb); row.appendChild(cTitle); row.appendChild(cCount);
+      listEl.appendChild(row);
+    }
+
+    // Wire radios
+    modeRadios.forEach(r => r.onchange = updateSummary);
+    targetInput.oninput = updateSummary;
+
+    document.getElementById('mergeCancel').onclick = () => dlg.close();
+    document.getElementById('mergeApply').onclick = () => {
+      const ids = Array.from(sel).map(String);
+      if (ids.length < 2) return;
+      const targetMode = modeRadios.find(r=>r.checked)?.value || 'min';
+      let targetId = targetMode === 'manual' && targetInput.value ? String(targetInput.value) : String(ids.map(x=>parseNumber(x)).sort((a,b)=>a-b)[0]);
+      if (!targetId) return;
+      let changed = 0;
+      for (const r of rows) {
+        const idStr = String(r.scene_count);
+        if (ids.includes(idStr) && idStr !== targetId) { r.scene_count = targetId; changed++; }
+      }
+      if (changed) { dirty = true; document.getElementById('saveCsv').disabled = false; setStatus(`Merged scenes into ${targetId}. ${changed} rows updated.`); }
+      renderScenes();
+      dlg.close();
+    };
+
+    updateSummary();
+
+    // Close any open scene dialog to avoid nested modals
+    try {
+      const sd = document.getElementById('sceneDlg');
+      if (sd && sd.open) sd.close();
+    } catch {}
+
+    try { dlg.showModal(); } catch (e) { try { dlg.show(); } catch(_) {} }
+  }
+
+  // Wire toolbar button for merge dialog
+  (function initMergeButton(){
+    const btn = document.getElementById('openMerge');
+    if (!btn) return;
+    btn.addEventListener('click', openMergeDialog);
   })();
 
   // Init
