@@ -55,20 +55,50 @@
     /* Grid */
     .grid { display: grid; gap: 12px; padding: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
     .card {
-      background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; overflow: clip; display: flex; flex-direction: column;
+      background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;
       transition: transform .12s ease, border-color .12s ease, background .12s ease;
     }
     .card:hover { transform: translateY(-2px); border-color: #2a3040; background: #191d28; }
     .thumb { aspect-ratio: 16/10; background: #0e1117; display:flex; align-items:center; justify-content:center; overflow: hidden; }
     .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
-    .card .body { padding: 10px 12px; display: grid; gap: 6px; }
-    .meta { display:flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .card .body { padding: 10px 12px 14px; display: grid; gap: 6px; }
+    .meta { display:flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; white-space: normal; gap: 8px; }
+    .meta > :first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .chips { display:flex; gap:6px; flex-wrap: wrap; }
     .chip { background: var(--chip); border:1px solid #2a3040; padding: 2px 8px; border-radius: 999px; font-size: 12px; color: #cbd2dc; }
     .chip.badge { background: #10293d; border-color: #1d3e5e; color: #a9c9ee; }
 
-    .inline { display:flex; gap:8px; align-items:center; }
-    .inline input[type="text"] { height: 30px; flex: 1; }
+    /* Improve chip rendering & truncation */
+    .chip { display: inline-flex; align-items: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Slight breathing room on meta row */
+    .meta { padding-right: 2px; }
+
+    /* Pill for score in meta rows to prevent clipping */
+    .meta .score { display: inline-flex; align-items: center; gap: 4px; background: #10293d; border: 1px solid #1d3e5e; color: #a9c9ee; padding: 2px 8px; border-radius: 999px; }
+
+    /* Further anti-clipping & wrapping safeguards */
+    .meta { flex-wrap: wrap; }
+    .meta .score { margin-left: auto; }
+    .chips { min-width: 0; }
+    .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Anti-clipping improvements */
+    .meta { gap: 8px; }
+    .meta > :first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .inline input[type="text"] { min-width: 0; }
+    .card .body { padding-bottom: 14px; }
+
+    /* Prevent text clipping with truncation */
+    .title { display: flex; gap: 6px; align-items: center; }
+    .title .name { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .meta .truncate { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    .inline { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+    .inline > * { min-width: 0; }
+    .inline button { height: 30px; white-space: nowrap; }
+    .inline input[type="text"] { height: 30px; flex: 1 1 160px; min-width: 0; }
 
     main { max-width: 1400px; margin: 0 auto; }
 
@@ -101,6 +131,10 @@
     .row label { min-width: 160px; color: var(--muted); font-size: 13px; }
     .row input[type="text"] { flex: 1; }
     .row select { width: 200px; }
+
+    /* Final override: allow wrapping in meta rows (was nowrap earlier) */
+    .meta { white-space: normal; }
+    .meta > * { min-width: 0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 </head>
@@ -377,16 +411,18 @@
         const body = document.createElement('div');
         body.className = 'body';
         const title = document.createElement('div');
-        title.innerHTML = `<b>Scene ${s.id}</b>${s.sceneName?` — ${escapeHtml(s.sceneName)}`:''}`;
+        title.className = 'title';
+        title.innerHTML = `<b>Scene ${s.id}</b>${s.sceneName?`<span class="name">— ${escapeHtml(s.sceneName)}</span>`:''}`;
+        if (s.sceneName) title.title = s.sceneName;
         const meta = document.createElement('div');
         meta.className = 'meta';
-        meta.innerHTML = `<span>📸 ${s.imageCount}</span><span>⭐ ${fmt3(s.maxQuality)}</span>`;
+        meta.innerHTML = `<span>📸 ${s.imageCount}</span><span class="score">⭐ ${fmt3(s.maxQuality)}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         for (const sp of s.species.slice(0,3)) {
-          const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; chips.appendChild(c);
+          const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
         }
-        if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; chips.appendChild(more); }
+        if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
 
         // Scene name editor inline
         const nameRow = document.createElement('div');
@@ -434,8 +470,8 @@
         const url = await getBlobUrlForPath(r.export_path || r.crop_path);
         if (url) img.src = url; th.appendChild(img); card.appendChild(th);
         const body = document.createElement('div'); body.className='body';
-        body.innerHTML = `<div><b>${escapeHtml(r.filename||'')}</b></div>
-          <div class="meta"><span>${escapeHtml(r.species||'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
+        body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename||'')}"><b>${escapeHtml(r.filename||'')}</b></div>
+          <div class="meta"><span class="truncate" title="${escapeHtml(r.species||'Unknown')}">${escapeHtml(r.species||'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
         card.appendChild(body);
 
         // New: double-click to open in editor
