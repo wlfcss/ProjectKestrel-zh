@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kestrel Visualizer (Web)</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root {
+      --bg: #0b0c0f;
+      --panel: #111318;
+      --muted: #8a9099;
+      --text: #e7e9ee;
+      --brand: #4aa3ff;
+      --ok: #2ecc71;
+      --warn: #f39c12;
+      --bad: #e74c3c;
+      --card: #161922;
+      --card-border: #222634;
+      --chip: #1d2230;
+      /* New: dialog column sizing */
+      --right-w: 340px;
+      --divider-w: 8px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text); font: 14px/1.35 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    header {
+      position: sticky; top: 0; z-index: 5;
+      background: linear-gradient(180deg, rgba(17,19,24,.95), rgba(17,19,24,.7));
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #1d2230;
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+    h1 { font-size: 20px; margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
+
+    .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .toolbar .grow { flex: 1 1 auto; }
+
+    button, select, input[type="text"], input[type="search"], input[type="number"] {
+      background: #0e1117; color: var(--text); border: 1px solid #2a3040; border-radius: 8px; height: 36px;
+      padding: 0 12px; outline: none; transition: border-color .15s ease, background .15s ease;
+    }
+    button { cursor: pointer; background: #173253; border-color: #214c7d; }
+    button:hover { background: #1c3a62; border-color: #2b5f9e; }
+    button.primary { background: #1d5aa8; border-color: #2b6ec8; }
+    button.primary:hover { background: #1f63b8; border-color: #3a84e6; }
+    button[disabled] { opacity: .6; cursor: not-allowed; }
+
+    .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
+
+    /* Grid */
+    .grid { display: grid; gap: 12px; padding: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .card {
+      background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; overflow: clip; display: flex; flex-direction: column;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: #2a3040; background: #191d28; }
+    .thumb { aspect-ratio: 16/10; background: #0e1117; display:flex; align-items:center; justify-content:center; overflow: hidden; }
+    .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .card .body { padding: 10px 12px; display: grid; gap: 6px; }
+    .meta { display:flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .chips { display:flex; gap:6px; flex-wrap: wrap; }
+    .chip { background: var(--chip); border:1px solid #2a3040; padding: 2px 8px; border-radius: 999px; font-size: 12px; color: #cbd2dc; }
+    .chip.badge { background: #10293d; border-color: #1d3e5e; color: #a9c9ee; }
+
+    .inline { display:flex; gap:8px; align-items:center; }
+    .inline input[type="text"] { height: 30px; flex: 1; }
+
+    main { max-width: 1400px; margin: 0 auto; }
+
+    /* Modal */
+    dialog { border:1px solid #2a3040; background: var(--panel); color: var(--text); border-radius: 14px; width: min(1200px, 96vw); max-height: 92vh; height: 92vh; overflow: hidden; }
+    dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
+    .modal { display: grid; grid-template-columns: minmax(0, 1fr) var(--divider-w) var(--right-w); gap: 0; height: 100%; }
+    .modal .left { padding: 0; min-height: 60vh; overflow: auto; }
+    .modal .right { border-left: 1px solid #2a3040; padding: 12px; display: grid; gap: 10px; grid-template-rows: auto auto 1fr auto; overflow: hidden; }
+    .modal .grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); padding: 12px; }
+    .detail { font-size: 13px; color: #cbd2dc; background: #10131a; border:1px solid #1f2533; border-radius: 10px; padding: 10px; }
+    .right .preview { width: 100%; aspect-ratio: 1/1; background:#0e1117; display:flex; align-items:center; justify-content:center; border-radius:10px; border:1px solid #1f2533; overflow:hidden; }
+    .right .preview img { width:100%; height:100%; object-fit: contain; }
+    .muted { color: var(--muted); }
+
+    /* New: column divider between grid and preview panel */
+    .divider { width: var(--divider-w); background: #1f2533; cursor: col-resize; }
+    .divider:hover { background: #2a3040; }
+    .divider:active { background: #3a84e6; }
+
+    .footer { display:flex; gap: 8px; justify-content: flex-end; }
+
+    .hidden { display: none !important; }
+
+    .notice { background:#0e1117; border:1px dashed #3a84e6; color:#a9c9ee; padding:8px 10px; border-radius:10px; font-size: 13px; }
+
+    /* Reuse dialog styling for settings */
+    .settings { display:grid; gap:10px; padding: 12px; width: min(560px, 96vw); }
+    .row { display:flex; gap:8px; align-items:center; }
+    .row label { min-width: 160px; color: var(--muted); font-size: 13px; }
+    .row input[type="text"] { flex: 1; }
+    .row select { width: 200px; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>🦅 Kestrel Visualizer (Web)</h1>
+      <div class="toolbar">
+        <button id="pickFolder" class="primary">Open Photo Folder…</button>
+        <button id="pickCsv">Open kestrel_database.csv…</button>
+        <button id="openSettings">Settings</button>
+        <div class="grow"></div>
+        <input id="search" type="search" placeholder="Search species (e.g. hawk, warbler)" />
+        <label class="inline">
+          <span class="muted">min species conf</span>
+          <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:84px" />
+        </label>
+        <select id="sortBy">
+          <option value="maxQuality">Sort by Max Quality</option>
+          <option value="imageCount">Sort by Image Count</option>
+          <option value="sceneId">Sort by Scene ID</option>
+        </select>
+        <button id="saveCsv" disabled>Save Changes</button>
+      </div>
+      <div id="status" class="status">Idle</div>
+    </div>
+  </header>
+
+  <main>
+    <div id="compat" class="wrap hidden">
+      <div class="notice">
+        Your browser does not support the File System Access API. You can still click "Open kestrel_database.csv…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
+      </div>
+    </div>
+
+    <section id="sceneGrid" class="grid"></section>
+  </main>
+
+  <dialog id="sceneDlg">
+    <div class="modal">
+      <div class="left">
+        <div id="imageGrid" class="grid"></div>
+      </div>
+      <!-- New draggable divider -->
+      <div class="divider" id="colDivider" title="Drag to resize"></div>
+      <div class="right">
+        <div class="inline">
+          <input id="sceneName" type="text" placeholder="Scene name…" />
+          <button id="applySceneName">Apply</button>
+        </div>
+        <div class="detail" id="sceneMeta">—</div>
+        <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
+        <div class="footer">
+          <button id="closeDlg">Close</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsDlg">
+    <div class="settings">
+      <h3 style="margin:0">Editor Integration</h3>
+      <div class="row">
+        <label for="backendUrl">Bridge URL</label>
+        <input id="backendUrl" type="text" placeholder="http://127.0.0.1:8765" />
+      </div>
+      <div class="row">
+        <label for="rootHint">Local Root (hint)</label>
+        <input id="rootHint" type="text" placeholder="C:\\Data\\Media - Photography\\Yellowstone\\100CANON" />
+      </div>
+      <div class="row">
+        <label for="editorChoice">Preferred Editor</label>
+        <select id="editorChoice">
+          <option value="system">System Default</option>
+          <option value="darktable">Darktable</option>
+          <option value="photoshop">Photoshop</option>
+        </select>
+      </div>
+      <div class="row" style="justify-content:flex-end; margin-top: 4px;">
+        <button id="settingsCancel">Cancel</button>
+        <button id="settingsSave" class="primary">Save</button>
+      </div>
+      <div class="notice">Run the local bridge to enable launching editors: backend/editor_bridge.py</div>
+    </div>
+  </dialog>
+
+  <script>
+  // State
+  let rootDirHandle = null;      // Top-level photo folder (contains .kestrel)
+  let csvFileHandle = null;      // .kestrel/kestrel_database.csv
+  let rows = [];                 // CSV rows (objects)
+  let header = [];               // CSV header fields
+  let scenes = [];               // Aggregated scene objects
+  let dirty = false;             // Track unsaved edits
+
+  const el = (sel) => document.querySelector(sel);
+  const sceneGrid = el('#sceneGrid');
+  const imageGrid = el('#imageGrid');
+  const statusEl = el('#status');
+  const sceneDlg = el('#sceneDlg');
+
+  const supportsFS = 'showDirectoryPicker' in window;
+  if (!supportsFS) el('#compat').classList.remove('hidden');
+
+  // Utilities
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  function sanitizePath(p) {
+    if (!p) return '';
+    // Normalize to forward slashes, trim quotes
+    return String(p).replace(/^\"|\"$/g, '').replace(/\\/g, '/');
+  }
+
+  function joinPath(a, b) {
+    a = sanitizePath(a); b = sanitizePath(b);
+    if (!a) return b; if (!b) return a;
+    return a.replace(/\/$/, '') + '/' + b.replace(/^\//, '');
+  }
+
+  async function getHandleFromRelativePath(dirHandle, relPath) {
+    relPath = sanitizePath(relPath);
+    const parts = relPath.split('/').filter(Boolean);
+    let handle = dirHandle;
+    for (let i = 0; i < parts.length; i++) {
+      const isLast = i === parts.length - 1;
+      try {
+        handle = await handle.getDirectoryHandle(parts[i]);
+      } catch (e) {
+        if (isLast) {
+          // maybe file
+          try { return await handle.getFileHandle(parts[i]); } catch (_) { throw e; }
+        } else {
+          throw e;
+        }
+      }
+    }
+    return handle;
+  }
+
+  // Try to turn an absolute Windows path into a path relative to the selected root
+  function toRootRelative(absPath) {
+    if (!absPath || !rootDirHandle) return null;
+    const p = sanitizePath(absPath);
+    // Heuristic: find ".kestrel/" in the path; else fall back to filename
+    const idx = p.toLowerCase().lastIndexOf('/.kestrel/');
+    if (idx >= 0) return p.substring(idx + 1); // include .kestrel/…
+    // fallback: if only filename, return that
+    const base = p.split('/').pop();
+    return base || null;
+  }
+
+  // Blob URL cache per path
+  const blobUrlCache = new Map();
+  async function getBlobUrlForPath(relOrAbsPath) {
+    // Resolve relative to rootDirHandle when possible
+    let rel = toRootRelative(relOrAbsPath);
+    if (!rel && rootDirHandle) {
+      // maybe the file is at the top-level (original filename)
+      rel = sanitizePath(relOrAbsPath);
+    }
+    if (!rel || !rootDirHandle) return null;
+    if (blobUrlCache.has(rel)) return blobUrlCache.get(rel);
+    try {
+      const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
+      const file = await fileHandle.getFile();
+      const url = URL.createObjectURL(file);
+      blobUrlCache.set(rel, url);
+      return url;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function parseNumber(v) {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : -1;
+  }
+
+  function ensureSceneNameColumn() {
+    if (!header.includes('scene_name')) { header.push('scene_name'); }
+    for (const r of rows) if (!('scene_name' in r)) r.scene_name = '';
+  }
+
+  function aggregateScenes(minSpeciesConf, searchTerm, sortBy) {
+    const groups = new Map();
+    for (const r of rows) {
+      const id = r.scene_count; // group identifier
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(r);
+    }
+
+    const list = [];
+    for (const [sceneId, arr] of groups) {
+      // representative by max quality
+      let rep = arr[0];
+      for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
+
+      const speciesSet = new Set();
+      for (const r of arr) {
+        const conf = parseNumber(r.species_confidence);
+        if (conf >= minSpeciesConf && r.species && r.species !== 'No Bird') speciesSet.add(r.species);
+      }
+      const species = Array.from(speciesSet).sort();
+
+      const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+      const sceneName = (arr.find(a => (a.scene_name||'').trim().length)?.scene_name || '').trim();
+
+      list.push({
+        id: sceneId,
+        images: arr.slice().sort((a,b)=>parseNumber(b.quality)-parseNumber(a.quality)),
+        representative: rep,
+        imageCount: arr.length,
+        species,
+        maxQuality: maxQ,
+        sceneName
+      });
+    }
+
+    // filter by search term
+    const q = (searchTerm||'').trim().toLowerCase();
+    const filtered = q ? list.filter(s => s.species.some(sp => sp.toLowerCase().includes(q))) : list;
+
+    // sort
+    const sorted = filtered.sort((a,b) => {
+      if (sortBy === 'imageCount') return b.imageCount - a.imageCount;
+      if (sortBy === 'sceneId') return parseNumber(a.id) - parseNumber(b.id);
+      return b.maxQuality - a.maxQuality;
+    });
+
+    return sorted;
+  }
+
+  function updateStatusBar(sceneList) {
+    const totalImages = sceneList.reduce((acc, s) => acc + s.imageCount, 0);
+    const totalScenes = sceneList.length;
+    const allScenes = new Set(rows.map(r => r.scene_count)).size;
+    const dirtyMark = dirty ? ' • unsaved changes' : '';
+    setStatus(`Showing ${totalScenes} scenes with ${totalImages} images${totalScenes<allScenes?` (filtered from ${allScenes})`:''}${dirtyMark}`);
+  }
+
+  // Render: Scenes
+  async function renderScenes() {
+    const minC = parseFloat(el('#speciesConf').value)||0;
+    const search = el('#search').value;
+    const sortBy = el('#sortBy').value;
+    scenes = aggregateScenes(minC, search, sortBy);
+    updateStatusBar(scenes);
+
+    sceneGrid.innerHTML = '';
+
+    // Incremental render for responsiveness
+    const batch = 24;
+    for (let i=0; i<scenes.length; i+=batch) {
+      const slice = scenes.slice(i, i+batch);
+      const frag = document.createDocumentFragment();
+      await Promise.all(slice.map(async (s) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.dataset.sceneId = s.id;
+
+        const th = document.createElement('div');
+        th.className = 'thumb';
+        const img = document.createElement('img');
+        img.alt = s.representative?.filename || '';
+        img.loading = 'lazy';
+        const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path);
+        if (url) img.src = url; else { img.alt = 'No preview'; }
+        th.appendChild(img);
+        card.appendChild(th);
+
+        const body = document.createElement('div');
+        body.className = 'body';
+        const title = document.createElement('div');
+        title.innerHTML = `<b>Scene ${s.id}</b>${s.sceneName?` — ${escapeHtml(s.sceneName)}`:''}`;
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = `<span>📸 ${s.imageCount}</span><span>⭐ ${fmt3(s.maxQuality)}</span>`;
+        const chips = document.createElement('div');
+        chips.className = 'chips';
+        for (const sp of s.species.slice(0,3)) {
+          const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; chips.appendChild(c);
+        }
+        if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; chips.appendChild(more); }
+
+        // Scene name editor inline
+        const nameRow = document.createElement('div');
+        nameRow.className = 'inline';
+        const nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='Scene name…'; nameInput.value=s.sceneName||'';
+        const nameBtn = document.createElement('button'); nameBtn.textContent = 'Apply';
+        nameBtn.addEventListener('click', () => applySceneName(s.id, nameInput.value));
+        nameRow.appendChild(nameInput); nameRow.appendChild(nameBtn);
+
+        body.appendChild(title);
+        body.appendChild(meta);
+        body.appendChild(chips);
+        body.appendChild(nameRow);
+        card.appendChild(body);
+
+        card.addEventListener('click', () => openSceneDialog(s.id));
+        frag.appendChild(card);
+      }));
+      sceneGrid.appendChild(frag);
+      await sleep(16);
+    }
+  }
+
+  // Render: Scene dialog
+  async function openSceneDialog(sceneId) {
+    const scene = scenes.find(s => String(s.id) === String(sceneId));
+    if (!scene) return;
+
+    el('#sceneName').value = scene.sceneName || '';
+    el('#sceneMeta').innerHTML = `
+      <div><b>Scene ${scene.id}</b></div>
+      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
+      <div style="margin-top:6px">Species: ${scene.species.length? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
+    `;
+
+    imageGrid.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    const batch = 48;
+    for (let i=0; i<scene.images.length; i+=batch) {
+      const slice = scene.images.slice(i, i+batch);
+      await Promise.all(slice.map(async (r) => {
+        const card = document.createElement('article'); card.className='card';
+        const th = document.createElement('div'); th.className='thumb';
+        const img = document.createElement('img'); img.alt = r.filename||''; img.loading='lazy';
+        const url = await getBlobUrlForPath(r.export_path || r.crop_path);
+        if (url) img.src = url; th.appendChild(img); card.appendChild(th);
+        const body = document.createElement('div'); body.className='body';
+        body.innerHTML = `<div><b>${escapeHtml(r.filename||'')}</b></div>
+          <div class="meta"><span>${escapeHtml(r.species||'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
+        card.appendChild(body);
+
+        // New: double-click to open in editor
+        card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
+
+        card.addEventListener('mouseenter', async () => {
+          const pv = el('#previewBox'); pv.innerHTML='';
+          const pimg = document.createElement('img');
+          const purl = await getBlobUrlForPath(r.crop_path || r.export_path);
+          if (purl) { pimg.src = purl; pv.appendChild(pimg); }
+          else { pv.innerHTML = '<span class="muted">No preview</span>'; }
+        });
+
+        // Path helpers
+        card.title = [
+          `File: ${r.filename}`,
+          `Species: ${r.species} (${fmt3(r.species_confidence)})`,
+          `Quality: ${fmt3(r.quality)}`
+        ].join('\n');
+
+        frag.appendChild(card);
+      }));
+      imageGrid.appendChild(frag);
+      await sleep(16);
+    }
+
+    // Hook up actions
+    el('#applySceneName').onclick = () => applySceneName(scene.id, el('#sceneName').value);
+    el('#closeDlg').onclick = () => sceneDlg.close();
+
+    sceneDlg.showModal();
+  }
+
+  function applySceneName(sceneId, name) {
+    const newName = String(name||'').trim();
+    let changed = 0;
+    for (const r of rows) if (String(r.scene_count) === String(sceneId)) { if ((r.scene_name||'') !== newName) { r.scene_name = newName; changed++; } }
+    if (changed) { dirty = true; el('#saveCsv').disabled = false; renderScenes(); }
+  }
+
+  function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+  // CSV IO
+  async function loadCsvFromHandle(fileHandle) {
+    csvFileHandle = fileHandle;
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    header = parsed.meta.fields || [];
+    rows = (parsed.data||[]).map(r => ({ ...r, scene_count: r.scene_count }));
+    ensureSceneNameColumn();
+    dirty = false; el('#saveCsv').disabled = true;
+    await renderScenes();
+  }
+
+  async function tryOpenDefaultCsv(dirHandle) {
+    try {
+      const csvRel = '.kestrel/kestrel_database.csv';
+      const fileHandle = await getHandleFromRelativePath(dirHandle, csvRel);
+      await loadCsvFromHandle(fileHandle);
+      setStatus('Loaded .kestrel/kestrel_database.csv');
+    } catch (e) {
+      setStatus('Could not find .kestrel/kestrel_database.csv in this folder. Use "Open kestrel_database.csv…"');
+    }
+  }
+
+  function csvEscape(val) {
+    if (val == null) return '';
+    let s = String(val);
+    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  async function saveCsv() {
+    if (!csvFileHandle) { alert('No CSV opened.'); return; }
+    // Keep header order; ensure scene_name exists
+    ensureSceneNameColumn();
+    const cols = header.slice();
+    if (!cols.includes('scene_name')) cols.push('scene_name');
+
+    const lines = [];
+    lines.push(cols.join(','));
+    for (const r of rows) {
+      const vals = cols.map(k => csvEscape(k in r ? r[k] : ''));
+      lines.push(vals.join(','));
+    }
+    const content = lines.join('\r\n');
+
+    const writable = await csvFileHandle.createWritable();
+    await writable.write(content);
+    await writable.close();
+    dirty = false; el('#saveCsv').disabled = true;
+    setStatus('Saved changes to kestrel_database.csv');
+  }
+
+  // Add draggable splitter for resizing right preview panel
+  (function setupColumnResizer(){
+    const dlg = document.getElementById('sceneDlg');
+    const divider = document.getElementById('colDivider');
+    if (!dlg || !divider) return;
+
+    function onMouseDown(e){
+      e.preventDefault();
+      const modal = divider.closest('.modal');
+      if (!modal) return;
+      const rect = modal.getBoundingClientRect();
+      const onMove = (ev) => {
+        const newW = Math.round(rect.right - ev.clientX); // distance from cursor to right edge
+        const min = 260; // min width of right panel
+        const max = Math.max(320, Math.floor(rect.width * 0.8));
+        const clamped = Math.min(Math.max(newW, min), max);
+        modal.style.setProperty('--right-w', clamped + 'px');
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }
+    divider.addEventListener('mousedown', onMouseDown);
+    divider.addEventListener('dblclick', () => {
+      const modal = divider.closest('.modal');
+      if (modal) modal.style.setProperty('--right-w', '340px');
+    });
+  })();
+
+  // Settings storage
+  const SETTINGS_KEY = 'kestrel-webviz-settings-v1';
+  function loadSettings(){
+    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; }
+  }
+  function saveSettings(obj){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj||{})); }
+  function getSetting(k, def){ const s = loadSettings(); return (k in s) ? s[k] : def; }
+
+  function showSettings(){
+    const dlg = document.getElementById('settingsDlg');
+    document.getElementById('backendUrl').value = getSetting('backendUrl', 'http://127.0.0.1:8765');
+    document.getElementById('rootHint').value = getSetting('rootHint', '');
+    document.getElementById('editorChoice').value = getSetting('editor', 'system');
+    dlg.showModal();
+  }
+  function applySettings(){
+    const backendUrl = document.getElementById('backendUrl').value.trim() || 'http://127.0.0.1:8765';
+    const rootHint = document.getElementById('rootHint').value.trim();
+    const editor = document.getElementById('editorChoice').value;
+    saveSettings({ backendUrl, rootHint, editor });
+    document.getElementById('settingsDlg').close();
+  }
+
+  document.getElementById('openSettings').addEventListener('click', showSettings);
+  document.getElementById('settingsSave').addEventListener('click', applySettings);
+  document.getElementById('settingsCancel').addEventListener('click', () => document.getElementById('settingsDlg').close());
+
+  // Helper to infer root from absolute export/crop path strings in CSV
+  function inferRootFromAbsPath(p){
+    if (!p) return null;
+    const s = sanitizePath(p);
+    const i = s.toLowerCase().lastIndexOf('/.kestrel/');
+    if (i > 0) return s.substring(0, i);
+    return null;
+  }
+
+  async function openInEditor(row){
+    // Always prefer opening the original RAW by filename
+    const origRel = (row.filename||'').replace(/^[\\/]+/, '');
+
+    // Try to determine a root to join with filename
+    const settings = loadSettings();
+    let rootToSend = (settings.rootHint||'').trim();
+    if (!rootToSend) {
+      // Best-effort inference from absolute export/crop paths present in CSV
+      rootToSend = inferRootFromAbsPath(row.export_path) || inferRootFromAbsPath(row.crop_path) || '';
+    }
+
+    if (!origRel) { setStatus('No filename available for this row.'); return; }
+    if (!rootToSend) {
+      setStatus('Set Local Root in Settings to enable launching originals.');
+      showSettings();
+      return;
+    }
+
+    const backendUrl = getSetting('backendUrl', 'http://127.0.0.1:8765');
+    const editor = getSetting('editor', 'system');
+
+    try {
+      const res = await fetch(backendUrl.replace(/\/$/, '') + '/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ root: rootToSend, relative: origRel, editor })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      if (data && data.ok) setStatus('Opened in editor'); else throw new Error(data && data.error || 'Launch failed');
+    } catch (e) {
+      setStatus('Failed to open in editor. Check Settings and run the bridge.');
+    }
+  }
+
+  // Event wiring
+  el('#pickFolder').addEventListener('click', async () => {
+    try {
+      if (!supportsFS) { alert('Your browser does not support folder access. Use the CSV button instead.'); return; }
+      rootDirHandle = await window.showDirectoryPicker();
+      await tryOpenDefaultCsv(rootDirHandle);
+    } catch (e) { /* cancelled */ }
+  });
+
+  el('#pickCsv').addEventListener('click', async () => {
+    try {
+      if (supportsFS) {
+        const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
+        if (!fh) return;
+        // Try to infer root from selected file: assume path like <root>/.kestrel/kestrel_database.csv
+        try { rootDirHandle = await fh.getFile(); } catch (_) {}
+        // Best effort: use handle for load only
+        await loadCsvFromHandle(fh);
+      } else {
+        // Fallback: <input type=file>
+        const input = document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
+        input.onchange = async () => {
+          const file = input.files[0]; if (!file) return;
+          const text = await file.text();
+          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+          header = parsed.meta.fields || [];
+          rows = parsed.data || [];
+          ensureSceneNameColumn();
+          await renderScenes();
+          setStatus('CSV loaded (limited features)');
+        };
+        input.click();
+      }
+    } catch (e) { /* cancelled */ }
+  });
+
+  el('#saveCsv').addEventListener('click', saveCsv);
+  el('#search').addEventListener('input', () => renderScenes());
+  el('#speciesConf').addEventListener('change', () => renderScenes());
+  el('#sortBy').addEventListener('change', () => renderScenes());
+
+  // Init
+  setStatus('Open your photo folder (the one that contains .kestrel) or open kestrel_database.csv');
+
+  </script>
+</body>
+</html>
