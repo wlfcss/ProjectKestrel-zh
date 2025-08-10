@@ -187,6 +187,7 @@
         </div>
         <div class="detail" id="sceneMeta">—</div>
         <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
+        <div class="detail" id="previewInfo">—</div>
         <div class="footer">
           <button id="closeDlg">Close</button>
         </div>
@@ -461,6 +462,8 @@
     imageGrid.innerHTML = '';
     const frag = document.createDocumentFragment();
     const batch = 48;
+    // Reset preview info placeholder on open
+    const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
     for (let i=0; i<scene.images.length; i+=batch) {
       const slice = scene.images.slice(i, i+batch);
       await Promise.all(slice.map(async (r) => {
@@ -483,6 +486,13 @@
           const purl = await getBlobUrlForPath(r.crop_path || r.export_path);
           if (purl) { pimg.src = purl; pv.appendChild(pimg); }
           else { pv.innerHTML = '<span class="muted">No preview</span>'; }
+          const info = el('#previewInfo');
+          if (info) {
+            info.innerHTML = `
+              <div><b>${escapeHtml(r.filename||'')}</b></div>
+              <div class="meta"><span title="Species confidence">${escapeHtml(r.species||'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
+            `;
+          }
         });
 
         // Path helpers
