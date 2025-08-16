@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone local web server for the Kestrel visualizer.
+"""Standalone local web server for the Kestrel visualizer (supersedes backend/editor_bridge.py).
 
 Features:
  - Serves the existing visualizer.html (and any static assets in the folder).
@@ -50,6 +50,38 @@ ALLOWED_EDITORS: Set[str] = {'system', 'darktable', 'photoshop'}
 _default_exts = ['.cr3', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.sr2', '.jpg', '.jpeg', '.png', '.tif', '.tiff']
 ALLOWED_EXTENSIONS: Set[str] = set(os.environ.get('KESTREL_ALLOWED_EXTENSIONS', ','.join(_default_exts)).lower().split(','))
 ALLOW_ANY_EXTENSION = os.environ.get('KESTREL_ALLOW_ANY_EXTENSION') == '1'
+
+# Cache for discovered darktable executable on Windows
+_DARKTABLE_EXE = None
+
+def _find_darktable_exe() -> str:
+    """Best-effort discovery of darktable.exe on Windows.
+
+    Many installs place darktable in one of:
+      C:\\Program Files\\darktable\\bin\\darktable.exe
+      C:\\Program Files\\darktable\\darktable.exe
+      C:\\Program Files (x86)\\darktable\\bin\\darktable.exe
+    We also scan PATH entries. Falls back to 'darktable.exe'.
+    """
+    global _DARKTABLE_EXE
+    if _DARKTABLE_EXE and os.path.exists(_DARKTABLE_EXE):
+        return _DARKTABLE_EXE
+    candidates = [
+        os.path.join(os.environ.get('ProgramFiles', ''), 'darktable', 'bin', 'darktable.exe'),
+        os.path.join(os.environ.get('ProgramFiles', ''), 'darktable', 'darktable.exe'),
+        os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'darktable', 'bin', 'darktable.exe'),
+    ]
+    # Add PATH search
+    for p in os.environ.get('PATH', '').split(os.pathsep):
+        if not p:
+            continue
+        exe = os.path.join(p, 'darktable.exe')
+        candidates.append(exe)
+    for exe in candidates:
+        if exe and os.path.exists(exe):
+            _DARKTABLE_EXE = exe
+            return exe
+    return 'darktable.exe'
 
 
 def log(*args):
@@ -102,7 +134,11 @@ def launch(path: str, editor: str):
     # Windows
     if sys.platform.startswith('win'):
         if editor == 'darktable':
-            subprocess.Popen(['darktable.exe', path]); return
+            dt = _find_darktable_exe()
+            try:
+                subprocess.Popen([dt, path]); return
+            except FileNotFoundError:
+                log('darktable not found at', dt, 'falling back to system default')
         if editor == 'photoshop':
             try:
                 subprocess.Popen(['photoshop.exe', path]); return
@@ -204,9 +240,14 @@ class Handler(SimpleHTTPRequestHandler):
             payload = self._read_json()
         except Exception as e:
             self._json(400, {'ok': False, 'error': str(e)}); return
+        log('payload', payload)
         root = payload.get('root')
         rel = payload.get('relative')
-        editor = (payload.get('editor') or 'system').lower()
+        editor = (payload.get('editor') or 'system')
+        if isinstance(editor, str):
+            editor = editor.strip().lower()
+        else:
+            editor = 'system'
         if editor not in ALLOWED_EDITORS:
             editor = 'system'
         target = build_original_path(root, rel)
@@ -216,9 +257,14 @@ class Handler(SimpleHTTPRequestHandler):
         if not _is_within_root(target):
             self._json(403, {'ok': False, 'error': 'Path escapes allowed root'}); return
         if not os.path.exists(target):
-            self._json(404, {'ok': False, 'error': 'Not found', 'target': target}); return
+            self._json(404, {
+                'ok': False,
+                'error': 'File not found',
+                'target': target,
+                'hint': 'Ensure Settings → Local Root points to the folder containing your RAW files.'
+            }); return
         if not _extension_allowed(target):
-            self._json(415, {'ok': False, 'error': 'Extension not allowed'}); return
+            self._json(415, {'ok': False, 'error': 'Extension not allowed', 'target': target, 'allowed': sorted(ALLOWED_EXTENSIONS)}); return
         try:
             launch(target, editor)
             self._json(200, {'ok': True, 'path': target})

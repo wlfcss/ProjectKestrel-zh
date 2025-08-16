@@ -236,7 +236,7 @@
         <label for="editorChoice">Preferred Editor</label>
         <select id="editorChoice">
           <option value="system">System Default</option>
-          <option value="darktable">Darktable</option>
+          <option value="darktable" selected>Darktable</option>
           <option value="photoshop">Photoshop</option>
         </select>
       </div>
@@ -784,14 +784,14 @@
     const dlg = document.getElementById('settingsDlg');
     document.getElementById('backendUrl').value = getSetting('backendUrl', 'http://127.0.0.1:8765');
     document.getElementById('rootHint').value = getSetting('rootHint', '');
-    document.getElementById('editorChoice').value = getSetting('editor', 'system');
+  document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
     dlg.showModal();
   }
   function applySettings(){
     const backendUrl = document.getElementById('backendUrl').value.trim() || 'http://127.0.0.1:8765';
     const rootHint = document.getElementById('rootHint').value.trim();
-    const editor = document.getElementById('editorChoice').value;
-    saveSettings({ backendUrl, rootHint, editor });
+  const editor = document.getElementById('editorChoice').value || 'darktable';
+  saveSettings({ backendUrl, rootHint, editor });
     document.getElementById('settingsDlg').close();
   }
 
