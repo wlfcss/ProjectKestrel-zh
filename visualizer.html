@@ -708,10 +708,8 @@
 
   function csvEscape(val) {
     if (val == null) return '';
-    const s = String(val);
-    if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
+    let s = String(val);
+    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
 
@@ -931,7 +929,6 @@
     return list.sort((a,b)=> parseNumber(a.id) - parseNumber(b.id));
   }
 
-  // Fix: robustly close scene dialog before opening merge dialog
   function openMergeDialog(){
     const dlg = document.getElementById('mergeDlg');
     const listEl = document.getElementById('mergeList');
@@ -1003,22 +1000,8 @@
     };
 
     updateSummary();
-
-    // Close any open scene dialog to avoid nested modals
-    try {
-      const sd = document.getElementById('sceneDlg');
-      if (sd && sd.open) sd.close();
-    } catch {}
-
-    try { dlg.showModal(); } catch (e) { try { dlg.show(); } catch(_) {} }
+    dlg.showModal();
   }
-
-  // Wire toolbar button for merge dialog
-  (function initMergeButton(){
-    const btn = document.getElementById('openMerge');
-    if (!btn) return;
-    btn.addEventListener('click', openMergeDialog);
-  })();
 
   // Init
   setStatus('Open your photo folder (the one that contains .kestrel) or open kestrel_database.csv');
