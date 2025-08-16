@@ -740,6 +740,27 @@
     setStatus('Saved changes to kestrel_database.csv');
   }
 
+  // Warn user on unsaved changes when attempting to close/refresh
+  window.addEventListener('beforeunload', (e) => {
+    if (dirty) {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return 'You have unsaved changes. Are you sure you want to leave?';
+    }
+  });
+
+  // Attempt to notify backend to shutdown when the page is fully unloaded
+  window.addEventListener('unload', () => {
+    try {
+      const backendUrl = getSetting('backendUrl', window.location.origin).replace(/\/$/, '');
+      const headers = { 'Content-Type': 'application/json' };
+      if (window.__BRIDGE_TOKEN) headers['X-Bridge-Token'] = window.__BRIDGE_TOKEN;
+      navigator.sendBeacon && navigator.sendBeacon(backendUrl + '/shutdown', new Blob([JSON.stringify({ reason: 'page_unload' })], { type: 'application/json' }));
+      // Fallback (best-effort, may be ignored on some browsers)
+      fetch(backendUrl + '/shutdown', { method: 'POST', keepalive: true, headers, body: JSON.stringify({ reason: 'page_unload' }) }).catch(()=>{});
+    } catch (_) {}
+  });
+
   // Add draggable splitter for resizing right preview panel
   (function setupColumnResizer(){
     const dlg = document.getElementById('sceneDlg');

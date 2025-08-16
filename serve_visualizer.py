@@ -31,6 +31,7 @@ import subprocess
 import webbrowser
 import secrets
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import threading
 from urllib.parse import urlparse
 from typing import Set
 
@@ -205,6 +206,8 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == '/open':
             self.handle_open()
+        elif parsed.path == '/shutdown':
+            self.handle_shutdown()
         else:
             self.send_response(404); self.end_headers(); self.wfile.write(b'{}')
 
@@ -270,6 +273,24 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(200, {'ok': True, 'path': target})
         except Exception as e:
             self._json(500, {'ok': False, 'error': str(e)})
+
+    def handle_shutdown(self):
+        # Require token (always) to prevent CSRF/drive-by shutdown
+        if AUTH_TOKEN:
+            token = self.headers.get('X-Bridge-Token') or ''
+            if token != AUTH_TOKEN:
+                self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
+        log('Received shutdown request from client; scheduling server shutdown.')
+        # Respond first, then shutdown asynchronously so reply is delivered
+        self._json(200, {'ok': True, 'message': 'Shutting down'})
+        def _shutdown():
+            try:
+                # slight delay to let response flush
+                import time; time.sleep(0.25)
+                self.server.shutdown()
+            except Exception as e:  # noqa: BLE001
+                log('Error during shutdown:', e)
+        threading.Thread(target=_shutdown, daemon=True).start()
 
 
 def parse_args():
