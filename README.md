@@ -1,6 +1,6 @@
 # Project Kestrel 🦅
 
-An AI-powered bird photography analysis and curation system that automatically detects, classifies, and evaluates bird images from RAW photography collections.
+A Machine Learning-powered bird photography analysis and curation system that automatically detects, classifies, and evaluates bird images from RAW photography collections.
 
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-green.svg)
