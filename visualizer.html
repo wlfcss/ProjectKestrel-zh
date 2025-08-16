@@ -85,8 +85,9 @@
     .filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* Anti-clipping improvements */
-    .meta { gap: 8px; }
-    .meta > :first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .meta { gap: 8px; }
+  /* Removed invalid comma between overflow properties (was causing lint error) */
+  /* .meta > :first-child duplicate rule retained earlier above */
     .inline input[type="text"] { min-width: 0; }
     .card .body { padding-bottom: 14px; }
 
@@ -144,6 +145,7 @@
     .star:hover { color: #8fb6ff; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="bridge_config.js"></script>
 </head>
 <body>
   <header>
@@ -807,38 +809,30 @@
   }
 
   async function openInEditor(row){
-    // Always prefer opening the original RAW by filename
     const origRel = (row.filename||'').replace(/^[\\/]+/, '');
-
-    // Try to determine a root to join with filename
     const settings = loadSettings();
     let rootToSend = (settings.rootHint||'').trim();
     if (!rootToSend) {
-      // Best-effort inference from absolute export/crop paths present in CSV
       rootToSend = inferRootFromAbsPath(row.export_path) || inferRootFromAbsPath(row.crop_path) || '';
     }
-
     if (!origRel) { setStatus('No filename available for this row.'); return; }
-    if (!rootToSend) {
-      setStatus('Set Local Root in Settings to enable launching originals.');
-      showSettings();
-      return;
-    }
-
-    const backendUrl = getSetting('backendUrl', 'http://127.0.0.1:8765');
+    if (!rootToSend) { setStatus('Set Local Root in Settings to enable launching originals.'); showSettings(); return; }
+    const backendUrl = getSetting('backendUrl', window.location.origin);
     const editor = getSetting('editor', 'system');
-
     try {
       const res = await fetch(backendUrl.replace(/\/$/, '') + '/open', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {})
+        },
         body: JSON.stringify({ root: rootToSend, relative: origRel, editor })
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (data && data.ok) setStatus('Opened in editor'); else throw new Error(data && data.error || 'Launch failed');
     } catch (e) {
-      setStatus('Failed to open in editor. Check Settings and run the bridge.');
+      setStatus('Failed to open in editor. Check Settings and server.');
     }
   }
 
