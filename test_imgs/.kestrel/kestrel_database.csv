@@ -1,0 +1,25 @@
+filename,species,species_confidence,quality,export_path,crop_path,rating,scene_count,feature_similarity,feature_confidence,color_similarity,color_confidence,similar,secondary_species_list,secondary_species_scores
+IMG_3067.CR3,Yellow Warbler,0.7810481786727905,0.2677852511405945,test_imgs\.kestrel\export\IMG_3067_export.jpg,test_imgs\.kestrel\crop\IMG_3067_crop.jpg,2,1,-1,-1,-1,-1,False,"['Yellow Warbler' 'Yellow Rail' ""Vaux's Swift"" 'Common Nighthawk']",[0.7810482  0.21767122 0.2034938  0.16643941]
+IMG_3068.CR3,Yellow Warbler,0.8070399165153503,0.2962079644203186,test_imgs\.kestrel\export\IMG_3068_export.jpg,test_imgs\.kestrel\crop\IMG_3068_crop.jpg,2,1,0.24,1.0,0,0,True,"['Yellow Warbler' ""Vaux's Swift"" 'Long-tailed Jaeger' ""Vaux's Swift""
+ 'Lapland Longspur']",[0.8070399  0.93624103 0.23257904 0.5021942  0.23744898]
+IMG_3069.CR3,Yellow Warbler,0.7842720746994019,0.2329397052526474,test_imgs\.kestrel\export\IMG_3069_export.jpg,test_imgs\.kestrel\crop\IMG_3069_crop.jpg,2,1,0.14333333333333334,1.0,0,0,True,"['Yellow Warbler' ""Vaux's Swift"" 'Yellow Rail']",[0.7842721  0.23192199 0.26750126]
+IMG_3360.CR3,Yellow-headed Blackbird,0.9930503368377686,0.1172529906034470,test_imgs\.kestrel\export\IMG_3360_export.jpg,test_imgs\.kestrel\crop\IMG_3360_crop.jpg,1,2,0.0,1.0,0,0,False,['Yellow-headed Blackbird'],[0.99305034]
+IMG_3361.CR3,Yellow-headed Blackbird,0.9942816495895386,0.1184407919645309,test_imgs\.kestrel\export\IMG_3361_export.jpg,test_imgs\.kestrel\crop\IMG_3361_crop.jpg,1,2,0.78,1.0,0,0,True,['Yellow-headed Blackbird'],[0.99428165]
+IMG_3362.CR3,Yellow-headed Blackbird,0.9770186543464661,0.0830878913402557,test_imgs\.kestrel\export\IMG_3362_export.jpg,test_imgs\.kestrel\crop\IMG_3362_crop.jpg,1,2,0.44333333333333336,1.0,0,0,True,['Yellow-headed Blackbird'],[0.97701865]
+IMG_3375.CR3,bear,0.9978157281875610,0.2111224383115768,test_imgs\.kestrel\export\IMG_3375_export.jpg,test_imgs\.kestrel\crop\IMG_3375_crop.jpg,2,3,0.0,1.0,0,0,False,[],[]
+IMG_3376.CR3,bear,0.9981811046600342,0.6224577426910400,test_imgs\.kestrel\export\IMG_3376_export.jpg,test_imgs\.kestrel\crop\IMG_3376_crop.jpg,4,3,0.15,1.0,0,0,True,[],[]
+IMG_3382.CR3,dog,0.9089361429214478,0.9664826393127441,test_imgs\.kestrel\export\IMG_3382_export.jpg,test_imgs\.kestrel\crop\IMG_3382_crop.jpg,5,4,0.006666666666666667,1.0,0,0,False,[],[]
+IMG_3383.CR3,dog,0.8837147355079651,0.9768038988113403,test_imgs\.kestrel\export\IMG_3383_export.jpg,test_imgs\.kestrel\crop\IMG_3383_crop.jpg,5,4,0.74,1.0,0,0,True,[],[]
+IMG_4472.CR3,Snow Goose,0.4799273014068604,0.1095559224486351,test_imgs\.kestrel\export\IMG_4472_export.jpg,test_imgs\.kestrel\crop\IMG_4472_crop.jpg,1,5,0.0033333333333333335,1.0,0,0,False,"[""Wilson's Storm-Petrel"" 'Snow Goose' 'Bufflehead' 'Eurasian Wigeon'
+ 'Canada Goose']",[0.16141313 0.4799273  0.20543785 0.2501254  0.27497   ]
+IMG_4473.CR3,Snow Goose,0.3357743024826050,0.0915831103920937,test_imgs\.kestrel\export\IMG_4473_export.jpg,test_imgs\.kestrel\crop\IMG_4473_crop.jpg,1,5,0.7266666666666667,1.0,0,0,True,"['Snow Goose' 'Black Scoter' 'Common Merganser' 'Canada Goose'
+ 'Pink-footed Goose']",[0.3357743  0.21499558 0.2575832  0.53668404 0.15345226]
+IMG_4474.CR3,Brant,0.3252477645874023,0.0687965676188469,test_imgs\.kestrel\export\IMG_4474_export.jpg,test_imgs\.kestrel\crop\IMG_4474_crop.jpg,1,5,0.43,1.0,0,0,True,"['Sandhill Crane' ""Wilson's Storm-Petrel"" 'Brant' 'Tufted Duck'
+ 'Cackling Goose']",[0.33157825 0.24024248 0.32524776 0.17935222 0.3292524 ]
+IMG_4767.CR3,sheep,0.8291543722152710,0.5588728189468384,test_imgs\.kestrel\export\IMG_4767_export.jpg,test_imgs\.kestrel\crop\IMG_4767_crop.jpg,3,6,0.0,1.0,0,0,False,[],[]
+IMG_4768.CR3,dog,0.8005859255790710,0.7393152117729187,test_imgs\.kestrel\export\IMG_4768_export.jpg,test_imgs\.kestrel\crop\IMG_4768_crop.jpg,4,6,0.22666666666666666,1.0,0,0,True,[],[]
+IMG_4769.CR3,sheep,0.9147493243217468,0.6127336621284485,test_imgs\.kestrel\export\IMG_4769_export.jpg,test_imgs\.kestrel\crop\IMG_4769_crop.jpg,4,6,0.37,1.0,0,0,True,[],[]
+IMG_4770.CR3,dog,0.8110093474388123,0.6068750023841858,test_imgs\.kestrel\export\IMG_4770_export.jpg,test_imgs\.kestrel\crop\IMG_4770_crop.jpg,4,6,0.31333333333333335,1.0,0,0,True,[],[]
+IMG_7368.CR3,White-winged Dove,0.9783483147621155,0.7085776329040527,test_imgs\.kestrel\export\IMG_7368_export.jpg,test_imgs\.kestrel\crop\IMG_7368_crop.jpg,4,7,0.0033333333333333335,1.0,0,0,False,['White-winged Dove'],[0.9783483]
+IMG_7369.CR3,White-winged Dove,0.9654858112335205,0.6998656392097473,test_imgs\.kestrel\export\IMG_7369_export.jpg,test_imgs\.kestrel\crop\IMG_7369_crop.jpg,4,7,0.83,1.0,0,0,True,['White-winged Dove'],[0.9654858]
+IMG_7370.CR3,White-winged Dove,0.9484508633613586,0.8874856829643250,test_imgs\.kestrel\export\IMG_7370_export.jpg,test_imgs\.kestrel\crop\IMG_7370_crop.jpg,4,7,0.7,1.0,0,0,True,['White-winged Dove'],[0.94845086]

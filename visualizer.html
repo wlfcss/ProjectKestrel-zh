@@ -898,6 +898,8 @@
   el('#search').addEventListener('input', () => renderScenes());
   el('#speciesConf').addEventListener('change', () => renderScenes());
   el('#sortBy').addEventListener('change', () => renderScenes());
+  // Wire merge scenes button
+  el('#openMerge').addEventListener('click', () => openMergeDialog());
 
   // Initialize toolbar toggle for inline scene naming
   (function initNameScenesToggle(){

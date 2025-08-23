@@ -25,6 +25,9 @@ if ONNX_USE_GPU:
 else:
     ONNX_PROVIDER = ['CPUExecutionProvider']
 
+WILDLIFE_CATEGORIES = ['cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'bird']
+PRIORITIZE_BIRD = True
+
 class maskRCNN:
     def __init__(self):
         self.COCO_INSTANCE_CATEGORY_NAMES = [
@@ -78,7 +81,7 @@ class maskRCNN:
         pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
         
         # Extract masks, class labels, and bounding boxes for the filtered predictions
-        masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
+        masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy() # 0.5 is threshold for mask prediction
         
         if len(masks.shape)==2:
             masks = np.expand_dims(masks, axis=0)
@@ -323,7 +326,6 @@ def read_image(path):
             pass  # No rotation needed
         return np.array(img)
 
-
 def compute_image_similarity_akaze(img1, img2, max_dim=1600):
     if img1 is None or img2 is None:
         return {
@@ -495,192 +497,239 @@ previous_image = None
 # Get scene count from the database.
 scene_count = database['scene_count'].max() if not database.empty else 0
 
+def process_nonbird(primary_mask, primary_box, primary_class, primary_score, img):
+    # If it is not a bird, we still need to classify the quality.
+    quality_crop, quality_mask = mask_rcnn.get_square_crop(primary_mask, img, resize=True)
+    quality_score = quality_classifier.classify_quality(quality_crop, quality_mask)
+
+    # Get the Rating
+    rating = 0
+    if quality_score == -1:
+        rating = 0
+    elif quality_score < 0.15:
+        rating = 1
+    elif quality_score < 0.3:
+        rating = 2
+    elif quality_score < 0.6:
+        rating = 3
+    elif quality_score < 0.9:
+        rating = 4
+    else:
+        rating = 5
+
+    return {
+        "species": primary_class,
+        "species_confidence": primary_score,
+        "quality": quality_score,
+        "rating": rating,
+        "quality_crop": quality_crop
+    }
+
+def process_bird(primary_mask, primary_box, primary_class, primary_score, img):
+    # If it is a bird, classify the species.
+    if primary_class == 'bird':
+        species_crop = mask_rcnn.get_species_crop(primary_box, img)
+        species_label, species_confidence, top_k_labels, top_k_scores = species_classifier.classify_bird(species_crop)
+    else:
+        species_label = primary_class
+        species_confidence = primary_score
+    
+    # Classify the quality
+    quality_crop, quality_mask = mask_rcnn.get_square_crop(primary_mask, img, resize=True)
+    quality_score = quality_classifier.classify_quality(quality_crop, quality_mask)
+
+    # Get the Rating
+    rating = 0
+    if quality_score == -1:
+        rating = 0
+    elif quality_score < 0.15:
+        rating = 1
+    elif quality_score < 0.3:
+        rating = 2
+    elif quality_score < 0.6:
+        rating = 3
+    elif quality_score < 0.9:
+        rating = 4
+    else:
+        rating = 5
+
+    return {
+        "species": species_label,
+        "species_confidence": species_confidence,
+        "quality": quality_score,
+        "rating": rating,
+        "quality_crop": quality_crop
+    }
+
+
 # Begin processing files.
 for raw_file in new_files:
+    default_entry = {
+        "filename": raw_file,
+        "species": "Unknown",
+        "species_confidence": 0,
+        "quality": -1,
+        "export_path": "N/A",
+        "crop_path": "N/A",
+        "scene_count": scene_count,
+        "rating": 0,
+        "feature_similarity": -1,
+        "feature_confidence": -1,
+        "color_similarity": -1,
+        "color_confidence": -1,
+        "similar": -1,
+        "secondary_species_list": [],
+        "secondary_species_scores": []
+    }
+
     try:
         print(f"Processing file: {raw_file}")
-        # Read the image
+
+        # STEP 1: Read the image
         image_path = os.path.join(input_directory, raw_file)
         img = read_image(image_path)
         
         if img is None:
             print(f"Failed to read image: {image_path}. Skipping.")
 
-            # Save a default entry in the database for this file.
-            new_entry = {
-                "filename": raw_file,
-                "species": "Failed to Read",
-                "species_confidence": 0,
-                "quality": -1,
-                "export_path": "N/A",
-                "crop_path": "N/A",
-                "scene_count": scene_count,
-                "rating": 0 ,
-                "feature_similarity": -1,
-                "feature_confidence": -1,
-                "color_similarity": -1,
-                "color_confidence": -1
-            }
             # Append the new entry to the database. This is a pandas dataframe.
-            database = pd.concat([database, pd.DataFrame([new_entry])], ignore_index=True)
+            database = pd.concat([database, pd.DataFrame([default_entry])], ignore_index=True)
             database.to_csv(database_path, index=False, float_format='%.16f')
             continue
-
+        
+        # STEP 2: COMPUTE SIMILARITY
         similarity = compute_image_similarity_akaze(previous_image, img)
+        
         if not similarity['similar']:
             scene_count += 1
         
+        # Update the default entry with similarity metrics
+        default_entry.update({
+            "feature_similarity": similarity['feature_similarity'],
+            "feature_confidence": similarity['feature_confidence'],
+            "color_similarity": similarity['color_similarity'],
+            "color_confidence": similarity['color_confidence'],
+            "scene_count": scene_count,
+            "similar": similarity['similar']
+        })
+        
         # Update previous_image for next iteration - THIS MUST HAPPEN REGARDLESS OF BIRD DETECTION
         previous_image = img.copy()
-        
+
+        # STEP 3: IDENTIFY WILDLIFE
         # Get predictions from Mask-RCNN
         masks, pred_boxes, pred_class, pred_score = mask_rcnn.get_prediction(img)
         if masks is None or pred_boxes is None or pred_class is None or pred_score is None:
             print(f"No valid predictions found in {raw_file}. Skipping.")
-            # Save a default entry in the database for this file.
-            new_entry = {
-                "filename": raw_file,
-                "species": "No Bird",
-                "species_confidence": 0,
-                "quality": -1,
-                "export_path": "N/A",
-                "crop_path": "N/A",
-                "scene_count": scene_count,
-                "rating": 0 ,
-                "feature_similarity": similarity['feature_similarity'],
-                "feature_confidence": similarity['feature_confidence'],
-                "color_similarity": similarity['color_similarity'],
-                "color_confidence": similarity['color_confidence']
-            }
             # Append the new entry to the database
-            database = pd.concat([database, pd.DataFrame([new_entry])], ignore_index=True)
+            database = pd.concat([database, pd.DataFrame([default_entry])], ignore_index=True)
             database.to_csv(database_path, index=False, float_format='%.16f')
             continue
-
-        # Get the index of the all 'bird' predictions
-        bird_indices = [i for i, c in enumerate(pred_class) if c == 'bird']
-
-        if not bird_indices:
-            print(f"No bird predictions found in {raw_file}. Skipping.")
+        
+        # STEP 4: TRIAGE MASKS
+        # First find all wildlife masks identified.
+        wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
+        # If no wildlife masks found, skip processing
+        if not wildlife_indices:
+            print(f"No wildlife masks found in {raw_file}. Skipping.")
             
             # Save the export file
             export_path = os.path.join(export_directory, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-            
             img = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))  # Resize to max dimension of 1200
             cv2.imwrite(export_path, cv2.cvtColor(img,cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])  # Convert RGB to BGR for OpenCV
 
-            # save the crop file as a blank image
+            # save the crop file as a copy of the same image
             crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
+            cv2.imwrite(crop_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])  # Convert RGB to BGR for OpenCV
 
-            blank_crop = np.zeros((1024, 1024, 3), dtype=np.uint8)
-            cv2.imwrite(crop_path, cv2.cvtColor(blank_crop, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])  # Convert RGB to BGR for OpenCV
-
-            new_entry = {
-                "filename": raw_file,
-                "species": "No Bird",
-                "species_confidence": 0,
-                "quality": -1,
+            # Update the default entry with export and crop paths
+            default_entry.update({
                 "export_path": export_path,
-                "crop_path": crop_path,
-                "scene_count": scene_count,
-                "rating": 0 ,
-                "feature_similarity": similarity['feature_similarity'],
-                "feature_confidence": similarity['feature_confidence'],
-                "color_similarity": -1,
-                "color_confidence": -1
-            }
+                "crop_path": crop_path
+            })
 
             # Append the new entry to the database
-            database = pd.concat([database, pd.DataFrame([new_entry])], ignore_index=True)
+            database = pd.concat([database, pd.DataFrame([default_entry])], ignore_index=True)
             database.to_csv(database_path, index=False, float_format='%.16f')
-            continue # Skip to the next file
-        
-        highest_confidence_index = bird_indices[np.argmax([pred_score[i] for i in bird_indices])]
+            continue
 
-        # Get the best mask, box, class, and score
-        best_mask = masks[highest_confidence_index]
-        best_box = pred_boxes[highest_confidence_index]
-        best_class = pred_class[highest_confidence_index]
-        best_score = pred_score[highest_confidence_index]
+        # Now, analyze all the birds
+        bird_indices = [i for i, c in enumerate(pred_class) if c == 'bird']
+        # filter to only the 5 bird indices with highest confidence 
+        bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
+        bird_data = [process_bird(masks[i], pred_boxes[i], pred_class[i], pred_score[i], img) for i in bird_indices]
 
-        # Get the species crop
-        species_crop = mask_rcnn.get_species_crop(best_box, img)
+        # If there are birds found, we will select the highest quality image for the species, crop, and so on...
+        if bird_data:
+            primary_bird = max(bird_data, key=lambda x: x['quality'])
+            # Update the default entry with primary bird information
+            default_entry.update({
+                "species": primary_bird['species'],
+                "species_confidence": primary_bird['species_confidence'],
+                "quality": primary_bird['quality'],
+                "rating": primary_bird['rating']
+            })
+            # Save the export file
+            export_path = os.path.join(export_directory, f"{os.path.splitext(raw_file)[0]}_export.jpg")
+            img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))  # Resize to max dimension of 1200
+            cv2.imwrite(export_path, cv2.cvtColor(img_small,cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])  # Convert RGB to BGR for OpenCV
 
-        # Classify the species
-        species_label, species_confidence, top_k_labels, top_k_scores = species_classifier.classify_bird(species_crop)
+            # save the crop file 
+            crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
+            cv2.imwrite(crop_path, cv2.cvtColor(primary_bird['quality_crop'], cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])  # Convert RGB to BGR for OpenCV
+            # update the paths
+            default_entry.update({
+                "export_path": export_path,
+                "crop_path": crop_path
+            })
 
-        # Get the quality crop and mask
-        quality_crop, quality_mask = mask_rcnn.get_square_crop(best_mask, img, resize=True)
+            # And then append the rest of the detected bird species and quality scores to the database.
+            all_species = np.array([i["species"] for i in bird_data])
+            all_confidences = np.array([i["species_confidence"] for i in bird_data])
 
-        # Classify the quality
-        quality_score = quality_classifier.classify_quality(quality_crop, quality_mask)
-
-        # Save the results to the database
-        export_path = os.path.join(export_directory, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-        crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")        # reduce jpeg quality to 85%
-        
-        # resize export image to max dimension of 1200
-        img = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))  # Resize to max dimension of 1200
-        cv2.imwrite(export_path, cv2.cvtColor(img,cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])  # Convert RGB to BGR for OpenCV
-        cv2.imwrite(crop_path, cv2.cvtColor(quality_crop, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])  # Convert RGB to BGR for OpenCV
-
-        # Obtain rating value (0-5):
-        # <0.15 = 1, <0.3 = 2, <0.6 = 3, <0.9 = 4, >=0.9 = 5
-        # If quality_score is -1, set rating to 0.
-        rating = 0
-        if quality_score == -1:
-            rating = 0
-        elif quality_score < 0.15:
-            rating = 1
-        elif quality_score < 0.3:
-            rating = 2
-        elif quality_score < 0.6:
-            rating = 3
-        elif quality_score < 0.9:
-            rating = 4
+            # Update the database
+            default_entry.update({
+                "secondary_species_list": all_species,
+                "secondary_species_scores": all_confidences
+            })
         else:
-            rating = 5
+            # If no bird is found, we will select the highest confidence wildlife mask and use it for analysis
+            primary_mask_index = wildlife_indices[np.argmax([pred_score[i] for i in wildlife_indices])] if wildlife_indices else None
+            
+            result = process_nonbird(masks[primary_mask_index], pred_boxes[primary_mask_index], pred_class[primary_mask_index], pred_score[primary_mask_index], img)
 
-        new_entry = {
-            "filename": raw_file,
-            "species": species_label,
-            "species_confidence": species_confidence,
-            "quality": quality_score,
-            "export_path": export_path,
-            "crop_path": crop_path,
-            "scene_count": scene_count,
-            "feature_similarity": similarity['feature_similarity'],
-            "feature_confidence": similarity['feature_confidence'],
-            "rating": rating,
-            "color_similarity": similarity['color_similarity'],
-            "color_confidence": similarity['color_confidence']
-        }
-        # Append the new entry to the database
-        database = pd.concat([database, pd.DataFrame([new_entry])], ignore_index=True)
+            # Update the database
+            default_entry.update({
+                "species": result["species"],
+                "species_confidence": result["species_confidence"],
+                "quality": result["quality"],
+                "rating": result["rating"]
+            })
+
+            # Save the crop and export
+            export_path = os.path.join(export_directory, f"{os.path.splitext(raw_file)[0]}_export.jpg")
+            img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))  # Resize to max dimension of 1200
+            cv2.imwrite(export_path, cv2.cvtColor(img_small,cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])  # Convert RGB to BGR for OpenCV
+
+            # save the crop file 
+            crop_path = os.path.join(crop_directory, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
+            cv2.imwrite(crop_path, cv2.cvtColor(result['quality_crop'], cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])  # Convert RGB to BGR for OpenCV
+
+            # update the paths
+            default_entry.update({
+                "export_path": export_path,
+                "crop_path": crop_path
+            })
+
+        # STEP 7: Finalize this entry.
+        database = pd.concat([database, pd.DataFrame([default_entry])], ignore_index=True)
         database.to_csv(database_path, index=False, float_format='%.16f')
-        print(f"Processed {raw_file}: Species: {species_label}, Confidence: {species_confidence}, Quality: {quality_score}, Rating: {rating}, Similarity: {similarity['similar']}, Scene Count: {scene_count}")
+        print(f"Processed {raw_file}: Species: {default_entry['species']}, Confidence: {default_entry['species_confidence']}, Quality: {default_entry['quality']}, Rating: {default_entry['rating']}, Similarity: {similarity['similar']}, Scene Count: {scene_count}")
         print(f"Similarity - Feature: {similarity['feature_similarity']}, Color: {similarity['color_similarity']}, Confidence: {similarity['confidence']}")
-        # Save the database
-
+        
     except Exception as e:
         print(f"Error reading image {raw_file}: {e}. Skipping.")
-        # Save a default entry in the database for this file.
-        new_entry = {
-            "filename": raw_file,
-            "species": "No Bird",
-            "species_confidence": 0,
-            "quality": -1,
-            "export_path": "N/A",
-            "crop_path": "N/A",
-            "scene_count": scene_count,
-            "rating": 0 ,
-            "feature_similarity": -1,
-            "feature_confidence": -1,
-            "color_similarity": -1,
-            "color_confidence": -1
-        }
-        # Append the new entry to the database
-        database = pd.concat([database, pd.DataFrame([new_entry])], ignore_index=True)
-        # save as csv with very high precision
+        # Save the current up-to-date default entry for this file.
+        database = pd.concat([database, pd.DataFrame([default_entry])], ignore_index=True)
         database.to_csv(database_path, index=False, float_format='%.16f')
         continue
