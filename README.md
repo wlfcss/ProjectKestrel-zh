@@ -20,19 +20,19 @@ After Kestrel is done scanning, run the visualizer tool to instantly discover yo
 ## Gallery
 
 Kestrel sorts all of your bird photos into scenes.
-![alt text](image-5.png)
+![alt text](readme_imgs/image-5.png)
 
 Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable, photoshop, or whatever photo software you prefer.
-![alt text](image-7.png)
+![alt text](readme_imgs/image-7.png)
 
 Kestrel has sorted your photos from sharp to blurry. No more time painstakingly reviewing each bird!
-![alt text](image-2.png)
+![alt text](readme_imgs/image-2.png)
 
 You can even search by bird species! (Note: Species detection is experimental and may be incorrect.)
-![alt text](image-6.png)
+![alt text](readme_imgs/image-6.png)
 
 **NEW!** Kestrel's analyzer is more intuitive than ever before! Just open the GUI, pick your bird photo folder, and hit "Start!"
-![alt text](image-8.png)
+![alt text](readme_imgs/image-8.png)
 
 ## 🌟 Features
 
@@ -82,7 +82,7 @@ Select a folder and hit start. The script will:
 - Generate a database of results in `.kestrel/kestrel_database.csv`
 - Create export JPEGs and cropped bird images
 
-![image](image-9.png)
+![image](readme_imgs/image-9.png)
 
 > Note: The script will take some time to run. All progress is saved automatically. If you encounter any errors, try re-running the script, and Kestrel will continue where it left off.
 
@@ -97,7 +97,7 @@ python visualizer.py
 ```
 
 Open the folder that you analyzed to explore its contents and Kestrel's analysis:
-![alt text](image-10.png)
+![alt text](readme_imgs/image-10.png)
 
 Features of the visualizer:
 - **Scene View**: Browse grouped similar images
