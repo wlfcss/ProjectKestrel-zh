@@ -13,19 +13,26 @@ Are you a bird photographer? Do you take hundreds or thousands of bird photos, o
 
 After Kestrel is done scanning, run the visualizer tool to instantly discover your favorite photos. As you drag your mouse across your photos, you'll see a zoom-in crop on the bird, so you can focus on evaluating the bird's pose or actions, rather than painstakingly finding images with slightly better sharpness.
 
+* **NEW!** Complete overhaul of the folder visualizer, now using a web-based framework that is extremely fast and responsive.
+* **NEW!** No more command lines needed! Kestrel's analyzer has a new GUI that shows you the analysis progress.
+* **NEW!** Rudimentary support for non-bird images. Use Kestrel to analyze other wildlife species! Note: this feature is in beta, and wildlife categories will not be accurate.
+
 ## Gallery
 
 Kestrel sorts all of your bird photos into scenes.
-![alt text](image.png)
+![alt text](image-5.png)
 
-Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable.
-![alt text](image-1.png)
+Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable, photoshop, or whatever photo software you prefer.
+![alt text](image-7.png)
 
 Kestrel has sorted your photos from sharp to blurry. No more time painstakingly reviewing each bird!
 ![alt text](image-2.png)
 
 You can even search by bird species! (Note: Species detection is experimental and may be incorrect.)
-![alt text](image-3.png)
+![alt text](image-6.png)
+
+**NEW!** Kestrel's analyzer is more intuitive than ever before! Just open the GUI, pick your bird photo folder, and hit "Start!"
+![alt text](image-8.png)
 
 ## 🌟 Features
 
@@ -60,37 +67,26 @@ cd ProjectKestrel
 pip install -r requirements.txt
 ```
 
-*Note: You may need to install the packages listed in `package-list.txt` if using conda:*
-```bash
-conda create --name kestrel --file package-list.txt
-conda activate kestrel
-```
-
-3. Ensure you have the required model files in the `models/` directory:
-   - `model.onnx` - Bird species classifier
-   - `labels.txt` - Species labels
-   - `quality.keras` - Image quality classifier
-
-The bird detection model will download on the first run of the project.
-
 ### Usage
 
 #### 1. Analyze a Photo Directory
 
-Run the main analysis script to process your bird photos:
+First open the analyzer.
 
 ```bash
-python analyze_directory.py
+python analyzer.py
 ```
 
-The script will:
-- Prompt for the directory containing your images
-- Ask whether to use GPU acceleration
+Select a folder and hit start. The script will:
 - Process each image to detect birds, classify species, and assess quality
 - Generate a database of results in `.kestrel/kestrel_database.csv`
 - Create export JPEGs and cropped bird images
 
-Note: The script will take some time to run. All progress is saved automatically. If you encounter any errors, try re-running the script, and Kestrel will continue where it left off.
+![image](image-9.png)
+
+> Note: The script will take some time to run. All progress is saved automatically. If you encounter any errors, try re-running the script, and Kestrel will continue where it left off.
+
+> Note: Kestrel comes with a set of test images. Simply open the `test_imgs` folder and hit Start. 
 
 #### 2. Visualize Results
 
@@ -99,6 +95,9 @@ Launch the interactive visualizer to browse your analyzed photos:
 ```bash
 python visualizer.py
 ```
+
+Open the folder that you analyzed to explore its contents and Kestrel's analysis:
+![alt text](image-10.png)
 
 Features of the visualizer:
 - **Scene View**: Browse grouped similar images
@@ -157,6 +156,8 @@ Kestrel's quality scoring model is trained on RAW images, and may not work as we
 - Pentax: `.pef`
 - Samsung: `.sr2`
 - Sigma: `.x3f`
+
+> Note: If this list does not support your camera's RAW file, please reach out via the email below. It is very easy to add new RAW file formats thanks to the ImageMagick Library.
 
 **Standard Formats** (fallback):
 - JPEG: `.jpg`, `.jpeg`

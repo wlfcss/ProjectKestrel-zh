@@ -487,8 +487,8 @@ class ProcessingWorker(QThread):
                         "quality": primary_bird['quality'],
                         "rating": primary_bird['rating']
                     })
-                    all_species = [b['species'] for b in bird_data]
-                    all_conf = [b['species_confidence'] for b in bird_data]
+                    all_species = np.array([b['species'] for b in bird_data])
+                    all_conf = np.array([b['species_confidence'] for b in bird_data])
                     entry.update({
                         "secondary_species_list": all_species,
                         "secondary_species_scores": all_conf
