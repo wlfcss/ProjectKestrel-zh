@@ -24,6 +24,7 @@ import pandas as pd
 import cv2
 import onnxruntime as ort
 import tensorflow as tf
+import torch
 import torchvision
 import torchvision.transforms as T
 from wand.image import Image as WandImage
@@ -70,22 +71,28 @@ class MaskRCNNWrapper:
         self.model.eval()
 
     def get_prediction(self, image_data, threshold=0.2):
-        transform = T.Compose([T.ToTensor()])
-        img = transform(image_data)
-        pred = self.model([img])
-        pred_score = list(pred[0]['scores'].detach().numpy())
-        if (np.array(pred_score) > threshold).sum() == 0:
-            return None, None, None, None
-        pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
-        masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
-        if len(masks.shape) == 2:
-            masks = np.expand_dims(masks, axis=0)
-        pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]['labels'].numpy())]
-        pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().numpy())]
-        masks = masks[:pred_t + 1]
-        pred_boxes = pred_boxes[:pred_t + 1]
-        pred_class = pred_class[:pred_t + 1]
-        return masks, pred_boxes, pred_class, pred_score[:pred_t + 1]
+        try:
+            transform = T.Compose([T.ToTensor()])
+            img = transform(image_data)
+            # Use no_grad to avoid building autograd graph and reduce memory footprint.
+            with torch.no_grad():
+                pred = self.model([img])
+            pred_score = list(pred[0]['scores'].detach().numpy())
+            if (np.array(pred_score) > threshold).sum() == 0:
+                return None, None, None, None
+            pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
+            masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
+            if len(masks.shape) == 2:
+                masks = np.expand_dims(masks, axis=0)
+            pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]['labels'].numpy())]
+            pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().numpy())]
+            masks = masks[:pred_t + 1]
+            pred_boxes = pred_boxes[:pred_t + 1]
+            pred_class = pred_class[:pred_t + 1]
+            return masks, pred_boxes, pred_class, pred_score[:pred_t + 1]
+        except Exception as e:
+            print("Error occurred while getting prediction:", e)
+            return [], [], [], [] # Return nothing as if nothing was detected.
 
     @staticmethod
     def _center_of_mass(mask):
@@ -353,7 +360,7 @@ class ProcessingWorker(QThread):
         self._stop_flag = True
         self._pause_event.set()
 
-    def run(self):  # noqa: C901
+    def run(self):
         try:
             files = [f for f in os.listdir(self.folder) if os.path.isfile(os.path.join(self.folder, f)) and os.path.splitext(f)[1].lower() in RAW_EXTENSIONS]
             if not files:
@@ -392,7 +399,6 @@ class ProcessingWorker(QThread):
             previous_image = None
             scene_count = database['scene_count'].max() if not database.empty else 0
 
-            MAX_RETRIES = 3
             for idx, raw_file in enumerate(new_files, start=1):
                 if self._stop_flag:
                     break
@@ -417,178 +423,151 @@ class ProcessingWorker(QThread):
                     "secondary_species_scores": []
                 }
 
-                success = False
-                last_error = None
-                for attempt in range(1, MAX_RETRIES + 1):
-                    try:
-                        image_path = os.path.join(self.folder, raw_file)
-                        img = read_image(image_path)
-                        if img is None:
-                            raise RuntimeError("Image read returned None")
+                try:
+                    image_path = os.path.join(self.folder, raw_file)
+                    img = read_image(image_path)
+                    if img is None:
+                        raise RuntimeError("Image read returned None")
 
-                        similarity = compute_image_similarity_akaze(previous_image, img)
-                        if not similarity['similar']:
-                            scene_count += 1
-                        entry.update({
-                            "feature_similarity": similarity['feature_similarity'],
-                            "feature_confidence": similarity['feature_confidence'],
-                            "color_similarity": similarity['color_similarity'],
-                            "color_confidence": similarity['color_confidence'],
-                            "scene_count": scene_count,
-                            "similar": similarity['similar']
-                        })
-                        previous_image = img.copy()
+                    similarity = compute_image_similarity_akaze(previous_image, img)
+                    if not similarity['similar']:
+                        scene_count += 1
+                    entry.update({
+                        "feature_similarity": similarity['feature_similarity'],
+                        "feature_confidence": similarity['feature_confidence'],
+                        "color_similarity": similarity['color_similarity'],
+                        "color_confidence": similarity['color_confidence'],
+                        "scene_count": scene_count,
+                        "similar": similarity['similar']
+                    })
+                    previous_image = img.copy()
 
-                        masks, pred_boxes, pred_class, pred_score = mask_rcnn.get_prediction(img)
-                        if masks is None:
-                            # No detections: still export a downsized copy
-                            self.status.emit(f"No detections in {raw_file}")
-                            export_path = os.path.join(self.export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-                            img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))
-                            cv2.imwrite(export_path, cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])
-                            crop_path = os.path.join(self.crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
-                            cv2.imwrite(crop_path, cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
-                            entry.update({"export_path": export_path, "crop_path": crop_path})
-                            # Persist and mark success
-                            database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
-                            database.to_csv(db_path, index=False)
-                            # Emit using file paths
-                            export_q = load_qimage_from_path(export_path)
-                            crop_q = load_qimage_from_path(crop_path)
-                            self.image_processed.emit(entry, export_q, crop_q)
-                            # Cleanup large objects early
-                            del img_small
-                            del img
-                            success = True
-                            break
+                    # Save img early to reduce memory later
+                    export_path = os.path.join(self.export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
+                    img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))
+                    cv2.imwrite(export_path, cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    entry.update({"export_path": export_path})
 
-                        wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
-                        bird_indices = [i for i, c in enumerate(pred_class) if c == 'bird']
-                        bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
-
-                        def process_nonbird(primary_mask_i):
-                            quality_crop, quality_mask = mask_rcnn.get_square_crop(masks[primary_mask_i], img, resize=True)
-                            quality_score = quality_clf.classify(quality_crop, quality_mask)
-                            return {
-                                "species": pred_class[primary_mask_i],
-                                "species_confidence": float(pred_score[primary_mask_i]),
-                                "quality": quality_score,
-                                "rating": quality_to_rating(quality_score),
-                                "quality_crop": quality_crop
-                            }
-
-                        def process_bird(i):
-                            if pred_class[i] == 'bird':
-                                species_crop = mask_rcnn.get_species_crop(pred_boxes[i], img)
-                                species_result = species_clf.classify(species_crop)
-                                species_label = species_result['predicted_label']
-                                species_confidence = species_result['confidence']
-                            else:
-                                species_label = pred_class[i]
-                                species_confidence = float(pred_score[i])
-                            quality_crop, quality_mask = mask_rcnn.get_square_crop(masks[i], img, resize=True)
-                            quality_score = quality_clf.classify(quality_crop, quality_mask)
-                            return {
-                                "species": species_label,
-                                "species_confidence": species_confidence,
-                                "quality": quality_score,
-                                "rating": quality_to_rating(quality_score),
-                                "quality_crop": quality_crop
-                            }
-
-                        if bird_indices:
-                            bird_data = [process_bird(i) for i in bird_indices]
-                            primary_bird = max(bird_data, key=lambda x: x['quality'])
-                            entry.update({
-                                "species": primary_bird['species'],
-                                "species_confidence": primary_bird['species_confidence'],
-                                "quality": primary_bird['quality'],
-                                "rating": primary_bird['rating']
-                            })
-                            all_species = np.array([b['species'] for b in bird_data])
-                            all_conf = np.array([b['species_confidence'] for b in bird_data])
-                            entry.update({
-                                "secondary_species_list": all_species,
-                                "secondary_species_scores": all_conf
-                            })
-                            crop_img = primary_bird['quality_crop']
-                        else:
-                            if wildlife_indices:
-                                primary_index = wildlife_indices[np.argmax([pred_score[i] for i in wildlife_indices])]
-                                result = process_nonbird(primary_index)
-                                entry.update({
-                                    "species": result['species'],
-                                    "species_confidence": result['species_confidence'],
-                                    "quality": result['quality'],
-                                    "rating": result['rating']
-                                })
-                                crop_img = result['quality_crop']
-                            else:
-                                crop_img = img
-
-                        export_path = os.path.join(self.export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-                        img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))
-                        cv2.imwrite(export_path, cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    masks, pred_boxes, pred_class, pred_score = mask_rcnn.get_prediction(img)
+                    if masks is None:
+                        # No detections: still export a downsized copy
+                        self.status.emit(f"No detections in {raw_file}")
                         crop_path = os.path.join(self.crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
-                        cv2.imwrite(crop_path, cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
-                        entry.update({"export_path": export_path, "crop_path": crop_path})
-
+                        cv2.imwrite(crop_path, cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
+                        entry.update({"crop_path": crop_path})
+                        # Persist and mark success
                         database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
                         database.to_csv(db_path, index=False)
-
+                        # Emit using file paths
                         export_q = load_qimage_from_path(export_path)
                         crop_q = load_qimage_from_path(crop_path)
                         self.image_processed.emit(entry, export_q, crop_q)
-                        self.status.emit(
-                            f"Processed {raw_file}: {entry['species']} Q={entry['quality']:.3f} R={entry['rating']} ({idx}/{total})"
-                        )
-                        success = True
-                        # Explicitly delete large intermediate objects to free memory
-                        try:
-                            del img_small
-                        except Exception:
-                            pass
-                        try:
-                            del crop_img
-                        except Exception:
-                            pass
-                        try:
-                            del img
-                        except Exception:
-                            pass
-                        try:
-                            del masks, pred_boxes, pred_class, pred_score
-                        except Exception:
-                            pass
-                        # Break after cleanup
                         break
-                    except Exception as e:  # catch per-attempt failures
-                        last_error = e
-                        self.status.emit(f"Error {raw_file} attempt {attempt}/{MAX_RETRIES}: {e}")
-                        time.sleep(0.1)
 
-                # After attempts conclude
-                if not success:
-                    # Record skipped entry (already base entry; ensure scene_count latest)
-                    entry['scene_count'] = scene_count
-                    entry['species'] = 'Skipped'
-                    entry['similar'] = False
+                    wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
+                    bird_indices = [i for i, c in enumerate(pred_class) if c == 'bird']
+                    bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
+
+                    def process_nonbird(primary_mask_i):
+                        quality_crop, quality_mask = mask_rcnn.get_square_crop(masks[primary_mask_i], img, resize=True)
+                        quality_score = quality_clf.classify(quality_crop, quality_mask)
+                        return {
+                            "species": pred_class[primary_mask_i],
+                            "species_confidence": float(pred_score[primary_mask_i]),
+                            "quality": quality_score,
+                            "rating": quality_to_rating(quality_score),
+                            "quality_crop": quality_crop
+                        }
+
+                    def process_bird(i):
+                        if pred_class[i] == 'bird':
+                            species_crop = mask_rcnn.get_species_crop(pred_boxes[i], img)
+                            species_result = species_clf.classify(species_crop)
+                            species_label = species_result['predicted_label']
+                            species_confidence = species_result['confidence']
+                        else:
+                            species_label = pred_class[i]
+                            species_confidence = float(pred_score[i])
+                        quality_crop, quality_mask = mask_rcnn.get_square_crop(masks[i], img, resize=True)
+                        quality_score = quality_clf.classify(quality_crop, quality_mask)
+                        return {
+                            "species": species_label,
+                            "species_confidence": species_confidence,
+                            "quality": quality_score,
+                            "rating": quality_to_rating(quality_score),
+                            "quality_crop": quality_crop
+                        }
+
+                    if bird_indices:
+                        bird_data = [process_bird(i) for i in bird_indices]
+                        primary_bird = max(bird_data, key=lambda x: x['quality'])
+                        entry.update({
+                            "species": primary_bird['species'],
+                            "species_confidence": primary_bird['species_confidence'],
+                            "quality": primary_bird['quality'],
+                            "rating": primary_bird['rating']
+                        })
+                        all_species = np.array([b['species'] for b in bird_data])
+                        all_conf = np.array([b['species_confidence'] for b in bird_data])
+                        entry.update({
+                            "secondary_species_list": all_species,
+                            "secondary_species_scores": all_conf
+                        })
+                        crop_img = primary_bird['quality_crop']
+                    else:
+                        if wildlife_indices:
+                            primary_index = wildlife_indices[np.argmax([pred_score[i] for i in wildlife_indices])]
+                            result = process_nonbird(primary_index)
+                            entry.update({
+                                "species": result['species'],
+                                "species_confidence": result['species_confidence'],
+                                "quality": result['quality'],
+                                "rating": result['rating']
+                            })
+                            crop_img = result['quality_crop']
+                        else:
+                            crop_img = img_small
+
+                    crop_path = os.path.join(self.crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
+                    cv2.imwrite(crop_path, cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    entry.update({"crop_path": crop_path})
+
                     database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
                     database.to_csv(db_path, index=False)
-                    self.status.emit(f"Skipped {raw_file} after {MAX_RETRIES} failures: {last_error}")
+
+                    export_q = load_qimage_from_path(export_path)
+                    crop_q = load_qimage_from_path(crop_path)
+
+                    masks, pred_boxes, pred_class, pred_score = None, None, None, None # Free memory
+                    crop_img = None
+                    img_small = None
+                    bird_data = None
+                    result = None
+                    # Nothing else to free before next maskRCNN call...
+                    
+                    self.image_processed.emit(entry, export_q, crop_q)
+                    self.status.emit(
+                        f"Processed {raw_file}: {entry['species']} Q={entry['quality']:.3f} R={entry['rating']} ({idx}/{total})"
+                    )
+                except Exception as e:  # catch per-attempt failures
+                    self.status.emit(f"Error {raw_file}: {e}")
+                    print(f"Error {raw_file}: {e}")
+                    entry['scene_count'] = scene_count
+                    entry['species'] = 'Error'
+                    entry['similar'] = False
+                    # save current state to database.
+                    database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
+                    database.to_csv(db_path, index=False)
+                    time.sleep(2)
 
                 # Progress always emitted
                 self.progress.emit(idx, total)
-
-                # Periodic garbage collection every 10 images
-                if idx % 10 == 0:
-                    gc.collect()
 
             self.finished.emit()
         except Exception as e:
             self.status.emit(f"Fatal error: {e}")
             print(f"Fatal error: {e}")
-            self.finished.emit()
+            #self.finished.emit() # Finish will mask the error.
 
 
 # -------------------- Main Window -------------------- #
