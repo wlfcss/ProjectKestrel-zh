@@ -22,7 +22,7 @@ After Kestrel is done scanning, run the visualizer tool to instantly discover yo
 Kestrel sorts all of your bird photos into scenes.
 ![alt text](readme_imgs/image-5.png)
 
-Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable, photoshop, or whatever photo software you prefer.
+Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable, lightroom, or whatever photo software you prefer.
 ![alt text](readme_imgs/image-7.png)
 
 Kestrel has sorted your photos from sharp to blurry. No more time painstakingly reviewing each bird!

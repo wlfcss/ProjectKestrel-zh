@@ -47,7 +47,7 @@ if not AUTH_TOKEN:
     # Generate an ephemeral token per run; injected into served page via /bridge_config.js
     AUTH_TOKEN = secrets.token_urlsafe(32)
 MAX_REQUEST_BYTES = int(os.environ.get('KESTREL_MAX_REQUEST_BYTES', '4096'))
-ALLOWED_EDITORS: Set[str] = {'system', 'darktable', 'photoshop'}
+ALLOWED_EDITORS: Set[str] = {'system', 'darktable', 'lightroom'}
 _default_exts = ['.cr3', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.sr2', '.jpg', '.jpeg', '.png', '.tif', '.tiff']
 ALLOWED_EXTENSIONS: Set[str] = set(os.environ.get('KESTREL_ALLOWED_EXTENSIONS', ','.join(_default_exts)).lower().split(','))
 ALLOW_ANY_EXTENSION = os.environ.get('KESTREL_ALLOW_ANY_EXTENSION') == '1'
@@ -140,11 +140,21 @@ def launch(path: str, editor: str):
                 subprocess.Popen([dt, path]); return
             except FileNotFoundError:
                 log('darktable not found at', dt, 'falling back to system default')
-        if editor == 'photoshop':
-            try:
-                subprocess.Popen(['photoshop.exe', path]); return
-            except FileNotFoundError:
-                pass
+        if editor == 'lightroom':
+            # Common Lightroom Classic executable names/locations
+            lr_candidates = [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Lightroom Classic', 'Lightroom.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Lightroom', 'Lightroom.exe'),
+                'lightroom.exe',
+                'Lightroom.exe'
+            ]
+            for exe in lr_candidates:
+                if exe and os.path.exists(exe):
+                    try:
+                        subprocess.Popen([exe, path]); return
+                    except Exception:
+                        continue
+            # Fallback to system default if Lightroom not found
         os.startfile(path)  # type: ignore[attr-defined]
         return
     # macOS
@@ -152,16 +162,18 @@ def launch(path: str, editor: str):
         if editor == 'darktable':
             try: subprocess.Popen(['open', '-a', 'darktable', path]); return
             except Exception: pass
-        if editor == 'photoshop':
-            try: subprocess.Popen(['open', '-a', 'Adobe Photoshop', path]); return
+        if editor == 'lightroom':
+            # macOS Lightroom app bundle name (Classic)
+            try: subprocess.Popen(['open', '-a', 'Adobe Lightroom Classic', path]); return
             except Exception: pass
         subprocess.Popen(['open', path]); return
     # Linux / other
     if editor == 'darktable':
         try: subprocess.Popen(['darktable', path]); return
         except FileNotFoundError: pass
-    if editor == 'photoshop':
-        try: subprocess.Popen(['photoshop', path]); return
+    if editor == 'lightroom':
+        # Linux users may have a wrapper script named lightroom; attempt it
+        try: subprocess.Popen(['lightroom', path]); return
         except FileNotFoundError: pass
     subprocess.Popen(['xdg-open', path])
 class Handler(SimpleHTTPRequestHandler):
