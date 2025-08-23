@@ -71,28 +71,34 @@ class MaskRCNNWrapper:
         self.model.eval()
 
     def get_prediction(self, image_data, threshold=0.2):
-        try:
-            transform = T.Compose([T.ToTensor()])
-            img = transform(image_data)
-            # Use no_grad to avoid building autograd graph and reduce memory footprint.
-            with torch.no_grad():
-                pred = self.model([img])
-            pred_score = list(pred[0]['scores'].detach().numpy())
-            if (np.array(pred_score) > threshold).sum() == 0:
-                return None, None, None, None
-            pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
-            masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
-            if len(masks.shape) == 2:
-                masks = np.expand_dims(masks, axis=0)
-            pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]['labels'].numpy())]
-            pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().numpy())]
-            masks = masks[:pred_t + 1]
-            pred_boxes = pred_boxes[:pred_t + 1]
-            pred_class = pred_class[:pred_t + 1]
-            return masks, pred_boxes, pred_class, pred_score[:pred_t + 1]
-        except Exception as e:
-            print("Error occurred while getting prediction:", e)
-            return [], [], [], [] # Return nothing as if nothing was detected.
+        # Retry prediction up to 3 times in case of transient runtime errors.
+        for attempt in range(3):
+            try:
+                transform = T.Compose([T.ToTensor()])
+                img = transform(image_data)
+                # Use no_grad to avoid building autograd graph and reduce memory footprint.
+                with torch.no_grad():
+                    pred = self.model([img])
+                pred_score = list(pred[0]['scores'].detach().numpy())
+                if (np.array(pred_score) > threshold).sum() == 0:
+                    return None, None, None, None
+                pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
+                masks = (pred[0]['masks'] > 0.5).squeeze().detach().cpu().numpy()
+                if len(masks.shape) == 2:
+                    masks = np.expand_dims(masks, axis=0)
+                pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]['labels'].numpy())]
+                pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]['boxes'].detach().numpy())]
+                masks = masks[:pred_t + 1]
+                pred_boxes = pred_boxes[:pred_t + 1]
+                pred_class = pred_class[:pred_t + 1]
+                return masks, pred_boxes, pred_class, pred_score[:pred_t + 1]
+            except Exception as e:
+                if attempt < 2:
+                    print(f"Prediction attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(0.1)
+                else:
+                    print("Error occurred while getting prediction after 3 attempts:", e)
+        return [], [], [], []  # Final failure after retries
 
     @staticmethod
     def _center_of_mass(mask):
@@ -356,10 +362,6 @@ class ProcessingWorker(QThread):
     def resume(self):
         self._pause_event.set()
 
-    def stop(self):
-        self._stop_flag = True
-        self._pause_event.set()
-
     def run(self):
         try:
             files = [f for f in os.listdir(self.folder) if os.path.isfile(os.path.join(self.folder, f)) and os.path.splitext(f)[1].lower() in RAW_EXTENSIONS]
@@ -400,8 +402,6 @@ class ProcessingWorker(QThread):
             scene_count = database['scene_count'].max() if not database.empty else 0
 
             for idx, raw_file in enumerate(new_files, start=1):
-                if self._stop_flag:
-                    break
                 self._pause_event.wait()
 
                 # Base entry for this file
@@ -462,7 +462,7 @@ class ProcessingWorker(QThread):
                         export_q = load_qimage_from_path(export_path)
                         crop_q = load_qimage_from_path(crop_path)
                         self.image_processed.emit(entry, export_q, crop_q)
-                        break
+                        
 
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
                     bird_indices = [i for i, c in enumerate(pred_class) if c == 'bird']
