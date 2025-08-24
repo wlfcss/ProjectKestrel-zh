@@ -2,6 +2,7 @@
 
 ## Known Issues
 - With the addition of multiple bird support, there is a slight increase in false bird detections. This needs to be investigated, and can likely be mitigated by raising the detection threshold.
+- Bird species detection is often inaccurate.
 - Lightroom support has not been tested on Windows
 - Entire software has not been tested on MacOS.
 
