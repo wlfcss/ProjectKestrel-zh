@@ -16,6 +16,7 @@ After Kestrel is done scanning, run the visualizer tool to instantly discover yo
 * **NEW!** Complete overhaul of the folder visualizer, now using a web-based framework that is extremely fast and responsive.
 * **NEW!** No more command lines needed! Kestrel's analyzer has a new GUI that shows you the analysis progress.
 * **NEW!** Rudimentary support for non-bird images. Use Kestrel to analyze other wildlife species! Note: this feature is in beta, and wildlife categories will not be accurate.
+* **NEW!** Bird Family Classification. Kestrel may understand that your bird is of one specific family (ex. a Sparrow), but unsure which exact species it is (Fox Sparrow or Song Sparrow). Kestrel now supports family classification, so you can search by "Sparrow sp." for these situations.
 
 ## Gallery
 
