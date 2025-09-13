@@ -70,7 +70,7 @@ class MaskRCNNWrapper:
         )
         self.model.eval()
 
-    def get_prediction(self, image_data, threshold=0.2):
+    def get_prediction(self, image_data, threshold=0.7):
         # Retry prediction up to 3 times in case of transient runtime errors.
         for attempt in range(3):
             try:
