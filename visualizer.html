@@ -175,10 +175,15 @@
           <input id="filterScenesManualRated" type="checkbox" />
           <span class="muted">Only my rated scenes</span>
         </label>
-        <!-- New: include secondary species toggle -->
-        <label class="inline" title="Include secondary species (from detector) in scene chips & search">
+        <!-- New: include secondary species/families toggle -->
+        <label class="inline" title="Include secondary species/families (from detector) in scene chips & search">
           <input id="includeSecondarySpecies" type="checkbox" />
-          <span class="muted">Secondary species</span>
+          <span class="muted">Secondary species/families</span>
+        </label>
+        <!-- New: include families toggle -->
+        <label class="inline" title="Include primary & secondary families in scene chips & search">
+          <input id="includeFamilies" type="checkbox" checked />
+          <span class="muted">Families</span>
         </label>
         <!-- New: open merge scenes dialog -->
         <button id="openMerge">Merge scenes…</button>
@@ -410,6 +415,36 @@
     return result;
   }
 
+  // Parse secondary family columns similar to secondary species
+  function parseSecondaryFamilies(row){
+    if (row.__secondaryFamilyCache) return row.__secondaryFamilyCache;
+    const listRaw = row.secondary_family_list;
+    const scoresRaw = row.secondary_family_scores;
+    const result = [];
+    if (!listRaw || !scoresRaw) { row.__secondaryFamilyCache = result; return result; }
+    try {
+      const fams = [];
+      const listStr = String(listRaw);
+      const regex = /['"]([^'"\n\r]+?)['"]/g;
+      let m;
+      while ((m = regex.exec(listStr)) !== null) {
+        const name = m[1].trim();
+        if (name) fams.push(name);
+      }
+      if (!fams.length) {
+        const inner = listStr.replace(/^\s*\[/,'').replace(/\]\s*$/,'');
+        inner.split(/\s{2,}|\s/).forEach(tok=>{ const t=tok.trim(); if(t) fams.push(t); });
+      }
+      const scoreStr = String(scoresRaw).replace(/^[^\[]*\[/,'[').replace(/\].*$/,'').replace(/[\[\]]/g,'').trim();
+      const nums = scoreStr.split(/\s+/).map(parseNumber).filter(x=>x>=0);
+      for (let i=0;i<fams.length && i<nums.length;i++) {
+        result.push({ name: fams[i], score: nums[i] });
+      }
+    } catch (_) {}
+    row.__secondaryFamilyCache = result;
+    return result;
+  }
+
   function ensureSceneNameColumn() {
     if (!header.includes('scene_name')) { header.push('scene_name'); }
     for (const r of rows) if (!('scene_name' in r)) r.scene_name = '';
@@ -428,7 +463,7 @@
   // Helper: is this image manually rated (>0 stars)?
   function isManualRated(r) { return getRating(r) > 0 && getOrigin(r) === 'manual'; }
 
-  function aggregateScenes(minSpeciesConf, searchTerm, sortBy, includeSecondary) {
+  function aggregateScenes(minSpeciesConf, searchTerm, sortBy, includeSecondary, includeFamilies) {
     const groups = new Map();
     for (const r of rows) {
       const id = r.scene_count; // group identifier
@@ -437,24 +472,40 @@
     }
 
     const list = [];
-    for (const [sceneId, arr] of groups) {
+  for (const [sceneId, arr] of groups) {
       // representative by max quality
       let rep = arr[0];
       for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
 
       const speciesSet = new Set();
+      const familySet = new Set();
       for (const r of arr) {
         const conf = parseNumber(r.species_confidence);
         if (conf >= minSpeciesConf && r.species && r.species !== 'No Bird') speciesSet.add(r.species);
+        if (includeFamilies) {
+          const fconf = parseNumber(r.family_confidence);
+            if (fconf >= minSpeciesConf && r.family && r.family !== 'Unknown' && r.family !== 'N/A') familySet.add(r.family);
+        }
         if (includeSecondary) {
           // Add secondary species passing threshold
           const secondary = parseSecondarySpecies(r);
-            for (const {name, score} of secondary) {
-              if (score >= minSpeciesConf && name && name !== 'No Bird') speciesSet.add(name);
+          for (const {name, score} of secondary) {
+            if (score >= minSpeciesConf && name && name !== 'No Bird') speciesSet.add(name);
+          }
+          if (includeFamilies) {
+            const secFams = parseSecondaryFamilies(r);
+            for (const {name, score} of secFams) {
+              if (score >= minSpeciesConf && name && name !== 'Unknown' && name !== 'N/A') familySet.add(name);
             }
+          }
         }
       }
-      const species = Array.from(speciesSet).sort();
+      let species = Array.from(speciesSet).sort();
+      if (includeFamilies) {
+        const families = Array.from(familySet).sort();
+        const merged = new Set([...species, ...families]);
+        species = Array.from(merged).sort();
+      }
 
       const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
       const sceneName = (arr.find(a => (a.scene_name||'').trim().length)?.scene_name || '').trim();
@@ -547,9 +598,11 @@
     const search = el('#search').value;
     const sortBy = el('#sortBy').value;
     const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
-  const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
-  const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
-  scenes = aggregateScenes(minC, search, sortBy, includeSecondary);
+    const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
+    const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
+    const includeFamiliesCheckbox = document.getElementById('includeFamilies');
+    const includeFamilies = includeFamiliesCheckbox ? includeFamiliesCheckbox.checked : !!getSetting('includeFamilies', true);
+    scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
     // Apply scene-level manual-rated filter without mutating global scenes
     const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
@@ -970,13 +1023,23 @@
     });
   })();
 
-  // Initialize secondary species inclusion toggle
+  // Initialize secondary species/families inclusion toggle
   (function initIncludeSecondary(){
     const t = document.getElementById('includeSecondarySpecies');
     if (!t) return;
     try { t.checked = getSetting('includeSecondarySpecies', true); } catch {}
     t.addEventListener('change', () => {
       const s = loadSettings(); s.includeSecondarySpecies = !!t.checked; saveSettings(s); renderScenes();
+    });
+  })();
+
+  // Initialize families inclusion toggle
+  (function initIncludeFamilies(){
+    const t = document.getElementById('includeFamilies');
+    if (!t) return;
+    try { t.checked = getSetting('includeFamilies', true); } catch {}
+    t.addEventListener('change', () => {
+      const s = loadSettings(); s.includeFamilies = !!t.checked; saveSettings(s); renderScenes();
     });
   })();
 
