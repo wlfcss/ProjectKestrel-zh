@@ -171,10 +171,57 @@ class MaskRCNNWrapper:
 
 class BirdSpeciesClassifier:
     def __init__(self, model_path: str, labels_path: str, use_gpu: bool):
+        """Initialize ONNX session, load labels and build vectorized family aggregation structures.
+
+        Precomputes a family indicator matrix so family probabilities can be obtained via
+        a single matrix multiplication: family_probs = family_matrix @ species_probs.
+        """
         with open(labels_path, 'r') as f:
-            self.labels = np.array([l.strip() for l in f.readlines()])
+            self.labels = np.array([l.strip() for l in f.readlines()])  # (num_species,)
         providers = ['DmlExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
         self.session = ort.InferenceSession(model_path, providers=providers)
+
+        # ---------------- Family / Display Name Mappings (Precomputed) ---------------- #
+        try:
+            df_sf = pd.read_csv('models/labels_scispecies.csv')  # columns: Species, Scientific Family
+            df_disp = pd.read_csv('models/scispecies_dispname.csv')  # columns: Scientific Family, Display Name
+        except Exception as e:
+            print(f"Failed to load family mapping CSVs: {e}")
+            # Fallback: empty structures
+            self.family_matrix = np.zeros((0, len(self.labels)), dtype=np.float32)
+            self.family_display_names = []
+            return
+
+        species_to_family = dict(zip(df_sf['Species'], df_sf['Scientific Family']))
+        family_to_display = dict(zip(df_disp['Scientific Family'], df_disp['Display Name']))
+
+        # Build array of display family names aligned with self.labels order.
+        display_families = []
+        unknown_family_name = 'Unknown Family'
+        for sp in self.labels:
+            fam = species_to_family.get(sp)
+            if fam is None:
+                display_families.append(unknown_family_name)
+            else:
+                display_families.append(family_to_display.get(fam, fam))
+        display_families = np.array(display_families)
+
+        # Unique display family names (stable order of first occurrence)
+        _, unique_indices = np.unique(display_families, return_index=True)
+        ordered_unique_fams = display_families[np.sort(unique_indices)]
+        self.family_display_names = ordered_unique_fams.tolist()
+
+        # Vectorized indicator matrix construction
+        fam_index_map = {fam: i for i, fam in enumerate(self.family_display_names)}
+        fam_indices = np.array([fam_index_map[f] for f in display_families])  # shape (num_species,)
+        num_fams = len(self.family_display_names)
+        num_species = len(self.labels)
+        family_matrix = np.zeros((num_fams, num_species), dtype=np.float32)
+        # Advanced indexing to set 1 where species belongs to family
+        family_matrix[fam_indices, np.arange(num_species)] = 1.0
+        self.family_matrix = family_matrix  # shape (num_fams, num_species)
+        # Store for later reference if needed
+        self._species_family_display = display_families
 
     @staticmethod
     def _preprocess(image):
@@ -183,18 +230,35 @@ class BirdSpeciesClassifier:
         return np.expand_dims(image, 0)
 
     def classify(self, image, top_k=5):
+        """Run inference and return top-k species and family probabilities.
+
+        Returns dict with:
+          top_species_labels, top_species_scores, top_family_labels, top_family_scores
+        """
         input_tensor = self._preprocess(image)
         input_name = self.session.get_inputs()[0].name
         outputs = self.session.run(None, {input_name: input_tensor})
-        logits = outputs[0][0]
-        top_k_indices = np.argsort(logits)[-top_k:][::-1]
-        top_k_scores = logits[top_k_indices]
-        predicted_index = np.argmax(logits)
+        logits = outputs[0][0]  # raw probabilities/logits already (assumed calibrated)
+
+        # Top species
+        top_species_indices = np.argsort(logits)[-top_k:][::-1]
+        top_species_labels = self.labels[top_species_indices]
+        top_species_scores = logits[top_species_indices].astype(float)
+
+        # Vectorized family aggregation (matrix multiplication)
+        if self.family_matrix.shape[0] > 0:
+            family_probs = self.family_matrix @ logits  # shape (num_families,)
+            top_family_indices = np.argsort(family_probs)[-top_k:][::-1]
+            top_family_labels = [self.family_display_names[i] for i in top_family_indices]
+            top_family_scores = family_probs[top_family_indices].astype(float).tolist()
+        else:
+            top_family_labels, top_family_scores = [], []
+
         return {
-            'predicted_label': self.labels[predicted_index],
-            'confidence': float(logits[predicted_index]),
-            'top_k_labels': self.labels[top_k_indices],
-            'top_k_scores': top_k_scores.astype(float)
+            'top_species_labels': top_species_labels,
+            'top_species_scores': top_species_scores,
+            'top_family_labels': top_family_labels,
+            'top_family_scores': top_family_scores
         }
 
 
@@ -379,10 +443,23 @@ class ProcessingWorker(QThread):
                 database = pd.read_csv(db_path)
             else:
                 database = pd.DataFrame(columns=[
-                    "filename", "species", "species_confidence", "quality", "export_path", "crop_path", "rating",
+                    "filename", "species", "species_confidence", "family", "family_confidence", "quality", "export_path", "crop_path", "rating",
                     "scene_count", "feature_similarity", "feature_confidence", "color_similarity", "color_confidence", "similar",
-                    "secondary_species_list", "secondary_species_scores"
+                    "secondary_species_list", "secondary_species_scores", "secondary_family_list", "secondary_family_scores"
                 ])
+
+            # Ensure any newly added columns exist (backwards compatibility with older DB)
+            required_columns = [
+                "family", "family_confidence", "secondary_family_list", "secondary_family_scores"
+            ]
+            for col in required_columns:
+                if col not in database.columns:
+                    if col.endswith('_list'):
+                        database[col] = [[] for _ in range(len(database))]
+                    elif col.endswith('_scores'):
+                        database[col] = [[] for _ in range(len(database))]
+                    else:
+                        database[col] = "Unknown" if 'family' in col else 0.0
 
             processed_set = set(database['filename'].values)
             new_files = [f for f in files if f not in processed_set]
@@ -418,6 +495,8 @@ class ProcessingWorker(QThread):
                     "filename": raw_file,
                     "species": "Unknown",
                     "species_confidence": 0.0,
+                    "family": "Unknown",
+                    "family_confidence": 0.0,
                     "quality": -1.0,
                     "export_path": "N/A",
                     "crop_path": "N/A",
@@ -429,7 +508,9 @@ class ProcessingWorker(QThread):
                     "color_confidence": -1.0,
                     "similar": False,
                     "secondary_species_list": [],
-                    "secondary_species_scores": []
+                    "secondary_species_scores": [],
+                    "secondary_family_list": [],
+                    "secondary_family_scores": []
                 }
 
                 try:
@@ -483,6 +564,8 @@ class ProcessingWorker(QThread):
                         return {
                             "species": pred_class[primary_mask_i],
                             "species_confidence": float(pred_score[primary_mask_i]),
+                            "family": "N/A",
+                            "family_confidence": 0.0,
                             "quality": quality_score,
                             "rating": quality_to_rating(quality_score),
                             "quality_crop": quality_crop
@@ -492,16 +575,22 @@ class ProcessingWorker(QThread):
                         if pred_class[i] == 'bird':
                             species_crop = mask_rcnn.get_species_crop(pred_boxes[i], img)
                             species_result = species_clf.classify(species_crop)
-                            species_label = species_result['predicted_label']
-                            species_confidence = species_result['confidence']
+                            species_label = species_result['top_species_labels'][0] if len(species_result['top_species_labels']) else 'Unknown'
+                            species_confidence = float(species_result['top_species_scores'][0]) if len(species_result['top_species_scores']) else 0.0
+                            family_label = species_result['top_family_labels'][0] if len(species_result['top_family_labels']) else 'Unknown'
+                            family_confidence = float(species_result['top_family_scores'][0]) if len(species_result['top_family_scores']) else 0.0
                         else:
                             species_label = pred_class[i]
                             species_confidence = float(pred_score[i])
+                            family_label = "N/A"
+                            family_confidence = 0.0
                         quality_crop, quality_mask = mask_rcnn.get_square_crop(masks[i], img, resize=True)
                         quality_score = quality_clf.classify(quality_crop, quality_mask)
                         return {
                             "species": species_label,
                             "species_confidence": species_confidence,
+                            "family": family_label,
+                            "family_confidence": family_confidence,
                             "quality": quality_score,
                             "rating": quality_to_rating(quality_score),
                             "quality_crop": quality_crop
@@ -513,14 +602,20 @@ class ProcessingWorker(QThread):
                         entry.update({
                             "species": primary_bird['species'],
                             "species_confidence": primary_bird['species_confidence'],
+                            "family": primary_bird['family'],
+                            "family_confidence": primary_bird['family_confidence'],
                             "quality": primary_bird['quality'],
                             "rating": primary_bird['rating']
                         })
                         all_species = np.array([b['species'] for b in bird_data])
-                        all_conf = np.array([b['species_confidence'] for b in bird_data])
+                        all_species_conf = np.array([b['species_confidence'] for b in bird_data])
+                        all_families = np.array([b['family'] for b in bird_data])
+                        all_family_conf = np.array([b['family_confidence'] for b in bird_data])
                         entry.update({
                             "secondary_species_list": all_species,
-                            "secondary_species_scores": all_conf
+                            "secondary_species_scores": all_species_conf,
+                            "secondary_family_list": all_families,
+                            "secondary_family_scores": all_family_conf
                         })
                         crop_img = primary_bird['quality_crop']
                     else:
@@ -530,6 +625,8 @@ class ProcessingWorker(QThread):
                             entry.update({
                                 "species": result['species'],
                                 "species_confidence": result['species_confidence'],
+                                "family": result['family'],
+                                "family_confidence": result['family_confidence'],
                                 "quality": result['quality'],
                                 "rating": result['rating']
                             })
@@ -631,7 +728,25 @@ class KestrelGUI(QWidget):
         info_box = QGroupBox("Current Detection")
         grid = QGridLayout()
         self.info_labels: Dict[str, QLabel] = {}
-        fields = ["filename", "species", "species_confidence", "quality", "rating", "scene_count", "feature_similarity", "feature_confidence", "color_similarity", "color_confidence", "similar"]
+        fields = [
+            "filename",
+            "species",
+            "species_confidence",
+            "family",
+            "family_confidence",
+            "quality",
+            "rating",
+            "scene_count",
+            "feature_similarity",
+            "feature_confidence",
+            "color_similarity",
+            "color_confidence",
+            "similar",
+            "secondary_species_list",
+            "secondary_species_scores",
+            "secondary_family_list",
+            "secondary_family_scores"
+        ]
         for row, field in enumerate(fields):
             grid.addWidget(QLabel(field.replace('_', ' ').title() + ':'), row, 0)
             val_label = QLabel('-')
