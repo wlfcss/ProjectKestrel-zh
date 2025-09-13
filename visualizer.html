@@ -154,7 +154,8 @@
       <div class="toolbar">
         <button id="pickFolder" class="primary">Open Photo Folder…</button>
         <button id="pickCsv">Open kestrel_database.csv…</button>
-        <button id="openSettings">Settings</button>
+  <button id="openSettings">Settings</button>
+  <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
         <div class="grow"></div>
         <input id="search" type="search" placeholder="Search species (e.g. hawk, warbler)" />
         <label class="inline">
@@ -282,6 +283,18 @@
       <div class="row" style="justify-content:flex-end; margin-top: 4px; gap:8px">
         <button id="mergeCancel">Cancel</button>
         <button id="mergeApply" class="primary" disabled>Merge</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Info dialog -->
+  <dialog id="infoDlg">
+    <div class="settings" style="width:min(560px,96vw)">
+      <h3 style="margin:0">Kestrel Database Info</h3>
+      <div id="infoNotice" class="notice hidden" style="margin:0 0 8px"></div>
+      <div id="infoContent" class="detail" style="max-height:50vh;overflow:auto;font-family:monospace;font-size:12px;white-space:pre;">—</div>
+      <div class="footer">
+        <button id="infoClose">Close</button>
       </div>
     </div>
   </dialog>
@@ -918,6 +931,42 @@
   document.getElementById('openSettings').addEventListener('click', showSettings);
   document.getElementById('settingsSave').addEventListener('click', applySettings);
   document.getElementById('settingsCancel').addEventListener('click', () => document.getElementById('settingsDlg').close());
+
+  // Info dialog: load kestrel_metadata.json from opened photo folder (.kestrel)
+  async function getMetadataHandle(){
+    if (!rootDirHandle) return null;
+    try { return await getHandleFromRelativePath(rootDirHandle, '.kestrel/kestrel_metadata.json'); } catch { return null; }
+  }
+  async function readMetadata(){
+    const h = await getMetadataHandle();
+    if (!h) return { error: 'kestrel_metadata.json not found. Use "Open Photo Folder…" to select your root.' };
+    try {
+      const file = await h.getFile();
+      const text = await file.text();
+      try { return JSON.parse(text); } catch { return { error: 'Failed to parse JSON in kestrel_metadata.json' }; }
+    } catch { return { error: 'Unable to read kestrel_metadata.json' }; }
+  }
+  async function openInfo(){
+    const dlg = document.getElementById('infoDlg');
+    const contentEl = document.getElementById('infoContent');
+    const noticeEl = document.getElementById('infoNotice');
+    contentEl.textContent = 'Loading…';
+    noticeEl.classList.add('hidden');
+    dlg.showModal();
+    const meta = await readMetadata();
+    if (meta && !meta.error){
+      // Add derived helper fields (non-destructive)
+      const enriched = { ...meta };
+      if (rootDirHandle) enriched.photo_root_name = rootDirHandle.name || '';
+      contentEl.textContent = JSON.stringify(enriched, null, 2);
+    } else {
+      contentEl.textContent = '—';
+      noticeEl.textContent = meta.error;
+      noticeEl.classList.remove('hidden');
+    }
+  }
+  document.getElementById('openInfo').addEventListener('click', openInfo);
+  document.getElementById('infoClose').addEventListener('click', () => document.getElementById('infoDlg').close());
 
   // Helper to infer root from absolute export/crop path strings in CSV
   function inferRootFromAbsPath(p){

@@ -17,6 +17,8 @@ import sys
 import threading
 import time
 import gc
+import json
+from datetime import datetime
 from typing import Optional, Dict
 
 import numpy as np
@@ -46,6 +48,8 @@ WILDLIFE_CATEGORIES = ['cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear'
 
 RAW_EXTENSIONS = [".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".raf", ".rw2", ".pef", ".sr2", ".x3f"]
 JPEG_EXTENSIONS = [".jpg", ".jpeg", ".png"]
+
+VERSION = "1.2.0"
 
 # -------------------- Core CV / ML Components (Copied & Adapted) -------------------- #
 
@@ -442,11 +446,26 @@ class ProcessingWorker(QThread):
             if os.path.exists(db_path):
                 database = pd.read_csv(db_path)
             else:
+                # Initialize fresh database
                 database = pd.DataFrame(columns=[
                     "filename", "species", "species_confidence", "family", "family_confidence", "quality", "export_path", "crop_path", "rating",
                     "scene_count", "feature_similarity", "feature_confidence", "color_similarity", "color_confidence", "similar",
                     "secondary_species_list", "secondary_species_scores", "secondary_family_list", "secondary_family_scores"
                 ])
+                # Write metadata file once on creation
+                metadata_path = os.path.join(self.kestrel_dir, "kestrel_metadata.json")
+                try:
+                    if not os.path.exists(metadata_path):
+                        metadata = {
+                            "version": VERSION,
+                            "analyzer": "gui",
+                            "created_utc": datetime.utcnow().isoformat() + "Z",
+                            "database_file": self.database_name
+                        }
+                        with open(metadata_path, 'w', encoding='utf-8') as mf:
+                            json.dump(metadata, mf, indent=2)
+                except Exception as e:
+                    print(f"Warning: failed to write metadata file: {e}")
 
             # Ensure any newly added columns exist (backwards compatibility with older DB)
             required_columns = [
