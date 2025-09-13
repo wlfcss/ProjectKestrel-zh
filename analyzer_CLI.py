@@ -493,7 +493,21 @@ mask_rcnn = maskRCNN()
 species_classifier = BirdSpeciesClassifier(SPECIESCLASSIFIER_PATH, SPECIESCLASSIFIER_LABELS)
 quality_classifier = QualityClassifier(QUALITYCLASSIFIER_PATH)
 
+# Set previous_image to last processed image if available and exists
 previous_image = None
+if not database.empty:
+    last_row = database.iloc[-1]
+    last_filename = last_row["filename"]
+    last_image_path = os.path.join(input_directory, last_filename)
+    if os.path.exists(last_image_path):
+        img = None
+        try:
+            with WandImage(filename=last_image_path) as wand_img:
+                img = np.array(wand_img)
+        except Exception:
+            img = None
+        if img is not None:
+            previous_image = img
 # Get scene count from the database.
 scene_count = database['scene_count'].max() if not database.empty else 0
 

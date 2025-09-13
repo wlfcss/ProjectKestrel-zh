@@ -398,7 +398,16 @@ class ProcessingWorker(QThread):
             quality_clf = QualityClassifier(QUALITYCLASSIFIER_PATH)
             self.status.emit("Models loaded. Processing started.")
 
+            # Set previous_image to last processed image if available and exists
             previous_image = None
+            if not database.empty:
+                last_row = database.iloc[-1]
+                last_filename = last_row["filename"]
+                last_image_path = os.path.join(self.folder, last_filename)
+                if os.path.exists(last_image_path):
+                    img = read_image(last_image_path)
+                    if img is not None:
+                        previous_image = img
             scene_count = database['scene_count'].max() if not database.empty else 0
 
             for idx, raw_file in enumerate(new_files, start=1):
