@@ -169,7 +169,7 @@ def launch(path: str, editor: str):
         subprocess.Popen(['open', path]); return
     # Linux / other
     if editor == 'darktable':
-        try: subprocess.Popen(['darktable', path]); return
+        try: subprocess.Popen(['flatpak', 'run', 'org.darktable.Darktable', path]); return
         except FileNotFoundError: pass
     if editor == 'lightroom':
         # Linux users may have a wrapper script named lightroom; attempt it
