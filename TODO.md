@@ -1,6 +1,7 @@
 # Project Kestrel To-Do and Changelog
 
 ## Known Issues
+- Kestrel's analysis struggles heavily with back-lit/front-dim images. The quality estimation and species detection suffers significantly because of this. An exposure normalization step should be cosnidered to standardize the exposure of the bird pixels.
 - Lightroom support has not been tested on Windows
 - Entire software has not been tested on MacOS.
 - Kestrel's data structure (csv database) is a bit messay and incomplete. Potentially need to switch to a JSON file structure while maintaining backward-compatibility in the visualizer.
