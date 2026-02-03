@@ -1,5 +1,5 @@
 __pycache__
-test_imgs/.kestrel
+test_imgs/.kestrel/
 .venv/
 .venv2/
 *.exe
