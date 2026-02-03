@@ -82,7 +82,7 @@ First open the analyzer.
 
 ```bash
 export QT_QPA_PLATFORM=wayland
-python analyzer.py
+python analyzer/gui_app.py
 ```
 
 Select a folder and hit start. The script will:
@@ -96,12 +96,17 @@ Select a folder and hit start. The script will:
 
 > Note: Kestrel comes with a set of test images. Simply open the `test_imgs` folder and hit Start. 
 
+CLI (headless) option:
+```bash
+python analyzer/cli.py "C:\\path\\to\\photos" --no-gpu
+```
+
 #### 2. Visualize Results
 
 Launch the interactive visualizer to browse your analyzed photos:
 
 ```bash
-python visualizer.py
+python visualizer/visualizer.py
 ```
 
 Open the folder that you analyzed to explore its contents and Kestrel's analysis:
@@ -139,14 +144,17 @@ Features of the visualizer:
 
 ```
 ProjectKestrel/
-├── analyze_directory.py    # Main analysis script
-├── visualizer.py          # Visualization interface
-├── models/                # AI model files
-│   ├── model.onnx        # Species classifier
-│   ├── labels.txt        # Species labels
-│   └── quality.keras     # Quality assessment model
-├── package-list.txt       # Conda environment specification
-└── README.md             # This file
+├── analyzer/                 # Analyzer app (GUI + CLI + core pipeline)
+│   ├── gui_app.py            # PyQt GUI entry
+│   ├── cli.py                # CLI entry
+│   ├── main.py               # GUI entrypoint wrapper
+│   ├── models/               # AI model files
+│   └── kestrel_analyzer/     # Core pipeline + ML wrappers
+├── visualizer/               # Visualizer app (local web server)
+│   ├── visualizer.py         # Server entry
+│   └── visualizer.html       # Web UI
+├── packaging/                # PyInstaller specs for .exe builds
+└── README.md
 ```
 
 ## 🎯 Supported File Formats
@@ -174,7 +182,7 @@ Kestrel's quality scoring model is trained on RAW images, and may not work as we
 ## 🔧 Configuration
 
 ### GPU Acceleration
-When running `analyze_directory.py`, you'll be prompted to choose between:
+When running the analyzer, you'll be prompted to choose between:
 - **GPU Mode**: Uses DirectML execution provider (faster, requires compatible GPU)
 - **CPU Mode**: Uses CPU execution provider (slower, but works on all systems)
 

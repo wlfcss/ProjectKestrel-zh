@@ -22,3 +22,6 @@ PyQt5>=5.15.11
 # Utilities
 pyexiftool>=0.5.6
 requests>=2.32.3
+
+# installer
+pyinstaller>=5.13.1

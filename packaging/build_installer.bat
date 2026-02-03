@@ -1,0 +1,102 @@
+@echo off
+REM ========================================
+REM Project Kestrel Installer Builder
+REM ========================================
+
+setlocal enabledelayedexpansion
+
+echo.
+echo ========================================
+echo Project Kestrel Installer Builder
+echo ========================================
+echo.
+
+set PROJECT_ROOT=%~dp0..
+set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+REM Change to project root directory
+cd /d "%PROJECT_ROOT%"
+
+echo Checking prerequisites...
+echo.
+
+REM Check if Inno Setup is installed
+if not exist %INNO_COMPILER% (
+    echo [ERROR] Inno Setup 6 not found at %INNO_COMPILER%
+    echo.
+    echo Please install Inno Setup 6 from: https://jrsoftware.org/isinfo.php
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Inno Setup 6 found
+
+REM Check if analyzer build exists
+if not exist "analyzer\dist\kestrel_analyzer.exe" (
+    echo [ERROR] Analyzer executable not found at:
+    echo        analyzer\dist\kestrel_analyzer.exe
+    echo.
+    echo Please build the analyzer first.
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Analyzer executable found
+
+REM Check if visualizer build exists  
+if not exist "visualizer\dist\kestrel_visualizer.exe" (
+    echo [ERROR] Visualizer executable not found at:
+    echo        visualizer\dist\kestrel_visualizer.exe
+    echo.
+    echo Please build the visualizer first.
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Visualizer executable found
+
+REM Check if LICENSE exists
+if not exist "LICENSE" (
+    echo [WARNING] LICENSE file not found - creating placeholder
+    echo MIT License > "LICENSE"
+)
+
+REM Create output directory
+if not exist "dist\installer" (
+    echo Creating output directory...
+    mkdir "dist\installer"
+)
+
+echo.
+echo ========================================
+echo Building installer...
+echo ========================================
+echo.
+
+REM Run Inno Setup compiler from packaging directory
+%INNO_COMPILER% "packaging\kestrel_installer.iss"
+
+if %ERRORLEVEL% EQU 0 (
+    echo.
+    echo ========================================
+    echo Installer built successfully!
+    echo ========================================
+    echo.
+    echo Output location:
+    echo %CD%\dist\installer\
+    echo.
+    
+    REM List the output file
+    for %%F in ("dist\installer\*.exe") do (
+        echo Created: %%~nxF
+        echo Size: %%~zF bytes
+    )
+    echo.
+) else (
+    echo.
+    echo [ERROR] Installer build failed!
+    echo Check the error messages above for details.
+    echo.
+)
+
+pause

@@ -1,10 +1,8 @@
-hierarchical_classifier.py
 __pycache__
 test_imgs/.kestrel
-actual_req_list.txt
-test_full_requirements.txt
-large_files/
-.venv2/
-dist/
-example_photos/
 .venv/
+.venv2/
+*.exe
+*.pkg
+models/**/*.pth
+large_files/
