@@ -25,3 +25,4 @@ requests==2.32.3
 
 # installer
 pyinstaller==6.1.0
+msvc-runtime==14.44.35112
