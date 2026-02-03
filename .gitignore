@@ -2,8 +2,5 @@ __pycache__
 test_imgs/.kestrel/
 .venv/
 .venv2/
-*.exe
-*.pkg
-models/**/*.pth
 large_files/
 .venv_from_base/
