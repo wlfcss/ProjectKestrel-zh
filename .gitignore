@@ -6,3 +6,4 @@ test_imgs/.kestrel
 *.pkg
 models/**/*.pth
 large_files/
+.venv_from_base/
