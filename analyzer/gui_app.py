@@ -257,7 +257,7 @@ class KestrelGUI(QWidget):
         self.btn_resume.setEnabled(False)
 
 
-def main():
+def main(app: Optional[QApplication] = None):
     log_path = get_log_path(None)
     try:
         log_event(
@@ -267,10 +267,14 @@ def main():
                 "event": "gui_start",
             },
         )
-        app = QApplication(sys.argv)
+        owns_app = app is None
+        app = app or QApplication(sys.argv)
         win = KestrelGUI()
         win.show()
-        sys.exit(app.exec_())
+        if owns_app:
+            sys.exit(app.exec_())
+        else:
+            app.exec_()
     except Exception as e:
         log_exception(
             log_path,

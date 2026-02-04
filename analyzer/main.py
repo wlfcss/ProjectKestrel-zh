@@ -1,33 +1,67 @@
 import sys
+import os
+import platform
+if platform.system() == "Windows": # REQUIRED to prevent pytorch dll load errors caused by importing pyqt before torch
+    import ctypes
+    from importlib.util import find_spec
+    try:
+        if (spec := find_spec("torch")) and spec.origin and os.path.exists(
+            dll_path := os.path.join(os.path.dirname(spec.origin), "lib", "c10.dll")
+        ):
+            ctypes.CDLL(os.path.normpath(dll_path))
+    except Exception:
+        pass
 
-# Sequential ML dependency loading with retry logic
-# This helps identify which modules are failing and in what order
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
-import torch as t
-import onnxruntime as ort
-import tensorflow as tf
+def _create_splash(app: QApplication) -> QWidget:
+    splash = QWidget()
+    splash.setWindowTitle("Kestrel Analyzer")
+    splash.setFixedSize(420, 160)
+    layout = QVBoxLayout(splash)
+    label = QLabel("Loading Kestrel…", splash)
+    label.setAlignment(Qt.AlignCenter)
+    label.setObjectName("splashLabel")
+    layout.addStretch(1)
+    layout.addWidget(label)
+    layout.addStretch(1)
+    splash.setLayout(layout)
+    splash.show()
+    app.processEvents()
+    return splash
 
-
-from gui_app import main
-from kestrel_analyzer.logging_utils import get_log_path, log_event, log_exception
-
+def _set_splash_text(app: QApplication, splash: QWidget, text: str) -> None:
+    label = splash.findChild(QLabel, "splashLabel")
+    if label:
+        label.setText(text)
+        app.processEvents()
 
 if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    splash = _create_splash(app)
+
+    _set_splash_text(app, splash, "Loading PyTorch…")
+    import torch as t
+
+    _set_splash_text(app, splash, "Loading ONNX Runtime…")
+    import onnxruntime as ort
+
+    _set_splash_text(app, splash, "Loading TensorFlow…")
+    import tensorflow as tf
+
+    _set_splash_text(app, splash, "Starting UI…")
+
+    from kestrel_analyzer.logging_utils import get_log_path, log_event
+    from gui_app import main
+
     log_path = get_log_path(None)
-    try:
-        log_event(
-            log_path,
-            {
-                "level": "info",
-                "event": "gui_start",
-            },
-        )
-        main()
-    except Exception as e:
-        log_exception(
-            log_path,
-            e,
-            stage="startup",
-            context={"analyzer": "gui"},
-        )
-        raise
+    log_event(
+        log_path,
+        {
+            "level": "info",
+            "event": "gui_start",
+        },
+    )
+    splash.close()
+    main(app)
