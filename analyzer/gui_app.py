@@ -115,6 +115,7 @@ class KestrelGUI(QWidget):
         self._thumbnail_image: Optional[QImage] = None
         self._overlay_image: Optional[QImage] = None
         self._crop_images: List[Optional[QImage]] = [None] * 5
+        self._paused: bool = False
 
         self._build_ui()
 
@@ -172,7 +173,7 @@ class KestrelGUI(QWidget):
             img_label.setAlignment(Qt.AlignCenter)
             img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             img_label.setMinimumSize(160, 160)
-            confidence_label = QLabel("Detection: -")
+            confidence_label = QLabel("Detection Confidence: -")
             rating_label = QLabel("Rating: -")
             species_label = QLabel("Species: -")
             family_label = QLabel("Family: -")
@@ -234,6 +235,7 @@ class KestrelGUI(QWidget):
         self.progress.setValue(0)
         self.lbl_status.setText("Initializing...")
         self.lbl_filename.setText("File: -")
+        self._paused = False
         self.btn_start.setEnabled(False)
         self.btn_pause.setEnabled(True)
         self.worker.start()
@@ -241,6 +243,7 @@ class KestrelGUI(QWidget):
     def pause_processing(self):
         if self.worker and self.worker.isRunning():
             self.worker.pause()
+            self._paused = True
             self.lbl_status.setText("Paused")
             self.btn_pause.setEnabled(False)
             self.btn_resume.setEnabled(True)
@@ -248,6 +251,7 @@ class KestrelGUI(QWidget):
     def resume_processing(self):
         if self.worker and self.worker.isRunning():
             self.worker.resume()
+            self._paused = False
             self.lbl_status.setText("Resumed")
             self.btn_pause.setEnabled(True)
             self.btn_resume.setEnabled(False)
@@ -266,9 +270,12 @@ class KestrelGUI(QWidget):
         super().resizeEvent(event)
 
     def on_status(self, msg: str):
+        if self._paused:
+            return
         self.lbl_status.setText(msg)
 
     def on_finished(self):
+        self._paused = False
         self.lbl_status.setText("Finished")
         self.btn_start.setEnabled(True)
         self.btn_pause.setEnabled(False)
@@ -327,16 +334,16 @@ class KestrelGUI(QWidget):
             self.crop_cards[idx]["image"].setText("")
             if idx < len(confidences):
                 self.crop_cards[idx]["confidence"].setText(
-                    f"Detection: {float(confidences[idx]):.2f}"
+                    f"Detection Confidence: {float(confidences[idx]):.2f}"
                 )
             else:
-                self.crop_cards[idx]["confidence"].setText("Detection: -")
+                self.crop_cards[idx]["confidence"].setText("Detection Confidence: -")
             self.crop_cards[idx]["rating"].setText("Rating: -")
             self.crop_cards[idx]["species"].setText("Species: -")
             self.crop_cards[idx]["family"].setText("Family: -")
         for idx in range(len(crops), 5):
             self.crop_cards[idx]["image"].setText("No bird")
-            self.crop_cards[idx]["confidence"].setText("Detection: -")
+            self.crop_cards[idx]["confidence"].setText("Detection Confidence: -")
             self.crop_cards[idx]["rating"].setText("Rating: -")
             self.crop_cards[idx]["species"].setText("Species: -")
             self.crop_cards[idx]["family"].setText("Family: -")

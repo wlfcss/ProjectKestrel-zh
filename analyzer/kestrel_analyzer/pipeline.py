@@ -167,11 +167,18 @@ class AnalysisPipeline:
 
             processed_set = set(database["filename"].values)
             new_files = [f for f in files if f not in processed_set]
+            processed_count = len(files) - len(new_files)
+            total = len(files)
+            if progress_cb:
+                progress_cb(processed_count, total)
+            if processed_count > 0 and status_cb:
+                status_cb("Picking up where Kestrel left off...")
             if not new_files:
                 if status_cb:
                     status_cb("No new files to process.")
+                if progress_cb:
+                    progress_cb(total, total)
                 return
-            total = len(new_files)
 
             stage_ctx["stage"] = "load_models"
             self.load_models(status_cb=status_cb)
@@ -283,7 +290,7 @@ class AnalysisPipeline:
                         if image_cb:
                             image_cb(entry)
                         if progress_cb:
-                            progress_cb(idx, total)
+                            progress_cb(idx + processed_count, total)
                         continue
 
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
@@ -508,7 +515,7 @@ class AnalysisPipeline:
                     if status_cb:
                         status_cb(
                             f"Processed {raw_file}: {entry['species']} Q={entry['quality']:.3f} "
-                            f"R={entry['rating']} ({idx}/{total})"
+                            f"R={entry['rating']} ({idx + processed_count}/{total})"
                         )
                 except Exception as e:
                     log_exception(
@@ -534,7 +541,7 @@ class AnalysisPipeline:
                     time.sleep(2)
 
                 if progress_cb:
-                    progress_cb(idx, total)
+                    progress_cb(idx + processed_count, total)
 
         except Exception as e:
             log_exception(
