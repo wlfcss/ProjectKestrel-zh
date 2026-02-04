@@ -35,6 +35,31 @@ class AnalysisPipeline:
         self.quality_clf: Optional[QualityClassifier] = None
         self._log_path: Optional[str] = None
 
+    @staticmethod
+    def _create_mask_overlay(
+        thumbnail: np.ndarray,
+        masks: Optional[np.ndarray],
+        indices: Optional[list],
+        color=(255, 64, 64),
+        alpha: float = 0.45,
+    ) -> Optional[np.ndarray]:
+        if thumbnail is None:
+            return None
+        overlay = thumbnail.copy()
+        if masks is None or not indices:
+            return overlay
+        h, w = overlay.shape[:2]
+        for i in indices:
+            mask = masks[i].astype(np.uint8)
+            mask_small = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+            mask_bool = mask_small.astype(bool)
+            if not np.any(mask_bool):
+                continue
+            overlay[mask_bool] = (
+                overlay[mask_bool] * (1.0 - alpha) + np.array(color, dtype=np.uint8) * alpha
+            ).astype(np.uint8)
+        return overlay
+
     def load_models(self, status_cb: Optional[Callable[[str], None]] = None) -> None:
         if self.mask_rcnn and self.species_clf and self.quality_clf:
             return
@@ -62,6 +87,11 @@ class AnalysisPipeline:
         status_cb = callbacks.get("on_status")
         progress_cb = callbacks.get("on_progress")
         image_cb = callbacks.get("on_image")
+        thumbnail_cb = callbacks.get("on_thumbnail")
+        detection_cb = callbacks.get("on_detection")
+        crops_cb = callbacks.get("on_crops")
+        quality_cb = callbacks.get("on_quality")
+        species_cb = callbacks.get("on_species")
         error_cb = callbacks.get("on_error")
 
         self._log_path = get_log_path(folder)
@@ -217,10 +247,26 @@ class AnalysisPipeline:
                         [cv2.IMWRITE_JPEG_QUALITY, 70],
                     )
                     entry.update({"export_path": export_path})
+                    if thumbnail_cb:
+                        thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path})
 
                     stage_ctx["stage"] = "mask_rcnn_prediction"
                     masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
-                    if masks is None:
+                    if masks is None or len(masks) == 0:
+                        if detection_cb:
+                            detection_cb(
+                                {
+                                    "filename": raw_file,
+                                    "overlay": self._create_mask_overlay(img_small, None, None),
+                                    "bird_count": 0,
+                                }
+                            )
+                        if crops_cb:
+                            crops_cb({"filename": raw_file, "crops": [], "confidences": []})
+                        if quality_cb:
+                            quality_cb({"filename": raw_file, "results": []})
+                        if species_cb:
+                            species_cb({"filename": raw_file, "results": []})
                         if status_cb:
                             status_cb(f"No detections in {raw_file}")
                         stage_ctx["stage"] = "write_crop"
@@ -244,6 +290,16 @@ class AnalysisPipeline:
                     bird_indices = [i for i, c in enumerate(pred_class) if c == "bird"]
                     bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
 
+                    overlay_indices = bird_indices if bird_indices else wildlife_indices[:1]
+                    if detection_cb:
+                        detection_cb(
+                            {
+                                "filename": raw_file,
+                                "overlay": self._create_mask_overlay(img_small, masks, overlay_indices),
+                                "bird_count": len(bird_indices),
+                            }
+                        )
+
                     def process_nonbird(primary_mask_i):
                         stage_ctx["stage"] = "process_nonbird"
                         quality_crop, quality_mask = self.mask_rcnn.get_square_crop(
@@ -260,51 +316,102 @@ class AnalysisPipeline:
                             "quality_crop": quality_crop,
                         }
 
-                    def process_bird(i):
+                    def process_bird_items(indices):
                         stage_ctx["stage"] = "process_bird"
-                        if pred_class[i] == "bird":
+                        items = []
+                        for i in indices:
                             species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img)
-                            species_result = self.species_clf.classify(species_crop)
-                            species_label = (
-                                species_result["top_species_labels"][0]
-                                if len(species_result["top_species_labels"])
-                                else "Unknown"
+                            quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
+                            items.append(
+                                {
+                                    "index": i,
+                                    "confidence": float(pred_score[i]),
+                                    "species_crop": species_crop,
+                                    "quality_crop": quality_crop,
+                                    "quality_mask": quality_mask,
+                                }
                             )
-                            species_confidence = (
-                                float(species_result["top_species_scores"][0])
-                                if len(species_result["top_species_scores"])
-                                else 0.0
+                        if crops_cb:
+                            crops_cb(
+                                {
+                                    "filename": raw_file,
+                                    "crops": [i["quality_crop"] for i in items],
+                                    "confidences": [i["confidence"] for i in items],
+                                }
                             )
-                            family_label = (
-                                species_result["top_family_labels"][0]
-                                if len(species_result["top_family_labels"])
-                                else "Unknown"
+                        for item in items:
+                            i = item["index"]
+                            if pred_class[i] == "bird":
+                                species_result = self.species_clf.classify(item["species_crop"])
+                                item["species"] = (
+                                    species_result["top_species_labels"][0]
+                                    if len(species_result["top_species_labels"])
+                                    else "Unknown"
+                                )
+                                item["species_confidence"] = (
+                                    float(species_result["top_species_scores"][0])
+                                    if len(species_result["top_species_scores"])
+                                    else 0.0
+                                )
+                                item["family"] = (
+                                    species_result["top_family_labels"][0]
+                                    if len(species_result["top_family_labels"])
+                                    else "Unknown"
+                                )
+                                item["family_confidence"] = (
+                                    float(species_result["top_family_scores"][0])
+                                    if len(species_result["top_family_scores"])
+                                    else 0.0
+                                )
+                            else:
+                                item["species"] = pred_class[i]
+                                item["species_confidence"] = float(pred_score[i])
+                                item["family"] = "N/A"
+                                item["family_confidence"] = 0.0
+                            stage_ctx["stage"] = "quality_score"
+                            quality_score = self.quality_clf.classify(item["quality_crop"], item["quality_mask"])
+                            item["quality"] = quality_score
+                            item["rating"] = quality_to_rating(quality_score)
+                        if quality_cb:
+                            quality_cb(
+                                {
+                                    "filename": raw_file,
+                                    "results": [
+                                        {"quality": i["quality"], "rating": i["rating"]} for i in items
+                                    ],
+                                }
                             )
-                            family_confidence = (
-                                float(species_result["top_family_scores"][0])
-                                if len(species_result["top_family_scores"])
-                                else 0.0
+                        if species_cb:
+                            species_cb(
+                                {
+                                    "filename": raw_file,
+                                    "results": [
+                                        {
+                                            "species": i["species"],
+                                            "species_confidence": i["species_confidence"],
+                                            "family": i["family"],
+                                            "family_confidence": i["family_confidence"],
+                                        }
+                                        for i in items
+                                    ],
+                                }
                             )
-                        else:
-                            species_label = pred_class[i]
-                            species_confidence = float(pred_score[i])
-                            family_label = "N/A"
-                            family_confidence = 0.0
-                        quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
-                        stage_ctx["stage"] = "quality_score"
-                        quality_score = self.quality_clf.classify(quality_crop, quality_mask)
-                        return {
-                            "species": species_label,
-                            "species_confidence": species_confidence,
-                            "family": family_label,
-                            "family_confidence": family_confidence,
-                            "quality": quality_score,
-                            "rating": quality_to_rating(quality_score),
-                            "quality_crop": quality_crop,
-                        }
+                        return items
 
                     if bird_indices:
-                        bird_data = [process_bird(i) for i in bird_indices]
+                        bird_items = process_bird_items(bird_indices)
+                        bird_data = [
+                            {
+                                "species": i["species"],
+                                "species_confidence": i["species_confidence"],
+                                "family": i["family"],
+                                "family_confidence": i["family_confidence"],
+                                "quality": i["quality"],
+                                "rating": i["rating"],
+                                "quality_crop": i["quality_crop"],
+                            }
+                            for i in bird_items
+                        ]
                         primary_bird = max(bird_data, key=lambda x: x["quality"])
                         entry.update(
                             {
@@ -333,6 +440,35 @@ class AnalysisPipeline:
                         if wildlife_indices:
                             primary_index = wildlife_indices[np.argmax([pred_score[i] for i in wildlife_indices])]
                             result = process_nonbird(primary_index)
+                            if crops_cb:
+                                crops_cb(
+                                    {
+                                        "filename": raw_file,
+                                        "crops": [result["quality_crop"]],
+                                        "confidences": [float(pred_score[primary_index])],
+                                    }
+                                )
+                            if quality_cb:
+                                quality_cb(
+                                    {
+                                        "filename": raw_file,
+                                        "results": [{"quality": result["quality"], "rating": result["rating"]}],
+                                    }
+                                )
+                            if species_cb:
+                                species_cb(
+                                    {
+                                        "filename": raw_file,
+                                        "results": [
+                                            {
+                                                "species": result["species"],
+                                                "species_confidence": result["species_confidence"],
+                                                "family": result["family"],
+                                                "family_confidence": result["family_confidence"],
+                                            }
+                                        ],
+                                    }
+                                )
                             entry.update(
                                 {
                                     "species": result["species"],
@@ -345,6 +481,12 @@ class AnalysisPipeline:
                             )
                             crop_img = result["quality_crop"]
                         else:
+                            if crops_cb:
+                                crops_cb({"filename": raw_file, "crops": [], "confidences": []})
+                            if quality_cb:
+                                quality_cb({"filename": raw_file, "results": []})
+                            if species_cb:
+                                species_cb({"filename": raw_file, "results": []})
                             crop_img = img_small
 
                     stage_ctx["stage"] = "write_crop"

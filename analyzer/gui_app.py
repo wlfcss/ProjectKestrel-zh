@@ -4,7 +4,7 @@ import tensorflow as tf
 
 import sys
 import threading
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from PyQt5.QtGui import QImage, QPixmap
@@ -30,13 +30,18 @@ from PyQt5.QtWidgets import (
 
 from kestrel_analyzer.pipeline import AnalysisPipeline
 from kestrel_analyzer.logging_utils import get_log_path, log_event, log_exception
-from gui_helpers import load_qimage_from_path
+from gui_helpers import load_qimage_from_path, numpy_to_qimage
 
 
 class ProcessingWorker(QThread):
     progress = pyqtSignal(int, int)
     image_processed = pyqtSignal(dict, QImage, QImage)
     status = pyqtSignal(str)
+    thumbnail_ready = pyqtSignal(object)
+    detection_ready = pyqtSignal(object)
+    crops_ready = pyqtSignal(object)
+    quality_ready = pyqtSignal(object)
+    species_ready = pyqtSignal(object)
     finished = pyqtSignal()
 
     def __init__(self, folder: str, use_gpu: bool, parent=None):
@@ -66,6 +71,21 @@ class ProcessingWorker(QThread):
             crop_q = load_qimage_from_path(entry.get("crop_path"))
             self.image_processed.emit(entry, export_q, crop_q)
 
+        def on_thumbnail(data: dict):
+            self.thumbnail_ready.emit(data)
+
+        def on_detection(data: dict):
+            self.detection_ready.emit(data)
+
+        def on_crops(data: dict):
+            self.crops_ready.emit(data)
+
+        def on_quality(data: dict):
+            self.quality_ready.emit(data)
+
+        def on_species(data: dict):
+            self.species_ready.emit(data)
+
         pipeline.process_folder(
             self.folder,
             pause_event=self._pause_event,
@@ -73,6 +93,11 @@ class ProcessingWorker(QThread):
                 "on_status": on_status,
                 "on_progress": on_progress,
                 "on_image": on_image,
+                "on_thumbnail": on_thumbnail,
+                "on_detection": on_detection,
+                "on_crops": on_crops,
+                "on_quality": on_quality,
+                "on_species": on_species,
             },
             analyzer_name="gui",
         )
@@ -87,6 +112,9 @@ class KestrelGUI(QWidget):
 
         self.folder: Optional[str] = None
         self.worker: Optional[ProcessingWorker] = None
+        self._thumbnail_image: Optional[QImage] = None
+        self._overlay_image: Optional[QImage] = None
+        self._crop_images: List[Optional[QImage]] = [None] * 5
 
         self._build_ui()
 
@@ -111,56 +139,64 @@ class KestrelGUI(QWidget):
         control_layout.addStretch(1)
         control_box.setLayout(control_layout)
 
+        status_box = QGroupBox("Live Status")
+        status_layout = QVBoxLayout()
         self.progress = QProgressBar()
         self.lbl_status = QLabel("Idle")
         self.lbl_status.setWordWrap(True)
+        self.lbl_filename = QLabel("File: -")
+        status_layout.addWidget(self.progress)
+        status_layout.addWidget(self.lbl_status)
+        status_layout.addWidget(self.lbl_filename)
+        status_box.setLayout(status_layout)
 
-        image_box = QGroupBox("Latest Images")
-        img_layout = QHBoxLayout()
-        self.lbl_export = QLabel("Export Image")
-        self.lbl_crop = QLabel("Crop Image")
-        for lbl in (self.lbl_export, self.lbl_crop):
+        preview_box = QGroupBox("Preview")
+        preview_layout = QHBoxLayout()
+        self.lbl_thumbnail = QLabel("Thumbnail")
+        self.lbl_overlay = QLabel("Detections")
+        for lbl in (self.lbl_thumbnail, self.lbl_overlay):
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        img_layout.addWidget(self.lbl_export)
-        img_layout.addWidget(self.lbl_crop)
-        image_box.setLayout(img_layout)
+            lbl.setMinimumHeight(260)
+        preview_layout.addWidget(self.lbl_thumbnail)
+        preview_layout.addWidget(self.lbl_overlay)
+        preview_box.setLayout(preview_layout)
 
-        info_box = QGroupBox("Current Detection")
-        grid = QGridLayout()
-        self.info_labels: Dict[str, QLabel] = {}
-        fields = [
-            "filename",
-            "species",
-            "species_confidence",
-            "family",
-            "family_confidence",
-            "quality",
-            "rating",
-            "scene_count",
-            "feature_similarity",
-            "feature_confidence",
-            "color_similarity",
-            "color_confidence",
-            "similar",
-            "secondary_species_list",
-            "secondary_species_scores",
-            "secondary_family_list",
-            "secondary_family_scores",
-        ]
-        for row, field in enumerate(fields):
-            grid.addWidget(QLabel(field.replace("_", " ").title() + ":"), row, 0)
-            val_label = QLabel("-")
-            val_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-            grid.addWidget(val_label, row, 1)
-            self.info_labels[field] = val_label
-        info_box.setLayout(grid)
+        birds_box = QGroupBox("Top Detections")
+        birds_layout = QGridLayout()
+        self.crop_cards: List[Dict[str, QLabel]] = []
+        for idx in range(5):
+            card = QWidget()
+            card_layout = QVBoxLayout()
+            img_label = QLabel("No bird")
+            img_label.setAlignment(Qt.AlignCenter)
+            img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            img_label.setMinimumSize(160, 160)
+            rating_label = QLabel("Rating: -")
+            species_label = QLabel("Species: -")
+            family_label = QLabel("Family: -")
+            for lbl in (rating_label, species_label, family_label):
+                lbl.setWordWrap(True)
+            card_layout.addWidget(img_label)
+            card_layout.addWidget(rating_label)
+            card_layout.addWidget(species_label)
+            card_layout.addWidget(family_label)
+            card.setLayout(card_layout)
+            birds_layout.addWidget(card, 0, idx)
+            self.crop_cards.append(
+                {
+                    "image": img_label,
+                    "rating": rating_label,
+                    "species": species_label,
+                    "family": family_label,
+                }
+            )
+        birds_box.setLayout(birds_layout)
 
         main_layout.addWidget(control_box)
-        main_layout.addWidget(self.progress)
-        main_layout.addWidget(self.lbl_status)
-        main_layout.addWidget(image_box, stretch=2)
-        main_layout.addWidget(info_box, stretch=1)
+        main_layout.addWidget(status_box)
+        main_layout.addWidget(preview_box, stretch=2)
+        main_layout.addWidget(birds_box, stretch=2)
         self.setLayout(main_layout)
 
         self.btn_select.clicked.connect(self.select_folder)
@@ -186,9 +222,15 @@ class KestrelGUI(QWidget):
         self.worker.progress.connect(self.on_progress)
         self.worker.image_processed.connect(self.on_image_processed)
         self.worker.status.connect(self.on_status)
+        self.worker.thumbnail_ready.connect(self.on_thumbnail_ready)
+        self.worker.detection_ready.connect(self.on_detection_ready)
+        self.worker.crops_ready.connect(self.on_crops_ready)
+        self.worker.quality_ready.connect(self.on_quality_ready)
+        self.worker.species_ready.connect(self.on_species_ready)
         self.worker.finished.connect(self.on_finished)
         self.progress.setValue(0)
         self.lbl_status.setText("Initializing...")
+        self.lbl_filename.setText("File: -")
         self.btn_start.setEnabled(False)
         self.btn_pause.setEnabled(True)
         self.worker.start()
@@ -213,38 +255,11 @@ class KestrelGUI(QWidget):
         self.progress.setValue(processed)
 
     def on_image_processed(self, entry: dict, export_img: QImage, crop_img: QImage):
-        if export_img:
-            self.lbl_export.setPixmap(
-                QPixmap.fromImage(export_img).scaled(
-                    self.lbl_export.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-                )
-            )
-        if crop_img:
-            self.lbl_crop.setPixmap(
-                QPixmap.fromImage(crop_img).scaled(
-                    self.lbl_crop.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-                )
-            )
-        for k, v in entry.items():
-            if k in self.info_labels:
-                if isinstance(v, float):
-                    self.info_labels[k].setText(f"{v:.4f}")
-                else:
-                    self.info_labels[k].setText(str(v))
+        if entry.get("filename"):
+            self.lbl_filename.setText(f"File: {entry.get('filename')}")
 
     def resizeEvent(self, event):
-        if self.lbl_export.pixmap():
-            self.lbl_export.setPixmap(
-                self.lbl_export.pixmap().scaled(
-                    self.lbl_export.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-                )
-            )
-        if self.lbl_crop.pixmap():
-            self.lbl_crop.setPixmap(
-                self.lbl_crop.pixmap().scaled(
-                    self.lbl_crop.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-                )
-            )
+        self._refresh_images()
         super().resizeEvent(event)
 
     def on_status(self, msg: str):
@@ -255,6 +270,93 @@ class KestrelGUI(QWidget):
         self.btn_start.setEnabled(True)
         self.btn_pause.setEnabled(False)
         self.btn_resume.setEnabled(False)
+
+    def _set_image_label(self, label: QLabel, image: Optional[QImage]) -> None:
+        if image is None:
+            label.setPixmap(QPixmap())
+            return
+        label.setPixmap(
+            QPixmap.fromImage(image).scaled(
+                label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
+
+    def _refresh_images(self) -> None:
+        self._set_image_label(self.lbl_thumbnail, self._thumbnail_image)
+        self._set_image_label(self.lbl_overlay, self._overlay_image)
+        for idx, card in enumerate(self.crop_cards):
+            self._set_image_label(card["image"], self._crop_images[idx])
+
+    def _clear_cards(self) -> None:
+        self._crop_images = [None] * 5
+        for card in self.crop_cards:
+            card["image"].setText("No bird")
+            card["rating"].setText("Rating: -")
+            card["species"].setText("Species: -")
+            card["family"].setText("Family: -")
+
+    @staticmethod
+    def _format_stars(rating: int) -> str:
+        rating = max(0, min(5, int(rating)))
+        return "★" * rating + "☆" * (5 - rating)
+
+    def on_thumbnail_ready(self, data: dict):
+        thumb = numpy_to_qimage(data.get("thumbnail"))
+        self._thumbnail_image = thumb
+        self._overlay_image = None
+        self._clear_cards()
+        if data.get("filename"):
+            self.lbl_filename.setText(f"File: {data.get('filename')}")
+        self._refresh_images()
+
+    def on_detection_ready(self, data: dict):
+        overlay = numpy_to_qimage(data.get("overlay"))
+        self._overlay_image = overlay
+        self._refresh_images()
+
+    def on_crops_ready(self, data: dict):
+        crops = data.get("crops") or []
+        self._crop_images = [None] * 5
+        for idx, crop in enumerate(crops[:5]):
+            self._crop_images[idx] = numpy_to_qimage(crop)
+            self.crop_cards[idx]["image"].setText("")
+            self.crop_cards[idx]["rating"].setText("Rating: -")
+            self.crop_cards[idx]["species"].setText("Species: -")
+            self.crop_cards[idx]["family"].setText("Family: -")
+        for idx in range(len(crops), 5):
+            self.crop_cards[idx]["image"].setText("No bird")
+            self.crop_cards[idx]["rating"].setText("Rating: -")
+            self.crop_cards[idx]["species"].setText("Species: -")
+            self.crop_cards[idx]["family"].setText("Family: -")
+        self._refresh_images()
+
+    def on_quality_ready(self, data: dict):
+        results = data.get("results") or []
+        for idx in range(5):
+            if idx < len(results):
+                rating = results[idx].get("rating", 0)
+                stars = self._format_stars(rating)
+                self.crop_cards[idx]["rating"].setText(f"Rating: {stars}")
+            else:
+                self.crop_cards[idx]["rating"].setText("Rating: -")
+
+    def on_species_ready(self, data: dict):
+        results = data.get("results") or []
+        for idx in range(5):
+            if idx < len(results):
+                species = results[idx].get("species", "Unknown")
+                species_conf = results[idx].get("species_confidence", 0.0)
+                family = results[idx].get("family", "Unknown")
+                family_conf = results[idx].get("family_confidence", 0.0)
+                self.crop_cards[idx]["species"].setText(
+                    f"Species: {species} ({species_conf:.2f})"
+                )
+                self.crop_cards[idx]["family"].setText(
+                    f"Family: {family} ({family_conf:.2f})"
+                )
+            else:
+                self.crop_cards[idx]["species"].setText("Species: -")
+                self.crop_cards[idx]["family"].setText("Family: -")
 
 
 def main(app: Optional[QApplication] = None):
