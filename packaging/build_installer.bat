@@ -91,7 +91,19 @@ if %ERRORLEVEL% EQU 0 (
         echo Created: %%~nxF
         echo Size: %%~zF bytes
     )
+
     echo.
+    echo.
+    echo ========================================
+    echo Moving build artifacts to dist...
+    echo ========================================
+    echo.
+
+    move /Y "analyzer\dist\kestrel_analyzer.exe" "release\kestrel_analyzer.exe"
+    move /Y "analyzer\build\kestrel_analyzer_build\kestrel_analyzer.pkg" "release\kestrel_analyzer.pkg"
+    move /Y "visualizer\dist\visualizer.exe" "release\visualizer.exe"
+    move /Y "visualizer\build\visualizer\visualizer.pkg" "release\kestrel_visualizer.pkg"
+
 ) else (
     echo.
     echo [ERROR] Installer build failed!

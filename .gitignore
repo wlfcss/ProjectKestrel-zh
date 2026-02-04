@@ -4,3 +4,5 @@ test_imgs/.kestrel/
 .venv2/
 large_files/
 .venv_from_base/
+dist/
+release/
