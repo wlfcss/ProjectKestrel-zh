@@ -109,7 +109,7 @@ if %ERRORLEVEL% EQU 0 (
     echo.
     echo.
     echo ========================================
-    echo Moving build artifacts to dist...
+    echo Moving build artifacts to release...
     echo ========================================
     echo.
 
@@ -117,7 +117,8 @@ if %ERRORLEVEL% EQU 0 (
     move /Y "analyzer\build\kestrel_analyzer_build\kestrel_analyzer.pkg" "release\kestrel_analyzer.pkg"
     move /Y "visualizer\dist\visualizer.exe" "release\visualizer.exe"
     move /Y "visualizer\build\visualizer\visualizer.pkg" "release\visualizer.pkg"
-
+    move /Y "dist\installer\*.exe" "release\"
+    echo [OK] Build artifacts moved to release/ directory
 ) else (
     echo.
     echo [ERROR] Installer build failed!
