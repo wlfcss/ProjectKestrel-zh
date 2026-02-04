@@ -6,6 +6,9 @@
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\numpy\\_pyinstaller',
    0),
   ('C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\__pyinstaller',
+   0),
+  ('C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks',
    -1000),
   ('C:\\Data\\Code\\Project '
@@ -28,28 +31,40 @@
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
    'PYSOURCE'),
+  ('pyi_rth_pkgutil',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgutil.py',
+   'PYSOURCE'),
+  ('pyi_rth_multiprocessing',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_multiprocessing.py',
+   'PYSOURCE'),
+  ('pyi_rth_setuptools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_setuptools.py',
+   'PYSOURCE'),
+  ('pyi_rth_pkgres',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pkgres.py',
+   'PYSOURCE'),
+  ('pyi_rth_pyqt5',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyqt5.py',
+   'PYSOURCE'),
   ('visualizer',
    'C:\\Data\\Code\\Project Kestrel\\ProjectKestrel\\visualizer\\visualizer.py',
    'PYSOURCE')],
- [('zipfile',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\zipfile.py',
-   'PYMODULE'),
-  ('py_compile',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\py_compile.py',
-   'PYMODULE'),
-  ('importlib.machinery',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\machinery.py',
+ [('_pyi_rth_utils.qt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\fake-modules\\_pyi_rth_utils\\qt.py',
    'PYMODULE'),
   ('importlib',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\__init__.py',
    'PYMODULE'),
-  ('importlib._bootstrap',
+  ('importlib.machinery',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\_bootstrap.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\machinery.py',
    'PYMODULE'),
   ('importlib._bootstrap_external',
    'C:\\Program '
@@ -135,6 +150,26 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\dataclasses.py',
    'PYMODULE'),
+  ('inspect',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\inspect.py',
+   'PYMODULE'),
+  ('token',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\token.py',
+   'PYMODULE'),
+  ('dis',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\dis.py',
+   'PYMODULE'),
+  ('opcode',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\opcode.py',
+   'PYMODULE'),
+  ('ast',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ast.py',
+   'PYMODULE'),
   ('copy',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\copy.py',
@@ -142,6 +177,10 @@
   ('_compat_pickle',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_compat_pickle.py',
+   'PYMODULE'),
+  ('struct',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\struct.py',
    'PYMODULE'),
   ('string',
    'C:\\Program '
@@ -151,9 +190,41 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\bisect.py',
    'PYMODULE'),
+  ('shutil',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\shutil.py',
+   'PYMODULE'),
+  ('tarfile',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\tarfile.py',
+   'PYMODULE'),
+  ('gzip',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\gzip.py',
+   'PYMODULE'),
+  ('_compression',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_compression.py',
+   'PYMODULE'),
+  ('lzma',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\lzma.py',
+   'PYMODULE'),
+  ('bz2',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\bz2.py',
+   'PYMODULE'),
+  ('fnmatch',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\fnmatch.py',
+   'PYMODULE'),
   ('importlib._abc',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\_abc.py',
+   'PYMODULE'),
+  ('contextlib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\contextlib.py',
    'PYMODULE'),
   ('importlib.metadata._itertools',
    'C:\\Program '
@@ -291,6 +362,22 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\textwrap.py',
    'PYMODULE'),
+  ('zipfile',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\zipfile.py',
+   'PYMODULE'),
+  ('py_compile',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\py_compile.py',
+   'PYMODULE'),
+  ('importlib.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\util.py',
+   'PYMODULE'),
+  ('pathlib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pathlib.py',
+   'PYMODULE'),
   ('email',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\email\\__init__.py',
@@ -323,69 +410,1973 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\tokenize.py',
    'PYMODULE'),
-  ('token',
+  ('importlib._bootstrap',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\token.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\_bootstrap.py',
    'PYMODULE'),
-  ('lzma',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\lzma.py',
+  ('_pyi_rth_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyInstaller\\fake-modules\\_pyi_rth_utils\\__init__.py',
    'PYMODULE'),
-  ('_compression',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_compression.py',
+  ('pkg_resources',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\__init__.py',
    'PYMODULE'),
-  ('bz2',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\bz2.py',
+  ('packaging.version',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\version.py',
    'PYMODULE'),
-  ('pathlib',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pathlib.py',
+  ('typing_extensions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\typing_extensions.py',
    'PYMODULE'),
-  ('fnmatch',
+  ('asyncio.coroutines',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\fnmatch.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\coroutines.py',
    'PYMODULE'),
-  ('contextlib',
+  ('asyncio',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\contextlib.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\__init__.py',
    'PYMODULE'),
-  ('struct',
+  ('asyncio.unix_events',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\struct.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\unix_events.py',
    'PYMODULE'),
-  ('shutil',
+  ('asyncio.log',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\shutil.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\log.py',
    'PYMODULE'),
-  ('tarfile',
+  ('signal',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\tarfile.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\signal.py',
    'PYMODULE'),
-  ('gzip',
+  ('asyncio.windows_events',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\gzip.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\windows_events.py',
    'PYMODULE'),
-  ('importlib.util',
+  ('asyncio.windows_utils',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\importlib\\util.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\windows_utils.py',
    'PYMODULE'),
-  ('inspect',
+  ('asyncio.selector_events',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\inspect.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\selector_events.py',
    'PYMODULE'),
-  ('dis',
+  ('ssl',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\dis.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ssl.py',
    'PYMODULE'),
-  ('opcode',
+  ('asyncio.proactor_events',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\opcode.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\proactor_events.py',
    'PYMODULE'),
-  ('ast',
+  ('asyncio.base_subprocess',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ast.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\base_subprocess.py',
+   'PYMODULE'),
+  ('asyncio.threads',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\threads.py',
+   'PYMODULE'),
+  ('asyncio.timeouts',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\timeouts.py',
+   'PYMODULE'),
+  ('asyncio.taskgroups',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\taskgroups.py',
+   'PYMODULE'),
+  ('asyncio.subprocess',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\subprocess.py',
+   'PYMODULE'),
+  ('asyncio.streams',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\streams.py',
+   'PYMODULE'),
+  ('asyncio.queues',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\queues.py',
+   'PYMODULE'),
+  ('asyncio.runners',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\runners.py',
+   'PYMODULE'),
+  ('asyncio.base_events',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\base_events.py',
+   'PYMODULE'),
+  ('concurrent.futures',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\concurrent\\futures\\__init__.py',
+   'PYMODULE'),
+  ('concurrent.futures.thread',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\concurrent\\futures\\thread.py',
+   'PYMODULE'),
+  ('queue',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\queue.py',
+   'PYMODULE'),
+  ('concurrent.futures.process',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\concurrent\\futures\\process.py',
+   'PYMODULE'),
+  ('multiprocessing.synchronize',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\synchronize.py',
+   'PYMODULE'),
+  ('multiprocessing.heap',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\heap.py',
+   'PYMODULE'),
+  ('multiprocessing.resource_tracker',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\resource_tracker.py',
+   'PYMODULE'),
+  ('multiprocessing.spawn',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\spawn.py',
+   'PYMODULE'),
+  ('runpy',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\runpy.py',
+   'PYMODULE'),
+  ('multiprocessing.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\util.py',
+   'PYMODULE'),
+  ('multiprocessing.forkserver',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\forkserver.py',
+   'PYMODULE'),
+  ('multiprocessing.process',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\process.py',
+   'PYMODULE'),
+  ('multiprocessing.context',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\context.py',
+   'PYMODULE'),
+  ('multiprocessing.popen_spawn_win32',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\popen_spawn_win32.py',
+   'PYMODULE'),
+  ('multiprocessing.popen_forkserver',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\popen_forkserver.py',
+   'PYMODULE'),
+  ('multiprocessing.popen_spawn_posix',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\popen_spawn_posix.py',
+   'PYMODULE'),
+  ('multiprocessing.popen_fork',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\popen_fork.py',
+   'PYMODULE'),
+  ('multiprocessing.sharedctypes',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\sharedctypes.py',
+   'PYMODULE'),
+  ('ctypes',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\__init__.py',
+   'PYMODULE'),
+  ('ctypes.wintypes',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\wintypes.py',
+   'PYMODULE'),
+  ('ctypes._endian',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\_endian.py',
+   'PYMODULE'),
+  ('multiprocessing.pool',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\pool.py',
+   'PYMODULE'),
+  ('multiprocessing.dummy',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\dummy\\__init__.py',
+   'PYMODULE'),
+  ('multiprocessing.dummy.connection',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\dummy\\connection.py',
+   'PYMODULE'),
+  ('multiprocessing.managers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\managers.py',
+   'PYMODULE'),
+  ('multiprocessing.shared_memory',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\shared_memory.py',
+   'PYMODULE'),
+  ('multiprocessing.reduction',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\reduction.py',
+   'PYMODULE'),
+  ('multiprocessing.resource_sharer',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\resource_sharer.py',
+   'PYMODULE'),
+  ('multiprocessing.queues',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\queues.py',
+   'PYMODULE'),
+  ('multiprocessing.connection',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\connection.py',
+   'PYMODULE'),
+  ('xmlrpc.client',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xmlrpc\\client.py',
+   'PYMODULE'),
+  ('xmlrpc',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xmlrpc\\__init__.py',
+   'PYMODULE'),
+  ('xml.parsers.expat',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\parsers\\expat.py',
+   'PYMODULE'),
+  ('xml.parsers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\parsers\\__init__.py',
+   'PYMODULE'),
+  ('xml',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\__init__.py',
+   'PYMODULE'),
+  ('xml.sax.expatreader',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\expatreader.py',
+   'PYMODULE'),
+  ('xml.sax.saxutils',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\saxutils.py',
+   'PYMODULE'),
+  ('urllib.request',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\urllib\\request.py',
+   'PYMODULE'),
+  ('ipaddress',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ipaddress.py',
+   'PYMODULE'),
+  ('getpass',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\getpass.py',
+   'PYMODULE'),
+  ('nturl2path',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\nturl2path.py',
+   'PYMODULE'),
+  ('ftplib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ftplib.py',
+   'PYMODULE'),
+  ('netrc',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\netrc.py',
+   'PYMODULE'),
+  ('shlex',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\shlex.py',
+   'PYMODULE'),
+  ('mimetypes',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\mimetypes.py',
+   'PYMODULE'),
+  ('http.cookiejar',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\cookiejar.py',
+   'PYMODULE'),
+  ('http',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\__init__.py',
+   'PYMODULE'),
+  ('urllib.response',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\urllib\\response.py',
+   'PYMODULE'),
+  ('urllib.error',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\urllib\\error.py',
+   'PYMODULE'),
+  ('xml.sax',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\__init__.py',
+   'PYMODULE'),
+  ('xml.sax.handler',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\handler.py',
+   'PYMODULE'),
+  ('xml.sax._exceptions',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\_exceptions.py',
+   'PYMODULE'),
+  ('xml.sax.xmlreader',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\sax\\xmlreader.py',
+   'PYMODULE'),
+  ('http.client',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\client.py',
+   'PYMODULE'),
+  ('hmac',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\hmac.py',
+   'PYMODULE'),
+  ('multiprocessing',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\multiprocessing\\__init__.py',
+   'PYMODULE'),
+  ('concurrent.futures._base',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\concurrent\\futures\\_base.py',
+   'PYMODULE'),
+  ('concurrent',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\concurrent\\__init__.py',
+   'PYMODULE'),
+  ('asyncio.trsock',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\trsock.py',
+   'PYMODULE'),
+  ('asyncio.staggered',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\staggered.py',
+   'PYMODULE'),
+  ('asyncio.tasks',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\tasks.py',
+   'PYMODULE'),
+  ('asyncio.locks',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\locks.py',
+   'PYMODULE'),
+  ('asyncio.base_tasks',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\base_tasks.py',
+   'PYMODULE'),
+  ('asyncio.mixins',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\mixins.py',
+   'PYMODULE'),
+  ('asyncio.sslproto',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\sslproto.py',
+   'PYMODULE'),
+  ('asyncio.transports',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\transports.py',
+   'PYMODULE'),
+  ('asyncio.protocols',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\protocols.py',
+   'PYMODULE'),
+  ('asyncio.futures',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\futures.py',
+   'PYMODULE'),
+  ('asyncio.base_futures',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\base_futures.py',
+   'PYMODULE'),
+  ('asyncio.exceptions',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\exceptions.py',
+   'PYMODULE'),
+  ('asyncio.events',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\events.py',
+   'PYMODULE'),
+  ('asyncio.format_helpers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\format_helpers.py',
+   'PYMODULE'),
+  ('asyncio.constants',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\asyncio\\constants.py',
+   'PYMODULE'),
+  ('packaging.utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\utils.py',
+   'PYMODULE'),
+  ('packaging.tags',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\tags.py',
+   'PYMODULE'),
+  ('packaging.specifiers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\specifiers.py',
+   'PYMODULE'),
+  ('packaging.requirements',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\requirements.py',
+   'PYMODULE'),
+  ('packaging.pylock',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\pylock.py',
+   'PYMODULE'),
+  ('packaging.metadata',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\metadata.py',
+   'PYMODULE'),
+  ('packaging.markers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\markers.py',
+   'PYMODULE'),
+  ('packaging.licenses._spdx',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\licenses\\_spdx.py',
+   'PYMODULE'),
+  ('packaging.licenses',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\licenses\\__init__.py',
+   'PYMODULE'),
+  ('packaging._tokenizer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_tokenizer.py',
+   'PYMODULE'),
+  ('packaging._structures',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_structures.py',
+   'PYMODULE'),
+  ('packaging._parser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_parser.py',
+   'PYMODULE'),
+  ('packaging._musllinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_musllinux.py',
+   'PYMODULE'),
+  ('packaging._manylinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_manylinux.py',
+   'PYMODULE'),
+  ('packaging._elffile',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\_elffile.py',
+   'PYMODULE'),
+  ('packaging',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\packaging\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.zipp',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\zipp.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\util.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.unicode',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\unicode.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.testing',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\testing.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.results',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\results.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.helpers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\helpers.py',
+   'PYMODULE'),
+  ('html.entities',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\html\\entities.py',
+   'PYMODULE'),
+  ('html',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\html\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.exceptions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\exceptions.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.core',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\core.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.diagram',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\diagram\\__init__.py',
+   'PYMODULE'),
+  ('jinja2',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\__init__.py',
+   'PYMODULE'),
+  ('jinja2.ext',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\ext.py',
+   'PYMODULE'),
+  ('jinja2.parser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\parser.py',
+   'PYMODULE'),
+  ('jinja2.lexer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\lexer.py',
+   'PYMODULE'),
+  ('jinja2._identifier',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\_identifier.py',
+   'PYMODULE'),
+  ('jinja2.defaults',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\defaults.py',
+   'PYMODULE'),
+  ('jinja2.tests',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\tests.py',
+   'PYMODULE'),
+  ('jinja2.filters',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\filters.py',
+   'PYMODULE'),
+  ('jinja2.sandbox',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\sandbox.py',
+   'PYMODULE'),
+  ('jinja2.async_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\async_utils.py',
+   'PYMODULE'),
+  ('markupsafe',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe\\__init__.py',
+   'PYMODULE'),
+  ('markupsafe._native',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe\\_native.py',
+   'PYMODULE'),
+  ('jinja2.utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\utils.py',
+   'PYMODULE'),
+  ('jinja2.constants',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\constants.py',
+   'PYMODULE'),
+  ('jinja2.runtime',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\runtime.py',
+   'PYMODULE'),
+  ('jinja2.loaders',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\loaders.py',
+   'PYMODULE'),
+  ('jinja2.exceptions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\exceptions.py',
+   'PYMODULE'),
+  ('jinja2.environment',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\environment.py',
+   'PYMODULE'),
+  ('jinja2.debug',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\debug.py',
+   'PYMODULE'),
+  ('jinja2.compiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\compiler.py',
+   'PYMODULE'),
+  ('jinja2.visitor',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\visitor.py',
+   'PYMODULE'),
+  ('jinja2.optimizer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\optimizer.py',
+   'PYMODULE'),
+  ('jinja2.idtracking',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\idtracking.py',
+   'PYMODULE'),
+  ('jinja2.bccache',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\bccache.py',
+   'PYMODULE'),
+  ('jinja2.nodes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\jinja2\\nodes.py',
+   'PYMODULE'),
+  ('pdb',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pdb.py',
+   'PYMODULE'),
+  ('pydoc',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pydoc.py',
+   'PYMODULE'),
+  ('pydoc_data.topics',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pydoc_data\\topics.py',
+   'PYMODULE'),
+  ('pydoc_data',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pydoc_data\\__init__.py',
+   'PYMODULE'),
+  ('tty',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\tty.py',
+   'PYMODULE'),
+  ('readline',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\readline.py',
+   'PYMODULE'),
+  ('pyreadline3.console',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\console\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.console.console',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\console\\console.py',
+   'PYMODULE'),
+  ('ctypes.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\util.py',
+   'PYMODULE'),
+  ('ctypes._aix',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\_aix.py',
+   'PYMODULE'),
+  ('ctypes.macholib.dyld',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\macholib\\dyld.py',
+   'PYMODULE'),
+  ('ctypes.macholib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\macholib\\__init__.py',
+   'PYMODULE'),
+  ('ctypes.macholib.dylib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\macholib\\dylib.py',
+   'PYMODULE'),
+  ('ctypes.macholib.framework',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ctypes\\macholib\\framework.py',
+   'PYMODULE'),
+  ('pyreadline3.logger.log',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\log.py',
+   'PYMODULE'),
+  ('pyreadline3.logger.logger',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\logger.py',
+   'PYMODULE'),
+  ('pyreadline3.logger.null_handler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\null_handler.py',
+   'PYMODULE'),
+  ('pyreadline3.logger',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.logger.control',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\control.py',
+   'PYMODULE'),
+  ('pyreadline3.logger.socket_stream',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\logger\\socket_stream.py',
+   'PYMODULE'),
+  ('logging.handlers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\logging\\handlers.py',
+   'PYMODULE'),
+  ('smtplib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\smtplib.py',
+   'PYMODULE'),
+  ('pyreadline3.keysyms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\keysyms\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.keysyms.keysyms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\keysyms\\keysyms.py',
+   'PYMODULE'),
+  ('pyreadline3.keysyms.common',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\keysyms\\common.py',
+   'PYMODULE'),
+  ('pyreadline3.keysyms.ironpython_keysyms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\keysyms\\ironpython_keysyms.py',
+   'PYMODULE'),
+  ('pyreadline3.keysyms.winconstants',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\keysyms\\winconstants.py',
+   'PYMODULE'),
+  ('pyreadline3.console.ansi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\console\\ansi.py',
+   'PYMODULE'),
+  ('pyreadline3.unicode_helper',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\unicode_helper.py',
+   'PYMODULE'),
+  ('pyreadline3.console.event',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\console\\event.py',
+   'PYMODULE'),
+  ('pyreadline3.console.ironpython_console',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\console\\ironpython_console.py',
+   'PYMODULE'),
+  ('clr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr.py',
+   'PYMODULE'),
+  ('pythonnet',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pythonnet\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.netfx',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\netfx.py',
+   'PYMODULE'),
+  ('clr_loader.ffi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.netfx',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\netfx.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.mono',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\mono.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.hostfxr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\hostfxr.py',
+   'PYMODULE'),
+  ('cffi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\__init__.py',
+   'PYMODULE'),
+  ('cffi.error',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\error.py',
+   'PYMODULE'),
+  ('cffi.api',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\api.py',
+   'PYMODULE'),
+  ('cffi.recompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\recompiler.py',
+   'PYMODULE'),
+  ('cffi.cffi_opcode',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\cffi_opcode.py',
+   'PYMODULE'),
+  ('cffi._shimmed_dist_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\_shimmed_dist_utils.py',
+   'PYMODULE'),
+  ('distutils.msvc9compiler',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\msvc9compiler.py',
+   'PYMODULE'),
+  ('distutils.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\util.py',
+   'PYMODULE'),
+  ('distutils.filelist',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\filelist.py',
+   'PYMODULE'),
+  ('distutils.debug',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\debug.py',
+   'PYMODULE'),
+  ('distutils.file_util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\file_util.py',
+   'PYMODULE'),
+  ('_osx_support',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_osx_support.py',
+   'PYMODULE'),
+  ('_aix_support',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_aix_support.py',
+   'PYMODULE'),
+  ('_bootsubprocess',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_bootsubprocess.py',
+   'PYMODULE'),
+  ('distutils.spawn',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\spawn.py',
+   'PYMODULE'),
+  ('distutils.dep_util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\dep_util.py',
+   'PYMODULE'),
+  ('distutils.errors',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\errors.py',
+   'PYMODULE'),
+  ('distutils.dir_util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\dir_util.py',
+   'PYMODULE'),
+  ('distutils.core',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\core.py',
+   'PYMODULE'),
+  ('distutils.extension',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\extension.py',
+   'PYMODULE'),
+  ('distutils.text_file',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\text_file.py',
+   'PYMODULE'),
+  ('distutils.config',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\config.py',
+   'PYMODULE'),
+  ('cgi',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\cgi.py',
+   'PYMODULE'),
+  ('configparser',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\configparser.py',
+   'PYMODULE'),
+  ('distutils.cmd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\cmd.py',
+   'PYMODULE'),
+  ('distutils.fancy_getopt',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\fancy_getopt.py',
+   'PYMODULE'),
+  ('distutils.archive_util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\archive_util.py',
+   'PYMODULE'),
+  ('distutils.dist',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\dist.py',
+   'PYMODULE'),
+  ('distutils.versionpredicate',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\versionpredicate.py',
+   'PYMODULE'),
+  ('distutils.version',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\version.py',
+   'PYMODULE'),
+  ('distutils.command',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\command\\__init__.py',
+   'PYMODULE'),
+  ('distutils.command.build_ext',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\command\\build_ext.py',
+   'PYMODULE'),
+  ('distutils._msvccompiler',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\_msvccompiler.py',
+   'PYMODULE'),
+  ('site',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\site.py',
+   'PYMODULE'),
+  ('rlcompleter',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\rlcompleter.py',
+   'PYMODULE'),
+  ('_sitebuiltins',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_sitebuiltins.py',
+   'PYMODULE'),
+  ('distutils.ccompiler',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\ccompiler.py',
+   'PYMODULE'),
+  ('distutils.sysconfig',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\sysconfig.py',
+   'PYMODULE'),
+  ('distutils.log',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\log.py',
+   'PYMODULE'),
+  ('distutils',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._distutils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\__init__.py',
+   'PYMODULE'),
+  ('setuptools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._distutils.versionpredicate',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\versionpredicate.py',
+   'PYMODULE'),
+  ('setuptools._distutils.version',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\version.py',
+   'PYMODULE'),
+  ('setuptools._distutils.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\util.py',
+   'PYMODULE'),
+  ('setuptools._distutils.unixccompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\unixccompiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.text_file',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\text_file.py',
+   'PYMODULE'),
+  ('setuptools._distutils.sysconfig',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\sysconfig.py',
+   'PYMODULE'),
+  ('setuptools._distutils.spawn',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\spawn.py',
+   'PYMODULE'),
+  ('setuptools._distutils.py39compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\py39compat.py',
+   'PYMODULE'),
+  ('setuptools._distutils.py38compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\py38compat.py',
+   'PYMODULE'),
+  ('setuptools._distutils.msvccompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\msvccompiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.msvc9compiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\msvc9compiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.log',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\log.py',
+   'PYMODULE'),
+  ('setuptools._distutils.filelist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\filelist.py',
+   'PYMODULE'),
+  ('setuptools._distutils.file_util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\file_util.py',
+   'PYMODULE'),
+  ('setuptools._distutils.fancy_getopt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\fancy_getopt.py',
+   'PYMODULE'),
+  ('setuptools._distutils.extension',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\extension.py',
+   'PYMODULE'),
+  ('setuptools._distutils.errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\errors.py',
+   'PYMODULE'),
+  ('setuptools._distutils.dist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\dist.py',
+   'PYMODULE'),
+  ('setuptools._distutils.dir_util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\dir_util.py',
+   'PYMODULE'),
+  ('setuptools._distutils.dep_util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\dep_util.py',
+   'PYMODULE'),
+  ('setuptools._distutils.debug',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\debug.py',
+   'PYMODULE'),
+  ('setuptools._distutils.cygwinccompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\cygwinccompiler.py',
+   'PYMODULE'),
+  ('distutils.unixccompiler',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\unixccompiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.core',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\core.py',
+   'PYMODULE'),
+  ('setuptools._distutils.config',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\config.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.upload',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\upload.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.sdist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\sdist.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.register',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\register.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.py37compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\py37compat.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install_scripts',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install_scripts.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install_lib',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install_lib.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install_headers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install_headers.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install_egg_info',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install_egg_info.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install_data',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install_data.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.install',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\install.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.config',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\config.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.clean',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\clean.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.check',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\check.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.build_scripts',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\build_scripts.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.build_py',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\build_py.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.build_ext',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\build_ext.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.build_clib',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\build_clib.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.build',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\build.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.bdist_rpm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\bdist_rpm.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.bdist_dumb',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\bdist_dumb.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command.bdist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\bdist.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command._framework_compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\_framework_compat.py',
+   'PYMODULE'),
+  ('setuptools._distutils.command',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\command\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._distutils.cmd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\cmd.py',
+   'PYMODULE'),
+  ('setuptools._distutils.ccompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\ccompiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.bcppcompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\bcppcompiler.py',
+   'PYMODULE'),
+  ('setuptools._distutils.archive_util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\archive_util.py',
+   'PYMODULE'),
+  ('setuptools._distutils._msvccompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\_msvccompiler.py',
+   'PYMODULE'),
+  ('unittest.mock',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\mock.py',
+   'PYMODULE'),
+  ('unittest',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\__init__.py',
+   'PYMODULE'),
+  ('unittest.async_case',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\async_case.py',
+   'PYMODULE'),
+  ('unittest.signals',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\signals.py',
+   'PYMODULE'),
+  ('unittest.main',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\main.py',
+   'PYMODULE'),
+  ('unittest.runner',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\runner.py',
+   'PYMODULE'),
+  ('unittest.loader',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\loader.py',
+   'PYMODULE'),
+  ('unittest.suite',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\suite.py',
+   'PYMODULE'),
+  ('unittest.case',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\case.py',
+   'PYMODULE'),
+  ('unittest._log',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\_log.py',
+   'PYMODULE'),
+  ('difflib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\difflib.py',
+   'PYMODULE'),
+  ('unittest.result',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\result.py',
+   'PYMODULE'),
+  ('unittest.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\unittest\\util.py',
+   'PYMODULE'),
+  ('setuptools._distutils._macos_compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\_macos_compat.py',
+   'PYMODULE'),
+  ('setuptools._distutils._functools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\_functools.py',
+   'PYMODULE'),
+  ('setuptools._distutils._collections',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_distutils\\_collections.py',
+   'PYMODULE'),
+  ('_distutils_hack',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\_distutils_hack\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.zipp',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\zipp.py',
+   'PYMODULE'),
+  ('setuptools._vendor.typing_extensions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\typing_extensions.py',
+   'PYMODULE'),
+  ('setuptools._vendor.tomli._types',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\tomli\\_types.py',
+   'PYMODULE'),
+  ('setuptools._vendor.tomli._re',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\tomli\\_re.py',
+   'PYMODULE'),
+  ('setuptools._vendor.tomli._parser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\tomli\\_parser.py',
+   'PYMODULE'),
+  ('setuptools._vendor.tomli',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\tomli\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\util.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.unicode',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\unicode.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.testing',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\testing.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.results',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\results.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.helpers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\helpers.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.exceptions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\exceptions.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.core',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\core.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.diagram',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\diagram\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.common',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\common.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing.actions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\actions.py',
+   'PYMODULE'),
+  ('setuptools._vendor.pyparsing',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\pyparsing\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.version',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\version.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\utils.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.tags',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\tags.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.specifiers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\specifiers.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.requirements',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\requirements.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.markers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\markers.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging._structures',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\_structures.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging._musllinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\_musllinux.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging._manylinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\_manylinux.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging.__about__',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\__about__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.packaging',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\packaging\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.ordered_set',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\ordered_set.py',
+   'PYMODULE'),
+  ('setuptools._vendor.more_itertools.recipes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\more_itertools\\recipes.py',
+   'PYMODULE'),
+  ('setuptools._vendor.more_itertools.more',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\more_itertools\\more.py',
+   'PYMODULE'),
+  ('setuptools._vendor.more_itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\more_itertools\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.jaraco.text',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\jaraco\\text\\__init__.py',
+   'PYMODULE'),
+  ('setuptools.extern',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\extern\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.jaraco.functools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\jaraco\\functools.py',
+   'PYMODULE'),
+  ('setuptools._vendor.jaraco.context',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\jaraco\\context.py',
+   'PYMODULE'),
+  ('setuptools._vendor.jaraco',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\jaraco\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources.simple',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\simple.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources.readers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\readers.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources.abc',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\abc.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources._legacy',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\_legacy.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources._itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\_itertools.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources._compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\_compat.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources._common',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\_common.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources._adapters',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\_adapters.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_resources',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_resources\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._text',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_text.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._meta',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_meta.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_itertools.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._functools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_functools.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_compat.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._collections',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_collections.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata._adapters',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\_adapters.py',
+   'PYMODULE'),
+  ('setuptools._vendor.importlib_metadata',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\importlib_metadata\\__init__.py',
+   'PYMODULE'),
+  ('setuptools._vendor',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_vendor\\__init__.py',
+   'PYMODULE'),
+  ('setuptools.msvc',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\msvc.py',
+   'PYMODULE'),
+  ('setuptools.logging',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\logging.py',
+   'PYMODULE'),
+  ('setuptools.monkey',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\monkey.py',
+   'PYMODULE'),
+  ('setuptools.discovery',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\discovery.py',
+   'PYMODULE'),
+  ('setuptools.errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\errors.py',
+   'PYMODULE'),
+  ('setuptools.depends',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\depends.py',
+   'PYMODULE'),
+  ('setuptools._imp',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_imp.py',
+   'PYMODULE'),
+  ('setuptools.py34compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\py34compat.py',
+   'PYMODULE'),
+  ('setuptools.dist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\dist.py',
+   'PYMODULE'),
+  ('setuptools.installer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\installer.py',
+   'PYMODULE'),
+  ('setuptools.wheel',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\wheel.py',
+   'PYMODULE'),
+  ('setuptools.archive_util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\archive_util.py',
+   'PYMODULE'),
+  ('setuptools._path',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_path.py',
+   'PYMODULE'),
+  ('setuptools.command.egg_info',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\egg_info.py',
+   'PYMODULE'),
+  ('setuptools.glob',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\glob.py',
+   'PYMODULE'),
+  ('setuptools.unicode_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\unicode_utils.py',
+   'PYMODULE'),
+  ('setuptools.command.bdist_egg',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\bdist_egg.py',
+   'PYMODULE'),
+  ('setuptools.command.setopt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\setopt.py',
+   'PYMODULE'),
+  ('setuptools.command.sdist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\sdist.py',
+   'PYMODULE'),
+  ('setuptools.command.build',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\build.py',
+   'PYMODULE'),
+  ('distutils.command.build',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\command\\build.py',
+   'PYMODULE'),
+  ('setuptools.command.py36compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\py36compat.py',
+   'PYMODULE'),
+  ('distutils.command.sdist',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\command\\sdist.py',
+   'PYMODULE'),
+  ('setuptools.config.pyprojecttoml',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\pyprojecttoml.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\__init__.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject.fastjsonschema_validations',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\fastjsonschema_validations.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject.fastjsonschema_exceptions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\fastjsonschema_exceptions.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject.extra_validations',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\extra_validations.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject.error_reporting',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\error_reporting.py',
+   'PYMODULE'),
+  ('setuptools.config._validate_pyproject.formats',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_validate_pyproject\\formats.py',
+   'PYMODULE'),
+  ('setuptools.config._apply_pyprojecttoml',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\_apply_pyprojecttoml.py',
+   'PYMODULE'),
+  ('setuptools.config.expand',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\expand.py',
+   'PYMODULE'),
+  ('setuptools.config.setupcfg',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\setupcfg.py',
+   'PYMODULE'),
+  ('setuptools.config',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\config\\__init__.py',
+   'PYMODULE'),
+  ('setuptools.command',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\command\\__init__.py',
+   'PYMODULE'),
+  ('distutils.command.bdist',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\distutils\\command\\bdist.py',
+   'PYMODULE'),
+  ('setuptools._importlib',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_importlib.py',
+   'PYMODULE'),
+  ('setuptools._entry_points',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_entry_points.py',
+   'PYMODULE'),
+  ('setuptools._itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_itertools.py',
+   'PYMODULE'),
+  ('setuptools._reqs',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_reqs.py',
+   'PYMODULE'),
+  ('setuptools.windows_support',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\windows_support.py',
+   'PYMODULE'),
+  ('setuptools.extension',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\extension.py',
+   'PYMODULE'),
+  ('setuptools.version',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\version.py',
+   'PYMODULE'),
+  ('setuptools._deprecation_warning',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools\\_deprecation_warning.py',
+   'PYMODULE'),
+  ('_distutils_hack.override',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\_distutils_hack\\override.py',
+   'PYMODULE'),
+  ('cffi.verifier',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\verifier.py',
+   'PYMODULE'),
+  ('cffi.lock',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\lock.py',
+   'PYMODULE'),
+  ('cffi.pkgconfig',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\pkgconfig.py',
+   'PYMODULE'),
+  ('cffi.vengine_cpy',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\vengine_cpy.py',
+   'PYMODULE'),
+  ('cffi._imp_emulation',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\_imp_emulation.py',
+   'PYMODULE'),
+  ('cffi.vengine_gen',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\vengine_gen.py',
+   'PYMODULE'),
+  ('cffi.ffiplatform',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\ffiplatform.py',
+   'PYMODULE'),
+  ('cffi.cparser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\cparser.py',
+   'PYMODULE'),
+  ('pycparser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\__init__.py',
+   'PYMODULE'),
+  ('pycparser.c_parser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_parser.py',
+   'PYMODULE'),
+  ('pycparser.ast_transforms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\ast_transforms.py',
+   'PYMODULE'),
+  ('pycparser.c_lexer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_lexer.py',
+   'PYMODULE'),
+  ('pycparser.c_ast',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_ast.py',
+   'PYMODULE'),
+  ('cffi.commontypes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\commontypes.py',
+   'PYMODULE'),
+  ('cffi.model',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\model.py',
+   'PYMODULE'),
+  ('clr_loader.hostfxr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\hostfxr.py',
+   'PYMODULE'),
+  ('clr_loader.mono',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\mono.py',
+   'PYMODULE'),
+  ('clr_loader.util.runtime_spec',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\runtime_spec.py',
+   'PYMODULE'),
+  ('clr_loader.util.find',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\find.py',
+   'PYMODULE'),
+  ('clr_loader.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.util.hostfxr_errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\hostfxr_errors.py',
+   'PYMODULE'),
+  ('clr_loader.util.coreclr_errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\coreclr_errors.py',
+   'PYMODULE'),
+  ('xml.etree.ElementTree',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\etree\\ElementTree.py',
+   'PYMODULE'),
+  ('xml.etree.cElementTree',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\etree\\cElementTree.py',
+   'PYMODULE'),
+  ('xml.etree.ElementInclude',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\etree\\ElementInclude.py',
+   'PYMODULE'),
+  ('xml.etree.ElementPath',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\etree\\ElementPath.py',
+   'PYMODULE'),
+  ('xml.etree',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\xml\\etree\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.util.clr_error',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\clr_error.py',
+   'PYMODULE'),
+  ('clr_loader.types',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\types.py',
+   'PYMODULE'),
+  ('pyreadline3',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.modes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\modes\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.modes.vi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\modes\\vi.py',
+   'PYMODULE'),
+  ('pyreadline3.lineeditor.lineobj',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\lineeditor\\lineobj.py',
+   'PYMODULE'),
+  ('pyreadline3.lineeditor.wordmatcher',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\lineeditor\\wordmatcher.py',
+   'PYMODULE'),
+  ('pyreadline3.modes.notemacs',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\modes\\notemacs.py',
+   'PYMODULE'),
+  ('pyreadline3.lineeditor.history',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\lineeditor\\history.py',
+   'PYMODULE'),
+  ('pyreadline3.modes.emacs',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\modes\\emacs.py',
+   'PYMODULE'),
+  ('pyreadline3.modes.basemode',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\modes\\basemode.py',
+   'PYMODULE'),
+  ('pyreadline3.error',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\error.py',
+   'PYMODULE'),
+  ('pyreadline3.lineeditor',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\lineeditor\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\__init__.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard.get_clipboard_text_and_convert',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\get_clipboard_text_and_convert.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard.api',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\api.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard.win32_clipboard',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\win32_clipboard.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard.no_clipboard',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\no_clipboard.py',
+   'PYMODULE'),
+  ('pyreadline3.clipboard.ironpython_clipboard',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\clipboard\\ironpython_clipboard.py',
+   'PYMODULE'),
+  ('pyreadline3.py3k_compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\py3k_compat.py',
+   'PYMODULE'),
+  ('pyreadline3.rlmain',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\rlmain.py',
+   'PYMODULE'),
+  ('glob',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\glob.py',
+   'PYMODULE'),
+  ('code',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\code.py',
+   'PYMODULE'),
+  ('codeop',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\codeop.py',
+   'PYMODULE'),
+  ('bdb',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\bdb.py',
+   'PYMODULE'),
+  ('cmd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\cmd.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.common',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\common.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing.actions',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\actions.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.pyparsing',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\pyparsing\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.version',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\version.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\utils.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.tags',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\tags.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.specifiers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\specifiers.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.requirements',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\requirements.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.markers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\markers.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging._structures',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\_structures.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging._musllinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\_musllinux.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging._manylinux',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\_manylinux.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging.__about__',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\__about__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.packaging',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\packaging\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.more_itertools.recipes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\more_itertools\\recipes.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.more_itertools.more',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\more_itertools\\more.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.more_itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\more_itertools\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.jaraco.text',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\jaraco\\text\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.jaraco.functools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\jaraco\\functools.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.jaraco.context',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\jaraco\\context.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.jaraco',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\jaraco\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources.simple',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\simple.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources.readers',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\readers.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources.abc',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\abc.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources._legacy',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\_legacy.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources._itertools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\_itertools.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources._compat',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\_compat.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources._common',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\_common.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources._adapters',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\_adapters.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.importlib_resources',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\importlib_resources\\__init__.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor.appdirs',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\appdirs.py',
+   'PYMODULE'),
+  ('pkg_resources._vendor',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\_vendor\\__init__.py',
+   'PYMODULE'),
+  ('sysconfig',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sysconfig.py',
+   'PYMODULE'),
+  ('pkg_resources.extern',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pkg_resources\\extern\\__init__.py',
+   'PYMODULE'),
+  ('imp',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\imp.py',
+   'PYMODULE'),
+  ('plistlib',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\plistlib.py',
+   'PYMODULE'),
+  ('platform',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\platform.py',
+   'PYMODULE'),
+  ('pkgutil',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pkgutil.py',
+   'PYMODULE'),
+  ('zipimport',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\zipimport.py',
    'PYMODULE'),
   ('tracemalloc',
    'C:\\Program '
@@ -399,6 +2390,218 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_py_abc.py',
    'PYMODULE'),
+  ('webview',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\__init__.py',
+   'PYMODULE'),
+  ('webview.window',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\window.py',
+   'PYMODULE'),
+  ('webview.state',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\state.py',
+   'PYMODULE'),
+  ('webview.dom.dom',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\dom.py',
+   'PYMODULE'),
+  ('webview.dom.element',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\element.py',
+   'PYMODULE'),
+  ('webview.dom.event',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\event.py',
+   'PYMODULE'),
+  ('webview.dom.propsdict',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\propsdict.py',
+   'PYMODULE'),
+  ('webview.dom.classlist',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\classlist.py',
+   'PYMODULE'),
+  ('webview.dom',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\dom\\__init__.py',
+   'PYMODULE'),
+  ('webview.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\util.py',
+   'PYMODULE'),
+  ('http.cookies',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\cookies.py',
+   'PYMODULE'),
+  ('webview.screen',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\screen.py',
+   'PYMODULE'),
+  ('webview.menu',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\menu.py',
+   'PYMODULE'),
+  ('webview.localization',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\localization.py',
+   'PYMODULE'),
+  ('webview.guilib',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\guilib.py',
+   'PYMODULE'),
+  ('webview.platforms.winforms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\winforms.py',
+   'PYMODULE'),
+  ('webview.platforms.mshtml',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\mshtml.py',
+   'PYMODULE'),
+  ('webview.platforms.edgechromium',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\edgechromium.py',
+   'PYMODULE'),
+  ('webview.models',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\models.py',
+   'PYMODULE'),
+  ('webview.platforms.cef',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\cef.py',
+   'PYMODULE'),
+  ('webview.platforms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\__init__.py',
+   'PYMODULE'),
+  ('webview.platforms.cocoa',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\cocoa.py',
+   'PYMODULE'),
+  ('webview.platforms.qt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\qt.py',
+   'PYMODULE'),
+  ('PyQt5',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\__init__.py',
+   'PYMODULE'),
+  ('webview.platforms.gtk',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\gtk.py',
+   'PYMODULE'),
+  ('webview.platforms.android',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\__init__.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jinterface',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jinterface\\__init__.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jinterface.webkit',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jinterface\\webkit.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jinterface.view',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jinterface\\view.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jinterface.pywebview',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jinterface\\pywebview.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\__init__.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.webkit',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\webkit.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.view',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\view.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.os',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\os.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.net',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\net.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.content',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\content.py',
+   'PYMODULE'),
+  ('webview.platforms.android.jclass.app',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\jclass\\app.py',
+   'PYMODULE'),
+  ('webview.platforms.android.app',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\app.py',
+   'PYMODULE'),
+  ('webview.platforms.android.event',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\event.py',
+   'PYMODULE'),
+  ('webview.platforms.android.base',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\platforms\\android\\base.py',
+   'PYMODULE'),
+  ('webview.event',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\event.py',
+   'PYMODULE'),
+  ('webview.errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\errors.py',
+   'PYMODULE'),
+  ('webview.http',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\http.py',
+   'PYMODULE'),
+  ('bottle',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\bottle.py',
+   'PYMODULE'),
+  ('wsgiref.handlers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\handlers.py',
+   'PYMODULE'),
+  ('wsgiref',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\__init__.py',
+   'PYMODULE'),
+  ('wsgiref.headers',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\headers.py',
+   'PYMODULE'),
+  ('wsgiref.util',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\util.py',
+   'PYMODULE'),
+  ('wsgiref.types',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\types.py',
+   'PYMODULE'),
+  ('wsgiref.simple_server',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\wsgiref\\simple_server.py',
+   'PYMODULE'),
+  ('socketserver',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\socketserver.py',
+   'PYMODULE'),
+  ('proxy_tools',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\proxy_tools\\__init__.py',
+   'PYMODULE'),
+  ('uuid',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\uuid.py',
+   'PYMODULE'),
   ('typing',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\typing.py',
@@ -406,10 +2609,6 @@
   ('urllib.parse',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\urllib\\parse.py',
-   'PYMODULE'),
-  ('ipaddress',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ipaddress.py',
    'PYMODULE'),
   ('threading',
    'C:\\Program '
@@ -423,61 +2622,17 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\server.py',
    'PYMODULE'),
-  ('http',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\__init__.py',
-   'PYMODULE'),
-  ('socketserver',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\socketserver.py',
-   'PYMODULE'),
-  ('mimetypes',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\mimetypes.py',
-   'PYMODULE'),
-  ('http.client',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\http\\client.py',
-   'PYMODULE'),
-  ('ssl',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ssl.py',
-   'PYMODULE'),
-  ('html',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\html\\__init__.py',
-   'PYMODULE'),
-  ('html.entities',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\html\\entities.py',
-   'PYMODULE'),
   ('secrets',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\secrets.py',
-   'PYMODULE'),
-  ('hmac',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\hmac.py',
    'PYMODULE'),
   ('webbrowser',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\webbrowser.py',
    'PYMODULE'),
-  ('glob',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\glob.py',
-   'PYMODULE'),
-  ('shlex',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\shlex.py',
-   'PYMODULE'),
   ('subprocess',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\subprocess.py',
-   'PYMODULE'),
-  ('signal',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\signal.py',
    'PYMODULE'),
   ('json',
    'C:\\Program '
@@ -503,9 +2658,145 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\__future__.py',
    'PYMODULE')],
- [('python311.dll',
+ [('webview\\lib\\WebBrowserInterop.x86.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x86.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x86\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.WinForms.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-arm64\\native\\WebView2Loader.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\runtimes\\win-arm64\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\Microsoft.Web.WebView2.Core.dll',
+   'BINARY'),
+  ('webview\\lib\\WebBrowserInterop.x64.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\WebBrowserInterop.x64.dll',
+   'BINARY'),
+  ('webview\\lib\\runtimes\\win-x64\\native\\WebView2Loader.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\runtimes\\win-x64\\native\\WebView2Loader.dll',
+   'BINARY'),
+  ('python311.dll',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\python311.dll',
+   'BINARY'),
+  ('pythonnet\\runtime\\Python.Runtime.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pythonnet\\runtime\\Python.Runtime.dll',
+   'BINARY'),
+  ('clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\x86\\ClrLoader.dll',
+   'BINARY'),
+  ('clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\dlls\\amd64\\ClrLoader.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\libssl-1_1-x64.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\libssl-1_1-x64.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\libcrypto-1_1-x64.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\libcrypto-1_1-x64.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\bearer\\qgenericbearer.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\bearer\\qgenericbearer.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\styles\\qwindowsvistastyle.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\styles\\qwindowsvistastyle.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\platforms\\qwindows.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platforms\\qwindows.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qwbmp.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qwbmp.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qico.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qico.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qtiff.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qtiff.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\platforms\\qwebgl.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platforms\\qwebgl.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qgif.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qgif.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qicns.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qicns.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qtga.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qtga.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qsvg.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qsvg.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\iconengines\\qsvgicon.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\iconengines\\qsvgicon.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qwebp.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qwebp.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\platforms\\qoffscreen.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platforms\\qoffscreen.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\platformthemes\\qxdgdesktopportal.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platformthemes\\qxdgdesktopportal.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\generic\\qtuiotouchplugin.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\generic\\qtuiotouchplugin.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\platforms\\qminimal.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platforms\\qminimal.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\plugins\\imageformats\\qjpeg.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\imageformats\\qjpeg.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\libGLESv2.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\libGLESv2.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\opengl32sw.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\opengl32sw.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\libEGL.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\libEGL.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\d3dcompiler_47.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\d3dcompiler_47.dll',
    'BINARY'),
   ('_decimal.pyd',
    'C:\\Program '
@@ -515,14 +2806,6 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_hashlib.pyd',
    'EXTENSION'),
-  ('select.pyd',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\select.pyd',
-   'EXTENSION'),
-  ('_socket.pyd',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_socket.pyd',
-   'EXTENSION'),
   ('_lzma.pyd',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_lzma.pyd',
@@ -531,32 +2814,100 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_bz2.pyd',
    'EXTENSION'),
-  ('unicodedata.pyd',
+  ('select.pyd',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\unicodedata.pyd',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\select.pyd',
+   'EXTENSION'),
+  ('_socket.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_socket.pyd',
+   'EXTENSION'),
+  ('_overlapped.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_overlapped.pyd',
    'EXTENSION'),
   ('_ssl.pyd',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_ssl.pyd',
    'EXTENSION'),
+  ('_queue.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_queue.pyd',
+   'EXTENSION'),
+  ('_ctypes.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_ctypes.pyd',
+   'EXTENSION'),
+  ('_multiprocessing.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_multiprocessing.pyd',
+   'EXTENSION'),
+  ('pyexpat.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\pyexpat.pyd',
+   'EXTENSION'),
+  ('_asyncio.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_asyncio.pyd',
+   'EXTENSION'),
+  ('markupsafe\\_speedups.cp311-win_amd64.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe\\_speedups.cp311-win_amd64.pyd',
+   'EXTENSION'),
+  ('unicodedata.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\unicodedata.pyd',
+   'EXTENSION'),
+  ('_cffi_backend.cp311-win_amd64.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\_cffi_backend.cp311-win_amd64.pyd',
+   'EXTENSION'),
+  ('_elementtree.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_elementtree.pyd',
+   'EXTENSION'),
+  ('PyQt5\\QtNetwork.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\QtNetwork.pyd',
+   'EXTENSION'),
+  ('PyQt5\\QtCore.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\QtCore.pyd',
+   'EXTENSION'),
+  ('PyQt5\\QtWidgets.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\QtWidgets.pyd',
+   'EXTENSION'),
+  ('PyQt5\\QtGui.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\QtGui.pyd',
+   'EXTENSION'),
+  ('PyQt5\\sip.cp311-win_amd64.pyd',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\sip.cp311-win_amd64.pyd',
+   'EXTENSION'),
+  ('_uuid.pyd',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\_uuid.pyd',
+   'EXTENSION'),
+  ('api-ms-win-crt-time-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-time-l1-1-0.dll',
+   'BINARY'),
   ('VCRUNTIME140.dll',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\VCRUNTIME140.dll',
    'BINARY'),
+  ('api-ms-win-crt-environment-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-environment-l1-1-0.dll',
+   'BINARY'),
   ('api-ms-win-crt-heap-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-heap-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-crt-time-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-time-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-crt-stdio-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-stdio-l1-1-0.dll',
    'BINARY'),
   ('api-ms-win-crt-conio-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-conio-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-crt-environment-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-environment-l1-1-0.dll',
+  ('api-ms-win-crt-process-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-process-l1-1-0.dll',
    'BINARY'),
   ('api-ms-win-crt-filesystem-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-filesystem-l1-1-0.dll',
@@ -564,20 +2915,71 @@
   ('api-ms-win-crt-convert-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-convert-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-crt-string-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-string-l1-1-0.dll',
+  ('api-ms-win-crt-locale-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-locale-l1-1-0.dll',
    'BINARY'),
   ('api-ms-win-crt-runtime-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-runtime-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-crt-locale-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-locale-l1-1-0.dll',
+  ('api-ms-win-crt-string-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-string-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-crt-process-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-process-l1-1-0.dll',
+  ('api-ms-win-crt-stdio-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-stdio-l1-1-0.dll',
    'BINARY'),
   ('api-ms-win-crt-math-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-math-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-crt-utility-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-utility-l1-1-0.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\VCRUNTIME140.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\VCRUNTIME140.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Core.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Core.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Network.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Network.dll',
+   'BINARY'),
+  ('VCRUNTIME140_1.dll',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\VCRUNTIME140_1.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Widgets.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Widgets.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Gui.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Gui.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\MSVCP140.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\MSVCP140.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Quick.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Quick.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5WebSockets.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5WebSockets.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5Svg.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Svg.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\Qt5DBus.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5DBus.dll',
+   'BINARY'),
+  ('PyQt5\\Qt5\\bin\\VCRUNTIME140_1.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\VCRUNTIME140_1.dll',
    'BINARY'),
   ('libcrypto-3.dll',
    'C:\\Program '
@@ -587,89 +2989,106 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\libssl-3.dll',
    'BINARY'),
+  ('libffi-8.dll',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\DLLs\\libffi-8.dll',
+   'BINARY'),
+  ('python3.dll',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\python3.dll',
+   'BINARY'),
   ('ucrtbase.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\ucrtbase.dll',
    'BINARY'),
-  ('api-ms-win-crt-utility-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-crt-utility-l1-1-0.dll',
+  ('PyQt5\\Qt5\\bin\\MSVCP140_1.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\MSVCP140_1.dll',
    'BINARY'),
-  ('api-ms-win-core-namedpipe-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-namedpipe-l1-1-0.dll',
+  ('PyQt5\\Qt5\\bin\\Qt5QmlModels.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5QmlModels.dll',
    'BINARY'),
-  ('api-ms-win-core-errorhandling-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-errorhandling-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-file-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-synch-l1-2-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-synch-l1-2-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-file-l2-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l2-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-util-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-util-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-fibers-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-fibers-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-libraryloader-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-libraryloader-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-profile-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-profile-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-processenvironment-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-processenvironment-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-file-l1-2-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l1-2-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-sysinfo-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-sysinfo-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-string-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-string-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-interlocked-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-interlocked-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-handle-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-handle-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-synch-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-synch-l1-1-0.dll',
-   'BINARY'),
-  ('api-ms-win-core-memory-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-memory-l1-1-0.dll',
+  ('PyQt5\\Qt5\\bin\\Qt5Qml.dll',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\bin\\Qt5Qml.dll',
    'BINARY'),
   ('api-ms-win-core-heap-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-heap-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-core-timezone-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-timezone-l1-1-0.dll',
+  ('api-ms-win-core-file-l1-2-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l1-2-0.dll',
    'BINARY'),
-  ('api-ms-win-core-debug-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-debug-l1-1-0.dll',
+  ('api-ms-win-core-errorhandling-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-errorhandling-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-core-localization-l1-2-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-localization-l1-2-0.dll',
+  ('api-ms-win-core-namedpipe-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-namedpipe-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-core-console-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-console-l1-1-0.dll',
+  ('api-ms-win-core-synch-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-synch-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-core-rtlsupport-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-rtlsupport-l1-1-0.dll',
+  ('api-ms-win-core-file-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l1-1-0.dll',
    'BINARY'),
-  ('api-ms-win-core-processthreads-l1-1-0.dll',
-   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-processthreads-l1-1-0.dll',
+  ('api-ms-win-core-sysinfo-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-sysinfo-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-synch-l1-2-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-synch-l1-2-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-processenvironment-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-processenvironment-l1-1-0.dll',
    'BINARY'),
   ('api-ms-win-core-processthreads-l1-1-1.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-processthreads-l1-1-1.dll',
    'BINARY'),
+  ('api-ms-win-core-interlocked-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-interlocked-l1-1-0.dll',
+   'BINARY'),
   ('api-ms-win-core-datetime-l1-1-0.dll',
    'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-datetime-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-string-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-string-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-processthreads-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-processthreads-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-util-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-util-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-profile-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-profile-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-debug-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-debug-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-libraryloader-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-libraryloader-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-memory-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-memory-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-rtlsupport-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-rtlsupport-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-file-l2-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-file-l2-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-localization-l1-2-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-localization-l1-2-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-timezone-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-timezone-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-console-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-console-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-fibers-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-fibers-l1-1-0.dll',
+   'BINARY'),
+  ('api-ms-win-core-handle-l1-1-0.dll',
+   'C:\\Users\\Sanja\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\api-ms-win-core-handle-l1-1-0.dll',
    'BINARY')],
  [],
  [],
@@ -677,33 +3096,449 @@
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\visualizer\\visualizer.html',
    'DATA'),
+  ('webview\\js\\lib\\polyfill.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\lib\\polyfill.js',
+   'DATA'),
+  ('webview\\js\\state.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\state.js',
+   'DATA'),
+  ('webview\\js\\api.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\api.js',
+   'DATA'),
+  ('webview\\lib\\pywebview-android.jar',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\lib\\pywebview-android.jar',
+   'DATA'),
+  ('webview\\js\\lib\\dom_json.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\lib\\dom_json.js',
+   'DATA'),
+  ('webview\\js\\finish.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\finish.js',
+   'DATA'),
+  ('webview\\js\\customize.js',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\webview\\js\\customize.js',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_zh_TW.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_zh_TW.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_ko.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_ko.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_cs.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_cs.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_it.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_it.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_ar.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_ar.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_tr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_tr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_sl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_sl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_ar.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_ar.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_gd.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_gd.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_de.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_de.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_ja.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_ja.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_pl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_pl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_he.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_he.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_ca.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_ca.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_zh_CN.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_zh_CN.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_gl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_gl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_ko.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_ko.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_ru.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_ru.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_en.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_en.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_it.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_it.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_tr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_tr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_da.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_da.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_en.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_en.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_uk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_uk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_sl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_sl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_bg.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_bg.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_ja.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_ja.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_uk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_uk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_da.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_da.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_fr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_fr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_bg.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_bg.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_it.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_it.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_zh_CN.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_zh_CN.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_fi.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_fi.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_he.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_he.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_ru.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_ru.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_de.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_de.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_lv.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_lv.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_en.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_en.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_es.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_es.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_bg.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_bg.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_da.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_da.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_pl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_pl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_pt.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_pt.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_gl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_gl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_ar.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_ar.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_uk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_uk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_lt.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_lt.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_fr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_fr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_cs.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_cs.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_tr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_tr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_pl.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_pl.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_ru.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_ru.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_cs.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_cs.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_es.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_es.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_hu.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_hu.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_zh_TW.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_zh_TW.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_sk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_sk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_sv.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_sv.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_de.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_de.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_sk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_sk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_ja.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_ja.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_es.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_es.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_zh_TW.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_zh_TW.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_ca.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_ca.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_ca.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_ca.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_gd.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_gd.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_fr.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_fr.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_fi.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_fi.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_help_ko.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_help_ko.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_sk.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_sk.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qtbase_hu.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qtbase_hu.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_hu.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_hu.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_lv.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_lv.qm',
+   'DATA'),
+  ('PyQt5\\Qt5\\translations\\qt_fa.qm',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\PyQt5\\Qt5\\translations\\qt_fa.qm',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\WHEEL',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\WHEEL',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\RECORD',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\RECORD',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\RECORD',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\RECORD',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\INSTALLER',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\INSTALLER',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\WHEEL',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\WHEEL',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\METADATA',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\METADATA',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\LICENSE',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\LICENSE',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\entry_points.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\entry_points.txt',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\METADATA',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\METADATA',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\WHEEL',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\WHEEL',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\top_level.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\top_level.txt',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\METADATA',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\METADATA',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\WHEEL',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\WHEEL',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\RECORD',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\RECORD',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\INSTALLER',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\INSTALLER',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\INSTALLER',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\INSTALLER',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\RECORD',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\RECORD',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\INSTALLER',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\INSTALLER',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\licenses\\LICENSE.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\licenses\\LICENSE.txt',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\METADATA',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\METADATA',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\REQUESTED',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\REQUESTED',
+   'DATA'),
+  ('pyreadline3-3.5.4.dist-info\\LICENSE.md',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3-3.5.4.dist-info\\LICENSE.md',
+   'DATA'),
+  ('setuptools-65.5.0.dist-info\\top_level.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\setuptools-65.5.0.dist-info\\top_level.txt',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\entry_points.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\entry_points.txt',
+   'DATA'),
+  ('markupsafe-3.0.3.dist-info\\top_level.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\markupsafe-3.0.3.dist-info\\top_level.txt',
+   'DATA'),
+  ('wheel-0.46.3.dist-info\\licenses\\LICENSE.txt',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\wheel-0.46.3.dist-info\\licenses\\LICENSE.txt',
+   'DATA'),
   ('base_library.zip',
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\visualizer\\build\\visualizer\\base_library.zip',
    'DATA')],
- [('weakref',
+ [('locale',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\weakref.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\locale.py',
    'PYMODULE'),
-  ('heapq',
+  ('warnings',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\heapq.py',
-   'PYMODULE'),
-  ('io',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\io.py',
-   'PYMODULE'),
-  ('reprlib',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\reprlib.py',
-   'PYMODULE'),
-  ('operator',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\operator.py',
-   'PYMODULE'),
-  ('posixpath',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\posixpath.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\warnings.py',
    'PYMODULE'),
   ('collections.abc',
    'C:\\Program '
@@ -712,10 +3547,6 @@
   ('collections',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\collections\\__init__.py',
-   'PYMODULE'),
-  ('warnings',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\warnings.py',
    'PYMODULE'),
   ('encodings.zlib_codec',
    'C:\\Program '
@@ -1205,13 +4036,69 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\encodings\\__init__.py',
    'PYMODULE'),
-  ('locale',
+  ('traceback',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\locale.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\traceback.py',
+   'PYMODULE'),
+  ('stat',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\stat.py',
    'PYMODULE'),
   ('_weakrefset',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_weakrefset.py',
+   'PYMODULE'),
+  ('enum',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\enum.py',
+   'PYMODULE'),
+  ('abc',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\abc.py',
+   'PYMODULE'),
+  ('functools',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\functools.py',
+   'PYMODULE'),
+  ('operator',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\operator.py',
+   'PYMODULE'),
+  ('heapq',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\heapq.py',
+   'PYMODULE'),
+  ('sre_parse',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sre_parse.py',
+   'PYMODULE'),
+  ('ntpath',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ntpath.py',
+   'PYMODULE'),
+  ('copyreg',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\copyreg.py',
+   'PYMODULE'),
+  ('genericpath',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\genericpath.py',
+   'PYMODULE'),
+  ('_collections_abc',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_collections_abc.py',
+   'PYMODULE'),
+  ('linecache',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\linecache.py',
+   'PYMODULE'),
+  ('posixpath',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\posixpath.py',
+   'PYMODULE'),
+  ('sre_constants',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sre_constants.py',
    'PYMODULE'),
   ('re._parser',
    'C:\\Program '
@@ -1233,69 +4120,33 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\re\\__init__.py',
    'PYMODULE'),
-  ('sre_parse',
+  ('io',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sre_parse.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\io.py',
    'PYMODULE'),
   ('sre_compile',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sre_compile.py',
    'PYMODULE'),
-  ('genericpath',
+  ('reprlib',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\genericpath.py',
-   'PYMODULE'),
-  ('functools',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\functools.py',
-   'PYMODULE'),
-  ('ntpath',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\ntpath.py',
-   'PYMODULE'),
-  ('linecache',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\linecache.py',
-   'PYMODULE'),
-  ('traceback',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\traceback.py',
-   'PYMODULE'),
-  ('keyword',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\keyword.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\reprlib.py',
    'PYMODULE'),
   ('codecs',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\codecs.py',
    'PYMODULE'),
-  ('copyreg',
+  ('keyword',
    'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\copyreg.py',
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\keyword.py',
+   'PYMODULE'),
+  ('weakref',
+   'C:\\Program '
+   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\weakref.py',
    'PYMODULE'),
   ('types',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\types.py',
-   'PYMODULE'),
-  ('_collections_abc',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\_collections_abc.py',
-   'PYMODULE'),
-  ('abc',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\abc.py',
-   'PYMODULE'),
-  ('enum',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\enum.py',
-   'PYMODULE'),
-  ('stat',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\stat.py',
-   'PYMODULE'),
-  ('sre_constants',
-   'C:\\Program '
-   'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\sre_constants.py',
    'PYMODULE'),
   ('os',
    'C:\\Program '

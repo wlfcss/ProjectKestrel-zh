@@ -660,6 +660,70 @@
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\certifi\\core.py',
    'PYMODULE'),
+  ('cffi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\__init__.py',
+   'PYMODULE'),
+  ('cffi._imp_emulation',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\_imp_emulation.py',
+   'PYMODULE'),
+  ('cffi._shimmed_dist_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\_shimmed_dist_utils.py',
+   'PYMODULE'),
+  ('cffi.api',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\api.py',
+   'PYMODULE'),
+  ('cffi.cffi_opcode',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\cffi_opcode.py',
+   'PYMODULE'),
+  ('cffi.commontypes',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\commontypes.py',
+   'PYMODULE'),
+  ('cffi.cparser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\cparser.py',
+   'PYMODULE'),
+  ('cffi.error',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\error.py',
+   'PYMODULE'),
+  ('cffi.ffiplatform',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\ffiplatform.py',
+   'PYMODULE'),
+  ('cffi.lock',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\lock.py',
+   'PYMODULE'),
+  ('cffi.model',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\model.py',
+   'PYMODULE'),
+  ('cffi.pkgconfig',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\pkgconfig.py',
+   'PYMODULE'),
+  ('cffi.recompiler',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\recompiler.py',
+   'PYMODULE'),
+  ('cffi.vengine_cpy',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\vengine_cpy.py',
+   'PYMODULE'),
+  ('cffi.vengine_gen',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\vengine_gen.py',
+   'PYMODULE'),
+  ('cffi.verifier',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\cffi\\verifier.py',
+   'PYMODULE'),
   ('cgi',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\cgi.py',
@@ -695,6 +759,70 @@
   ('charset_normalizer.version',
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\charset_normalizer\\version.py',
+   'PYMODULE'),
+  ('clr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr.py',
+   'PYMODULE'),
+  ('clr_loader',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.ffi',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.hostfxr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\hostfxr.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.mono',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\mono.py',
+   'PYMODULE'),
+  ('clr_loader.ffi.netfx',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\ffi\\netfx.py',
+   'PYMODULE'),
+  ('clr_loader.hostfxr',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\hostfxr.py',
+   'PYMODULE'),
+  ('clr_loader.mono',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\mono.py',
+   'PYMODULE'),
+  ('clr_loader.netfx',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\netfx.py',
+   'PYMODULE'),
+  ('clr_loader.types',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\types.py',
+   'PYMODULE'),
+  ('clr_loader.util',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\__init__.py',
+   'PYMODULE'),
+  ('clr_loader.util.clr_error',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\clr_error.py',
+   'PYMODULE'),
+  ('clr_loader.util.coreclr_errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\coreclr_errors.py',
+   'PYMODULE'),
+  ('clr_loader.util.find',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\find.py',
+   'PYMODULE'),
+  ('clr_loader.util.hostfxr_errors',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\hostfxr_errors.py',
+   'PYMODULE'),
+  ('clr_loader.util.runtime_spec',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\clr_loader\\util\\runtime_spec.py',
    'PYMODULE'),
   ('cmd',
    'C:\\Program '
@@ -4551,6 +4679,10 @@
   ('kestrel_analyzer.image_utils',
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\analyzer\\kestrel_analyzer\\image_utils.py',
+   'PYMODULE'),
+  ('kestrel_analyzer.logging_utils',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\analyzer\\kestrel_analyzer\\logging_utils.py',
    'PYMODULE'),
   ('kestrel_analyzer.ml',
    'C:\\Data\\Code\\Project '
@@ -8556,6 +8688,26 @@
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\py_compile.py',
    'PYMODULE'),
+  ('pycparser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\__init__.py',
+   'PYMODULE'),
+  ('pycparser.ast_transforms',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\ast_transforms.py',
+   'PYMODULE'),
+  ('pycparser.c_ast',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_ast.py',
+   'PYMODULE'),
+  ('pycparser.c_lexer',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_lexer.py',
+   'PYMODULE'),
+  ('pycparser.c_parser',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pycparser\\c_parser.py',
+   'PYMODULE'),
   ('pydoc',
    'C:\\Program '
    'Files\\WindowsApps\\PythonSoftwareFoundation.Python.3.11_3.11.2544.0_x64__qbz5n2kfra8p0\\Lib\\pydoc.py',
@@ -10051,6 +10203,10 @@
   ('pyreadline3.unicode_helper',
    'C:\\Data\\Code\\Project '
    'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pyreadline3\\unicode_helper.py',
+   'PYMODULE'),
+  ('pythonnet',
+   'C:\\Data\\Code\\Project '
+   'Kestrel\\ProjectKestrel\\.venv2\\Lib\\site-packages\\pythonnet\\__init__.py',
    'PYMODULE'),
   ('queue',
    'C:\\Program '

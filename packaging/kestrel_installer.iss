@@ -37,6 +37,8 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ArchitecturesAllowed=x64compatible
 DisableProgramGroupPage=yes
+WizardImageFile=..\assets\logo.png
+WizardSmallImageFile=..\assets\logo.png
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

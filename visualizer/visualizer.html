@@ -809,14 +809,42 @@
     await renderScenes();
   }
 
+  // Try to find .kestrel/kestrel_database.csv in the selected folder (optionally nested)
+  async function findKestrelDatabase(dirHandle, maxDepth = 2, depth = 0) {
+    // First, check directly in this folder
+    try {
+      const kestrelDir = await dirHandle.getDirectoryHandle('.kestrel');
+      const csvHandle = await kestrelDir.getFileHandle('kestrel_database.csv');
+      return { rootHandle: dirHandle, fileHandle: csvHandle };
+    } catch (_) {
+      // Not found at this level; continue
+    }
+
+    if (depth >= maxDepth) return null;
+
+    // Search subfolders (limited depth)
+    try {
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind !== 'directory') continue;
+        if (entry.name === '.kestrel') continue;
+        const found = await findKestrelDatabase(entry, maxDepth, depth + 1);
+        if (found) return found;
+      }
+    } catch (_) {
+      // Ignore permission/iteration errors
+    }
+    return null;
+  }
+
   async function tryOpenDefaultCsv(dirHandle) {
     try {
-      const csvRel = '.kestrel/kestrel_database.csv';
-      const fileHandle = await getHandleFromRelativePath(dirHandle, csvRel);
-      await loadCsvFromHandle(fileHandle);
-      setStatus('Loaded .kestrel/kestrel_database.csv');
+      const found = await findKestrelDatabase(dirHandle, 2);
+      if (!found) throw new Error('not found');
+      rootDirHandle = found.rootHandle;
+      await loadCsvFromHandle(found.fileHandle);
+      setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootDirHandle.name || 'selected folder'})`);
     } catch (e) {
-      setStatus('Could not find .kestrel/kestrel_database.csv in this folder. Use "Open kestrel_database.csv…"');
+      setStatus('Could not find .kestrel/kestrel_database.csv in this folder (or its subfolders). Use "Open kestrel_database.csv…"');
     }
   }
 

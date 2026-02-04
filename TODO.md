@@ -1,5 +1,11 @@
 # Project Kestrel To-Do and Changelog
 
+# Latest Issues
+* Bug in visualizer when run via .exe; does not open preferred editor by default (and no method to permanently store preferred editor config.) (might also exist when running in native python!). Need to open the settings and close it and then it starts working.
+    * This is simply because there isn't a current persistent method to create a kestrel configuration file. Unclear how to fix this.
+
+
+
 ## Known Issues
 - Kestrel's analysis struggles heavily with back-lit/front-dim images. The quality estimation and species detection suffers significantly because of this. An exposure normalization step should be cosnidered to standardize the exposure of the bird pixels.
 - Lightroom support has not been tested on Windows
