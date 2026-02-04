@@ -130,7 +130,7 @@ class KestrelGUI(QWidget):
         self.btn_resume = QPushButton("Resume")
         self.btn_pause.setEnabled(False)
         self.btn_resume.setEnabled(False)
-        self.chk_gpu = QCheckBox("Use GPU (DirectML) for ONNX")
+        self.chk_gpu = QCheckBox("Use GPU When Possible")
         self.chk_gpu.setChecked(True)
         control_layout.addWidget(self.btn_select)
         control_layout.addWidget(self.btn_start)

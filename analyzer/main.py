@@ -20,11 +20,15 @@ def _create_splash(app: QApplication) -> QWidget:
     splash.setWindowTitle("Kestrel Analyzer")
     splash.setFixedSize(420, 160)
     layout = QVBoxLayout(splash)
-    label = QLabel("Loading Kestrel…", splash)
-    label.setAlignment(Qt.AlignCenter)
-    label.setObjectName("splashLabel")
+    title_label = QLabel("Project Kestrel is Loading…", splash)
+    title_label.setAlignment(Qt.AlignCenter)
+    title_label.setObjectName("splashTitle")
+    status_label = QLabel("Starting…", splash)
+    status_label.setAlignment(Qt.AlignCenter)
+    status_label.setObjectName("splashStatus")
     layout.addStretch(1)
-    layout.addWidget(label)
+    layout.addWidget(title_label)
+    layout.addWidget(status_label)
     layout.addStretch(1)
     splash.setLayout(layout)
     splash.show()
@@ -32,7 +36,7 @@ def _create_splash(app: QApplication) -> QWidget:
     return splash
 
 def _set_splash_text(app: QApplication, splash: QWidget, text: str) -> None:
-    label = splash.findChild(QLabel, "splashLabel")
+    label = splash.findChild(QLabel, "splashStatus")
     if label:
         label.setText(text)
         app.processEvents()
