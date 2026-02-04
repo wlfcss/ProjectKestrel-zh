@@ -14,6 +14,20 @@ echo.
 set PROJECT_ROOT=%~dp0..
 set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
+REM Build default release name: Project Kestrel aYYYY.MM.DD.HH.MM
+for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format \"yyyy.MM.dd.HH.mm\""') do set "RELEASE_TS=%%I"
+set "DEFAULT_RELEASE_NAME=Project Kestrel a%RELEASE_TS%"
+set "RELEASE_NAME="
+set /p RELEASE_NAME=Enter installer release name [%DEFAULT_RELEASE_NAME%]: 
+if "%RELEASE_NAME%"=="" set "RELEASE_NAME=%DEFAULT_RELEASE_NAME%"
+echo Using release name: %RELEASE_NAME%
+
+set "DEFAULT_APP_VERSION=alpha-%RELEASE_TS%"
+set "APP_VERSION="
+set /p APP_VERSION=Enter app version [%DEFAULT_APP_VERSION%]: 
+if "%APP_VERSION%"=="" set "APP_VERSION=%DEFAULT_APP_VERSION%"
+echo Using app version: %APP_VERSION%
+
 REM Change to project root directory
 cd /d "%PROJECT_ROOT%"
 
@@ -44,9 +58,9 @@ if not exist "analyzer\dist\kestrel_analyzer.exe" (
 echo [OK] Analyzer executable found
 
 REM Check if visualizer build exists  
-if not exist "visualizer\dist\kestrel_visualizer.exe" (
+if not exist "visualizer\dist\visualizer.exe" (
     echo [ERROR] Visualizer executable not found at:
-    echo        visualizer\dist\kestrel_visualizer.exe
+    echo        visualizer\dist\visualizer.exe
     echo.
     echo Please build the visualizer first.
     echo.
@@ -74,7 +88,7 @@ echo ========================================
 echo.
 
 REM Run Inno Setup compiler from packaging directory
-%INNO_COMPILER% "packaging\kestrel_installer.iss"
+%INNO_COMPILER% /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" "packaging\kestrel_installer.iss"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -102,7 +116,7 @@ if %ERRORLEVEL% EQU 0 (
     move /Y "analyzer\dist\kestrel_analyzer.exe" "release\kestrel_analyzer.exe"
     move /Y "analyzer\build\kestrel_analyzer_build\kestrel_analyzer.pkg" "release\kestrel_analyzer.pkg"
     move /Y "visualizer\dist\visualizer.exe" "release\visualizer.exe"
-    move /Y "visualizer\build\visualizer\visualizer.pkg" "release\kestrel_visualizer.pkg"
+    move /Y "visualizer\build\visualizer\visualizer.pkg" "release\visualizer.pkg"
 
 ) else (
     echo.

@@ -2,9 +2,16 @@
 ; Packages Kestrel Analyzer and Visualizer with ImageMagick dependency
 
 #define MyAppName "Project Kestrel"
-#define MyAppVersion "alpha-R2026.02.01"
 #define MyAppPublisher "Project Kestrel"
 #define MyAppURL "https://github.com/sirspongelord/ProjectKestrel"
+
+#ifndef AppVersion
+  #define AppVersion "alpha-YYYY.MM.DD.HH.MM"
+#endif
+
+#ifndef ReleaseName
+  #define ReleaseName "Project Kestrel aYYYY.MM.DD.HH.MM"
+#endif
 
 ; ImageMagick download URL (Windows x64 Q8 dynamic release)
 #define ImageMagickURL "https://imagemagick.org/archive/binaries/ImageMagick-7.1.2-13-Q16-x64-dll.exe"
@@ -13,7 +20,7 @@
 [Setup]
 AppId=org.ProjectKestrel
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}
+AppVersion={#AppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
@@ -22,7 +29,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\dist\installer
-OutputBaseFilename=ProjectKestrel-{#MyAppVersion}-Setup
+OutputBaseFilename={#ReleaseName}-{#AppVersion}-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -44,7 +51,7 @@ Name: "installimagemagick"; Description: "Install ImageMagick (required for RAW 
 Source: "..\analyzer\dist\kestrel_analyzer.exe"; DestDir: "{app}\Analyzer"; Flags: ignoreversion
 
 ; Kestrel Visualizer files  
-Source: "..\visualizer\dist\kestrel_visualizer.exe"; DestDir: "{app}\Visualizer"; Flags: ignoreversion
+Source: "..\visualizer\dist\visualizer.exe"; DestDir: "{app}\Visualizer"; Flags: ignoreversion
 
 ; Documentation
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
@@ -53,12 +60,12 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 ; Start Menu icons
 Name: "{group}\Kestrel Analyzer"; Filename: "{app}\Analyzer\kestrel_analyzer.exe"; WorkingDir: "{app}\Analyzer"
-Name: "{group}\Kestrel Visualizer"; Filename: "{app}\Visualizer\kestrel_visualizer.exe"; WorkingDir: "{app}\Visualizer"
+Name: "{group}\Kestrel Visualizer"; Filename: "{app}\Visualizer\visualizer.exe"; WorkingDir: "{app}\Visualizer"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop icons
 Name: "{autodesktop}\Kestrel Analyzer"; Filename: "{app}\Analyzer\kestrel_analyzer.exe"; WorkingDir: "{app}\Analyzer"; Tasks: desktopicon_analyzer
-Name: "{autodesktop}\Kestrel Visualizer"; Filename: "{app}\Visualizer\kestrel_visualizer.exe"; WorkingDir: "{app}\Visualizer"; Tasks: desktopicon_visualizer
+Name: "{autodesktop}\Kestrel Visualizer"; Filename: "{app}\Visualizer\visualizer.exe"; WorkingDir: "{app}\Visualizer"; Tasks: desktopicon_visualizer
 
 [Run]
 ; Run ImageMagick installer if task selected and installer was downloaded
@@ -66,7 +73,7 @@ Filename: "{tmp}\{#ImageMagickInstaller}"; Parameters: "/SILENT /NORESTART"; Sta
 
 ; Option to launch after install
 Filename: "{app}\Analyzer\kestrel_analyzer.exe"; Description: "Launch Kestrel Analyzer"; Flags: nowait postinstall skipifsilent unchecked
-Filename: "{app}\Visualizer\kestrel_visualizer.exe"; Description: "Launch Kestrel Visualizer"; Flags: nowait postinstall skipifsilent unchecked
+Filename: "{app}\Visualizer\visualizer.exe"; Description: "Launch Kestrel Visualizer"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 var
