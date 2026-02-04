@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 
 from .config import DATABASE_NAME, METADATA_FILENAME, VERSION
+from .logging_utils import log_warning
 
 BASE_COLUMNS = [
     "filename",
@@ -36,7 +37,7 @@ REQUIRED_COLUMNS = [
 ]
 
 
-def load_database(kestrel_dir: str, analyzer_name: str):
+def load_database(kestrel_dir: str, analyzer_name: str, log_path: str = None):
     db_path = os.path.join(kestrel_dir, DATABASE_NAME)
     metadata_path = os.path.join(kestrel_dir, METADATA_FILENAME)
 
@@ -55,7 +56,16 @@ def load_database(kestrel_dir: str, analyzer_name: str):
                 with open(metadata_path, "w", encoding="utf-8") as mf:
                     json.dump(metadata, mf, indent=2)
         except Exception as e:
-            print(f"Warning: failed to write metadata file: {e}")
+            if log_path:
+                log_warning(
+                    log_path,
+                    f"Failed to write metadata file: {e}",
+                    category=type(e),
+                    stage="metadata_write",
+                    context={"metadata_path": metadata_path},
+                )
+            else:
+                print(f"Warning: failed to write metadata file: {e}")
 
     database = ensure_columns(database)
     return database, db_path

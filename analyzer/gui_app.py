@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import (
 #sys.path.insert(0, str(Path(__file__).parent))
 
 from kestrel_analyzer.pipeline import AnalysisPipeline
+from kestrel_analyzer.logging_utils import get_log_path, log_event, log_exception
 from gui_helpers import load_qimage_from_path
 
 
@@ -257,10 +258,27 @@ class KestrelGUI(QWidget):
 
 
 def main():
-    app = QApplication(sys.argv)
-    win = KestrelGUI()
-    win.show()
-    sys.exit(app.exec_())
+    log_path = get_log_path(None)
+    try:
+        log_event(
+            log_path,
+            {
+                "level": "info",
+                "event": "gui_start",
+            },
+        )
+        app = QApplication(sys.argv)
+        win = KestrelGUI()
+        win.show()
+        sys.exit(app.exec_())
+    except Exception as e:
+        log_exception(
+            log_path,
+            e,
+            stage="startup",
+            context={"analyzer": "gui"},
+        )
+        raise
 
 
 if __name__ == "__main__":

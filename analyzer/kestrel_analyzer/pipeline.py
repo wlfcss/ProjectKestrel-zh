@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 from typing import Callable, Dict, Optional
 
 import cv2
@@ -14,11 +15,13 @@ from .config import (
     QUALITYCLASSIFIER_PATH,
     WILDLIFE_CATEGORIES,
     MODELS_DIR,
+    KESTREL_DIR_NAME,
 )
 from .database import load_database, save_database
 from .image_utils import read_image
 from .ratings import quality_to_rating
 from .similarity import compute_image_similarity_akaze
+from .logging_utils import get_log_path, log_event, log_exception, log_warning
 from .ml.mask_rcnn import MaskRCNNWrapper
 from .ml.bird_species import BirdSpeciesClassifier
 from .ml.quality import QualityClassifier
@@ -30,6 +33,7 @@ class AnalysisPipeline:
         self.mask_rcnn: Optional[MaskRCNNWrapper] = None
         self.species_clf: Optional[BirdSpeciesClassifier] = None
         self.quality_clf: Optional[QualityClassifier] = None
+        self._log_path: Optional[str] = None
 
     def load_models(self, status_cb: Optional[Callable[[str], None]] = None) -> None:
         if self.mask_rcnn and self.species_clf and self.quality_clf:
@@ -60,7 +64,28 @@ class AnalysisPipeline:
         image_cb = callbacks.get("on_image")
         error_cb = callbacks.get("on_error")
 
+        self._log_path = get_log_path(folder)
+        stage_ctx = {"stage": "startup", "file": None}
+
+        original_showwarning = warnings.showwarning
+
+        def _showwarning(message, category, filename, lineno, file=None, line=None):
+            log_warning(
+                self._log_path,
+                message,
+                category=category,
+                filename=filename,
+                lineno=lineno,
+                stage=stage_ctx["stage"],
+                context={"file": stage_ctx["file"], "folder": folder},
+            )
+            if original_showwarning:
+                original_showwarning(message, category, filename, lineno, file=file, line=line)
+
+        warnings.showwarning = _showwarning
+
         try:
+            stage_ctx["stage"] = "list_files"
             files = [
                 f
                 for f in os.listdir(folder)
@@ -78,15 +103,37 @@ class AnalysisPipeline:
             if not files:
                 if status_cb:
                     status_cb("No supported image files found.")
+                log_event(
+                    self._log_path,
+                    {
+                        "level": "warning",
+                        "event": "no_supported_files",
+                        "analyzer": analyzer_name,
+                        "folder": folder,
+                    },
+                )
                 return
 
-            kestrel_dir = os.path.join(folder, ".kestrel")
+            log_event(
+                self._log_path,
+                {
+                    "level": "info",
+                    "event": "analysis_start",
+                    "analyzer": analyzer_name,
+                    "folder": folder,
+                    "file_count": len(files),
+                },
+            )
+
+            stage_ctx["stage"] = "create_kestrel_dirs"
+            kestrel_dir = os.path.join(folder, KESTREL_DIR_NAME)
             export_dir = os.path.join(kestrel_dir, "export")
             crop_dir = os.path.join(kestrel_dir, "crop")
             os.makedirs(export_dir, exist_ok=True)
             os.makedirs(crop_dir, exist_ok=True)
 
-            database, db_path = load_database(kestrel_dir, analyzer_name)
+            stage_ctx["stage"] = "load_database"
+            database, db_path = load_database(kestrel_dir, analyzer_name, log_path=self._log_path)
 
             processed_set = set(database["filename"].values)
             new_files = [f for f in files if f not in processed_set]
@@ -96,6 +143,7 @@ class AnalysisPipeline:
                 return
             total = len(new_files)
 
+            stage_ctx["stage"] = "load_models"
             self.load_models(status_cb=status_cb)
 
             previous_image = None
@@ -135,12 +183,16 @@ class AnalysisPipeline:
                     "secondary_family_scores": [],
                 }
 
+                image_path = None
                 try:
+                    stage_ctx["stage"] = "read_image"
+                    stage_ctx["file"] = raw_file
                     image_path = os.path.join(folder, raw_file)
                     img = read_image(image_path)
                     if img is None:
                         raise RuntimeError("Image read returned None")
 
+                    stage_ctx["stage"] = "compute_similarity"
                     similarity = compute_image_similarity_akaze(previous_image, img)
                     if not similarity["similar"]:
                         scene_count += 1
@@ -156,6 +208,7 @@ class AnalysisPipeline:
                     )
                     previous_image = img.copy()
 
+                    stage_ctx["stage"] = "export_image"
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
                     img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))
                     cv2.imwrite(
@@ -165,10 +218,12 @@ class AnalysisPipeline:
                     )
                     entry.update({"export_path": export_path})
 
+                    stage_ctx["stage"] = "mask_rcnn_prediction"
                     masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
                     if masks is None:
                         if status_cb:
                             status_cb(f"No detections in {raw_file}")
+                        stage_ctx["stage"] = "write_crop"
                         crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
                         cv2.imwrite(
                             crop_path,
@@ -176,6 +231,7 @@ class AnalysisPipeline:
                             [cv2.IMWRITE_JPEG_QUALITY, 85],
                         )
                         entry.update({"crop_path": crop_path})
+                        stage_ctx["stage"] = "save_database"
                         database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
                         save_database(database, db_path)
                         if image_cb:
@@ -189,6 +245,7 @@ class AnalysisPipeline:
                     bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
 
                     def process_nonbird(primary_mask_i):
+                        stage_ctx["stage"] = "process_nonbird"
                         quality_crop, quality_mask = self.mask_rcnn.get_square_crop(
                             masks[primary_mask_i], img, resize=True
                         )
@@ -204,6 +261,7 @@ class AnalysisPipeline:
                         }
 
                     def process_bird(i):
+                        stage_ctx["stage"] = "process_bird"
                         if pred_class[i] == "bird":
                             species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img)
                             species_result = self.species_clf.classify(species_crop)
@@ -233,6 +291,7 @@ class AnalysisPipeline:
                             family_label = "N/A"
                             family_confidence = 0.0
                         quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
+                        stage_ctx["stage"] = "quality_score"
                         quality_score = self.quality_clf.classify(quality_crop, quality_mask)
                         return {
                             "species": species_label,
@@ -288,6 +347,7 @@ class AnalysisPipeline:
                         else:
                             crop_img = img_small
 
+                    stage_ctx["stage"] = "write_crop"
                     crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
                     cv2.imwrite(
                         crop_path,
@@ -296,6 +356,7 @@ class AnalysisPipeline:
                     )
                     entry.update({"crop_path": crop_path})
 
+                    stage_ctx["stage"] = "save_database"
                     database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
                     save_database(database, db_path)
 
@@ -308,6 +369,17 @@ class AnalysisPipeline:
                             f"R={entry['rating']} ({idx}/{total})"
                         )
                 except Exception as e:
+                    log_exception(
+                        self._log_path,
+                        e,
+                        stage=stage_ctx["stage"],
+                        context={
+                            "file": raw_file,
+                            "folder": folder,
+                            "image_path": image_path,
+                            "analyzer": analyzer_name,
+                        },
+                    )
                     if error_cb:
                         error_cb(raw_file, e)
                     if status_cb:
@@ -323,7 +395,15 @@ class AnalysisPipeline:
                     progress_cb(idx, total)
 
         except Exception as e:
+            log_exception(
+                self._log_path,
+                e,
+                stage=stage_ctx["stage"],
+                context={"folder": folder, "analyzer": analyzer_name},
+            )
             if status_cb:
                 status_cb(f"Fatal error: {e}")
             if error_cb:
                 error_cb("fatal", e)
+        finally:
+            warnings.showwarning = original_showwarning

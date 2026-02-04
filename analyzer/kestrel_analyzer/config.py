@@ -19,3 +19,6 @@ JPEG_EXTENSIONS = [".jpg", ".jpeg", ".png"]
 
 DATABASE_NAME = "kestrel_database.csv"
 METADATA_FILENAME = "kestrel_metadata.json"
+KESTREL_DIR_NAME = ".kestrel"
+LOG_FILENAME_PREFIX = "kestrel_error"
+LOG_FILE_EXTENSION = "json"

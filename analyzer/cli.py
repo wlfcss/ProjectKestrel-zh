@@ -4,6 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from kestrel_analyzer.pipeline import AnalysisPipeline
+from kestrel_analyzer.logging_utils import get_log_path, log_event, log_exception
 
 
 def parse_args():
@@ -16,24 +17,45 @@ def parse_args():
 
 
 def main():
-    args = parse_args()
-    pipeline = AnalysisPipeline(use_gpu=args.use_gpu)
+    log_path = get_log_path(None)
+    try:
+        args = parse_args()
+        log_path = get_log_path(args.folder)
+        pipeline = AnalysisPipeline(use_gpu=args.use_gpu)
 
-    def on_status(msg):
-        print(msg)
+        def on_status(msg):
+            print(msg)
 
-    def on_progress(processed, total):
-        print(f"\rProcessed {processed}/{total}", end="", flush=True)
+        def on_progress(processed, total):
+            print(f"\rProcessed {processed}/{total}", end="", flush=True)
 
-    pipeline.process_folder(
-        args.folder,
-        callbacks={
-            "on_status": on_status,
-            "on_progress": on_progress,
-        },
-        analyzer_name="cli",
-    )
-    print()
+        log_event(
+            log_path,
+            {
+                "level": "info",
+                "event": "cli_start",
+                "folder": args.folder,
+                "use_gpu": args.use_gpu,
+            },
+        )
+
+        pipeline.process_folder(
+            args.folder,
+            callbacks={
+                "on_status": on_status,
+                "on_progress": on_progress,
+            },
+            analyzer_name="cli",
+        )
+        print()
+    except Exception as e:
+        log_exception(
+            log_path,
+            e,
+            stage="startup",
+            context={"analyzer": "cli"},
+        )
+        raise
 
 
 if __name__ == "__main__":
