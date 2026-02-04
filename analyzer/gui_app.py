@@ -172,12 +172,14 @@ class KestrelGUI(QWidget):
             img_label.setAlignment(Qt.AlignCenter)
             img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             img_label.setMinimumSize(160, 160)
+            confidence_label = QLabel("Detection: -")
             rating_label = QLabel("Rating: -")
             species_label = QLabel("Species: -")
             family_label = QLabel("Family: -")
-            for lbl in (rating_label, species_label, family_label):
+            for lbl in (confidence_label, rating_label, species_label, family_label):
                 lbl.setWordWrap(True)
             card_layout.addWidget(img_label)
+            card_layout.addWidget(confidence_label)
             card_layout.addWidget(rating_label)
             card_layout.addWidget(species_label)
             card_layout.addWidget(family_label)
@@ -186,6 +188,7 @@ class KestrelGUI(QWidget):
             self.crop_cards.append(
                 {
                     "image": img_label,
+                    "confidence": confidence_label,
                     "rating": rating_label,
                     "species": species_label,
                     "family": family_label,
@@ -291,6 +294,7 @@ class KestrelGUI(QWidget):
         self._crop_images = [None] * 5
         for card in self.crop_cards:
             card["image"].setText("No bird")
+            card["confidence"].setText("Detection Confidence: -")
             card["rating"].setText("Rating: -")
             card["species"].setText("Species: -")
             card["family"].setText("Family: -")
@@ -316,15 +320,23 @@ class KestrelGUI(QWidget):
 
     def on_crops_ready(self, data: dict):
         crops = data.get("crops") or []
+        confidences = data.get("confidences") or []
         self._crop_images = [None] * 5
         for idx, crop in enumerate(crops[:5]):
             self._crop_images[idx] = numpy_to_qimage(crop)
             self.crop_cards[idx]["image"].setText("")
+            if idx < len(confidences):
+                self.crop_cards[idx]["confidence"].setText(
+                    f"Detection: {float(confidences[idx]):.2f}"
+                )
+            else:
+                self.crop_cards[idx]["confidence"].setText("Detection: -")
             self.crop_cards[idx]["rating"].setText("Rating: -")
             self.crop_cards[idx]["species"].setText("Species: -")
             self.crop_cards[idx]["family"].setText("Family: -")
         for idx in range(len(crops), 5):
             self.crop_cards[idx]["image"].setText("No bird")
+            self.crop_cards[idx]["confidence"].setText("Detection: -")
             self.crop_cards[idx]["rating"].setText("Rating: -")
             self.crop_cards[idx]["species"].setText("Species: -")
             self.crop_cards[idx]["family"].setText("Family: -")
