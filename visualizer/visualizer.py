@@ -309,6 +309,8 @@ def parse_args():
     ap = argparse.ArgumentParser(description='Serve Kestrel visualizer with local /open bridge.')
     ap.add_argument('--port', type=int, default=8765, help='Port to listen on (default 8765)')
     ap.add_argument('--no-browser', action='store_true', help='Do not auto-open a browser window')
+    ap.add_argument('--windowed', action='store_true', help='Open in a desktop window (requires pywebview) [default]')
+    ap.add_argument('--no-windowed', action='store_true', help='Disable windowed mode and use the system browser')
     ap.add_argument('--root', default='', help='Default root folder for RAW originals (client can override unless KESTREL_ALLOWED_ROOT set)')
     return ap.parse_args()
 
@@ -321,18 +323,52 @@ def main():
     log('Ephemeral bridge token (auto-injected):', AUTH_TOKEN[:8] + '…')
     if args.root:
         log('Default root (client-supplied):', args.root)
-    if not args.no_browser:
+    url = f'http://{HOST}:{args.port}/'
+    if args.no_windowed:
+        args.windowed = False
+    else:
+        args.windowed = True
+    if args.windowed:
         try:
-            webbrowser.open(f'http://{HOST}:{args.port}/')
-        except Exception:
+            import webview  # type: ignore
+        except Exception as e:
+            log('Windowed mode disabled: failed to import pywebview:', repr(e))
+            args.windowed = False
+    if args.windowed:
+        def _serve():
+            try:
+                server.serve_forever()
+            except Exception:
+                pass
+        t = threading.Thread(target=_serve, daemon=True)
+        t.start()
+        try:
+            log('Starting windowed UI via pywebview...')
+            webview.create_window('Kestrel Visualizer', url)
+            webview.start()
+        except Exception as e:
+            log('Windowed mode failed at runtime; falling back to browser:', repr(e))
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        finally:
+            server.shutdown()
+            server.server_close()
+            log('Server stopped.')
+    else:
+        if not args.no_browser:
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
             pass
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
-        log('Server stopped.')
+        finally:
+            server.server_close()
+            log('Server stopped.')
 
 
 if __name__ == '__main__':
