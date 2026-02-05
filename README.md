@@ -1,73 +1,93 @@
 # Project Kestrel 🦅
 
-A Machine Learning-powered bird photography analysis and curation system that automatically detects, classifies, and evaluates bird images from RAW photography collections.
+Project Kestrel is a Machine Learning-powered bird photography analysis software that groups your burst photos together and ranks them by image quality. Let Kestrel move you from your RAW photo collection to a searchable, quality-sorted and interactive library, then take the last few steps to select your favorite photos to edit and share!
 
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+
 [Donate](https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A) | [Visit Projectkestrel.org](https://projectkestrel.org)
 
 ## At a Glance
 
-Are you a bird photographer? Do you take hundreds or thousands of bird photos, often in bursts? Project Kestrel scans through your bird photos, grouping them by scene, finding the birds in each photo, and sorting them by the sharpness of the **bird**. 
+Are you a bird photographer? Do you take hundreds or thousands of bird photos, often in bursts? How much time do you spend comparing your images to find the sharpest ones to edit and share?
 
-After Kestrel is done scanning, run the visualizer tool to instantly discover your favorite photos. As you drag your mouse across your photos, you'll see a zoom-in crop on the bird, so you can focus on evaluating the bird's pose or actions, rather than painstakingly finding images with slightly better sharpness.
+Project Kestrel creates a searchable, quality-sorted, and easy-to-browse visualization of your bird photo collection. To do this, Kestrel first scans through your photos, grouping them together by scene/burst, and identifying birds in each photo. After that, it anazlyes the bird, identifying its family/species and estimating the **objective** image quality (sharpness, motion blur, and noise).
 
-* **NEW!** Complete overhaul of the folder visualizer, now using a web-based framework that is extremely fast and responsive.
-* **NEW!** No more command lines needed! Kestrel's analyzer has a new GUI that shows you the analysis progress.
-* **NEW!** Rudimentary support for non-bird images. Use Kestrel to analyze other wildlife species! Note: this feature is in beta, and wildlife categories will not be accurate.
-* **NEW!** Bird Family Classification. Kestrel may understand that your bird is of one specific family (ex. a Sparrow), but unsure which exact species it is (Fox Sparrow or Song Sparrow). Kestrel now supports family classification, so you can search by "Sparrow sp." for these situations.
+After Kestrel is done scanning, run the visualizer tool to intelligently browse through your photos. Search by species or family, and double-click on an image you like to launch it in your favorite photo editor (darktable, lightroom, etc.) 
 
-## Gallery
+✅ Kestrel is for:
+* Hobbyist/Professional bird photographers who take **hundreds or thousands of photos in bursts.**
+* Bird photographers who want to **retain control** and decision-making authority when selecting their favorite photos.
+* Bird photographers who spend too much time painstakingly scrutinizing their images to find minor differences in sharpness, motion blur, or noise.
 
-Kestrel sorts all of your bird photos into scenes.
-![alt text](readme_imgs/image-5.png)
+❌ Kestrel does NOT:
+* Attempt to evaluate your photos on **subjective** characteristics (ex. bird pose, framing, etc.)
+* Delete or modify any of your photos
+* Do any processing in the cloud (All processing is done locally on your computer!)
+* Collect or transmit any data about your photos.
+
+
+## Get Started
+
+Windows users can simply download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases/tag/Public-Release-1) and install it on their computer! Run Kestrel Analyzer to analyze your photos. Once it is finished, run Kestrel Visualizer to browse your photos!
+
+At this time, MacOS and Linux users need to install python and manually clone this repository. See the quick start section below.
+
+## Gallery/Quick Tutorial
+
+First, open Kestrel Analyzer. Kestrel will analyze all of your photos, spotting birds, checking their species, and estimating the objective image quality.
+![alt text](readme_imgs/image.png)
+
+After Kestrel is done, it is time to launch the interactive visualizer. Search by bird species and click on a scene.
+![alt text](readme_imgs/image-1.png)
 
 Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable or whatever photo software you prefer.
-![alt text](readme_imgs/image-7.png)
+![alt text](readme_imgs/image-2.png)
 
 Kestrel has sorted your photos from sharp to blurry. No more time painstakingly reviewing each bird!
-![alt text](readme_imgs/image-2.png)
+![alt text](readme_imgs/image-3.png)
 
 You can even search by bird species! (Note: Species detection is experimental and may be incorrect.)
 ![alt text](readme_imgs/image-6.png)
 
-**NEW!** Kestrel's analyzer is more intuitive than ever before! Just open the GUI, pick your bird photo folder, and hit "Start!"
-![alt text](readme_imgs/image-8.png)
 
-## 🌟 Features
+## Features
 
-- **🔍 Automatic Bird Detection**: Kestrel will find exactly where the bird is in your photo
-- **🐦 Species Classification**: (BETA) Kestrel will guess the bird species, allowing you to search by species!
-- **⭐ Quality Assessment**: Sort your photos by image quality, from sharp to blurry! Kestrel will assign quality scores using a custom Machine Learning model.
-- **📂 Smart Organization**: Groups similar images or bursts of photos into scenes to easily compare all images within a scene!
-- **🖼️ Interactive Visualizer**: Responsive and fast. Shows close-ups of each bird. Double-click to open in your favorite editor (darktable is supported for now)
-- **📸 RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats
-- **🔗 External Tool Integration**: Direct integration with Darktable so you can stop sorting and start editing!
+- **Automatic Bird Detection**: Kestrel will find exactly where the bird is in your photo
+- **Family Classification**: Kestrel will guess the bird family (ex. Waterfowl, Hummingbirds, Sparrows) and species, allowing you to search your photos quickly!
+- **Objective Quality Assessment**: Kestrel will analyze the quality of your photos based on sharpness, motion blur, and noise. It will NOT analyze your photos based on bird pose, framing, or other subjective characteristics.
+- **Intelligent Organization**: Kestrel groups your photos by scene/burst, allowing you to compare all images of a given subject.
+- **Responsive, Interactive Visualizer**: Browse Kestrel's results and double-click on photos to import into your preferred editing workflow.
+- **RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats thanks to the ImageMagick Library
 
 ## 🚀 Quick Start
 
-### Prerequisites
+For Windows, navigate to the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases/tag/Public-Release-1) and install it on your computer. Open Kestrel Analyzer, select a folder, and click "Start". Once finished, run Kestrel Visualizer to browse your photos!
 
+### To Install on MacOS or Linux
+
+First install the prerequisites:
 - Python 3.12+
-- Windows OS (primary support, macOS support is planned)
-- ImageMagick (for RAW file reading via Wand)
+- ImageMagick
 
-To install ImageMagick, visit their [download page](https://imagemagick.org/script/download.php) and install the latest Q8 dynamic release.
+To install ImageMagick, visit their [download page](https://imagemagick.org/script/download.php) and install the latest Q8 **dynamic** release.
 
-For Debian(or Debian Based Distros),
-```
-sudo apt update
-sudo apt install imagemagick
-```
+> For Debian(or Debian Based Distros), run
+> ```
+> sudo apt update
+> sudo apt install imagemagick
+> ```
 
-### Installation
 
-1. Clone the repository:
+#### Installation
+
+1. Clone the repository with [Git](https://git-scm.com/):
 ```bash
 git clone https://github.com/SanjaySoniLV/ProjectKestrel.git
 cd ProjectKestrel
 ```
+or simply download the Code as a .zip file and extract it.
 
 2. Install dependencies:
 ```bash
@@ -81,22 +101,21 @@ pip install -r requirements.txt
 First open the analyzer.
 
 ```bash
-export QT_QPA_PLATFORM=wayland
-python analyzer/gui_app.py
+python analyzer/main.py
 ```
 
 Select a folder and hit start. The script will:
 - Process each image to detect birds, classify species, and assess quality
-- Generate a database of results in `.kestrel/kestrel_database.csv`
+- Generate a database of results in `{your_photo_folder}/.kestrel/kestrel_database.csv`
 - Create export JPEGs and cropped bird images
 
-![image](readme_imgs/image-9.png)
+![alt text](readme_imgs/image-4.png)
 
 > Note: The script will take some time to run. All progress is saved automatically. If you encounter any errors, try re-running the script, and Kestrel will continue where it left off.
 
 > Note: Kestrel comes with a set of test images. Simply open the `test_imgs` folder and hit Start. 
 
-CLI (headless) option:
+If you want to use a command line to analyze your photos, run:
 ```bash
 python analyzer/cli.py "C:\\path\\to\\photos" --no-gpu
 ```
@@ -119,7 +138,7 @@ Features of the visualizer:
 - **Detailed View**: Examine individual images with metadata
 - **External Tools**: Open original files or simply double-click to launch Darktable
 
-## 📊 How It Works
+## How It Works
 
 ### 1. Bird Detection
 - Uses PyTorch's Mask R-CNN ResNet50 FPN v2 model
@@ -140,7 +159,7 @@ Features of the visualizer:
 - A custom image similarity algorithm was developed to identify images that belong to the same scene.
 - Bursts are automatically grouped together, allowing their relative quality to be ranked with ease.
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 ProjectKestrel/
@@ -157,9 +176,9 @@ ProjectKestrel/
 └── README.md
 ```
 
-## 🎯 Supported File Formats
+## Supported File Formats
 
-Kestrel's quality scoring model is trained on RAW images, and may not work as well for JPG images. Kestrel relies on ImageMagick to read RAW files. If your camera's RAW format is not listed below, please create a pull request, and we will add it to the list.
+Kestrel's quality scoring model is trained on RAW images, and may not work as well for JPG images (but can still be used). Kestrel relies on ImageMagick to read RAW files. If your camera's RAW format is not listed below, please create a pull request, and we will add it to the list.
 
 **RAW Formats** (preferred):
 - Canon: `.cr2`, `.cr3`
@@ -183,8 +202,8 @@ Kestrel's quality scoring model is trained on RAW images, and may not work as we
 
 ### GPU Acceleration
 When running the analyzer, you'll be prompted to choose between:
-- **GPU Mode**: Uses DirectML execution provider (faster, requires compatible GPU)
-- **CPU Mode**: Uses CPU execution provider (slower, but works on all systems)
+- **GPU Mode**: Uses DirectML on Windows (faster, requires compatible GPU and Windows OS)
+- **CPU Mode**: Uses CPU execution provider (slightly, but works on all systems)
 
 > NOTE: Not all models are run on the GPU, and GPU acceleration is in Beta development and may be unstable. If you run into errors or instability, please use CPU mode.
 
@@ -199,7 +218,7 @@ your_photos/
 └── [your original photos]
 ```
 
-The `.kestrel` folder will require an additional 1MB of disk space for every ~100MB of RAW files. Once the `.kestrel` folder has been created, 
+The `.kestrel` folder will require an additional 1MB of disk space for every ~100MB of RAW files. This folder may also include error or warning logs.
 
 ## 🤝 Contributing
 
@@ -216,12 +235,8 @@ This project is licensed under the GPL v3 License - see the LICENSE file for det
 
 ## 🙏 Acknowledgments
 
-- PyTorch team for Mask R-CNN implementation
-- TensorFlow/Keras for the neural network framework
-- ONNX Runtime for efficient model inference
-- ImageMagick/Wand for robust image file handling
-- PyQt5 for the user interface framework
+- **ImageMagick** team for robust RAW image file format handling
 
 ---
 
-**Note**: This project is designed primarily for bird photography analysis. Functionality for other wildlife is planned but not a priority at this time.
+**Note**: This project is designed primarily for bird photography analysis. Functionality for other wildlife is in alpha stage, but will still function. Try it on your photos of wildlife!
