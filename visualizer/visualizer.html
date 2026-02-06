@@ -152,8 +152,7 @@
     <div class="wrap">
       <h1>🦅 Kestrel Visualizer (Web)</h1>
       <div class="toolbar">
-        <button id="pickFolder" class="primary">Open Photo Folder…</button>
-        <button id="pickCsv">Open kestrel_database.csv…</button>
+        <button id="pickFolder" class="primary">Open Folder…</button>
   <button id="openSettings">Settings</button>
   <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
         <div class="grow"></div>
@@ -197,7 +196,7 @@
   <main>
     <div id="compat" class="wrap hidden">
       <div class="notice">
-        Your browser does not support the File System Access API. You can still click "Open kestrel_database.csv…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
+        Your browser does not support the File System Access API. You can still click "Open Folder or CSV…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
       </div>
     </div>
 
@@ -302,6 +301,7 @@
   <script>
   // State
   let rootDirHandle = null;      // Top-level photo folder (contains .kestrel)
+  let rootIsKestrel = false;     // True if user selected the .kestrel folder itself
   let csvFileHandle = null;      // .kestrel/kestrel_database.csv
   let rows = [];                 // CSV rows (objects)
   let header = [];               // CSV header fields
@@ -338,6 +338,9 @@
 
   async function getHandleFromRelativePath(dirHandle, relPath) {
     relPath = sanitizePath(relPath);
+    if (rootIsKestrel && relPath.toLowerCase().startsWith('.kestrel/')) {
+      relPath = relPath.substring('.kestrel/'.length);
+    }
     const parts = relPath.split('/').filter(Boolean);
     let handle = dirHandle;
     for (let i = 0; i < parts.length; i++) {
@@ -362,7 +365,10 @@
     const p = sanitizePath(absPath);
     // Heuristic: find ".kestrel/" in the path; else fall back to filename
     const idx = p.toLowerCase().lastIndexOf('/.kestrel/');
-    if (idx >= 0) return p.substring(idx + 1); // include .kestrel/…
+    if (idx >= 0) {
+      const rel = p.substring(idx + 1); // include .kestrel/…
+      return rootIsKestrel ? rel.replace(/^\.kestrel\//i, '') : rel;
+    }
     // fallback: if only filename, return that
     const base = p.split('/').pop();
     return base || null;
@@ -810,12 +816,21 @@
   }
 
   // Try to find .kestrel/kestrel_database.csv in the selected folder (optionally nested)
-  async function findKestrelDatabase(dirHandle, maxDepth = 2, depth = 0) {
-    // First, check directly in this folder
+  async function findKestrelDatabase(dirHandle, maxDepth = 3, depth = 0) {
+    // If user selected the .kestrel folder itself, read directly
+    if (dirHandle && dirHandle.name === '.kestrel') {
+      try {
+        const csvHandle = await dirHandle.getFileHandle('kestrel_database.csv');
+        return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: true };
+      } catch (_) {
+        // fall through to normal search
+      }
+    }
+    // First, check for a .kestrel folder in this folder
     try {
       const kestrelDir = await dirHandle.getDirectoryHandle('.kestrel');
       const csvHandle = await kestrelDir.getFileHandle('kestrel_database.csv');
-      return { rootHandle: dirHandle, fileHandle: csvHandle };
+      return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: false };
     } catch (_) {
       // Not found at this level; continue
     }
@@ -841,10 +856,12 @@
       const found = await findKestrelDatabase(dirHandle, 2);
       if (!found) throw new Error('not found');
       rootDirHandle = found.rootHandle;
+      rootIsKestrel = !!found.rootIsKestrel;
       await loadCsvFromHandle(found.fileHandle);
-      setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootDirHandle.name || 'selected folder'})`);
+      const rootLabel = rootIsKestrel ? '.kestrel (selected folder)' : (rootDirHandle.name || 'selected folder');
+      setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootLabel})`);
     } catch (e) {
-      setStatus('Could not find .kestrel/kestrel_database.csv in this folder (or its subfolders). Use "Open kestrel_database.csv…"');
+      setStatus('Could not find .kestrel/kestrel_database.csv in this folder (or its subfolders). Use "Open Folder or CSV…" to try a CSV file directly.');
     }
   }
 
@@ -1036,22 +1053,7 @@
   // Event wiring
   el('#pickFolder').addEventListener('click', async () => {
     try {
-      if (!supportsFS) { alert('Your browser does not support folder access. Use the CSV button instead.'); return; }
-      rootDirHandle = await window.showDirectoryPicker();
-      await tryOpenDefaultCsv(rootDirHandle);
-    } catch (e) { /* cancelled */ }
-  });
-
-  el('#pickCsv').addEventListener('click', async () => {
-    try {
-      if (supportsFS) {
-        const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
-        if (!fh) return;
-        // Try to infer root from selected file: assume path like <root>/.kestrel/kestrel_database.csv
-        try { rootDirHandle = await fh.getFile(); } catch (_) {}
-        // Best effort: use handle for load only
-        await loadCsvFromHandle(fh);
-      } else {
+      if (!supportsFS) {
         // Fallback: <input type=file>
         const input = document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
         input.onchange = async () => {
@@ -1066,7 +1068,28 @@
           setStatus('CSV loaded (limited features)');
         };
         input.click();
+        return;
       }
+
+      // Primary path: pick a folder (root or .kestrel)
+      try {
+        rootDirHandle = await window.showDirectoryPicker();
+        rootIsKestrel = rootDirHandle && rootDirHandle.name === '.kestrel';
+        await tryOpenDefaultCsv(rootDirHandle);
+        return;
+      } catch (e) {
+        // user may have cancelled the folder picker; fall through to file picker
+      }
+
+      // Secondary path: open CSV directly
+      try {
+        const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
+        if (!fh) return;
+        rootDirHandle = null;
+        rootIsKestrel = false;
+        await loadCsvFromHandle(fh);
+        setStatus('CSV loaded (limited previews; use folder selection for full features)');
+      } catch (e) { /* cancelled */ }
     } catch (e) { /* cancelled */ }
   });
 
@@ -1217,7 +1240,7 @@
   }
 
   // Init
-  setStatus('Open your photo folder (the one that contains .kestrel) or open kestrel_database.csv');
+  setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
 
   </script>
 </body>
