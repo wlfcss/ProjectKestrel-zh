@@ -26,32 +26,28 @@
     html, body { height: 100%; }
     body {
       margin: 0; background: var(--bg); color: var(--text); font: 14px/1.35 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      display: flex; min-height: 100vh;
     }
 
     header {
       position: sticky; top: 0; z-index: 5;
-      background: linear-gradient(180deg, rgba(17,19,24,.95), rgba(17,19,24,.7));
+      width: 320px; flex: 0 0 320px; height: 100vh;
+      background: linear-gradient(180deg, rgba(17,19,24,.95), rgba(17,19,24,.85));
       backdrop-filter: blur(8px);
-      border-bottom: 1px solid #1d2230;
+      border-right: 1px solid #1d2230;
+      overflow: auto;
     }
-    .wrap { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+    .wrap { max-width: none; margin: 0; padding: 16px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
     h1 { font-size: 20px; margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
 
-    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .toolbar-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .toolbar-group.filters { flex: 1 1 520px; min-width: 280px; }
-    .toolbar-group.actions { flex: 1 1 360px; }
-    .toolbar-group.meta { flex: 0 1 auto; }
-
-    @media (max-width: 860px) {
-      .toolbar { flex-direction: column; align-items: stretch; }
-      .toolbar-group { width: 100%; justify-content: flex-start; }
-      .toolbar-group.meta { justify-content: flex-end; }
-      .filter-panel { width: 100%; }
-    }
+    .toolbar { display: grid; gap: 10px; }
+    .toolbar-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .toolbar-row.actions { flex-direction: column; align-items: stretch; }
+    .toolbar-row.filters { flex-direction: column; align-items: stretch; }
+    .toolbar-row.status { justify-content: flex-start; }
+    .filter-panel { width: 100%; }
 
     .filter-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border: 1px solid #1d2230; border-radius: 10px; background: #0e1117; }
-    .filter-panel .label { color: var(--muted); font-size: 12px; margin-right: 2px; }
 
     button, select, input[type="text"], input[type="search"], input[type="number"] {
       background: #0e1117; color: var(--text); border: 1px solid #2a3040; border-radius: 8px; height: 36px;
@@ -139,7 +135,7 @@
     .inline button { height: 30px; white-space: nowrap; }
     .inline input[type="text"] { height: 30px; flex: 1 1 160px; min-width: 0; }
 
-    main { max-width: 1400px; margin: 0 auto; }
+    main { max-width: none; flex: 1 1 auto; min-width: 0; }
 
     /* Modal */
     dialog { border:1px solid #2a3040; background: var(--panel); color: var(--text); border-radius: 14px; width: min(1200px, 96vw); max-height: 92vh; height: 92vh; overflow: hidden; }
@@ -190,18 +186,16 @@
     <div class="wrap">
       <h1>🦅 Kestrel Visualizer (Web)</h1>
       <div class="toolbar">
-        <div class="toolbar-group actions">
+        <div class="toolbar-row actions">
           <button id="pickFolder" class="primary">Open Folder…
             <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
           </button>
-          <button id="openSettings">Settings</button>
-          <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
-          <button id="openMerge">Merge scenes…</button>
+          <button id="openSettings">Default Editor Options…</button>
+          <button id="openMerge" disabled>Merge scenes…</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
-        <div class="toolbar-group filters">
+        <div class="toolbar-row filters">
           <div class="filter-panel" aria-label="Filtering options">
-            <span class="label">Filter</span>
             <input id="search" type="search" placeholder="Search by species or family" />
             <label class="inline">
               <span class="muted">Confidence Threshold</span>
@@ -217,17 +211,19 @@
               <span class="help-tip" data-tip="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability." aria-label="Multi-subject mode help" title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
             </label>
           </div>
+          <div class="inline" aria-label="Sort order">
+            <span class="muted">Sort by:</span>
+            <select id="sortBy">
+              <option value="sceneId" selected>Scene ID</option>
+              <option value="maxQuality">Max Quality</option>
+              <option value="imageCount">Image Count</option>
+            </select>
+          </div>
         </div>
-        <div class="toolbar-group meta">
-          <span class="muted">Sort by:</span>
-          <select id="sortBy">
-            <option value="sceneId" selected>Scene ID</option>
-            <option value="maxQuality">Max Quality</option>
-            <option value="imageCount">Image Count</option>
-          </select>
+        <div class="toolbar-row status">
+          <div id="status" class="status">Idle</div>
         </div>
       </div>
-      <div id="status" class="status">Idle</div>
     </div>
   </header>
 
@@ -896,6 +892,8 @@
       rootDirHandle = found.rootHandle;
       rootIsKestrel = !!found.rootIsKestrel;
       await loadCsvFromHandle(found.fileHandle);
+      const mergeBtn = document.getElementById('openMerge');
+      if (mergeBtn) mergeBtn.disabled = false;
       const rootLabel = rootIsKestrel ? '.kestrel (selected folder)' : (rootDirHandle.name || 'selected folder');
       setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootLabel})`);
     } catch (e) {
@@ -1049,8 +1047,10 @@
       noticeEl.classList.remove('hidden');
     }
   }
-  document.getElementById('openInfo').addEventListener('click', openInfo);
-  document.getElementById('infoClose').addEventListener('click', () => document.getElementById('infoDlg').close());
+  const openInfoBtn = document.getElementById('openInfo');
+  if (openInfoBtn) openInfoBtn.addEventListener('click', openInfo);
+  const infoCloseBtn = document.getElementById('infoClose');
+  if (infoCloseBtn) infoCloseBtn.addEventListener('click', () => document.getElementById('infoDlg').close());
 
   // Helper to infer root from absolute export/crop path strings in CSV
   function inferRootFromAbsPath(p){
@@ -1127,6 +1127,8 @@
         rootDirHandle = null;
         rootIsKestrel = false;
         await loadCsvFromHandle(fh);
+        const mergeBtn = document.getElementById('openMerge');
+        if (mergeBtn) mergeBtn.disabled = true;
         setStatus('CSV loaded (limited previews; use folder selection for full features)');
       } catch (e) { /* cancelled */ }
     } catch (e) { /* cancelled */ }
