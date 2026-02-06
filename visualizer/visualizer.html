@@ -50,6 +50,29 @@
     button.primary:hover { background: #1f63b8; border-color: #3a84e6; }
     button[disabled] { opacity: .6; cursor: not-allowed; }
 
+    .help-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 8px; border-radius: 50%; background: #0e1117; border: 1px solid #2a3040; color: #a9c9ee; font-size: 12px; line-height: 1; }
+    .help-tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 10px);
+      right: 0;
+      min-width: 220px;
+      max-width: 320px;
+      background: #0e1117;
+      border: 1px solid #2a3040;
+      color: #cbd2dc;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      white-space: normal;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity .12s ease, transform .12s ease;
+      z-index: 20;
+    }
+    .help-tip:hover::after { opacity: 1; transform: translateY(0); }
+
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
 
     /* Grid */
@@ -152,7 +175,9 @@
     <div class="wrap">
       <h1>🦅 Kestrel Visualizer (Web)</h1>
       <div class="toolbar">
-        <button id="pickFolder" class="primary">Open Folder…</button>
+        <button id="pickFolder" class="primary">Open Folder…
+          <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
+        </button>
   <button id="openSettings">Settings</button>
   <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
         <div class="grow"></div>
@@ -862,6 +887,7 @@
       setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootLabel})`);
     } catch (e) {
       setStatus('Could not find .kestrel/kestrel_database.csv in this folder (or its subfolders). Use "Open Folder or CSV…" to try a CSV file directly.');
+      alert("Couldn't find Kestrel Analysis files. Make sure you analyze this folder with Kestrel Analyzer.");
     }
   }
 
