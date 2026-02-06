@@ -37,8 +37,18 @@
     .wrap { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
     h1 { font-size: 20px; margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
 
-    .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .toolbar .grow { flex: 1 1 auto; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .toolbar-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .toolbar-group.filters { flex: 1 1 520px; min-width: 280px; }
+    .toolbar-group.actions { flex: 1 1 360px; }
+    .toolbar-group.meta { flex: 0 1 auto; }
+
+    @media (max-width: 860px) {
+      .toolbar { flex-direction: column; align-items: stretch; }
+      .toolbar-group { width: 100%; justify-content: flex-start; }
+      .toolbar-group.meta { justify-content: flex-end; }
+      .filter-panel { width: 100%; }
+    }
 
     .filter-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border: 1px solid #1d2230; border-radius: 10px; background: #0e1117; }
     .filter-panel .label { color: var(--muted); font-size: 12px; margin-right: 2px; }
@@ -52,6 +62,8 @@
     button.primary { background: #1d5aa8; border-color: #2b6ec8; }
     button.primary:hover { background: #1f63b8; border-color: #3a84e6; }
     button[disabled] { opacity: .6; cursor: not-allowed; }
+    #saveCsv:not([disabled]) { background: #f5c542; border-color: #d1a735; color: #1a1a1a; }
+    #saveCsv:not([disabled]):hover { background: #ffd45f; border-color: #e6c049; }
 
     .help-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 8px; border-radius: 50%; background: #0e1117; border: 1px solid #2a3040; color: #a9c9ee; font-size: 12px; line-height: 1; }
     .help-tip::after {
@@ -178,38 +190,42 @@
     <div class="wrap">
       <h1>🦅 Kestrel Visualizer (Web)</h1>
       <div class="toolbar">
-        <button id="pickFolder" class="primary">Open Folder…
-          <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
-        </button>
-  <button id="openSettings">Settings</button>
-  <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
-        <div class="grow"></div>
-        <div class="filter-panel" aria-label="Filtering options">
-          <span class="label">Filter</span>
-          <input id="search" type="search" placeholder="Search by species or family" />
-          <label class="inline">
-            <span class="muted">Confidence Threshold</span>
-            <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:120px" />
-          </label>
-          <!-- New: include secondary species/families toggle -->
-          <label class="inline" title="Include secondary species/families (from detector) in scene chips & search">
-            <input id="includeSecondarySpecies" type="checkbox" />
-            <span class="muted">My photos contain multiple birds</span>
-          </label>
+        <div class="toolbar-group actions">
+          <button id="pickFolder" class="primary">Open Folder…
+            <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
+          </button>
+          <button id="openSettings">Settings</button>
+          <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
+          <button id="openMerge">Merge scenes…</button>
+          <button id="saveCsv" disabled>Save Changes</button>
         </div>
-        <select id="sortBy">
-          <option value="maxQuality">Sort by Max Quality</option>
-          <option value="imageCount">Sort by Image Count</option>
-          <option value="sceneId">Sort by Scene ID</option>
-        </select>
-        <!-- New: filter scenes to only those with my manual-rated photos -->
-        <label class="inline" title="Show only scenes that contain images I rated manually">
-          <input id="filterScenesManualRated" type="checkbox" />
-          <span class="muted">Only my rated scenes</span>
-        </label>
-        <!-- New: open merge scenes dialog -->
-        <button id="openMerge">Merge scenes…</button>
-        <button id="saveCsv" disabled>Save Changes</button>
+        <div class="toolbar-group filters">
+          <div class="filter-panel" aria-label="Filtering options">
+            <span class="label">Filter</span>
+            <input id="search" type="search" placeholder="Search by species or family" />
+            <label class="inline">
+              <span class="muted">Confidence Threshold</span>
+              <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:120px" />
+            </label>
+            <label class="inline" title="Only show scenes with photos that you've manually assigned ratings to.">
+              <input id="filterScenesManualRated" type="checkbox" />
+              <span class="muted">Previously rated scenes only</span>
+            </label>
+            <label class="inline">
+              <input id="includeSecondarySpecies" type="checkbox" />
+              <span class="muted">Multi-subject mode</span>
+              <span class="help-tip" data-tip="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability." aria-label="Multi-subject mode help" title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
+            </label>
+          </div>
+        </div>
+        <div class="toolbar-group meta">
+          <span class="muted">Sort by:</span>
+          <select id="sortBy">
+            <option value="sceneId" selected>Scene ID</option>
+            <option value="maxQuality">Max Quality</option>
+            <option value="imageCount">Image Count</option>
+          </select>
+        </div>
       </div>
       <div id="status" class="status">Idle</div>
     </div>
