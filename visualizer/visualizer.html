@@ -142,6 +142,7 @@
     .inline input[type="text"] { height: 30px; flex: 1 1 160px; min-width: 0; }
 
     main { max-width: none; flex: 1 1 auto; min-width: 0; height: 100vh; overflow: auto; }
+    #mainZoom { transform-origin: top left; width: 100%; height: 100%; }
 
     /* Modal */
     dialog { border:1px solid #2a3040; background: var(--panel); color: var(--text); border-radius: 14px; width: min(1200px, 96vw); max-height: 92vh; height: 92vh; overflow: hidden; }
@@ -243,13 +244,15 @@
   </header>
 
   <main>
-    <div id="compat" class="wrap hidden">
-      <div class="notice">
-        Your browser does not support the File System Access API. You can still click "Open Folder or CSV…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
+    <div id="mainZoom">
+      <div id="compat" class="wrap hidden">
+        <div class="notice">
+          Your browser does not support the File System Access API. You can still click "Open Folder or CSV…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
+        </div>
       </div>
-    </div>
 
-    <section id="sceneGrid" class="grid"></section>
+      <section id="sceneGrid" class="grid"></section>
+    </div>
   </main>
 
   <dialog id="sceneDlg">
@@ -376,8 +379,12 @@
   // Simple UI zoom controls (Chromium webviews support CSS zoom)
   let uiZoom = 1;
   function applyZoom() {
-    const mainEl = document.querySelector('main');
-    if (mainEl) mainEl.style.zoom = uiZoom.toFixed(2);
+    const zoomEl = document.getElementById('mainZoom');
+    if (!zoomEl) return;
+    const z = uiZoom.toFixed(2);
+    zoomEl.style.transform = `scale(${z})`;
+    zoomEl.style.width = `calc(100% / ${z})`;
+    zoomEl.style.height = `calc(100% / ${z})`;
   }
 
   function sanitizePath(p) {
