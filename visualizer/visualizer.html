@@ -40,6 +40,9 @@
     .toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .toolbar .grow { flex: 1 1 auto; }
 
+    .filter-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border: 1px solid #1d2230; border-radius: 10px; background: #0e1117; }
+    .filter-panel .label { color: var(--muted); font-size: 12px; margin-right: 2px; }
+
     button, select, input[type="text"], input[type="search"], input[type="number"] {
       background: #0e1117; color: var(--text); border: 1px solid #2a3040; border-radius: 8px; height: 36px;
       padding: 0 12px; outline: none; transition: border-color .15s ease, background .15s ease;
@@ -181,34 +184,28 @@
   <button id="openSettings">Settings</button>
   <button id="openInfo" title="Show database metadata (kestrel_metadata.json)">Info</button>
         <div class="grow"></div>
-        <input id="search" type="search" placeholder="Search species (e.g. hawk, warbler)" />
-        <label class="inline">
-          <span class="muted">min species conf</span>
-          <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:84px" />
-        </label>
+        <div class="filter-panel" aria-label="Filtering options">
+          <span class="label">Filter</span>
+          <input id="search" type="search" placeholder="Search by species or family" />
+          <label class="inline">
+            <span class="muted">Confidence Threshold</span>
+            <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:120px" />
+          </label>
+          <!-- New: include secondary species/families toggle -->
+          <label class="inline" title="Include secondary species/families (from detector) in scene chips & search">
+            <input id="includeSecondarySpecies" type="checkbox" />
+            <span class="muted">My photos contain multiple birds</span>
+          </label>
+        </div>
         <select id="sortBy">
           <option value="maxQuality">Sort by Max Quality</option>
           <option value="imageCount">Sort by Image Count</option>
           <option value="sceneId">Sort by Scene ID</option>
         </select>
-        <label class="inline" title="Show scene name editor on cards">
-          <input id="toggleNameScenes" type="checkbox" />
-          <span class="muted">Name scenes</span>
-        </label>
         <!-- New: filter scenes to only those with my manual-rated photos -->
         <label class="inline" title="Show only scenes that contain images I rated manually">
           <input id="filterScenesManualRated" type="checkbox" />
           <span class="muted">Only my rated scenes</span>
-        </label>
-        <!-- New: include secondary species/families toggle -->
-        <label class="inline" title="Include secondary species/families (from detector) in scene chips & search">
-          <input id="includeSecondarySpecies" type="checkbox" />
-          <span class="muted">Secondary species/families</span>
-        </label>
-        <!-- New: include families toggle -->
-        <label class="inline" title="Include primary & secondary families in scene chips & search">
-          <input id="includeFamilies" type="checkbox" checked />
-          <span class="muted">Families</span>
         </label>
         <!-- New: open merge scenes dialog -->
         <button id="openMerge">Merge scenes…</button>
@@ -644,8 +641,7 @@
     const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
     const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
     const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
-    const includeFamiliesCheckbox = document.getElementById('includeFamilies');
-    const includeFamilies = includeFamiliesCheckbox ? includeFamiliesCheckbox.checked : !!getSetting('includeFamilies', true);
+    const includeFamilies = true;
     scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
     // Apply scene-level manual-rated filter without mutating global scenes
@@ -706,7 +702,8 @@
         body.appendChild(title);
         body.appendChild(meta);
         body.appendChild(chips);
-        if (document.getElementById('toggleNameScenes')?.checked) body.appendChild(nameRow);
+        // Scene name editor inline removed from toolbar; enable if set via settings
+        if (getSetting('inlineSceneName', false)) body.appendChild(nameRow);
         card.appendChild(body);
 
         card.addEventListener('click', () => openSceneDialog(s.id));
@@ -1126,18 +1123,6 @@
   // Wire merge scenes button
   el('#openMerge').addEventListener('click', () => openMergeDialog());
 
-  // Initialize toolbar toggle for inline scene naming
-  (function initNameScenesToggle(){
-    const t = document.getElementById('toggleNameScenes');
-    if (!t) return;
-    // Load saved preference
-    try { t.checked = !!getSetting('inlineSceneName', false); } catch {}
-    t.addEventListener('change', () => {
-      const s = loadSettings(); s.inlineSceneName = !!t.checked; saveSettings(s);
-      renderScenes();
-    });
-  })();
-
   // Initialize toolbar toggle for scene-level manual-rated filter
   (function initScenesManualFilter(){
     const t = document.getElementById('filterScenesManualRated');
@@ -1156,16 +1141,6 @@
     try { t.checked = getSetting('includeSecondarySpecies', true); } catch {}
     t.addEventListener('change', () => {
       const s = loadSettings(); s.includeSecondarySpecies = !!t.checked; saveSettings(s); renderScenes();
-    });
-  })();
-
-  // Initialize families inclusion toggle
-  (function initIncludeFamilies(){
-    const t = document.getElementById('includeFamilies');
-    if (!t) return;
-    try { t.checked = getSetting('includeFamilies', true); } catch {}
-    t.addEventListener('change', () => {
-      const s = loadSettings(); s.includeFamilies = !!t.checked; saveSettings(s); renderScenes();
     });
   })();
 
