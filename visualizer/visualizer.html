@@ -26,11 +26,11 @@
     html, body { height: 100%; }
     body {
       margin: 0; background: var(--bg); color: var(--text); font: 14px/1.35 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      display: flex; min-height: 100vh;
+      display: flex; min-height: 100vh; overflow: hidden;
     }
 
     header {
-      position: sticky; top: 0; z-index: 5;
+      position: relative; z-index: 5;
       width: 320px; flex: 0 0 320px; height: 100vh;
       background: linear-gradient(180deg, rgba(17,19,24,.95), rgba(17,19,24,.85));
       backdrop-filter: blur(8px);
@@ -49,7 +49,8 @@
     .filter-panel { width: 100%; }
 
     .filter-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border: 1px solid #1d2230; border-radius: 10px; background: #0e1117; }
-    .filter-panel .filter-title { width: 100%; text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .3px; }
+    .filter-panel .filter-title { width: 100%; text-align: center; color: var(--text); font-size: 12px; letter-spacing: .3px; }
+    .filter-panel .muted { color: var(--text); }
     .filter-panel input[type="search"] { flex: 1 1 100%; width: 100%; }
 
     button, select, input[type="text"], input[type="search"], input[type="number"] {
@@ -140,7 +141,7 @@
     .inline button { height: 30px; white-space: nowrap; }
     .inline input[type="text"] { height: 30px; flex: 1 1 160px; min-width: 0; }
 
-    main { max-width: none; flex: 1 1 auto; min-width: 0; }
+    main { max-width: none; flex: 1 1 auto; min-width: 0; height: 100vh; overflow: auto; }
 
     /* Modal */
     dialog { border:1px solid #2a3040; background: var(--panel); color: var(--text); border-radius: 14px; width: min(1200px, 96vw); max-height: 92vh; height: 92vh; overflow: hidden; }
@@ -372,7 +373,8 @@
   // Simple UI zoom controls (Chromium webviews support CSS zoom)
   let uiZoom = 1;
   function applyZoom() {
-    document.body.style.zoom = uiZoom.toFixed(2);
+    const mainEl = document.querySelector('main');
+    if (mainEl) mainEl.style.zoom = uiZoom.toFixed(2);
   }
 
   function sanitizePath(p) {
