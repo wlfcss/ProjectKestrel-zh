@@ -38,6 +38,7 @@
       overflow: auto;
     }
     .wrap { max-width: none; margin: 0; padding: 16px; height: 100%; display: flex; flex-direction: column; gap: 12px; }
+    .spacer { flex: 1 1 auto; }
     h1 { font-size: 20px; margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
 
     .toolbar { display: grid; gap: 10px; }
@@ -48,6 +49,8 @@
     .filter-panel { width: 100%; }
 
     .filter-panel { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 6px 8px; border: 1px solid #1d2230; border-radius: 10px; background: #0e1117; }
+    .filter-panel .filter-title { width: 100%; text-align: center; color: var(--muted); font-size: 12px; letter-spacing: .3px; }
+    .filter-panel input[type="search"] { flex: 1 1 100%; width: 100%; }
 
     button, select, input[type="text"], input[type="search"], input[type="number"] {
       background: #0e1117; color: var(--text); border: 1px solid #2a3040; border-radius: 8px; height: 36px;
@@ -85,6 +88,8 @@
     .help-tip:hover::after { opacity: 1; transform: translateY(0); }
 
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
+
+    .sidebar-footer { display: flex; gap: 8px; align-items: center; justify-content: flex-start; }
 
     /* Grid */
     .grid { display: grid; gap: 12px; padding: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
@@ -196,6 +201,7 @@
         </div>
         <div class="toolbar-row filters">
           <div class="filter-panel" aria-label="Filtering options">
+            <div class="filter-title">Filtering Options</div>
             <input id="search" type="search" placeholder="Search by species or family" />
             <label class="inline">
               <span class="muted">Confidence Threshold</span>
@@ -223,6 +229,11 @@
         <div class="toolbar-row status">
           <div id="status" class="status">Idle</div>
         </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="sidebar-footer" aria-label="Zoom controls">
+        <button id="zoomOut" title="Zoom out">Zoom −</button>
+        <button id="zoomIn" title="Zoom in">Zoom +</button>
       </div>
     </div>
   </header>
@@ -357,6 +368,12 @@
   function setStatus(msg) { statusEl.textContent = msg; }
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  // Simple UI zoom controls (Chromium webviews support CSS zoom)
+  let uiZoom = 1;
+  function applyZoom() {
+    document.body.style.zoom = uiZoom.toFixed(2);
+  }
 
   function sanitizePath(p) {
     if (!p) return '';
@@ -1140,6 +1157,11 @@
   el('#sortBy').addEventListener('change', () => renderScenes());
   // Wire merge scenes button
   el('#openMerge').addEventListener('click', () => openMergeDialog());
+
+  const zoomInBtn = el('#zoomIn');
+  const zoomOutBtn = el('#zoomOut');
+  if (zoomInBtn) zoomInBtn.addEventListener('click', () => { uiZoom = Math.min(1.4, uiZoom + 0.1); applyZoom(); });
+  if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => { uiZoom = Math.max(0.7, uiZoom - 0.1); applyZoom(); });
 
   // Initialize toolbar toggle for scene-level manual-rated filter
   (function initScenesManualFilter(){
