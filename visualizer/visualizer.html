@@ -66,11 +66,8 @@
     #saveCsv:not([disabled]):hover { background: #ffd45f; border-color: #e6c049; }
 
     .help-tip { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 8px; border-radius: 50%; background: #0e1117; border: 1px solid #2a3040; color: #a9c9ee; font-size: 12px; line-height: 1; }
-    .help-tip::after {
-      content: attr(data-tip);
-      position: absolute;
-      bottom: calc(100% + 10px);
-      right: 0;
+    .tooltip-layer {
+      position: fixed;
       min-width: 220px;
       max-width: 320px;
       background: #0e1117;
@@ -84,9 +81,9 @@
       pointer-events: none;
       transform: translateY(4px);
       transition: opacity .12s ease, transform .12s ease;
-      z-index: 20;
+      z-index: 1000;
     }
-    .help-tip:hover::after { opacity: 1; transform: translateY(0); }
+    .tooltip-layer.visible { opacity: 1; transform: translateY(0); }
 
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
 
@@ -374,6 +371,50 @@
   function setStatus(msg) { statusEl.textContent = msg; }
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  // Tooltip layer so tips can render over the main image area
+  (function initTooltips(){
+    const tipEl = document.createElement('div');
+    tipEl.className = 'tooltip-layer';
+    document.body.appendChild(tipEl);
+
+    function positionTip(anchor) {
+      const pad = 10;
+      const rect = anchor.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const box = tipEl.getBoundingClientRect();
+
+      let left = rect.left;
+      let top = rect.top - box.height - 10;
+      if (left + box.width + pad > vw) left = vw - box.width - pad;
+      if (left < pad) left = pad;
+      if (top < pad) top = rect.bottom + 10;
+      if (top + box.height + pad > vh) top = vh - box.height - pad;
+
+      tipEl.style.left = left + 'px';
+      tipEl.style.top = top + 'px';
+    }
+
+    function showTip(e) {
+      const tip = e.currentTarget.getAttribute('data-tip');
+      if (!tip) return;
+      tipEl.textContent = tip;
+      tipEl.classList.add('visible');
+      positionTip(e.currentTarget);
+    }
+
+    function hideTip() {
+      tipEl.classList.remove('visible');
+    }
+
+    document.querySelectorAll('.help-tip').forEach((el) => {
+      el.addEventListener('mouseenter', showTip);
+      el.addEventListener('mousemove', (e) => positionTip(e.currentTarget));
+      el.addEventListener('mouseleave', hideTip);
+      el.addEventListener('blur', hideTip);
+    });
+  })();
 
   // Simple UI zoom controls (Chromium webviews support CSS zoom)
   let uiZoom = 1;
