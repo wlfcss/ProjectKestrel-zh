@@ -60,10 +60,16 @@ if not exist %INNO_COMPILER% (
 )
 echo [OK] Inno Setup 6 found
 
-call :handle_component analyzer "kestrel_analyzer.exe" "analyzer.spec" "analyzer_build"
+call :prompt_component analyzer ANALYZER_MODE ANALYZER_SOURCE_RELEASE
 if %ERRORLEVEL% NEQ 0 goto :fail
 
-call :handle_component visualizer "visualizer.exe" "visualizer.spec" "visualizer_build"
+call :prompt_component visualizer VISUALIZER_MODE VISUALIZER_SOURCE_RELEASE
+if %ERRORLEVEL% NEQ 0 goto :fail
+
+call :build_component analyzer "kestrel_analyzer.exe" "analyzer.spec" "analyzer_build" "%ANALYZER_MODE%" "%ANALYZER_SOURCE_RELEASE%"
+if %ERRORLEVEL% NEQ 0 goto :fail
+
+call :build_component visualizer "visualizer.exe" "visualizer.spec" "visualizer_build" "%VISUALIZER_MODE%" "%VISUALIZER_SOURCE_RELEASE%"
 if %ERRORLEVEL% NEQ 0 goto :fail
 
 REM Check if LICENSE exists
@@ -129,18 +135,44 @@ echo.
 pause
 exit /b 1
 
-:handle_component
+:prompt_component
 set "COMPONENT_NAME=%~1"
-set "COMPONENT_EXE=%~2"
-set "COMPONENT_SPEC=%~3"
-set "COMPONENT_BUILD_LABEL=%~4"
+set "MODE_OUT=%~2"
+set "RELEASE_OUT=%~3"
 
 echo.
 echo ========================================
 echo %COMPONENT_NAME% build selection
 echo ========================================
 choice /C BN /N /M "%COMPONENT_NAME%: Build new (B) or use existing (N)? "
-if errorlevel 2 goto :use_existing
+if errorlevel 2 (
+    call :select_release_dir SELECTED_RELEASE
+    if %ERRORLEVEL% NEQ 0 exit /b 1
+    set "%MODE_OUT%=existing"
+    set "%RELEASE_OUT%=%SELECTED_RELEASE%"
+) else (
+    set "%MODE_OUT%=build"
+    set "%RELEASE_OUT%="
+)
+exit /b 0
+
+:build_component
+set "COMPONENT_NAME=%~1"
+set "COMPONENT_EXE=%~2"
+set "COMPONENT_SPEC=%~3"
+set "COMPONENT_BUILD_LABEL=%~4"
+set "COMPONENT_MODE=%~5"
+set "COMPONENT_RELEASE=%~6"
+
+if /I "%COMPONENT_MODE%"=="existing" (
+    set "SOURCE_EXE=%RELEASE_ROOT%\%COMPONENT_RELEASE%\%COMPONENT_EXE%"
+    if not exist "%SOURCE_EXE%" (
+        echo [ERROR] %COMPONENT_NAME% executable not found at %SOURCE_EXE%
+        exit /b 1
+    )
+    copy /Y "%SOURCE_EXE%" "%RELEASE_DIR%\%COMPONENT_EXE%" >nul
+    exit /b 0
+)
 
 call :ensure_venv
 if %ERRORLEVEL% NEQ 0 exit /b 1
@@ -164,18 +196,6 @@ if exist "%COMPONENT_NAME%\build\%COMPONENT_NAME%" (
     move /Y "%COMPONENT_NAME%\build\%COMPONENT_NAME%" "%RELEASE_DIR%\%COMPONENT_BUILD_LABEL%" >nul
 )
 
-exit /b 0
-
-:use_existing
-call :select_release_dir SELECTED_RELEASE
-if %ERRORLEVEL% NEQ 0 exit /b 1
-
-set "SOURCE_EXE=%RELEASE_ROOT%\%SELECTED_RELEASE%\%COMPONENT_EXE%"
-if not exist "%SOURCE_EXE%" (
-    echo [ERROR] %COMPONENT_NAME% executable not found at %SOURCE_EXE%
-    exit /b 1
-)
-copy /Y "%SOURCE_EXE%" "%RELEASE_DIR%\%COMPONENT_EXE%" >nul
 exit /b 0
 
 :ensure_venv
