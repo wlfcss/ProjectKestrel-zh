@@ -55,6 +55,8 @@ ALLOW_ANY_EXTENSION = os.environ.get('KESTREL_ALLOW_ANY_EXTENSION') == '1'
 # Cache for discovered darktable executable on Windows
 _DARKTABLE_EXE = None
 
+SETTINGS_FILENAME = 'settings.json'
+
 def _find_darktable_exe() -> str:
     """Best-effort discovery of darktable.exe on Windows.
 
@@ -83,6 +85,43 @@ def _find_darktable_exe() -> str:
             _DARKTABLE_EXE = exe
             return exe
     return 'darktable.exe'
+
+
+def _get_user_data_dir() -> str:
+    if sys.platform.startswith('win'):
+        base = os.environ.get('LOCALAPPDATA') or os.environ.get('APPDATA') or os.path.expanduser('~')
+        return os.path.join(base, 'KestrelVisualizer')
+    if sys.platform == 'darwin':
+        return os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'KestrelVisualizer')
+    base = os.environ.get('XDG_DATA_HOME') or os.path.join(os.path.expanduser('~'), '.local', 'share')
+    return os.path.join(base, 'kestrel-visualizer')
+
+
+def _get_settings_path() -> str:
+    return os.path.join(_get_user_data_dir(), SETTINGS_FILENAME)
+
+
+def load_persisted_settings() -> dict:
+    path = _get_settings_path()
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+
+def save_persisted_settings(data: dict) -> None:
+    if not isinstance(data, dict):
+        raise ValueError('Settings payload must be an object')
+    path = _get_settings_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, sort_keys=True)
+    os.replace(tmp, path)
 
 
 def log(*args):
@@ -199,6 +238,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if self.path == '/settings':
+            self._json(200, {'ok': True, 'settings': load_persisted_settings()})
+            return
         if self.path in ('/', '/index.html'):
             if os.path.exists('visualizer.html'):
                 self.path = '/visualizer.html'
@@ -218,6 +260,8 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == '/open':
             self.handle_open()
+        elif parsed.path == '/settings':
+            self.handle_settings()
         elif parsed.path == '/shutdown':
             self.handle_shutdown()
         else:
@@ -303,6 +347,25 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001
                 log('Error during shutdown:', e)
         threading.Thread(target=_shutdown, daemon=True).start()
+
+    def handle_settings(self):
+        if AUTH_TOKEN:
+            token = self.headers.get('X-Bridge-Token') or ''
+            if token != AUTH_TOKEN:
+                self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
+        origin = self.headers.get('Origin')
+        expected_origin = f'http://{HOST}:{self.server.server_port}'  # type: ignore[attr-defined]
+        if origin and origin != expected_origin:
+            self._json(403, {'ok': False, 'error': 'Origin mismatch'}); return
+        try:
+            payload = self._read_json()
+            settings = payload.get('settings') if isinstance(payload, dict) else None
+            if not isinstance(settings, dict):
+                raise ValueError('Invalid settings payload')
+            save_persisted_settings(settings)
+            self._json(200, {'ok': True})
+        except Exception as e:
+            self._json(400, {'ok': False, 'error': str(e)})
 
 
 def parse_args():

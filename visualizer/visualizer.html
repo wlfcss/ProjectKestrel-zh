@@ -1064,6 +1064,19 @@
   function saveSettings(obj){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj||{})); }
   function getSetting(k, def){ const s = loadSettings(); return (k in s) ? s[k] : def; }
 
+  async function hydrateSettingsFromServer(){
+    const backendUrl = (getSetting('backendUrl', window.location.origin) || window.location.origin).replace(/\/$/, '');
+    try {
+      const headers = window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {};
+      const res = await fetch(backendUrl + '/settings', { headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.settings && typeof data.settings === 'object') {
+        saveSettings(data.settings);
+      }
+    } catch (_) {}
+  }
+
   function showSettings(){
     const dlg = document.getElementById('settingsDlg');
     document.getElementById('backendUrl').value = getSetting('backendUrl', 'http://127.0.0.1:8765');
@@ -1071,11 +1084,20 @@
   document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
     dlg.showModal();
   }
-  function applySettings(){
+  async function applySettings(){
     const backendUrl = document.getElementById('backendUrl').value.trim() || 'http://127.0.0.1:8765';
     const rootHint = document.getElementById('rootHint').value.trim();
   const editor = document.getElementById('editorChoice').value || 'darktable';
-  saveSettings({ backendUrl, rootHint, editor });
+  const settings = { backendUrl, rootHint, editor };
+  saveSettings(settings);
+  try {
+    const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
+    await fetch(backendUrl.replace(/\/$/, '') + '/settings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ settings })
+    });
+  } catch (_) {}
     document.getElementById('settingsDlg').close();
   }
 
@@ -1334,6 +1356,7 @@
 
   // Init
   setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
+  hydrateSettingsFromServer();
 
   </script>
 </body>
