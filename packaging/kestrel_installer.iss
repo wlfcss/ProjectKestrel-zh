@@ -13,6 +13,10 @@
   #define ReleaseName "Project Kestrel aYYYY.MM.DD.HH.MM"
 #endif
 
+#ifndef ReleaseDir
+  #define ReleaseDir "..\\release"
+#endif
+
 ; ImageMagick download URL (Windows x64 Q8 dynamic release)
 #define ImageMagickURL "https://imagemagick.org/archive/binaries/ImageMagick-7.1.2-13-Q16-x64-dll.exe"
 #define ImageMagickInstaller "ImageMagick-Setup.exe"
@@ -50,10 +54,10 @@ Name: "installimagemagick"; Description: "Install ImageMagick (required for RAW 
 
 [Files]
 ; Kestrel Analyzer files
-Source: "..\analyzer\dist\kestrel_analyzer.exe"; DestDir: "{app}\Analyzer"; Flags: ignoreversion
+Source: "{#ReleaseDir}\kestrel_analyzer.exe"; DestDir: "{app}\Analyzer"; Flags: ignoreversion
 
 ; Kestrel Visualizer files  
-Source: "..\visualizer\dist\visualizer.exe"; DestDir: "{app}\Visualizer"; Flags: ignoreversion
+Source: "{#ReleaseDir}\visualizer.exe"; DestDir: "{app}\Visualizer"; Flags: ignoreversion
 
 ; Documentation
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
