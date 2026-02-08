@@ -86,6 +86,7 @@
     .tooltip-layer.visible { opacity: 1; transform: translateY(0); }
 
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
+    .version-badge { color: var(--muted); padding: 4px 2px 8px; font-size: 12px; }
 
     .sidebar-footer { display: flex; gap: 8px; align-items: center; justify-content: flex-start; }
 
@@ -231,6 +232,9 @@
         <div class="toolbar-row status">
           <div id="status" class="status">Idle</div>
         </div>
+        <div class="toolbar-row status">
+          <div id="versionBadge" class="version-badge">Version: —</div>
+        </div>
       </div>
       <div class="spacer"></div>
       <div class="sidebar-footer" aria-label="Zoom controls">
@@ -363,6 +367,7 @@
   const imageGrid = el('#imageGrid');
   const statusEl = el('#status');
   const sceneDlg = el('#sceneDlg');
+  const versionBadge = el('#versionBadge');
 
   const supportsFS = 'showDirectoryPicker' in window;
   if (!supportsFS) el('#compat').classList.remove('hidden');
@@ -371,6 +376,31 @@
   function setStatus(msg) { statusEl.textContent = msg; }
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  function loadVersionBadge() {
+    if (!versionBadge) return;
+    fetch('VERSION.txt', { cache: 'no-store' })
+      .then((resp) => (resp.ok ? resp.text() : ''))
+      .then((text) => {
+        const lines = String(text || '')
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (lines.length === 0) {
+          versionBadge.textContent = 'Version: unknown';
+          return;
+        }
+        if (lines.length === 1) {
+          const line = lines[0];
+          versionBadge.textContent = line.toLowerCase().startsWith('version') ? line : `Version: ${line}`;
+          return;
+        }
+        versionBadge.textContent = lines.join(' | ');
+      })
+      .catch(() => {
+        versionBadge.textContent = 'Version: unknown';
+      });
+  }
 
   // Tooltip layer so tips can render over the main image area
   (function initTooltips(){
@@ -1355,6 +1385,7 @@
   }
 
   // Init
+  loadVersionBadge();
   setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
   hydrateSettingsFromServer();
 

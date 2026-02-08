@@ -31,6 +31,15 @@ echo Using app version: %APP_VERSION%
 REM Change to project root directory
 cd /d "%PROJECT_ROOT%"
 
+REM Create VERSION.txt and copy into analyzer/visualizer
+set "VERSION_FILE=VERSION.txt"
+(
+    echo Build: %RELEASE_TS%
+    echo Version: %APP_VERSION%
+) > "%VERSION_FILE%"
+copy /Y "%VERSION_FILE%" "analyzer\VERSION.txt" >nul
+copy /Y "%VERSION_FILE%" "visualizer\VERSION.txt" >nul
+
 echo Checking prerequisites...
 echo.
 

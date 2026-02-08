@@ -5,7 +5,7 @@ a = Analysis(
     ['visualizer.py'],
     pathex=['.'],
     binaries=[],
-    datas=[('visualizer.html', '.')],
+    datas=[('visualizer.html', '.'), ('VERSION.txt', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

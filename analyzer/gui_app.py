@@ -2,6 +2,7 @@ import torch as t
 import onnxruntime as ort
 import tensorflow as tf
 
+import os
 import sys
 import threading
 from typing import Optional, Dict, List
@@ -31,6 +32,36 @@ from PyQt5.QtWidgets import (
 from kestrel_analyzer.pipeline import AnalysisPipeline
 from kestrel_analyzer.logging_utils import get_log_path, log_event, log_exception
 from gui_helpers import load_qimage_from_path, numpy_to_qimage
+
+
+def _read_version_text() -> str:
+    candidates = []
+    if getattr(sys, "frozen", False):
+        base_dir = getattr(sys, "_MEIPASS", None)
+        if base_dir:
+            candidates.append(os.path.join(base_dir, "VERSION.txt"))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION.txt"))
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                return handle.read().strip()
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+    return ""
+
+
+def _format_version_label(raw_text: str) -> str:
+    if not raw_text:
+        return "Version: unknown"
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if not lines:
+        return "Version: unknown"
+    if len(lines) == 1:
+        line = lines[0]
+        return line if line.lower().startswith("version") else f"Version: {line}"
+    return " | ".join(lines)
 
 
 class ProcessingWorker(QThread):
@@ -107,7 +138,9 @@ class ProcessingWorker(QThread):
 class KestrelGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Kestrel Analyzer")
+        self._version_label = _format_version_label(_read_version_text())
+        title_suffix = f" - {self._version_label}" if self._version_label != "Version: unknown" else ""
+        self.setWindowTitle(f"Kestrel Analyzer{title_suffix}")
         self.setMinimumSize(1100, 700)
 
         self.folder: Optional[str] = None
@@ -146,9 +179,11 @@ class KestrelGUI(QWidget):
         self.lbl_status = QLabel("Idle")
         self.lbl_status.setWordWrap(True)
         self.lbl_filename = QLabel("File: -")
+        self.lbl_version = QLabel(self._version_label)
         status_layout.addWidget(self.progress)
         status_layout.addWidget(self.lbl_status)
         status_layout.addWidget(self.lbl_filename)
+        status_layout.addWidget(self.lbl_version)
         status_box.setLayout(status_layout)
 
         preview_box = QGroupBox("Preview")
