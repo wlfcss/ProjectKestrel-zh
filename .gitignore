@@ -6,3 +6,4 @@ large_files/
 .venv_from_base/
 dist/
 release/
+.venv-macos/
