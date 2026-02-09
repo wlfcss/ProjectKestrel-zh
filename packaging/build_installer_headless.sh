@@ -69,8 +69,11 @@ build_component() {
   local dist_path="${component_name}/dist/${component_artifact}"
   if [[ ! -e "${dist_path}" ]]; then
     local fallback_app="${component_name}/dist/${component_name}.app"
+    local fallback_bin="${component_name}/dist/${component_name}"
     if [[ -e "${fallback_app}" ]]; then
       dist_path="${fallback_app}"
+    elif [[ -e "${fallback_bin}" ]]; then
+      dist_path="${fallback_bin}"
     else
       echo "[ERROR] ${component_name} artifact not found at ${dist_path}"
       return 1
