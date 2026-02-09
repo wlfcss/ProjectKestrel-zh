@@ -20,6 +20,9 @@
 ; ImageMagick download URL (Windows x64 Q8 dynamic release)
 #define ImageMagickURL "https://imagemagick.org/archive/binaries/ImageMagick-7.1.2-13-Q16-x64-dll.exe"
 #define ImageMagickInstaller "ImageMagick-Setup.exe"
+; WebView2 runtime (Evergreen bootstrapper)
+#define WebView2URL "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+#define WebView2Installer "MicrosoftEdgeWebView2Setup.exe"
 
 [Setup]
 AppId=org.ProjectKestrel
@@ -51,6 +54,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon_analyzer"; Description: "Create desktop shortcut for Kestrel Analyzer"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
 Name: "desktopicon_visualizer"; Description: "Create desktop shortcut for Kestrel Visualizer"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
 Name: "installimagemagick"; Description: "Install ImageMagick (required for RAW image support)"; GroupDescription: "Dependencies:"; Flags: checkedonce
+Name: "installwebview2"; Description: "Install Microsoft Edge WebView2 Runtime (required for Visualizer)"; GroupDescription: "Dependencies:"; Flags: checkedonce
 
 [Files]
 ; Kestrel Analyzer files
@@ -76,6 +80,8 @@ Name: "{autodesktop}\Kestrel Visualizer"; Filename: "{app}\Visualizer\visualizer
 [Run]
 ; Run ImageMagick installer if task selected and installer was downloaded
 Filename: "{tmp}\{#ImageMagickInstaller}"; Parameters: "/SILENT /NORESTART"; StatusMsg: "Installing ImageMagick..."; Flags: waituntilterminated; Tasks: installimagemagick; Check: ImageMagickInstallerExists
+; Run WebView2 Runtime installer if task selected and installer was downloaded
+Filename: "{tmp}\{#WebView2Installer}"; Parameters: "/silent /install"; StatusMsg: "Installing WebView2 Runtime..."; Flags: waituntilterminated; Tasks: installwebview2; Check: WebView2InstallerExists
 
 ; Option to launch after install
 Filename: "{app}\Analyzer\kestrel_analyzer.exe"; Description: "Launch Kestrel Analyzer"; Flags: nowait postinstall skipifsilent unchecked
@@ -85,6 +91,7 @@ Filename: "{app}\Visualizer\visualizer.exe"; Description: "Launch Kestrel Visual
 var
   DownloadPage: TDownloadWizardPage;
   ImageMagickNeeded: Boolean;
+  WebView2Needed: Boolean;
 
 // Check if ImageMagick is already installed
 function IsImageMagickInstalled: Boolean;
@@ -151,6 +158,51 @@ begin
     Log('ImageMagick installer not found');
 end;
 
+// Check if WebView2 runtime is already installed
+function IsWebView2Installed: Boolean;
+var
+  BaseDir: String;
+  SearchRec: TFindRec;
+begin
+  Result := False;
+
+  BaseDir := ExpandConstant('{pf86}\Microsoft\EdgeWebView\Application');
+  if DirExists(BaseDir) then
+  begin
+    if FindFirst(BaseDir + '\\*\\msedgewebview2.exe', SearchRec) then
+    begin
+      Result := True;
+      FindClose(SearchRec);
+      Log('WebView2 runtime found at: ' + BaseDir);
+      Exit;
+    end;
+  end;
+
+  BaseDir := ExpandConstant('{pf}\Microsoft\EdgeWebView\Application');
+  if DirExists(BaseDir) then
+  begin
+    if FindFirst(BaseDir + '\\*\\msedgewebview2.exe', SearchRec) then
+    begin
+      Result := True;
+      FindClose(SearchRec);
+      Log('WebView2 runtime found at: ' + BaseDir);
+      Exit;
+    end;
+  end;
+
+  Log('WebView2 runtime not detected on system');
+end;
+
+// Check if the downloaded WebView2 installer exists
+function WebView2InstallerExists: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{tmp}\{#WebView2Installer}'));
+  if Result then
+    Log('WebView2 installer found at: ' + ExpandConstant('{tmp}\{#WebView2Installer}'))
+  else
+    Log('WebView2 installer not found');
+end;
+
 // Download progress callback
 function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
 begin
@@ -173,6 +225,7 @@ begin
   if CurPageID = wpSelectTasks then
   begin
     ImageMagickNeeded := WizardIsTaskSelected('installimagemagick') and not IsImageMagickInstalled;
+    WebView2Needed := WizardIsTaskSelected('installwebview2') and not IsWebView2Installed;
     
     if ImageMagickNeeded then
       Log('ImageMagick will be downloaded and installed')
@@ -180,47 +233,58 @@ begin
       Log('ImageMagick installation selected but already installed, skipping')
     else
       Log('ImageMagick installation not selected');
+
+    if WebView2Needed then
+      Log('WebView2 runtime will be downloaded and installed')
+    else if WizardIsTaskSelected('installwebview2') then
+      Log('WebView2 installation selected but already installed, skipping')
+    else
+      Log('WebView2 installation not selected');
   end;
   
   // Download ImageMagick before installation begins
   if CurPageID = wpReady then
   begin
-    if ImageMagickNeeded then
+    if ImageMagickNeeded or WebView2Needed then
     begin
-      Log('Starting ImageMagick download...');
+      Log('Starting dependency download...');
       DownloadPage.Clear;
-      DownloadPage.Add('{#ImageMagickURL}', '{#ImageMagickInstaller}', '');
+      if ImageMagickNeeded then
+        DownloadPage.Add('{#ImageMagickURL}', '{#ImageMagickInstaller}', '');
+      if WebView2Needed then
+        DownloadPage.Add('{#WebView2URL}', '{#WebView2Installer}', '');
       DownloadPage.Show;
       try
         try
           DownloadPage.Download;
           Result := True;
-          Log('ImageMagick download completed successfully');
+          Log('Dependency download completed successfully');
         except
           if DownloadPage.AbortedByUser then
           begin
-            Log('ImageMagick download aborted by user');
+            Log('Dependency download aborted by user');
             Result := False;
           end
           else
           begin
-            Log('ImageMagick download failed');
+            Log('Dependency download failed');
             // Download failed - ask user what to do
             case SuppressibleMsgBox(
-              'Failed to download ImageMagick.' + #13#10 + #13#10 +
-              'ImageMagick is required for Kestrel Analyzer to process RAW image files.' + #13#10 + #13#10 +
+              'Failed to download one or more dependencies.' + #13#10 + #13#10 +
+              'ImageMagick is required for Kestrel Analyzer RAW image support.' + #13#10 +
+              'WebView2 is required for Kestrel Visualizer rendering.' + #13#10 + #13#10 +
               'Click Retry to try downloading again' + #13#10 +
-              'Click Ignore to continue without ImageMagick (not recommended)' + #13#10 +
+              'Click Ignore to continue without these dependencies (not recommended)' + #13#10 +
               'Click Abort to cancel installation',
               mbError, MB_ABORTRETRYIGNORE, IDRETRY) of
               IDRETRY: Result := NextButtonClick(CurPageID);  // Retry download
               IDIGNORE: begin
                 Result := True;  // Continue without ImageMagick
-                Log('User chose to continue without ImageMagick');
+                Log('User chose to continue without dependencies');
               end;
               IDABORT: begin
                 Result := False;  // Cancel installation
-                Log('User cancelled installation due to ImageMagick download failure');
+                Log('User cancelled installation due to dependency download failure');
               end;
             end;
           end;
@@ -251,6 +315,21 @@ begin
     else if IsImageMagickInstalled or ImageMagickInstallerExists then
     begin
       Log('ImageMagick is installed or will be installed');
+    end;
+
+    if not IsWebView2Installed and not WebView2InstallerExists then
+    begin
+      Log('Warning: WebView2 runtime not installed and installer not found');
+      MsgBox(
+        'Warning: WebView2 Runtime was not installed.' + #13#10 + #13#10 +
+        'Kestrel Visualizer requires Microsoft Edge WebView2 Runtime.' + #13#10 + #13#10 +
+        'To install manually, download from:' + #13#10 +
+        'https://developer.microsoft.com/microsoft-edge/webview2/' + #13#10,
+        mbInformation, MB_OK);
+    end
+    else if IsWebView2Installed or WebView2InstallerExists then
+    begin
+      Log('WebView2 is installed or will be installed');
     end;
   end;
 end;
