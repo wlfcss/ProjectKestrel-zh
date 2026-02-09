@@ -7,9 +7,9 @@ import sys
 import threading
 from typing import Optional, Dict, List
 
-from PyQt5.QtCore import Qt, pyqtSignal, QThread
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtGui import QImage, QPixmap
+from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
     QPushButton,
@@ -191,7 +191,7 @@ class KestrelGUI(QWidget):
         self.lbl_thumbnail = QLabel("Thumbnail")
         self.lbl_overlay = QLabel("Detections")
         for lbl in (self.lbl_thumbnail, self.lbl_overlay):
-            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             lbl.setMinimumHeight(260)
         preview_layout.addWidget(self.lbl_thumbnail)
@@ -205,7 +205,7 @@ class KestrelGUI(QWidget):
             card = QWidget()
             card_layout = QVBoxLayout()
             img_label = QLabel("No bird")
-            img_label.setAlignment(Qt.AlignCenter)
+            img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             img_label.setMinimumSize(160, 160)
             confidence_label = QLabel("Detection Confidence: -")
@@ -322,7 +322,9 @@ class KestrelGUI(QWidget):
             return
         label.setPixmap(
             QPixmap.fromImage(image).scaled(
-                label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
         )
 
@@ -428,9 +430,9 @@ def main(app: Optional[QApplication] = None):
         win = KestrelGUI()
         win.show()
         if owns_app:
-            sys.exit(app.exec_())
+            sys.exit(app.exec())
         else:
-            app.exec_()
+            app.exec()
     except Exception as e:
         log_exception(
             log_path,

@@ -5,7 +5,7 @@
 ```
 ProjectKestrel/
 ├── analyzer/                    # Analyzer application (GUI + CLI)
-│   ├── gui_app.py              # PyQt5 GUI entry point
+│   ├── gui_app.py              # PyQt6 GUI entry point
 │   ├── cli.py                  # CLI entry point (headless mode)
 │   ├── main.py                 # Default GUI launcher
 │   ├── gui_helpers.py          # GUI utilities (QImage conversion)
@@ -116,12 +116,12 @@ The `analyzer/kestrel_analyzer/` package contains all business logic with **zero
 - **ml/*.py**: Model wrappers (ONNX, Keras, Torch)
 
 This allows the pipeline to be:
-- ✅ Used by GUI (PyQt5)
+- ✅ Used by GUI (PyQt6)
 - ✅ Used by CLI (command-line)
 - ✅ Used by web services (FastAPI, Flask)
 - ✅ Used by third-party tools
 
-### GUI Layer (PyQt5)
+### GUI Layer (PyQt6)
 - **gui_app.py**: Main GUI window and worker thread
 - **gui_helpers.py**: Qt-specific utilities
 - **main.py**: Entry point that launches GUI
@@ -153,7 +153,7 @@ Both applications can be packaged as single-file executables:
 - onnxruntime (Bird species classifier)
 - opencv-python, pillow, wand (Image processing)
 - pandas, numpy (Data handling)
-- PyQt5 (GUI only)
+- PyQt6 (GUI only)
 
 **Internal Imports:**
 - CLI and GUI both import from `kestrel_analyzer` package

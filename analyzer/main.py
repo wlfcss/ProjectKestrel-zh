@@ -12,8 +12,8 @@ if platform.system() == "Windows": # REQUIRED to prevent pytorch dll load errors
     except Exception:
         pass
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
 
 def _create_splash(app: QApplication) -> QWidget:
     splash = QWidget()
@@ -21,10 +21,10 @@ def _create_splash(app: QApplication) -> QWidget:
     splash.setFixedSize(420, 160)
     layout = QVBoxLayout(splash)
     title_label = QLabel("Project Kestrel is Loading…", splash)
-    title_label.setAlignment(Qt.AlignCenter)
+    title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     title_label.setObjectName("splashTitle")
     status_label = QLabel("Starting…", splash)
-    status_label.setAlignment(Qt.AlignCenter)
+    status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     status_label.setObjectName("splashStatus")
     layout.addStretch(1)
     layout.addWidget(title_label)
