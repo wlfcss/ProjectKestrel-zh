@@ -50,6 +50,7 @@ ensure_venv() {
     source "${PROJECT_ROOT}/.venv2/bin/activate"
   else
     echo "[WARNING] .venv2 not found at ${PROJECT_ROOT}/.venv2"
+    echo "[WARNING] Create it and install requirements-macos.txt before running."
   fi
 }
 
