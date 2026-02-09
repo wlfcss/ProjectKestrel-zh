@@ -192,7 +192,7 @@ class KestrelGUI(QWidget):
         self.lbl_overlay = QLabel("Detections")
         for lbl in (self.lbl_thumbnail, self.lbl_overlay):
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             lbl.setMinimumHeight(260)
         preview_layout.addWidget(self.lbl_thumbnail)
         preview_layout.addWidget(self.lbl_overlay)
@@ -206,7 +206,7 @@ class KestrelGUI(QWidget):
             card_layout = QVBoxLayout()
             img_label = QLabel("No bird")
             img_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            img_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
             img_label.setMinimumSize(160, 160)
             confidence_label = QLabel("Detection Confidence: -")
             rating_label = QLabel("Rating: -")
