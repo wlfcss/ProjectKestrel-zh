@@ -99,14 +99,36 @@ echo
 PKG_ROOT="${RELEASE_DIR}/pkgroot"
 APP_INSTALL_DIR="${PKG_ROOT}/Applications/Project Kestrel"
 PKG_OUTPUT="${RELEASE_DIR}/ProjectKestrel-${APP_VERSION}.pkg"
+PKG_SCRIPTS="${RELEASE_DIR}/pkg-scripts"
 
 rm -rf "${PKG_ROOT}"
+rm -rf "${PKG_SCRIPTS}"
 mkdir -p "${APP_INSTALL_DIR}"
+mkdir -p "${PKG_SCRIPTS}"
 cp -R "${RELEASE_DIR}/kestrel_analyzer.app" "${APP_INSTALL_DIR}/"
 cp -R "${RELEASE_DIR}/visualizer.app" "${APP_INSTALL_DIR}/"
 
+cat > "${PKG_SCRIPTS}/postinstall" <<'EOS'
+#!/bin/bash
+set -euo pipefail
+
+IM_URL="https://imagemagick.org/script/download.php"
+if command -v magick >/dev/null 2>&1; then
+  exit 0
+fi
+
+if /usr/bin/osascript <<EOF
+display dialog "ImageMagick was not detected.\n\nProject Kestrel can use ImageMagick for RAW image support.\nWould you like to open the download page now?" buttons {"Cancel","Open Download"} default button "Open Download"
+EOF
+then
+  /usr/bin/open "${IM_URL}" || true
+fi
+EOS
+chmod +x "${PKG_SCRIPTS}/postinstall"
+
 pkgbuild \
   --root "${PKG_ROOT}" \
+  --scripts "${PKG_SCRIPTS}" \
   --identifier "org.ProjectKestrel" \
   --version "${APP_VERSION}" \
   --install-location "/" \

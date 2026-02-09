@@ -32,8 +32,20 @@ jobs:
           chmod +x packaging/build_installer_headless.sh
           ./packaging/build_installer_headless.sh
 
-      - name: Upload build artifacts
+      - name: Upload macOS installer
         uses: actions/upload-artifact@v4
         with:
-          name: macos-build
-          path: release/**
+          name: macos-installer
+          path: release/**/ProjectKestrel-*.pkg
+
+      - name: Upload analyzer app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-analyzer-app
+          path: release/**/kestrel_analyzer.app
+
+      - name: Upload visualizer app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-visualizer-app
+          path: release/**/visualizer.app
