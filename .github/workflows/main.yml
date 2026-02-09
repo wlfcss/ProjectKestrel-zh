@@ -1,0 +1,53 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Create venv
+        shell: powershell
+        run: |
+          python -m venv .venv2
+          .\.venv2\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+
+      - name: Install Python dependencies
+        shell: powershell
+        run: |
+          .\.venv2\Scripts\Activate.ps1
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
+          Start-Process -FilePath .\is.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -Wait
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { throw "Inno Setup not found" }
+
+      - name: Run installer build
+        shell: powershell
+        run: |
+          .\packaging\build_installer_headless.bat
+
+      - name: Upload installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: |
+            release/**/Project*/*.exe
+            release/**/alpha-*/**/*.exe
+            dist/installer/*.exe
