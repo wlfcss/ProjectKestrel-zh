@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-
+      
       - name: Install Qt (qmake)
         shell: bash
         run: |
@@ -24,6 +24,10 @@ jobs:
           QT_PREFIX="$(brew --prefix qt@5)"
           echo "${QT_PREFIX}/bin" >> "$GITHUB_PATH"
           echo "QT_PREFIX=${QT_PREFIX}" >> "$GITHUB_ENV"
+          echo "CMAKE_PREFIX_PATH=${QT_PREFIX}" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L${QT_PREFIX}/lib" >> "$GITHUB_ENV"
+          echo "CPPFLAGS=-I${QT_PREFIX}/include" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=${QT_PREFIX}/lib/pkgconfig" >> "$GITHUB_ENV"
           "${QT_PREFIX}/bin/qmake" -v
 
       - name: Create venv and install deps
