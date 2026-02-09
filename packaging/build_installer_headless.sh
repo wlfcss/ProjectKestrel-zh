@@ -92,7 +92,30 @@ build_component "visualizer" "visualizer.app" "visualizer.spec" "visualizer_buil
 
 echo
 printf "%s\n" "========================================"
+printf "%s\n" "Building macOS installer (.pkg)"
+printf "%s\n" "========================================"
+echo
+
+PKG_ROOT="${RELEASE_DIR}/pkgroot"
+APP_INSTALL_DIR="${PKG_ROOT}/Applications/Project Kestrel"
+PKG_OUTPUT="${RELEASE_DIR}/ProjectKestrel-${APP_VERSION}.pkg"
+
+rm -rf "${PKG_ROOT}"
+mkdir -p "${APP_INSTALL_DIR}"
+cp -R "${RELEASE_DIR}/kestrel_analyzer.app" "${APP_INSTALL_DIR}/"
+cp -R "${RELEASE_DIR}/visualizer.app" "${APP_INSTALL_DIR}/"
+
+pkgbuild \
+  --root "${PKG_ROOT}" \
+  --identifier "org.ProjectKestrel" \
+  --version "${APP_VERSION}" \
+  --install-location "/" \
+  "${PKG_OUTPUT}"
+
+echo
+printf "%s\n" "========================================"
 printf "%s\n" "Build completed"
 printf "%s\n" "========================================"
 echo
 printf "Artifacts in: %s\n" "${RELEASE_DIR}"
+printf "Installer: %s\n" "${PKG_OUTPUT}"
