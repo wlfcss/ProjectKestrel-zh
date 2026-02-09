@@ -38,3 +38,10 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+app = BUNDLE(
+    exe,
+    name='visualizer.app',
+    icon='../assets/logo.ico',
+    bundle_identifier='org.ProjectKestrel.Visualizer',
+)

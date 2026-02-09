@@ -51,3 +51,10 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
+app = BUNDLE(
+    exe,
+    name='kestrel_analyzer.app',
+    icon='../assets/logo.ico',
+    bundle_identifier='org.ProjectKestrel.Analyzer',
+)
