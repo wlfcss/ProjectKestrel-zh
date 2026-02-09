@@ -393,6 +393,12 @@ def main():
         args.windowed = True
     if args.windowed:
         try:
+            if not getattr(sys, 'frozen', False):
+                sys.argv[0] = os.path.abspath(__file__)
+            resource_path = os.environ.get('RESOURCEPATH')
+            if resource_path and not os.path.exists(resource_path):
+                log('Clearing invalid RESOURCEPATH:', resource_path)
+                os.environ.pop('RESOURCEPATH', None)
             import webview  # type: ignore
         except Exception as e:
             log('Windowed mode disabled: failed to import pywebview:', repr(e))
