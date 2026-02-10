@@ -34,6 +34,14 @@ def _dump_tree(root: str, max_depth: int = 2) -> None:
             _debug(f"{indent}  {name}")
 
 
+def _first_existing_dir(base_path: str, candidates: list[str]) -> str | None:
+    for rel in candidates:
+        path = os.path.join(base_path, rel)
+        if os.path.isdir(path):
+            return path
+    return None
+
+
 if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     _debug(f"frozen=True platform=win32 base_path={base_path}")
@@ -58,19 +66,41 @@ elif sys.platform == 'darwin' and getattr(sys, 'frozen', False):
     _dump_tree(base_path, max_depth=2)
     # Flattened layout: ImageMagick directories live directly under MEIPASS.
     magick_home = base_path
-    magick_bin = os.path.join(magick_home, 'bin')
-    magick_lib = os.path.join(magick_home, 'lib')
-    magick_etc = os.path.join(magick_home, 'etc', 'ImageMagick-7')
-    magick_coders = os.path.join(
-        magick_lib, 'ImageMagick-7.0.10', 'modules-Q16HDRI', 'coders'
-    )
+    magick_bin = _first_existing_dir(magick_home, [
+        'bin',
+        os.path.join('ImageMagick-7.0.10', 'bin'),
+        os.path.join('ImageMagick', 'ImageMagick-7.0.10', 'bin'),
+    ])
+    magick_lib = _first_existing_dir(magick_home, [
+        'lib',
+        os.path.join('ImageMagick-7.0.10', 'lib'),
+        os.path.join('ImageMagick', 'ImageMagick-7.0.10', 'lib'),
+    ])
+    magick_etc = _first_existing_dir(magick_home, [
+        os.path.join('etc', 'ImageMagick-7'),
+        os.path.join('ImageMagick-7.0.10', 'etc', 'ImageMagick-7'),
+        os.path.join('ImageMagick', 'ImageMagick-7.0.10', 'etc', 'ImageMagick-7'),
+    ])
+    magick_coders = None
+    if magick_lib:
+        magick_coders = _first_existing_dir(magick_lib, [
+            os.path.join('ImageMagick-7.0.10', 'modules-Q16HDRI', 'coders'),
+        ])
+
+    _debug(f"MAGICK_HOME={magick_home}")
+    _debug(f"MAGICK_BIN={magick_bin}")
+    _debug(f"MAGICK_LIB={magick_lib}")
+    _debug(f"MAGICK_ETC={magick_etc}")
+    _debug(f"MAGICK_CODERS={magick_coders}")
 
     if os.path.isdir(magick_home):
         os.environ.setdefault('MAGICK_HOME', magick_home)
-        if os.path.isdir(magick_etc):
+        if magick_etc:
             os.environ.setdefault('MAGICK_CONFIGURE_PATH', magick_etc)
-        if os.path.isdir(magick_coders):
+        if magick_coders:
             os.environ.setdefault('MAGICK_CODER_MODULE_PATH', magick_coders)
-        _prepend_env_path('PATH', magick_bin)
-        _prepend_env_path('DYLD_FALLBACK_LIBRARY_PATH', magick_lib)
-        _prepend_env_path('DYLD_LIBRARY_PATH', magick_lib)
+        if magick_bin:
+            _prepend_env_path('PATH', magick_bin)
+        if magick_lib:
+            _prepend_env_path('DYLD_FALLBACK_LIBRARY_PATH', magick_lib)
+            _prepend_env_path('DYLD_LIBRARY_PATH', magick_lib)
