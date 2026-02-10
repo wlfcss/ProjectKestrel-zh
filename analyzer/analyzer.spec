@@ -9,7 +9,7 @@ from PyInstaller.building.datastruct import Tree
 
 datas = [('models', 'models'), ('gui_app.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer')]
 if os.path.isdir('ImageMagick/ImageMagick-7.0.10'):
-    datas += Tree('ImageMagick/ImageMagick-7.0.10', prefix='ImageMagick/ImageMagick-7.0.10')
+    datas.append(Tree('ImageMagick/ImageMagick-7.0.10', prefix='ImageMagick/ImageMagick-7.0.10'))
 binaries = []
 hiddenimports = []
 binaries += collect_dynamic_libs('torch')
