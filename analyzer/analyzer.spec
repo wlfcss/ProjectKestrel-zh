@@ -5,7 +5,7 @@ import os
 # COMMAND USED TO GENERATE THIS: python -m PyInstaller main.py --onefile --paths=. --runtime-hook=runtime_hook.py --add-data "models;models" --add-data "gui_app.py;." --add-data "gui_helpers.py;." --add-data "cli.py;." --add-data "VERSION.txt;." --add-data "kestrel_analyzer;kestrel_analyzer" --collect-all msvc-runtime --collect-binaries torch --collect-binaries onnxruntime --collect-binaries tensorflow --name "main_with_msvcruntime"
 from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_all
-from PyInstaller.utils.hooks import Tree
+from PyInstaller.building.datastruct import Tree
 
 datas = [('models', 'models'), ('gui_app.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer')]
 if os.path.isdir('ImageMagick/ImageMagick-7.0.10'):
