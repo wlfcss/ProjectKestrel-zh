@@ -56,7 +56,7 @@ elif sys.platform == 'darwin':
     base_path = sys._MEIPASS
     _debug(f"frozen=True platform=darwin base_path={base_path}")
     _dump_tree(base_path, max_depth=2)
-    magick_home = os.path.join(base_path, 'ImageMagick', 'ImageMagick-7.0.10')
+    magick_home = base_path #os.path.join(base_path, 'ImageMagick', 'ImageMagick-7.0.10')
     magick_bin = os.path.join(magick_home, 'bin')
     magick_lib = os.path.join(magick_home, 'lib')
     magick_etc = os.path.join(magick_home, 'etc', 'ImageMagick-7')
