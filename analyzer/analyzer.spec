@@ -19,6 +19,37 @@ tmp_ret = collect_all('msvc-runtime')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
+def _normalize_datas(items):
+    normalized = []
+    for item in items:
+        if isinstance(item, tuple):
+            if len(item) == 2:
+                normalized.append(item)
+            elif len(item) == 3:
+                normalized.append((item[0], item[1]))
+            else:
+                print(f"Unexpected datas tuple len={len(item)}: {item}")
+        elif hasattr(item, 'toc'):
+            try:
+                toc_items = item.toc
+            except Exception as exc:
+                print(f"Failed to read Tree.toc: {exc}")
+                continue
+            for entry in toc_items:
+                if len(entry) == 2:
+                    normalized.append(entry)
+                elif len(entry) == 3:
+                    normalized.append((entry[0], entry[1]))
+                else:
+                    print(f"Unexpected Tree entry len={len(entry)}: {entry}")
+        else:
+            print(f"Unexpected datas entry type={type(item)} value={item}")
+    return normalized
+
+
+datas = _normalize_datas(datas)
+
+
 a = Analysis(
     ['main.py'],
     pathex=['.'],
