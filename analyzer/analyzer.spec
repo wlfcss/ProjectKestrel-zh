@@ -9,7 +9,7 @@ from PyInstaller.utils.hooks import collect_system_data_files
 
 datas = [('models', 'models'), ('gui_app.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer')]
 if os.path.isdir('ImageMagick/ImageMagick-7.0.10'):
-    datas += collect_system_data_files('ImageMagick/ImageMagick-7.0.10', prefix='ImageMagick/ImageMagick-7.0.10')
+    datas += collect_system_data_files('ImageMagick/ImageMagick-7.0.10')
 binaries = []
 hiddenimports = []
 binaries += collect_dynamic_libs('torch')
