@@ -29,7 +29,7 @@ if sys.platform == 'win32' and getattr(sys, 'frozen', False):
                 ctypes.CDLL(dll_path)
             except Exception:
                 pass
-elif sys.platform == 'darwin' and getattr(sys, 'frozen', False):
+elif sys.platform == 'darwin':
     base_path = sys._MEIPASS
     magick_home = os.path.join(base_path, 'ImageMagick', 'ImageMagick-7.0.10')
     magick_bin = os.path.join(magick_home, 'bin')
