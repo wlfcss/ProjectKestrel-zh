@@ -2,7 +2,7 @@ import os
 import sys
 import ctypes
 
-if getattr(sys, 'frozen', False):
+if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     
     # Add base path to DLL search

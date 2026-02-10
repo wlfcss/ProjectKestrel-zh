@@ -23,6 +23,13 @@ Optionally set env vars (same as editor_bridge):
 
 """
 from __future__ import annotations
+windowed_available = False
+_webview_import_error = None
+try:
+    import webview  # type: ignore
+    windowed_available = True
+except Exception as e:
+    _webview_import_error = repr(e)
 import argparse
 import json
 import os
@@ -392,17 +399,9 @@ def main():
     else:
         args.windowed = True
     if args.windowed:
-        try:
-            if not getattr(sys, 'frozen', False):
-                sys.argv[0] = os.path.abspath(__file__)
-            resource_path = os.environ.get('RESOURCEPATH')
-            if resource_path and not os.path.exists(resource_path):
-                log('Clearing invalid RESOURCEPATH:', resource_path)
-                os.environ.pop('RESOURCEPATH', None)
-            import webview  # type: ignore
-        except Exception as e:
-            log('Windowed mode disabled: failed to import pywebview:', repr(e))
-            args.windowed = False
+        if not windowed_available:
+            log('Windowed mode disabled: failed to import pywebview:', _webview_import_error)
+        args.windowed = windowed_available
     if args.windowed:
         def _serve():
             try:
