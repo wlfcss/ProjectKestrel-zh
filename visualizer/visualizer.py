@@ -22,20 +22,23 @@ Optionally set env vars (same as editor_bridge):
   KESTREL_ALLOW_ANY_EXTENSION=1            (disable extension filtering)
 
 """
+
 from __future__ import annotations
-windowed_available = False
-_webview_import_error = None
+
+WEBVIEW_IMPORT_SUCCESS = False
 try:
     import webview  # type: ignore
-    windowed_available = True
-except Exception as e:
-    _webview_import_error = repr(e)
+    WEBVIEW_IMPORT_SUCCESS = True
+except Exception:
+    pass
+
 import argparse
 import json
 import os
 import sys
 import subprocess
 import webbrowser
+
 import secrets
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import threading
@@ -398,10 +401,11 @@ def main():
         args.windowed = False
     else:
         args.windowed = True
-    if args.windowed:
-        if not windowed_available:
-            log('Windowed mode disabled: failed to import pywebview:', _webview_import_error)
-        args.windowed = windowed_available
+    if args.windowed and not WEBVIEW_IMPORT_SUCCESS:
+        log('pywebview not available; falling back to system browser')
+        args.windowed = False
+    else:
+        log('Windowed mode enabled; using pywebview' if args.windowed else 'Windowed mode disabled; using system browser')
     if args.windowed:
         def _serve():
             try:
