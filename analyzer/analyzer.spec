@@ -22,6 +22,9 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 def _normalize_datas(items):
     normalized = []
     for item in items:
+        if isinstance(item, Tree):
+            normalized.append(item)
+            continue
         if isinstance(item, tuple):
             if len(item) == 2:
                 normalized.append(item)
@@ -29,6 +32,17 @@ def _normalize_datas(items):
                 normalized.append((item[0], item[1]))
             else:
                 print(f"Unexpected datas tuple len={len(item)}: {item}")
+        elif isinstance(item, list):
+            for entry in item:
+                if isinstance(entry, tuple):
+                    if len(entry) == 2:
+                        normalized.append(entry)
+                    elif len(entry) == 3:
+                        normalized.append((entry[0], entry[1]))
+                    else:
+                        print(f"Unexpected datas list entry len={len(entry)}: {entry}")
+                else:
+                    print(f"Unexpected datas list entry type={type(entry)} value={entry}")
         elif hasattr(item, 'toc'):
             try:
                 toc_items = item.toc
