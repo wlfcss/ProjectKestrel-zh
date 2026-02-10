@@ -25,4 +25,4 @@ requests==2.32.3
 pywebview==6.1
 
 # installer
-pyinstaller==6.1.0
+pyinstaller==6.18.0
