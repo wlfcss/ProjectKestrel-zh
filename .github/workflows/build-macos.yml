@@ -26,19 +26,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-macos.txt
 
-      - name: Install ImageMagick (Homebrew)
+      - name: Python smoke test (pre-build)
         shell: bash
         run: |
-          brew install imagemagick
-
-      - name: Stage ImageMagick for packaging
-        shell: bash
-        run: |
-          IM_PREFIX="$(brew --prefix imagemagick)"
-          STAGING_DIR="analyzer/ImageMagick/ImageMagick-7.0.10"
-          rm -rf "${STAGING_DIR}"
-          mkdir -p "${STAGING_DIR}"
-          rsync -a "${IM_PREFIX}/" "${STAGING_DIR}/"
+          set -e
+          source .venv2/bin/activate
+          echo "Running Python smoke test to verify rawpy and image_utils work..."
+          python analyzer/cli.py --smoke test_imgs --no-gpu
+          echo "Python smoke test PASSED - rawpy is working correctly"
 
       - name: Run macOS headless build
         shell: bash
