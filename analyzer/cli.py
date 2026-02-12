@@ -61,28 +61,20 @@ def main():
             )
             image_path = _find_first_image(args.folder)
             if not image_path:
-                print("No supported image files found.")
+                print("No supported image files found.", flush=True)
                 return
-            pipeline = AnalysisPipeline(use_gpu=args.use_gpu)
-
-            def on_status(msg):
-                print(msg)
-
-            def on_progress(processed, total):
-                print(f"\rProcessed {processed}/{total}", end="", flush=True)
-
-            with tempfile.TemporaryDirectory(prefix="kestrel_smoke_") as temp_dir:
-                shutil.copy(image_path, os.path.join(temp_dir, os.path.basename(image_path)))
-                pipeline.process_folder(
-                    temp_dir,
-                    callbacks={
-                        "on_status": on_status,
-                        "on_progress": on_progress,
-                    },
-                    analyzer_name="cli_smoke",
-                )
-            print()
-            print(f"Smoke test ok: {os.path.basename(image_path)}")
+            
+            print(f"Smoke test: reading image {os.path.basename(image_path)}", flush=True)
+            print(f"Smoke test image path: {image_path}", flush=True)
+            print(f"Smoke test image exists: {os.path.exists(image_path)}", flush=True)
+            
+            from kestrel_analyzer.image_utils import read_image
+            
+            img_array = read_image(image_path)
+            if img_array is not None:
+                print(f"Smoke test SUCCESS: Read image with shape {img_array.shape}", flush=True)
+            else:
+                print("Smoke test FAILED: read_image returned None", flush=True)
             return
         pipeline = AnalysisPipeline(use_gpu=args.use_gpu)
 
