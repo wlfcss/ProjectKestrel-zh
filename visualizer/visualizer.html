@@ -378,7 +378,47 @@
   const versionBadge = el('#versionBadge');
 
   const supportsFS = 'showDirectoryPicker' in window;
-  const hasPywebviewApi = typeof window.pywebview !== 'undefined';
+  let hasPywebviewApi = typeof window.pywebview !== 'undefined';
+  
+  // Debug: Log what APIs are available (initial check)
+  console.log('[DEBUG] Initial API Detection:');
+  console.log('  - File System Access API (showDirectoryPicker):', supportsFS);
+  console.log('  - Pywebview API (window.pywebview):', hasPywebviewApi);
+  if (hasPywebviewApi) {
+    console.log('  - window.pywebview object:', window.pywebview);
+    console.log('  - window.pywebview.api:', window.pywebview.api);
+    if (window.pywebview.api) {
+      console.log('  - Available API methods:', Object.keys(window.pywebview.api));
+    }
+  }
+  
+  // Pywebview API might load asynchronously, so wait for it
+  async function waitForPywebview() {
+    if (typeof window.pywebview !== 'undefined' && window.pywebview.api) {
+      return true;
+    }
+    // Poll for up to 2 seconds
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      if (typeof window.pywebview !== 'undefined' && window.pywebview.api) {
+        console.log('[DEBUG] Pywebview API became available after', (i+1)*100, 'ms');
+        hasPywebviewApi = true;
+        console.log('[DEBUG] Updated hasPywebviewApi to:', hasPywebviewApi);
+        console.log('[DEBUG] window.pywebview:', window.pywebview);
+        console.log('[DEBUG] window.pywebview.api:', window.pywebview.api);
+        console.log('[DEBUG] Available API methods:', Object.keys(window.pywebview.api));
+        return true;
+      }
+    }
+    console.log('[DEBUG] Pywebview API not available after 2 seconds');
+    return false;
+  }
+  
+  // Start checking for pywebview immediately
+  if (!hasPywebviewApi) {
+    waitForPywebview();
+  }
+  
   if (!supportsFS && !hasPywebviewApi) el('#compat').classList.remove('hidden');
 
   // Utilities
@@ -520,8 +560,13 @@
   const blobUrlCache = new Map();
   
   async function getBlobUrlForPath(relOrAbsPath) {
-    // Priority 1: Use Python API if available (works on all platforms in desktop app)
-    if (hasPywebviewApi && window.pywebview.api && typeof window.pywebview.api.read_image_file === 'function' && rootPath) {
+    console.log('[DEBUG] getBlobUrlForPath called with:', relOrAbsPath);
+    console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi, 'rootPath:', rootPath);
+    
+    // PRIORITY 1: Python API (desktop app - all platforms)
+    // Use this when available for consistent behavior across Windows/macOS/Linux
+    if (hasPywebviewApi && window.pywebview?.api?.read_image_file && rootPath) {
+      console.log('[DEBUG] Using Python API for image loading');
       let rel = toRootRelative(relOrAbsPath);
       if (!rel) {
         // Try as a direct relative path
@@ -531,42 +576,55 @@
       
       // Check cache first
       const cacheKey = `pyapi:${rel}`;
-      if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
+      if (blobUrlCache.has(cacheKey)) {
+        console.log('[DEBUG] Using cached image:', rel);
+        return blobUrlCache.get(cacheKey);
+      }
       
       try {
         const result = await window.pywebview.api.read_image_file(rel, rootPath);
         if (result && result.success && result.data) {
+          console.log('[DEBUG] Successfully loaded image via Python API:', rel);
           // Create data URL from base64
           const dataUrl = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
           blobUrlCache.set(cacheKey, dataUrl);
           return dataUrl;
+        } else {
+          console.warn('[DEBUG] Python API returned no data for:', rel, result);
         }
       } catch (e) {
         console.error('Python API image read failed:', e);
-        // Fall through to File System Access API
+        // Don't fall through to File System Access API in desktop app
+        // If Python API fails, something is wrong
+        return null;
       }
     }
     
-    // Priority 2: Use File System Access API (browser with handle)
-    let rel = toRootRelative(relOrAbsPath);
-    if (!rel && rootDirHandle) {
-      // maybe the file is at the top-level (original filename)
-      rel = sanitizePath(relOrAbsPath);
+    // PRIORITY 2: File System Access API (browser mode only)
+    // This only runs when NOT using Python API (browser context) 
+    if (!rootPath && rootDirHandle) {
+      let rel = toRootRelative(relOrAbsPath);
+      if (!rel) {
+        // maybe the file is at the top-level (original filename)
+        rel = sanitizePath(relOrAbsPath);
+      }
+      if (!rel) return null;
+      
+      const cacheKey = `fsapi:${rel}`;
+      if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
+      
+      try {
+        const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
+        const file = await fileHandle.getFile();
+        const url = URL.createObjectURL(file);
+        blobUrlCache.set(cacheKey, url);
+        return url;
+      } catch (e) {
+        return null;
+      }
     }
-    if (!rel || !rootDirHandle) return null;
     
-    const cacheKey = `fsapi:${rel}`;
-    if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
-    
-    try {
-      const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
-      const file = await fileHandle.getFile();
-      const url = URL.createObjectURL(file);
-      blobUrlCache.set(cacheKey, url);
-      return url;
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   function parseNumber(v) {
@@ -1268,12 +1326,14 @@
       rows = parsed.data || [];
       ensureSceneNameColumn();
       ensureRatingColumns();
-      await renderScenes();
       
-      // Store the folder path for Python API image loading
+      // IMPORTANT: Set rootPath BEFORE renderScenes so image loading works
       rootPath = result.root || folderPath;
       rootDirHandle = null; // Clear handle since we're using Python API
       rootIsKestrel = false;
+      
+      // Now render with rootPath set
+      await renderScenes();
       
       // Also save in settings for file opening
       const settings = loadSettings();
@@ -1292,27 +1352,43 @@
 
   // Event wiring
   el('#pickFolder').addEventListener('click', async () => {
+    console.log('[DEBUG] Folder picker clicked');
+    console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi);
+    console.log('[DEBUG] window.pywebview:', window.pywebview);
+    console.log('[DEBUG] window.pywebview?.api:', window.pywebview?.api);
+    
+    // Wait for pywebview API if it's not ready yet
+    if (!hasPywebviewApi) {
+      console.log('[DEBUG] Waiting for pywebview API...');
+      const ready = await waitForPywebview();
+      console.log('[DEBUG] Pywebview API ready:', ready);
+    }
+    
     try {
-      // First priority: Use pywebview native folder picker if available (macOS/Windows desktop app)
+      // PRIORITY 1: Python API (desktop app - all platforms)
+      // When available, ALWAYS use this for consistency
       if (hasPywebviewApi && window.pywebview?.api?.choose_directory) {
+        console.log('[DEBUG] Using Python API for folder picker');
         try {
           setStatus('Opening folder picker...');
           const folderPath = await window.pywebview.api.choose_directory();
           if (folderPath) {
             await loadFolderFromPath(folderPath);
-            return; // Success - don't fall through
+            return; // Success - Python API handled everything
           } else {
             setStatus('Folder selection cancelled');
-            return; // User cancelled - don't fall through
+            return; // User cancelled
           }
         } catch (e) {
-          console.error('Pywebview folder picker failed:', e);
-          setStatus('Native folder picker failed, trying fallback...');
-          // Fall through to next method
+          console.error('Python API folder picker failed:', e);
+          alert(`Desktop folder picker failed: ${e.message || e}\n\nPlease restart the application and try again.`);
+          setStatus('Folder picker failed');
+          return; // Don't fall through - Python API should always work in desktop app
         }
       }
 
-      // Second priority: File System Access API (modern browsers)
+      // PRIORITY 2: File System Access API (browser mode only)
+      // This only runs when NOT in pywebview context
       if (supportsFS) {
         // Primary path: pick a folder (root or .kestrel)
         try {

@@ -232,6 +232,7 @@ class Api:
         """Open native folder picker dialog.
         Returns: absolute path to selected folder, or None if cancelled.
         """
+        print(f"[API] choose_directory() called (platform: {sys.platform})", flush=True)
         try:
             if sys.platform == 'darwin':
                 # macOS: Use AppleScript to show folder picker
@@ -244,7 +245,10 @@ class Api:
                     timeout=120
                 )
                 if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
+                    selected_path = result.stdout.strip()
+                    print(f"[API] choose_directory() → Success: {selected_path}", flush=True)
+                    return selected_path
+                print("[API] choose_directory() → Cancelled by user", flush=True)
                 return None
             elif sys.platform.startswith('win'):
                 # Windows: Use tkinter folder dialog
@@ -255,7 +259,12 @@ class Api:
                 root.attributes('-topmost', True)  # Bring dialog to front
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
-                return folder if folder else None
+                if folder:
+                    print(f"[API] choose_directory() → Success: {folder}", flush=True)
+                    return folder
+                else:
+                    print("[API] choose_directory() → Cancelled by user", flush=True)
+                    return None
             else:
                 # Linux: Use tkinter as well
                 import tkinter as tk
@@ -264,8 +273,14 @@ class Api:
                 root.withdraw()
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
-                return folder if folder else None
+                if folder:
+                    print(f"[API] choose_directory() → Success: {folder}", flush=True)
+                    return folder
+                else:
+                    print("[API] choose_directory() → Cancelled by user", flush=True)
+                    return None
         except Exception as e:
+            print(f"[API] choose_directory() → Error: {e}", flush=True)
             log(f"Error in choose_directory: {e}")
             return None
     
@@ -278,6 +293,7 @@ class Api:
         Returns:
             dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str
         """
+        print(f"[API] read_kestrel_csv() called with folder_path: {folder_path}", flush=True)
         try:
             import os
             folder_path = folder_path.rstrip('/')
@@ -292,6 +308,7 @@ class Api:
                 parent_folder = folder_path
             
             if not os.path.exists(csv_path):
+                print(f"[API] read_kestrel_csv() → CSV not found at: {csv_path}", flush=True)
                 return {
                     'success': False,
                     'error': f'Could not find kestrel_database.csv at: {csv_path}',
@@ -302,6 +319,7 @@ class Api:
             with open(csv_path, 'r', encoding='utf-8') as f:
                 data = f.read()
             
+            print(f"[API] read_kestrel_csv() → Success: Read {len(data)} bytes from {csv_path}", flush=True)
             return {
                 'success': True,
                 'data': data,
@@ -310,6 +328,7 @@ class Api:
                 'root': parent_folder
             }
         except Exception as e:
+            print(f"[API] read_kestrel_csv() → Error: {e}", flush=True)
             return {
                 'success': False,
                 'error': str(e),
@@ -327,6 +346,7 @@ class Api:
         Returns:
             dict with 'success': bool, 'data': str (base64), 'mime': str, 'error': str
         """
+        print(f"[API] read_image_file() called: relative_path='{relative_path}', root_path='{root_path}'", flush=True)
         try:
             import os
             import base64
@@ -343,6 +363,7 @@ class Api:
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
             if not full_path_real.startswith(root_path_real):
+                print(f"[API] read_image_file() → Security error: Path escapes root", flush=True)
                 return {
                     'success': False,
                     'error': 'Path escapes root directory',
@@ -351,6 +372,7 @@ class Api:
                 }
             
             if not os.path.exists(full_path):
+                print(f"[API] read_image_file() → File not found: {full_path}", flush=True)
                 return {
                     'success': False,
                     'error': f'File not found: {full_path}',
@@ -381,6 +403,7 @@ class Api:
                 }
                 mime_type = mime_map.get(ext, 'application/octet-stream')
             
+            print(f"[API] read_image_file() → Success: Read {len(data)} bytes ({mime_type}) from {os.path.basename(full_path)}", flush=True)
             return {
                 'success': True,
                 'data': b64_data,
@@ -388,6 +411,7 @@ class Api:
                 'error': ''
             }
         except Exception as e:
+            print(f"[API] read_image_file() → Error: {e}", flush=True)
             return {
                 'success': False,
                 'error': str(e),
@@ -589,7 +613,7 @@ def main():
             log('Starting windowed UI via pywebview...')
             api = Api()
             webview.create_window('Kestrel Visualizer', url, js_api=api)
-            webview.start()
+            webview.start(debug=True)  # Enable developer console for debugging
         except Exception as e:
             log('Windowed mode failed at runtime; falling back to browser:', repr(e))
             try:
