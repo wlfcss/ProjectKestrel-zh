@@ -296,7 +296,7 @@
       </div>
       <div class="row">
         <label for="rootHint">Local Root (hint)</label>
-        <input id="rootHint" type="text" placeholder="C:\\Data\\Media - Photography\\Yellowstone\\100CANON" />
+        <input id="rootHint" type="text" placeholder="/path/to/your/photos" />
       </div>
       <div class="row">
         <label for="editorChoice">Preferred Editor</label>
@@ -1356,9 +1356,9 @@
       // Now render with rootPath set
       await renderScenes();
       
-      // Also save in settings for file opening
+      // Also save in settings for file opening (use rootHint for consistency)
       const settings = loadSettings();
-      settings.localRoot = rootPath;
+      settings.rootHint = rootPath;
       saveSettings(settings);
       
       setStatus(`Loaded from: ${result.path}`);
