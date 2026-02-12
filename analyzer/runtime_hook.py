@@ -24,18 +24,6 @@ def _dump_tree(root: str, max_depth: int = 2) -> None:
         for name in sorted(files):
             _debug(f"{indent}  {name}")
 
-
-def _find_libomp(base_path: str) -> str | None:
-    # Search for libomp.dylib under the bundle root
-    for root, dirs, files in os.walk(base_path):
-        if "libomp.dylib" in files:
-            return os.path.join(root, "libomp.dylib")
-        depth = root[len(base_path):].count(os.sep)
-        if depth > 4:
-            dirs[:] = []
-    return None
-
-
 if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
     _debug(f"frozen=True platform=win32 base_path={base_path}")
@@ -57,20 +45,3 @@ if sys.platform == 'win32' and getattr(sys, 'frozen', False):
                 ctypes.CDLL(dll_path)
             except Exception:
                 pass
-elif sys.platform == 'darwin' and getattr(sys, 'frozen', False):
-    base_path = sys._MEIPASS
-    _debug(f"frozen=True platform=darwin base_path={base_path}")
-    _dump_tree(base_path, max_depth=2)
-    
-    # macOS-specific setup (no ImageMagick needed - using rawpy for RAW files)
-    os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
-    
-    # Find and preload libomp if present (needed by some ML libraries)
-    libomp_path = _find_libomp(base_path)
-    if libomp_path:
-        _debug(f"LIBOMP_PATH={libomp_path}")
-        try:
-            ctypes.CDLL(libomp_path, mode=ctypes.RTLD_GLOBAL)
-            _debug("libomp preloaded")
-        except Exception as exc:
-            _debug(f"libomp preload failed: {exc}")
