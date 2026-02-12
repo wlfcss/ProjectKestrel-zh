@@ -13,6 +13,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
+      
+      - name: Download model file (mask_rcnn_resnet50_fpn_v2.pth)
+        shell: powershell
+        run: |
+          Write-Host "Downloading mask_rcnn_resnet50_fpn_v2.pth from GitHub release..."
+          New-Item -ItemType Directory -Force -Path "analyzer\models" | Out-Null
+          Invoke-WebRequest -Uri "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth" `
+            -OutFile "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth"
+          
+          Write-Host ""
+          Write-Host "Verifying download..."
+          if (-not (Test-Path "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth")) {
+            Write-Host "ERROR: mask_rcnn_resnet50_fpn_v2.pth not found after download"
+            exit 1
+          }
+          
+          $fileSize = (Get-Item "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth").Length
+          Write-Host "Downloaded file size: $fileSize bytes"
+          
+          if ($fileSize -lt 100000) {
+            Write-Host "ERROR: Downloaded file is too small ($fileSize bytes), likely download failed"
+            exit 1
+          }
+          
+          Write-Host ""
+          Write-Host "Contents of analyzer\models\:"
+          Get-ChildItem "analyzer\models\" | Format-Table Name, Length, LastWriteTime
+          Write-Host ""
+          Write-Host "Model file successfully downloaded and verified"
 
       - name: Set up Python
         uses: actions/setup-python@v5
