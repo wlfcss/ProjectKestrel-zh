@@ -407,6 +407,8 @@
         console.log('[DEBUG] window.pywebview:', window.pywebview);
         console.log('[DEBUG] window.pywebview.api:', window.pywebview.api);
         console.log('[DEBUG] Available API methods:', Object.keys(window.pywebview.api));
+        // Hide compatibility warning since we now have pywebview
+        el('#compat').classList.add('hidden');
         return true;
       }
     }
@@ -414,7 +416,7 @@
     return false;
   }
   
-  // Start checking for pywebview immediately
+  // Start checking for pywebview immediately and update UI when ready
   if (!hasPywebviewApi) {
     waitForPywebview();
   }
