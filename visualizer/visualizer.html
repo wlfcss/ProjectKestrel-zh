@@ -248,7 +248,10 @@
     <div id="mainZoom">
       <div id="compat" class="wrap hidden">
         <div class="notice">
-          Your browser does not support the File System Access API. You can still click "Open Folder or CSV…" and browse, but image previews and saving changes may be limited. For the best experience, use a Chromium-based browser (Chrome, Edge, Brave, Arc). 
+          Limited functionality detected. For the best experience with full folder access and image previews, use one of these options:<br/>
+          • Use the Kestrel Visualizer desktop app (recommended for macOS)<br/>
+          • Use a Chromium-based browser (Chrome, Edge, Brave, Arc)<br/>
+          You can still load CSV files directly, but image previews and opening files in editors will not work.
         </div>
       </div>
 
@@ -352,8 +355,13 @@
 
   <script>
   // State
-  let rootDirHandle = null;      // Top-level photo folder (contains .kestrel)
+  // NOTE: Two modes for file access:
+  // 1. Python API mode (desktop app): Uses rootPath + Python backend API calls
+  // 2. File System Access API mode (browser): Uses rootDirHandle for direct file access
+  // The getBlobUrlForPath function automatically chooses the best available method
+  let rootDirHandle = null;      // Top-level photo folder (contains .kestrel) - for File System Access API
   let rootIsKestrel = false;     // True if user selected the .kestrel folder itself
+  let rootPath = '';             // Absolute path to root folder (for Python API)
   let csvFileHandle = null;      // .kestrel/kestrel_database.csv
   let rows = [];                 // CSV rows (objects)
   let header = [];               // CSV header fields
@@ -370,7 +378,8 @@
   const versionBadge = el('#versionBadge');
 
   const supportsFS = 'showDirectoryPicker' in window;
-  if (!supportsFS) el('#compat').classList.remove('hidden');
+  const hasPywebviewApi = typeof window.pywebview !== 'undefined';
+  if (!supportsFS && !hasPywebviewApi) el('#compat').classList.remove('hidden');
 
   // Utilities
   function setStatus(msg) { statusEl.textContent = msg; }
@@ -509,20 +518,51 @@
 
   // Blob URL cache per path
   const blobUrlCache = new Map();
+  
   async function getBlobUrlForPath(relOrAbsPath) {
-    // Resolve relative to rootDirHandle when possible
+    // Priority 1: Use Python API if available (works on all platforms in desktop app)
+    if (hasPywebviewApi && window.pywebview.api && typeof window.pywebview.api.read_image_file === 'function' && rootPath) {
+      let rel = toRootRelative(relOrAbsPath);
+      if (!rel) {
+        // Try as a direct relative path
+        rel = sanitizePath(relOrAbsPath);
+      }
+      if (!rel) return null;
+      
+      // Check cache first
+      const cacheKey = `pyapi:${rel}`;
+      if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
+      
+      try {
+        const result = await window.pywebview.api.read_image_file(rel, rootPath);
+        if (result && result.success && result.data) {
+          // Create data URL from base64
+          const dataUrl = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
+          blobUrlCache.set(cacheKey, dataUrl);
+          return dataUrl;
+        }
+      } catch (e) {
+        console.error('Python API image read failed:', e);
+        // Fall through to File System Access API
+      }
+    }
+    
+    // Priority 2: Use File System Access API (browser with handle)
     let rel = toRootRelative(relOrAbsPath);
     if (!rel && rootDirHandle) {
       // maybe the file is at the top-level (original filename)
       rel = sanitizePath(relOrAbsPath);
     }
     if (!rel || !rootDirHandle) return null;
-    if (blobUrlCache.has(rel)) return blobUrlCache.get(rel);
+    
+    const cacheKey = `fsapi:${rel}`;
+    if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
+    
     try {
       const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
       const file = await fileHandle.getFile();
       const url = URL.createObjectURL(file);
-      blobUrlCache.set(rel, url);
+      blobUrlCache.set(cacheKey, url);
       return url;
     } catch (e) {
       return null;
@@ -1210,14 +1250,116 @@
     }
   }
 
+  // Helper function to load folder using native path (for pywebview API)
+  async function loadFolderFromPath(folderPath) {
+    if (!folderPath) return;
+    
+    try {
+      // Use pywebview API to read the CSV file
+      const result = await window.pywebview.api.read_kestrel_csv(folderPath);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to read CSV');
+      }
+      
+      // Parse the CSV data
+      const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
+      header = parsed.meta.fields || [];
+      rows = parsed.data || [];
+      ensureSceneNameColumn();
+      ensureRatingColumns();
+      await renderScenes();
+      
+      // Store the folder path for Python API image loading
+      rootPath = result.root || folderPath;
+      rootDirHandle = null; // Clear handle since we're using Python API
+      rootIsKestrel = false;
+      
+      // Also save in settings for file opening
+      const settings = loadSettings();
+      settings.localRoot = rootPath;
+      saveSettings(settings);
+      
+      setStatus(`Loaded from: ${result.path}`);
+      const mergeBtn = document.getElementById('openMerge');
+      if (mergeBtn) mergeBtn.disabled = true; // Can't save in pywebview mode
+    } catch (e) {
+      const errorMsg = (e.message || String(e)).replace(/^Error: /, '');
+      alert(`Could not load Kestrel database from this folder.\n\nMake sure:\n1. The folder has been analyzed with Kestrel Analyzer\n2. The .kestrel folder exists (it may be hidden on macOS)\n3. You selected the correct folder\n\nTip: On macOS, .kestrel folders are hidden by default. You can:\n• Press Cmd+Shift+. (period) to show hidden files in Finder\n• Or select the parent folder that contains the .kestrel folder\n\nError: ${errorMsg}`);
+      setStatus('Failed to load database');
+    }
+  }
+
   // Event wiring
   el('#pickFolder').addEventListener('click', async () => {
     try {
-      if (!supportsFS) {
-        // Fallback: <input type=file>
-        const input = document.createElement('input'); input.type='file'; input.accept='.csv,text/csv';
-        input.onchange = async () => {
-          const file = input.files[0]; if (!file) return;
+      // First priority: Use pywebview native folder picker if available (macOS/Windows desktop app)
+      if (hasPywebviewApi && window.pywebview?.api?.choose_directory) {
+        try {
+          setStatus('Opening folder picker...');
+          const folderPath = await window.pywebview.api.choose_directory();
+          if (folderPath) {
+            await loadFolderFromPath(folderPath);
+            return; // Success - don't fall through
+          } else {
+            setStatus('Folder selection cancelled');
+            return; // User cancelled - don't fall through
+          }
+        } catch (e) {
+          console.error('Pywebview folder picker failed:', e);
+          setStatus('Native folder picker failed, trying fallback...');
+          // Fall through to next method
+        }
+      }
+
+      // Second priority: File System Access API (modern browsers)
+      if (supportsFS) {
+        // Primary path: pick a folder (root or .kestrel)
+        try {
+          rootDirHandle = await window.showDirectoryPicker();
+          rootIsKestrel = rootDirHandle && rootDirHandle.name === '.kestrel';
+          rootPath = ''; // Clear rootPath since we're using handle-based API
+          await tryOpenDefaultCsv(rootDirHandle);
+          return;
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error('showDirectoryPicker failed:', e);
+          }
+          // user may have cancelled; fall through to file picker
+        }
+
+        // Secondary path: open CSV directly
+        try {
+          const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
+          if (!fh) return;
+          rootDirHandle = null;
+          rootIsKestrel = false;
+          rootPath = ''; // Clear rootPath
+          await loadCsvFromHandle(fh);
+          const mergeBtn = document.getElementById('openMerge');
+          if (mergeBtn) mergeBtn.disabled = true;
+          setStatus('CSV loaded (limited previews; use folder selection for full features)');
+          return;
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            console.error('showOpenFilePicker failed:', e);
+          }
+          // cancelled
+        }
+        return;
+      }
+
+      // Last resort fallback: file input for CSV only
+      setStatus('Opening file picker (limited functionality)...');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,text/csv';
+      rootDirHandle = null;
+      rootPath = ''; // Clear both for fallback mode
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        try {
           const text = await file.text();
           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
           header = parsed.meta.fields || [];
@@ -1225,34 +1367,18 @@
           ensureSceneNameColumn();
           ensureRatingColumns();
           await renderScenes();
-          setStatus('CSV loaded (limited features)');
-        };
-        input.click();
-        return;
-      }
-
-      // Primary path: pick a folder (root or .kestrel)
-      try {
-        rootDirHandle = await window.showDirectoryPicker();
-        rootIsKestrel = rootDirHandle && rootDirHandle.name === '.kestrel';
-        await tryOpenDefaultCsv(rootDirHandle);
-        return;
-      } catch (e) {
-        // user may have cancelled the folder picker; fall through to file picker
-      }
-
-      // Secondary path: open CSV directly
-      try {
-        const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
-        if (!fh) return;
-        rootDirHandle = null;
-        rootIsKestrel = false;
-        await loadCsvFromHandle(fh);
-        const mergeBtn = document.getElementById('openMerge');
-        if (mergeBtn) mergeBtn.disabled = true;
-        setStatus('CSV loaded (limited previews; use folder selection for full features)');
-      } catch (e) { /* cancelled */ }
-    } catch (e) { /* cancelled */ }
+          setStatus('CSV loaded (limited features - no folder access)');
+          alert('CSV loaded successfully.\n\nNote: Image previews and opening files in editors will not work without folder access.\n\nFor full functionality, use the desktop app or a Chromium-based browser (Chrome, Edge, Brave).');
+        } catch (e) {
+          alert(`Failed to load CSV: ${e.message}`);
+          setStatus('CSV load failed');
+        }
+      };
+      input.click();
+    } catch (e) {
+      console.error('Unexpected error in pickFolder:', e);
+      setStatus('An unexpected error occurred');
+    }
   });
 
   el('#saveCsv').addEventListener('click', saveCsv);

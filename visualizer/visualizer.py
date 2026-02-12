@@ -225,6 +225,177 @@ def launch(path: str, editor: str):
         try: subprocess.Popen(['lightroom', path]); return
         except FileNotFoundError: pass
     subprocess.Popen(['xdg-open', path])
+class Api:
+    """JavaScript API exposed to webview for native file/folder operations."""
+    
+    def choose_directory(self):
+        """Open native folder picker dialog.
+        Returns: absolute path to selected folder, or None if cancelled.
+        """
+        try:
+            if sys.platform == 'darwin':
+                # macOS: Use AppleScript to show folder picker
+                import subprocess
+                script = 'POSIX path of (choose folder with prompt "Select folder containing analyzed photos")'
+                result = subprocess.run(
+                    ['osascript', '-e', script],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip()
+                return None
+            elif sys.platform.startswith('win'):
+                # Windows: Use tkinter folder dialog
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()  # Hide the root window
+                root.attributes('-topmost', True)  # Bring dialog to front
+                folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
+                root.destroy()
+                return folder if folder else None
+            else:
+                # Linux: Use tkinter as well
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
+                root.destroy()
+                return folder if folder else None
+        except Exception as e:
+            log(f"Error in choose_directory: {e}")
+            return None
+    
+    def read_kestrel_csv(self, folder_path):
+        """Read the kestrel_database.csv from the given folder path.
+        
+        Args:
+            folder_path: Absolute path to folder (may be parent folder or .kestrel folder itself)
+            
+        Returns:
+            dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str
+        """
+        try:
+            import os
+            folder_path = folder_path.rstrip('/')
+            
+            # Check if this IS the .kestrel folder
+            if os.path.basename(folder_path) == '.kestrel':
+                csv_path = os.path.join(folder_path, 'kestrel_database.csv')
+                parent_folder = os.path.dirname(folder_path)
+            else:
+                # Look for .kestrel subfolder
+                csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
+                parent_folder = folder_path
+            
+            if not os.path.exists(csv_path):
+                return {
+                    'success': False,
+                    'error': f'Could not find kestrel_database.csv at: {csv_path}',
+                    'path': csv_path,
+                    'data': ''
+                }
+            
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                data = f.read()
+            
+            return {
+                'success': True,
+                'data': data,
+                'error': '',
+                'path': csv_path,
+                'root': parent_folder
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'path': '',
+                'data': ''
+            }
+    
+    def read_image_file(self, relative_path, root_path):
+        """Read an image file and return it as base64-encoded data.
+        
+        Args:
+            relative_path: Path relative to root (e.g., "photo.jpg" or ".kestrel/thumbnails/photo.jpg")
+            root_path: Absolute path to root folder
+            
+        Returns:
+            dict with 'success': bool, 'data': str (base64), 'mime': str, 'error': str
+        """
+        try:
+            import os
+            import base64
+            import mimetypes
+            
+            # Normalize paths
+            root_path = root_path.rstrip('/\\')
+            relative_path = relative_path.lstrip('/\\')
+            
+            # Build full path
+            full_path = os.path.join(root_path, relative_path)
+            
+            # Security check: ensure path doesn't escape root
+            full_path_real = os.path.realpath(full_path)
+            root_path_real = os.path.realpath(root_path)
+            if not full_path_real.startswith(root_path_real):
+                return {
+                    'success': False,
+                    'error': 'Path escapes root directory',
+                    'data': '',
+                    'mime': ''
+                }
+            
+            if not os.path.exists(full_path):
+                return {
+                    'success': False,
+                    'error': f'File not found: {full_path}',
+                    'data': '',
+                    'mime': ''
+                }
+            
+            # Read file as binary
+            with open(full_path, 'rb') as f:
+                data = f.read()
+            
+            # Encode as base64
+            b64_data = base64.b64encode(data).decode('ascii')
+            
+            # Detect MIME type
+            mime_type, _ = mimetypes.guess_type(full_path)
+            if not mime_type:
+                # Fallback based on extension
+                ext = os.path.splitext(full_path)[1].lower()
+                mime_map = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png',
+                    '.gif': 'image/gif',
+                    '.webp': 'image/webp',
+                    '.tif': 'image/tiff',
+                    '.tiff': 'image/tiff'
+                }
+                mime_type = mime_map.get(ext, 'application/octet-stream')
+            
+            return {
+                'success': True,
+                'data': b64_data,
+                'mime': mime_type,
+                'error': ''
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'data': '',
+                'mime': ''
+            }
+
+
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
     def translate_path(self, path: str) -> str:  # type: ignore[override]
@@ -416,7 +587,8 @@ def main():
         t.start()
         try:
             log('Starting windowed UI via pywebview...')
-            webview.create_window('Kestrel Visualizer', url)
+            api = Api()
+            webview.create_window('Kestrel Visualizer', url, js_api=api)
             webview.start()
         except Exception as e:
             log('Windowed mode failed at runtime; falling back to browser:', repr(e))
