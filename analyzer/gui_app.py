@@ -98,8 +98,18 @@ class ProcessingWorker(QThread):
             self.progress.emit(processed, total)
 
         def on_image(entry: dict):
-            export_q = load_qimage_from_path(entry.get("export_path"))
-            crop_q = load_qimage_from_path(entry.get("crop_path"))
+            # Convert relative paths (new format) to absolute paths for Qt image loading
+            export_path = entry.get("export_path")
+            crop_path = entry.get("crop_path")
+            
+            # If paths are relative, make them absolute using the folder
+            if export_path and not os.path.isabs(export_path):
+                export_path = os.path.join(self.folder, export_path)
+            if crop_path and not os.path.isabs(crop_path):
+                crop_path = os.path.join(self.folder, crop_path)
+            
+            export_q = load_qimage_from_path(export_path)
+            crop_q = load_qimage_from_path(crop_path)
             self.image_processed.emit(entry, export_q, crop_q)
 
         def on_thumbnail(data: dict):

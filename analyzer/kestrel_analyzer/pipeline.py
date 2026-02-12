@@ -253,9 +253,11 @@ class AnalysisPipeline:
                         cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR),
                         [cv2.IMWRITE_JPEG_QUALITY, 70],
                     )
-                    entry.update({"export_path": export_path})
+                    # Store relative path for cross-platform compatibility
+                    export_path_rel = os.path.relpath(export_path, folder)
+                    entry.update({"export_path": export_path_rel})
                     if thumbnail_cb:
-                        thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path})
+                        thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path_rel})
 
                     stage_ctx["stage"] = "mask_rcnn_prediction"
                     masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
@@ -283,7 +285,9 @@ class AnalysisPipeline:
                             cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR),
                             [cv2.IMWRITE_JPEG_QUALITY, 85],
                         )
-                        entry.update({"crop_path": crop_path})
+                        # Store relative path for cross-platform compatibility
+                        crop_path_rel = os.path.relpath(crop_path, folder)
+                        entry.update({"crop_path": crop_path_rel})
                         stage_ctx["stage"] = "save_database"
                         database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
                         save_database(database, db_path)
@@ -503,7 +507,9 @@ class AnalysisPipeline:
                         cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR),
                         [cv2.IMWRITE_JPEG_QUALITY, 85],
                     )
-                    entry.update({"crop_path": crop_path})
+                    # Store relative path for cross-platform compatibility
+                    crop_path_rel = os.path.relpath(crop_path, folder)
+                    entry.update({"crop_path": crop_path_rel})
 
                     stage_ctx["stage"] = "save_database"
                     database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)

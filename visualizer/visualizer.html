@@ -567,11 +567,30 @@
     // Use this when available for consistent behavior across Windows/macOS/Linux
     if (hasPywebviewApi && window.pywebview?.api?.read_image_file && rootPath) {
       console.log('[DEBUG] Using Python API for image loading');
-      let rel = toRootRelative(relOrAbsPath);
-      if (!rel) {
-        // Try as a direct relative path
-        rel = sanitizePath(relOrAbsPath);
+      
+      let rel = null;
+      const sanitized = sanitizePath(relOrAbsPath);
+      
+      // Check if path is already relative (new CSV format)
+      // Relative paths start with .kestrel/ and don't have drive letters or leading /
+      if (sanitized && (sanitized.startsWith('.kestrel/') || sanitized.startsWith('kestrel/'))) {
+        // Already relative - use as-is
+        rel = sanitized;
+        console.log('[DEBUG] Path appears to be relative (new format):', rel);
+      } else if (sanitized && !sanitized.match(/^[A-Za-z]:/) && !sanitized.startsWith('/')) {
+        // Looks like a simple filename or relative path without .kestrel prefix
+        rel = sanitized;
+        console.log('[DEBUG] Path appears to be simple relative:', rel);
+      } else {
+        // Absolute path (old CSV format) - extract relative part
+        rel = toRootRelative(relOrAbsPath);
+        console.log('[DEBUG] Extracted relative path from absolute:', rel);
+        if (!rel) {
+          // Last resort: just use the sanitized path
+          rel = sanitized;
+        }
       }
+      
       if (!rel) return null;
       
       // Check cache first

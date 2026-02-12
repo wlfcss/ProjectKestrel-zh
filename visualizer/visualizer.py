@@ -340,7 +340,8 @@ class Api:
         """Read an image file and return it as base64-encoded data.
         
         Args:
-            relative_path: Path relative to root (e.g., "photo.jpg" or ".kestrel/thumbnails/photo.jpg")
+            relative_path: Path relative to root (e.g., ".kestrel/export/photo.jpg") 
+                          OR absolute path (for backward compatibility with old databases)
             root_path: Absolute path to root folder
             
         Returns:
@@ -354,16 +355,25 @@ class Api:
             
             # Normalize paths
             root_path = root_path.rstrip('/\\')
-            relative_path = relative_path.lstrip('/\\')
             
-            # Build full path
-            full_path = os.path.join(root_path, relative_path)
+            # Check if relative_path is actually an absolute path (backward compatibility)
+            if os.path.isabs(relative_path):
+                print(f"[API] Detected absolute path (old format), using directly", flush=True)
+                full_path = relative_path
+            else:
+                # It's a relative path (new format) - join with root
+                relative_path = relative_path.lstrip('/\\')
+                full_path = os.path.join(root_path, relative_path)
             
-            # Security check: ensure path doesn't escape root
+            print(f"[API] Full path resolved to: {full_path}", flush=True)
+            
+            # Security check: ensure path is within or equal to root
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
             if not full_path_real.startswith(root_path_real):
                 print(f"[API] read_image_file() → Security error: Path escapes root", flush=True)
+                print(f"[API]   full_path_real: {full_path_real}", flush=True)
+                print(f"[API]   root_path_real: {root_path_real}", flush=True)
                 return {
                     'success': False,
                     'error': 'Path escapes root directory',
