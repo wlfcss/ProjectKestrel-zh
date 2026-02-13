@@ -30,9 +30,9 @@ After Kestrel is done scanning, run the visualizer tool to intelligently browse 
 
 ## Get Started
 
-Windows users can simply download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases/tag/Public-Release-1) and install it on their computer! Run Kestrel Analyzer to analyze your photos. Once it is finished, run Kestrel Visualizer to browse your photos!
+Download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases) for your platform! Windows and macOS users can simply download and run the installer or application. Once installed, run Kestrel Analyzer to analyze your photos. Once it is finished, run Kestrel Visualizer to browse your photos!
 
-At this time, MacOS and Linux users need to install python and manually clone this repository. See the quick start section below.
+Linux users or those who prefer to run from source code should see the Quick Start section below.
 
 ## Gallery/Quick Tutorial
 
@@ -59,26 +59,19 @@ You can even search by bird species! (Note: Species detection is experimental an
 - **Objective Quality Assessment**: Kestrel will analyze the quality of your photos based on sharpness, motion blur, and noise. It will NOT analyze your photos based on bird pose, framing, or other subjective characteristics.
 - **Intelligent Organization**: Kestrel groups your photos by scene/burst, allowing you to compare all images of a given subject.
 - **Responsive, Interactive Visualizer**: Browse Kestrel's results and double-click on photos to import into your preferred editing workflow.
-- **RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats thanks to the ImageMagick Library
+- **RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats using rawpy library
 
 ## 🚀 Quick Start
 
-For Windows, navigate to the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases/tag/Public-Release-1) and install it on your computer. Open Kestrel Analyzer, select a folder, and click "Start". Once finished, run Kestrel Visualizer to browse your photos!
+For the easiest setup, download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases) for your platform. Windows and macOS executables are available!
 
-### To Install on MacOS or Linux
+### Running from Source (Linux or Development)
 
-First install the prerequisites:
+If you prefer to run Kestrel from source code or are on Linux, follow these steps:
+
+#### Prerequisites
 - Python 3.12+
-- ImageMagick
-
-To install ImageMagick, visit their [download page](https://imagemagick.org/script/download.php) and install the latest Q8 **dynamic** release.
-
-> For Debian(or Debian Based Distros), run
-> ```
-> sudo apt update
-> sudo apt install imagemagick
-> ```
-
+- Git (for cloning)
 
 #### Installation
 
@@ -178,7 +171,7 @@ ProjectKestrel/
 
 ## Supported File Formats
 
-Kestrel's quality scoring model is trained on RAW images, and may not work as well for JPG images (but can still be used). Kestrel relies on ImageMagick to read RAW files. If your camera's RAW format is not listed below, please create a pull request, and we will add it to the list.
+Kestrel's quality scoring model is trained on RAW images, and may not work as well for JPG images (but can still be used). Kestrel uses rawpy to read RAW files. If your camera's RAW format is not listed below, please create a pull request, and we will add it to the list.
 
 **RAW Formats** (preferred):
 - Canon: `.cr2`, `.cr3`
@@ -192,7 +185,7 @@ Kestrel's quality scoring model is trained on RAW images, and may not work as we
 - Samsung: `.sr2`
 - Sigma: `.x3f`
 
-> Note: If this list does not support your camera's RAW file, please reach out via the email below. It is very easy to add new RAW file formats thanks to the ImageMagick Library.
+> Note: If this list does not support your camera's RAW file, please reach out via the email below. It is easy to add new RAW file formats thanks to the rawpy library.
 
 **Standard Formats** (fallback):
 - JPEG: `.jpg`, `.jpeg`
@@ -235,7 +228,7 @@ This project is licensed under the GPL v3 License - see the LICENSE file for det
 
 ## 🙏 Acknowledgments
 
-- **ImageMagick** team for robust RAW image file format handling
+- **rawpy** library for robust RAW image file format handling
 
 ---
 
