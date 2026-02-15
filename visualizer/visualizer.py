@@ -246,9 +246,9 @@ class Api:
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     selected_path = result.stdout.strip()
-                    print(f"[API] choose_directory() → Success: {selected_path}", flush=True)
+                    print(f"[API] choose_directory() -> Success: {selected_path}", flush=True)
                     return selected_path
-                print("[API] choose_directory() → Cancelled by user", flush=True)
+                print("[API] choose_directory() -> Cancelled by user", flush=True)
                 return None
             elif sys.platform.startswith('win'):
                 # Windows: Use tkinter folder dialog
@@ -260,10 +260,10 @@ class Api:
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
                 if folder:
-                    print(f"[API] choose_directory() → Success: {folder}", flush=True)
+                    print(f"[API] choose_directory() -> Success: {folder}", flush=True)
                     return folder
                 else:
-                    print("[API] choose_directory() → Cancelled by user", flush=True)
+                    print("[API] choose_directory() -> Cancelled by user", flush=True)
                     return None
             else:
                 # Linux: Use tkinter as well
@@ -274,13 +274,13 @@ class Api:
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
                 if folder:
-                    print(f"[API] choose_directory() → Success: {folder}", flush=True)
+                    print(f"[API] choose_directory() -> Success: {folder}", flush=True)
                     return folder
                 else:
-                    print("[API] choose_directory() → Cancelled by user", flush=True)
+                    print("[API] choose_directory() -> Cancelled by user", flush=True)
                     return None
         except Exception as e:
-            print(f"[API] choose_directory() → Error: {e}", flush=True)
+            print(f"[API] choose_directory() -> Error: {e}", flush=True)
             log(f"Error in choose_directory: {e}")
             return None
     
@@ -291,24 +291,42 @@ class Api:
             folder_path: Absolute path to folder (may be parent folder or .kestrel folder itself)
             
         Returns:
-            dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str
+            dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str, 'root': str
         """
         print(f"[API] read_kestrel_csv() called with folder_path: {folder_path}", flush=True)
         try:
             import os
-            folder_path = folder_path.rstrip('/')
             
-            # Check if this IS the .kestrel folder
-            if os.path.basename(folder_path) == '.kestrel':
+            # Normalize path: remove trailing separators to ensure reliable basename detection
+            folder_path = folder_path.strip()
+            while folder_path and folder_path[-1] in ('/', '\\'):
+                folder_path = folder_path[:-1]
+            
+            if not folder_path:
+                raise ValueError("Empty folder path")
+            
+            print(f"[API] Normalized folder_path: {folder_path}", flush=True)
+            
+            # Determine if this IS the .kestrel folder or contains one
+            folder_name = os.path.basename(folder_path)
+            print(f"[API] Folder name: '{folder_name}'", flush=True)
+            
+            is_kestrel_folder = (folder_name == '.kestrel')
+            print(f"[API] Is .kestrel folder: {is_kestrel_folder}", flush=True)
+            
+            if is_kestrel_folder:
+                # User selected the .kestrel folder directly
                 csv_path = os.path.join(folder_path, 'kestrel_database.csv')
                 parent_folder = os.path.dirname(folder_path)
+                print(f"[API] Selected .kestrel folder directly. Parent: {parent_folder}", flush=True)
             else:
-                # Look for .kestrel subfolder
+                # User selected a parent folder; look for .kestrel subfolder
                 csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
                 parent_folder = folder_path
+                print(f"[API] Selected parent folder. Will look for .kestrel subfolder.", flush=True)
             
             if not os.path.exists(csv_path):
-                print(f"[API] read_kestrel_csv() → CSV not found at: {csv_path}", flush=True)
+                print(f"[API] read_kestrel_csv() -> CSV not found at: {csv_path}", flush=True)
                 return {
                     'success': False,
                     'error': f'Could not find kestrel_database.csv at: {csv_path}',
@@ -319,7 +337,7 @@ class Api:
             with open(csv_path, 'r', encoding='utf-8') as f:
                 data = f.read()
             
-            print(f"[API] read_kestrel_csv() → Success: Read {len(data)} bytes from {csv_path}", flush=True)
+            print(f"[API] read_kestrel_csv() -> Success: Read {len(data)} bytes from {csv_path}", flush=True)
             return {
                 'success': True,
                 'data': data,
@@ -328,7 +346,7 @@ class Api:
                 'root': parent_folder
             }
         except Exception as e:
-            print(f"[API] read_kestrel_csv() → Error: {e}", flush=True)
+            print(f"[API] read_kestrel_csv() -> Error: {e}", flush=True)
             return {
                 'success': False,
                 'error': str(e),
@@ -371,7 +389,7 @@ class Api:
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
             if not full_path_real.startswith(root_path_real):
-                print(f"[API] read_image_file() → Security error: Path escapes root", flush=True)
+                print(f"[API] read_image_file() -> Security error: Path escapes root", flush=True)
                 print(f"[API]   full_path_real: {full_path_real}", flush=True)
                 print(f"[API]   root_path_real: {root_path_real}", flush=True)
                 return {
@@ -382,7 +400,7 @@ class Api:
                 }
             
             if not os.path.exists(full_path):
-                print(f"[API] read_image_file() → File not found: {full_path}", flush=True)
+                print(f"[API] read_image_file() -> File not found: {full_path}", flush=True)
                 return {
                     'success': False,
                     'error': f'File not found: {full_path}',
@@ -413,7 +431,7 @@ class Api:
                 }
                 mime_type = mime_map.get(ext, 'application/octet-stream')
             
-            print(f"[API] read_image_file() → Success: Read {len(data)} bytes ({mime_type}) from {os.path.basename(full_path)}", flush=True)
+            print(f"[API] read_image_file() -> Success: Read {len(data)} bytes ({mime_type}) from {os.path.basename(full_path)}", flush=True)
             return {
                 'success': True,
                 'data': b64_data,
@@ -421,7 +439,7 @@ class Api:
                 'error': ''
             }
         except Exception as e:
-            print(f"[API] read_image_file() → Error: {e}", flush=True)
+            print(f"[API] read_image_file() -> Error: {e}", flush=True)
             return {
                 'success': False,
                 'error': str(e),
@@ -535,7 +553,7 @@ class Handler(SimpleHTTPRequestHandler):
                 'ok': False,
                 'error': 'File not found',
                 'target': target,
-                'hint': 'Ensure Settings → Local Root points to the folder containing your RAW files.'
+                'hint': 'Ensure Settings -> Local Root points to the folder containing your RAW files.'
             }); return
         if not _extension_allowed(target):
             self._json(415, {'ok': False, 'error': 'Extension not allowed', 'target': target, 'allowed': sorted(ALLOWED_EXTENSIONS)}); return
