@@ -544,19 +544,30 @@
   }
 
   // Try to turn an absolute Windows path into a path relative to the selected root
+  // Also handles paths that are already relative (from new relative roots format)
   function toRootRelative(absPath) {
     if (!absPath || !rootDirHandle) return null;
     const p = sanitizePath(absPath);
-    // Heuristic: find ".kestrel/" in the path; else fall back to filename
+    
+    // Check if path is ALREADY relative (new format)
+    // Relative paths start with .kestrel/ or kestrel/ and don't have drive letters or leading /
+    if (p.toLowerCase().startsWith('.kestrel/') || p.toLowerCase().startsWith('kestrel/')) {
+      // Already relative - return as-is, but strip .kestrel/ prefix if rootIsKestrel
+      return rootIsKestrel ? p.replace(/^\.?kestrel\//i, '') : p;
+    }
+    
+    // Check for absolute path with embedded .kestrel folder (old format)
     const idx = p.toLowerCase().lastIndexOf('/.kestrel/');
     if (idx >= 0) {
       const rel = p.substring(idx + 1); // include .kestrel/…
       return rootIsKestrel ? rel.replace(/^\.kestrel\//i, '') : rel;
     }
+    
     // fallback: if only filename, return that
     const base = p.split('/').pop();
     return base || null;
   }
+
 
   // Blob URL cache per path
   const blobUrlCache = new Map();
