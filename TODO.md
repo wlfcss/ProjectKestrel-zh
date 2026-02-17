@@ -2,7 +2,7 @@
 
 # Priority Issues
 * Issue with multi-subject mode detecting false birds and ranking those subjects with higher quality over the true bird. This may be confusing and unoptimal behavior. Potentially add a multi-subject-mode toggle or allow the user to scroll between multiple bird thumbnails/store all (up to 5) subject thumbnails.
-    - Potential improvement: Exclude lower-confidence detections that overlap with higher-confidence detections
+    - Potential improvement: Exclude lower-confidence detections that **overlap** with higher-confidence detections
     - Potential improvement: raise detection threshold to avoid falsely flagging leaves
     - Potential improvement: Focus on highest-confidence detection for quality estimation, rather than highest-quality image.
     
@@ -10,12 +10,10 @@
 
 
 ## Known Issues
-- Kestrel's analysis struggles heavily with back-lit/front-dim images. The quality estimation and species detection suffers significantly because of this. An exposure normalization step should be cosnidered to standardize the exposure of the bird pixels.
+- Kestrel's analysis struggles heavily with back-lit/front-dim images. The quality estimation and species detection suffers significantly because of this. An exposure normalization step should be cosnidered to standardize the exposure of the bird pixels. --> MAY BE FIXED with implementation of RawPy post-processing algorithm
 - Lightroom support has not been tested on Windows
 - Entire software has not been tested on MacOS.
-- Kestrel's data structure (csv database) is a bit messay and incomplete. Potentially need to switch to a JSON file structure while maintaining backward-compatibility in the visualizer.
-- There may be a performance issue associated with specific package versions. This is under investigation.
-
+- Kestrel's data structure (csv database) is a bit messay and incomplete. Potentially need to switch to a JSON file structure while maintaining backward-compatibility or upgradeability in the visualizer.
 
 ## Features under consideration
 - Build debug platform that runs Kestrel analysis, but saves the full output at every step for detailed troubleshooting and root-cause analysis. (Under Consideration, likely requires simple modification of CLI)
