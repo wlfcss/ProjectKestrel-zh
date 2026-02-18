@@ -447,6 +447,62 @@ class Api:
                 'mime': ''
             }
 
+    def list_subfolders(self, root_path: str, max_depth: int = 3):
+        """Recursively list subfolders under root_path, flagging those with .kestrel.
+
+        Args:
+            root_path: Absolute path to the root folder to scan.
+            max_depth:  How many directory levels to descend (1 = direct children only).
+
+        Returns:
+            dict with 'success': bool, 'tree': list[node], 'error': str
+            Each node: {name, path, has_kestrel, children: [...]}
+        """
+        print(f"[API] list_subfolders() called: root='{root_path}' max_depth={max_depth}", flush=True)
+        try:
+            root_path = root_path.strip().rstrip('/\\')
+            if not root_path or not os.path.isdir(root_path):
+                return {'success': False, 'tree': [], 'error': f'Not a directory: {root_path}'}
+
+            # Safety caps
+            max_depth = max(1, min(int(max_depth), 6))
+            MAX_NODES = 300  # total node limit to avoid huge trees
+            node_count = [0]
+
+            def _scan(dir_path: str, depth: int) -> list:
+                if depth < 1 or node_count[0] >= MAX_NODES:
+                    return []
+                result = []
+                try:
+                    entries = sorted(os.scandir(dir_path), key=lambda e: e.name.lower())
+                except PermissionError:
+                    return []
+                for entry in entries:
+                    if not entry.is_dir(follow_symlinks=False):
+                        continue
+                    name = entry.name
+                    # Skip hidden and common system/tool folders
+                    if name.startswith('.') or name in ('__pycache__', '$RECYCLE.BIN', 'System Volume Information'):
+                        continue
+                    node_count[0] += 1
+                    full = entry.path
+                    has_kestrel = os.path.isfile(os.path.join(full, '.kestrel', 'kestrel_database.csv'))
+                    children = _scan(full, depth - 1)
+                    result.append({
+                        'name': name,
+                        'path': full,
+                        'has_kestrel': has_kestrel,
+                        'children': children,
+                    })
+                return result
+
+            tree = _scan(root_path, max_depth)
+            print(f"[API] list_subfolders() -> {node_count[0]} nodes found", flush=True)
+            return {'success': True, 'tree': tree, 'error': ''}
+        except Exception as e:
+            print(f"[API] list_subfolders() -> Error: {e}", flush=True)
+            return {'success': False, 'tree': [], 'error': str(e)}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.

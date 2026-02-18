@@ -182,6 +182,27 @@
     .star.filled.auto { color: #6aa0ff; }
     .star.filled.manual { color: #f5c542; }
     .star:hover { color: #8fb6ff; }
+
+    /* Folder tree panel */
+    .folder-tree-wrap { border-top: 1px solid #1d2230; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .folder-tree-header { display: flex; align-items: center; gap: 6px; }
+    .folder-tree-header .tree-title { font-size: 12px; color: var(--muted); letter-spacing: .3px; flex: 1 1 auto; }
+    .folder-tree-header button { padding: 2px 7px; font-size: 11px; height: auto; }
+    #folderTree { max-height: 38vh; overflow-y: auto; overflow-x: hidden; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; }
+    .tree-node { display: flex; flex-direction: column; }
+    .tree-node-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; cursor: default; user-select: none; min-width: 0; }
+    .tree-node-row:hover { background: #0e1117; }
+    .tree-arrow { flex: 0 0 14px; font-size: 10px; color: var(--muted); transition: transform .15s ease; line-height: 1; text-align: center; }
+    .tree-arrow.open { transform: rotate(90deg); }
+    .tree-arrow.leaf { visibility: hidden; }
+    .tree-icon { flex: 0 0 14px; font-size: 12px; line-height: 1; }
+    .tree-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .tree-node-row.has-kestrel .tree-label { color: #a9c9ee; cursor: pointer; }
+    .tree-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
+    .tree-node-row.no-kestrel { opacity: 0.38; }
+    .tree-node-row.active .tree-label { color: #fff; font-weight: 700; }
+    .tree-node-row.active { background: #10293d; }
+    .tree-children { padding-left: 14px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -235,6 +256,14 @@
         <div class="toolbar-row status">
           <div id="versionBadge" class="version-badge">Version: —</div>
         </div>
+      </div>
+      <!-- Folder tree panel (populated after scanning a root folder) -->
+      <div id="folderTreeWrap" class="folder-tree-wrap hidden">
+        <div class="folder-tree-header">
+          <span class="tree-title">Folder Tree</span>
+          <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
+        </div>
+        <div id="folderTree"></div>
       </div>
       <div class="spacer"></div>
       <div class="sidebar-footer" aria-label="Zoom controls">
@@ -305,6 +334,10 @@
           <option value="darktable" selected>Darktable</option>
           <option value="lightroom">Lightroom</option>
         </select>
+      </div>
+      <div class="row">
+        <label for="treeScanDepth">Tree scan depth</label>
+        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" title="How many folder levels to scan when building the folder tree (1–6)" />
       </div>
       <div class="row" style="justify-content:flex-end; margin-top: 4px;">
         <button id="settingsCancel">Cancel</button>
@@ -1241,14 +1274,16 @@
     const dlg = document.getElementById('settingsDlg');
     document.getElementById('backendUrl').value = getSetting('backendUrl', 'http://127.0.0.1:8765');
     document.getElementById('rootHint').value = getSetting('rootHint', '');
-  document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
+    document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
+    document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
     dlg.showModal();
   }
   async function applySettings(){
     const backendUrl = document.getElementById('backendUrl').value.trim() || 'http://127.0.0.1:8765';
     const rootHint = document.getElementById('rootHint').value.trim();
-  const editor = document.getElementById('editorChoice').value || 'darktable';
-  const settings = { backendUrl, rootHint, editor };
+    const editor = document.getElementById('editorChoice').value || 'darktable';
+    const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
+    const settings = { backendUrl, rootHint, editor, treeScanDepth };
   saveSettings(settings);
   try {
     const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
@@ -1340,6 +1375,119 @@
     }
   }
 
+  // ── Folder Tree ──────────────────────────────────────────────────────────────
+  let folderTreeRoot = null;  // absolute path of the scanned tree root
+  let folderTreeData = null;  // raw tree from API
+  let treeExpandedPaths = new Set(); // paths that are open
+  let treeActivePath = null;  // currently loaded folder
+
+  async function scanFolderTree(rootPath) {
+    if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return;
+    if (!rootPath) return;
+
+    folderTreeRoot = rootPath;
+    const depth = getSetting('treeScanDepth', 3);
+    setStatus('Scanning folder tree…');
+    try {
+      const result = await window.pywebview.api.list_subfolders(rootPath, depth);
+      if (!result.success) {
+        console.warn('[tree] list_subfolders failed:', result.error);
+        return;
+      }
+      folderTreeData = result.tree;
+      renderFolderTree();
+      document.getElementById('folderTreeWrap').classList.remove('hidden');
+    } catch (e) {
+      console.error('[tree] scanFolderTree error:', e);
+    }
+  }
+
+  function renderFolderTree() {
+    const container = document.getElementById('folderTree');
+    if (!container || !folderTreeData) return;
+    container.innerHTML = '';
+    folderTreeData.forEach(node => container.appendChild(buildTreeNode(node)));
+  }
+
+  function buildTreeNode(node) {
+    const wrap = document.createElement('div');
+    wrap.className = 'tree-node';
+
+    const row = document.createElement('div');
+    row.className = 'tree-node-row ' + (node.has_kestrel ? 'has-kestrel' : 'no-kestrel');
+    if (node.path === treeActivePath) row.classList.add('active');
+
+    // Arrow toggle (only if children exist)
+    const arrow = document.createElement('span');
+    arrow.className = 'tree-arrow';
+    const hasChildren = node.children && node.children.length > 0;
+    if (hasChildren) {
+      arrow.textContent = '▶';
+      if (treeExpandedPaths.has(node.path)) arrow.classList.add('open');
+    } else {
+      arrow.classList.add('leaf');
+      arrow.textContent = '▶';
+    }
+
+    // Folder icon
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    icon.textContent = node.has_kestrel ? '📂' : '📁';
+
+    // Label
+    const label = document.createElement('span');
+    label.className = 'tree-label';
+    label.textContent = node.name;
+    label.title = node.path;
+
+    row.appendChild(arrow);
+    row.appendChild(icon);
+    row.appendChild(label);
+    wrap.appendChild(row);
+
+    // Children container
+    let childWrap = null;
+    if (hasChildren) {
+      childWrap = document.createElement('div');
+      childWrap.className = 'tree-children';
+      if (!treeExpandedPaths.has(node.path)) childWrap.classList.add('hidden');
+      node.children.forEach(child => childWrap.appendChild(buildTreeNode(child)));
+      wrap.appendChild(childWrap);
+
+      arrow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = treeExpandedPaths.has(node.path);
+        if (open) {
+          treeExpandedPaths.delete(node.path);
+          arrow.classList.remove('open');
+          childWrap.classList.add('hidden');
+        } else {
+          treeExpandedPaths.add(node.path);
+          arrow.classList.add('open');
+          childWrap.classList.remove('hidden');
+        }
+      });
+    }
+
+    // Click label/row to load if it has kestrel
+    if (node.has_kestrel) {
+      label.addEventListener('click', async () => {
+        treeActivePath = node.path;
+        renderFolderTree(); // refresh active state
+        await loadFolderFromPath(node.path);
+      });
+      icon.addEventListener('click', async () => {
+        treeActivePath = node.path;
+        renderFolderTree();
+        await loadFolderFromPath(node.path);
+      });
+    }
+
+    return wrap;
+  }
+
+  // ── End Folder Tree ───────────────────────────────────────────────────────────
+
   // Helper function to load folder using native path (for pywebview API)
   async function loadFolderFromPath(folderPath) {
     if (!folderPath) return;
@@ -1375,10 +1523,22 @@
       setStatus(`Loaded from: ${result.path}`);
       const mergeBtn = document.getElementById('openMerge');
       if (mergeBtn) mergeBtn.disabled = true; // Can't save in pywebview mode
+
+      // Update active selection in tree if tree is open
+      if (folderTreeData) {
+        treeActivePath = result.root || folderPath;
+        renderFolderTree();
+      }
     } catch (e) {
       const errorMsg = (e.message || String(e)).replace(/^Error: /, '');
-      alert(`Could not load Kestrel database from this folder.\n\nMake sure:\n1. The folder has been analyzed with Kestrel Analyzer\n2. The .kestrel folder exists (it may be hidden on macOS)\n3. You selected the correct folder\n\nTip: On macOS, .kestrel folders are hidden by default. You can:\n• Press Cmd+Shift+. (period) to show hidden files in Finder\n• Or select the parent folder that contains the .kestrel folder\n\nError: ${errorMsg}`);
-      setStatus('Failed to load database');
+      // If the folder tree is already visible the user may have clicked a parent folder
+      // intentionally (no .kestrel there). Show a soft status message instead of an alert.
+      if (folderTreeData) {
+        setStatus(`No Kestrel database in this folder — select one that shows 📂 in the tree`);
+      } else {
+        alert(`Could not load Kestrel database from this folder.\n\nMake sure:\n1. The folder has been analyzed with Kestrel Analyzer\n2. The .kestrel folder exists (it may be hidden on macOS)\n3. You selected the correct folder\n\nTip: On macOS, .kestrel folders are hidden by default. You can:\n• Press Cmd+Shift+. (period) to show hidden files in Finder\n• Or select the parent folder that contains the .kestrel folder\n\nError: ${errorMsg}`);
+        setStatus('Failed to load database');
+      }
     }
   }
 
@@ -1405,6 +1565,13 @@
           setStatus('Opening folder picker...');
           const folderPath = await window.pywebview.api.choose_directory();
           if (folderPath) {
+            // Scan the selected folder as the tree root (user may have picked a parent
+            // folder with multiple analyzed sub-folders, or a leaf folder directly)
+            treeExpandedPaths.clear();
+            await scanFolderTree(folderPath);
+            // Check if the selected folder itself has .kestrel; if not, check if tree
+            // has any entries — the user likely picked a parent. Either way, also try
+            // loading the CSV (it will fail gracefully if no .kestrel here).
             await loadFolderFromPath(folderPath);
             return; // Success - Python API handled everything
           } else {
@@ -1622,6 +1789,25 @@
   loadVersionBadge();
   setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
   hydrateSettingsFromServer();
+
+  // Wire "Change root…" button in the tree panel
+  const treeChangeRootBtn = document.getElementById('treeChangeRoot');
+  if (treeChangeRootBtn) {
+    treeChangeRootBtn.addEventListener('click', async () => {
+      if (!hasPywebviewApi) { const ready = await waitForPywebview(); if (!ready) return; }
+      if (!window.pywebview?.api?.choose_directory) return;
+      setStatus('Opening folder picker…');
+      const folderPath = await window.pywebview.api.choose_directory();
+      if (folderPath) {
+        treeExpandedPaths.clear();
+        await scanFolderTree(folderPath);
+        // Also try loading that folder (harmless if it has no .kestrel)
+        await loadFolderFromPath(folderPath);
+      } else {
+        setStatus('Folder selection cancelled');
+      }
+    });
+  }
 
   </script>
 </body>
