@@ -504,6 +504,23 @@ class Api:
             print(f"[API] list_subfolders() -> Error: {e}", flush=True)
             return {'success': False, 'tree': [], 'error': str(e)}
 
+    def open_folder(self, path: str):
+        """Open a folder in the system file browser (pywebview desktop mode)."""
+        try:
+            import platform as _platform
+            p = _platform.system()
+            if p == 'Windows':
+                subprocess.Popen(['explorer', os.path.normpath(path)])
+            elif p == 'Darwin':
+                subprocess.Popen(['open', path])
+            else:
+                subprocess.Popen(['xdg-open', path])
+            print(f'[API] open_folder({path!r}) -> success', flush=True)
+            return {'success': True}
+        except Exception as e:
+            print(f'[API] open_folder({path!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.

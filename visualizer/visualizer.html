@@ -19,7 +19,7 @@
       --card-border: #222634;
       --chip: #1d2230;
       /* New: dialog column sizing */
-      --right-w: 340px;
+      --right-w: 510px;
       --divider-w: 8px;
     }
     * { box-sizing: border-box; }
@@ -299,15 +299,11 @@
       <div class="divider" id="colDivider" title="Drag to resize"></div>
       <div class="right">
         <div class="inline">
-          <input id="sceneName" type="text" placeholder="Scene name…" />
+          <input id="sceneName" type="text" placeholder="Rename this scene…" />
           <button id="applySceneName">Apply</button>
         </div>
         <div class="detail" id="sceneMeta">—</div>
-        <!-- New: filter to show only images with manual ratings -->
-        <label class="inline" title="Show only images with manual ratings">
-          <input id="filterManualRated" type="checkbox" />
-          <span class="muted">Only my rated photos</span>
-        </label>
+        <div class="detail" id="sceneFolderPath" style="cursor:default;user-select:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">—</div>
         <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
         <div class="detail" id="previewInfo">—</div>
         <div class="footer">
@@ -968,11 +964,11 @@
         body.className = 'body';
         const title = document.createElement('div');
         title.className = 'title';
-        title.innerHTML = `<b>Scene ${s.id}</b>${s.sceneName?`<span class="name">— ${escapeHtml(s.sceneName)}</span>`:''}`;
-        if (s.sceneName) title.title = s.sceneName;
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.innerHTML = `<span>📸 ${s.imageCount}</span><span class="score">⭐ ${fmt3(s.maxQuality)}</span>`;
+        const _localNum = String(s.id).split(':').pop();
+        const _folderName = folderBaseName(s.representative?.__rootPath || '');
+        const _label = _folderName ? `${escapeHtml(_folderName)} / #${_localNum}` : `Scene ${s.id}`;
+        title.innerHTML = `<b>${_label}</b>${s.sceneName ? ` <span class="name">— ${escapeHtml(s.sceneName)}</span>` : ''} <span class="score">⭐ ${fmt3(s.maxQuality)}</span> <span class="muted">📸 ${s.imageCount}</span>`;
+        title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` — ${s.sceneName}` : '');
         const chips = document.createElement('div');
         chips.className = 'chips';
         for (const sp of s.species.slice(0,3)) {
@@ -989,7 +985,6 @@
         nameRow.appendChild(nameInput); nameRow.appendChild(nameBtn);
 
         body.appendChild(title);
-        body.appendChild(meta);
         body.appendChild(chips);
         // Scene name editor inline removed from toolbar; enable if set via settings
         if (getSetting('inlineSceneName', false)) body.appendChild(nameRow);
@@ -1007,8 +1002,7 @@
   function renderSceneImages(scene) {
     const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
     imageGrid.innerHTML = '';
-    const showManualOnly = !!el('#filterManualRated')?.checked;
-    const images = showManualOnly ? scene.images.filter(isManualRated) : scene.images;
+    const images = scene.images;
 
     const batch = 48;
     for (let i = 0; i < images.length; i += batch) {
@@ -1080,17 +1074,21 @@
     currentSceneId = scene.id;
 
     el('#sceneName').value = scene.sceneName || '';
+    const _sceneLocalNum = String(scene.id).split(':').pop();
+    const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
     el('#sceneMeta').innerHTML = `
-      <div><b>Scene ${scene.id}</b></div>
+      <div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}</div>
       <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
-      <div style="margin-top:6px">Species: ${scene.species.length? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
+      <div style="margin-top:6px">Species: ${scene.species.length ? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
     `;
 
-    // Initialize filter checkbox from settings and wire change handler
-    const filterCb = el('#filterManualRated');
-    if (filterCb) {
-      try { filterCb.checked = !!getSetting('onlyManualRated', false); } catch {}
-      filterCb.onchange = () => { const s = loadSettings(); s.onlyManualRated = !!filterCb.checked; saveSettings(s); renderSceneImages(scene); };
+    // Populate folder path and wire double-click to open in system file browser
+    const folderPathEl = el('#sceneFolderPath');
+    if (folderPathEl) {
+      const fp = scene.representative?.__rootPath || '';
+      folderPathEl.textContent = fp || '—';
+      folderPathEl.title = fp ? 'Double-click to open folder in file explorer' : '';
+      folderPathEl.ondblclick = fp ? () => { if (window.pywebview?.api) window.pywebview.api.open_folder(fp); } : null;
     }
 
     renderSceneImages(scene);
@@ -1111,6 +1109,7 @@
 
   function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+  function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 
   // CSV IO
   async function loadCsvFromHandle(fileHandle) {
@@ -1260,7 +1259,7 @@
     divider.addEventListener('mousedown', onMouseDown);
     divider.addEventListener('dblclick', () => {
       const modal = divider.closest('.modal');
-      if (modal) modal.style.setProperty('--right-w', '340px');
+      if (modal) modal.style.setProperty('--right-w', '510px');
     });
   })();
 
