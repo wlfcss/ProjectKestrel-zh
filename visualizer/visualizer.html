@@ -216,6 +216,9 @@
     /* Thumbnail badges (quality & image count) */
     .thumb .badge { position: absolute; top: 8px; left: 8px; background: #10293d; border: 1px solid #1d3e5e; color: #a9c9ee; padding: 4px 8px; border-radius: 999px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
     .thumb .badge.count { left: auto; right: 8px; }
+    /* Title-level badges (placed under title, right-aligned) */
+    .title-badges { justify-content: flex-end; gap: 8px; color: var(--muted); font-size: 12px; }
+    .title-badges .score { background: #10293d; border: 1px solid #1d3e5e; color: #a9c9ee; padding: 1px 7px; border-radius: 999px; }
 
     /* Folder tree panel */
     .folder-tree-wrap { border-top: 1px solid #1d2230; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -1025,15 +1028,6 @@
         if (url) img.src = url;
       })();
       th.appendChild(img);
-      // Badges: quality and image count (visible on thumbnail)
-      const qBadge = document.createElement('div');
-      qBadge.className = 'badge quality';
-      qBadge.textContent = `⭐ ${fmt3(s.maxQuality)}`;
-      th.appendChild(qBadge);
-      const cBadge = document.createElement('div');
-      cBadge.className = 'badge count';
-      cBadge.textContent = `📸 ${s.imageCount}`;
-      th.appendChild(cBadge);
       card.appendChild(th);
 
       const body = document.createElement('div');
@@ -1050,7 +1044,8 @@
       title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${escapeHtml(s.sceneName)}</span>` : '');
       title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
       const meta = document.createElement('div');
-      meta.className = 'meta';
+      // Use a dedicated class for title-level badges so other .meta uses are unaffected
+      meta.className = 'meta title-badges';
       meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
       const chips = document.createElement('div');
       chips.className = 'chips';
@@ -1059,6 +1054,8 @@
       }
       if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
       body.appendChild(title);
+      // Place the quality/count badges beneath the title, right-aligned
+      body.appendChild(meta);
       body.appendChild(chips);
       card.appendChild(body);
 
