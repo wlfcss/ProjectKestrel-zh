@@ -466,8 +466,14 @@ class Api:
 
             # Safety caps
             max_depth = max(1, min(int(max_depth), 6))
-            MAX_NODES = 300  # total node limit to avoid huge trees
+            # Total node limit to avoid huge trees. Make configurable via
+            # env var KESTREL_TREE_NODE_LIMIT (defaults to 2000).
+            try:
+                MAX_NODES = max(100, int(os.environ.get('KESTREL_TREE_NODE_LIMIT', '2000')))
+            except Exception:
+                MAX_NODES = 2000
             node_count = [0]
+            limit_reached = [False]
 
             def _scan(dir_path: str, depth: int) -> list:
                 if depth < 1 or node_count[0] >= MAX_NODES:
@@ -478,6 +484,10 @@ class Api:
                 except PermissionError:
                     return []
                 for entry in entries:
+                    # If we've already reached the node cap, stop scanning further
+                    if node_count[0] >= MAX_NODES:
+                        limit_reached[0] = True
+                        break
                     if not entry.is_dir(follow_symlinks=False):
                         continue
                     name = entry.name
@@ -498,8 +508,11 @@ class Api:
 
             tree = _scan(root_path, max_depth)
             root_has_kestrel = os.path.isfile(os.path.join(root_path, '.kestrel', 'kestrel_database.csv'))
-            print(f"[API] list_subfolders() -> {node_count[0]} nodes found, root_has_kestrel={root_has_kestrel}", flush=True)
-            return {'success': True, 'tree': tree, 'root_has_kestrel': root_has_kestrel, 'error': ''}
+            if limit_reached[0]:
+                print(f"[API] list_subfolders() -> Node limit reached ({MAX_NODES}); scan truncated at {node_count[0]} nodes", flush=True)
+            else:
+                print(f"[API] list_subfolders() -> {node_count[0]} nodes found, root_has_kestrel={root_has_kestrel}", flush=True)
+            return {'success': True, 'tree': tree, 'root_has_kestrel': root_has_kestrel, 'error': '', 'nodes': node_count[0], 'truncated': bool(limit_reached[0])}
         except Exception as e:
             print(f"[API] list_subfolders() -> Error: {e}", flush=True)
             return {'success': False, 'tree': [], 'error': str(e)}
