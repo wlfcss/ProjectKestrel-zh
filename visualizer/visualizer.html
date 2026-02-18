@@ -131,9 +131,30 @@
     .card .body .meta { justify-content: center; gap: 14px; }
 
     /* Prevent text clipping with truncation */
-    .title { display: flex; gap: 6px; align-items: center; }
+    .title { display: flex; gap: 4px; align-items: center; overflow: hidden; white-space: nowrap; }
+    .title i.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; max-width: 9em; display: inline-block; vertical-align: middle; font-style: italic; }
+    .title .title-sep { flex-shrink: 0; }
+    .title b { flex-shrink: 0; }
     .title .name { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .meta .truncate { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    /* Multi-select: selected scene card */
+    .card.selected { background: #1a2540 !important; border-color: #3a84e6 !important; outline: 2px solid rgba(58,132,230,.5); }
+    .card.selected:hover { background: #1f2d4e !important; }
+
+    /* Folder group headers in scene grid */
+    .folder-group { margin-bottom: 4px; }
+    .folder-group-header { display: flex; align-items: center; gap: 8px; padding: 7px 14px; background: #161922; border: 1px solid #222634; border-radius: 8px; cursor: pointer; user-select: none; font-size: 13px; color: #cbd2dc; }
+    .folder-group-header:hover { background: #1d2230; border-color: #2a3040; }
+    .folder-group-toggle { font-size: 10px; flex-shrink: 0; transition: transform .15s; color: var(--muted); }
+    .folder-group-header.collapsed .folder-group-toggle { transform: rotate(-90deg); }
+    .folder-group-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+    .folder-group-count { flex-shrink: 0; font-size: 12px; }
+    .folder-group-grid.hidden { display: none; }
+
+    /* Floating multi-select action bar */
+    .select-action-bar { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #1d2230; border: 1px solid #3a84e6; border-radius: 12px; padding: 10px 18px; display: flex; gap: 14px; align-items: center; box-shadow: 0 6px 32px rgba(0,0,0,.6); z-index: 300; white-space: nowrap; }
+    .select-action-bar.hidden { display: none; }
 
     .inline { display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
     .inline > * { min-width: 0; }
@@ -222,7 +243,6 @@
             <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder is analyzed with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
           </button>
           <button id="openSettings">Default Editor Options…</button>
-          <button id="openMerge" disabled>Merge scenes…</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
         <!-- Folder tree panel (populated after scanning a root folder) -->
@@ -287,7 +307,13 @@
         </div>
       </div>
 
-      <section id="sceneGrid" class="grid"></section>
+      <section id="sceneGrid"></section>
+    </div>
+    <!-- Floating multi-select action bar -->
+    <div id="selectActionBar" class="select-action-bar hidden">
+      <span id="selectActionLabel" class="muted">0 scenes selected</span>
+      <button id="selectMergeBtn" class="primary">Merge selected scenes</button>
+      <button id="selectClearBtn">× Clear selection</button>
     </div>
   </main>
 
@@ -399,6 +425,10 @@
   let header = [];               // CSV header fields
   let scenes = [];               // Aggregated scene objects
   let dirty = false;             // Track unsaved edits
+  let selectedSceneIds = new Set(); // Multi-select: selected scene IDs ("slot:count")
+  let collapsedFolders = new Set(); // rootPaths of collapsed folder groups
+  let _lastSelectedIdx = -1;        // Shift-click range: last clicked index in _visibleSceneOrder
+  let _visibleSceneOrder = [];       // Flat ordered list of visible scene IDs after last render
   // Track which scene dialog is open for refreshing filters
   let currentSceneId = null;
 
@@ -917,7 +947,7 @@
     setStatus(`Showing ${totalScenes} scenes with ${totalImages} images${totalScenes<allScenes?` (filtered from ${allScenes})`:''}${dirtyMark}`);
   }
 
-  // Render: Scenes (fix ordering by appending synchronously; load images async)
+  // Render: Scenes — grouped by folder when multiple folders are loaded
   async function renderScenes() {
     const myVer = ++_renderScenesVersion;
     const minC = parseFloat(el('#speciesConf').value)||0;
@@ -933,76 +963,195 @@
     const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
 
     updateStatusBar(visibleScenes);
-
     sceneGrid.innerHTML = '';
 
-    // Incremental render for responsiveness and consistent ordering
-    const batch = 24;
-    for (let i=0; i<visibleScenes.length; i+=batch) {
-      if (myVer !== _renderScenesVersion) return; // superseded by newer call
-      const slice = visibleScenes.slice(i, i+batch);
-      const frag = document.createDocumentFragment();
-      // Synchronous DOM append in desired order
-      for (const s of slice) {
-        const card = document.createElement('article');
-        card.className = 'card';
-        card.dataset.sceneId = s.id;
+    // Flat index for shift-click range selection
+    _visibleSceneOrder = visibleScenes.map(s => String(s.id));
 
-        const th = document.createElement('div');
-        th.className = 'thumb';
-        const img = document.createElement('img');
-        img.alt = s.representative?.filename || '';
-        img.loading = 'lazy';
-        // Set src asynchronously to keep order stable
-        (async () => {
-          const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path, s.representative?.__rootPath);
-          if (url) img.src = url;
-        })();
-        th.appendChild(img);
-        card.appendChild(th);
-
-        const body = document.createElement('div');
-        body.className = 'body';
-        const title = document.createElement('div');
-        title.className = 'title';
-        const _localNum = String(s.id).split(':').pop();
-        const _folderName = folderBaseName(s.representative?.__rootPath || '');
-        const _titleHtml = _folderName
-          ? `<i>${escapeHtml(_folderName)}</i> / <b>#${_localNum}</b>`
-          : `<b>Scene ${s.id}</b>`;
-        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">— ${escapeHtml(s.sceneName)}</span>` : '');
-        title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` — ${s.sceneName}` : '');
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        meta.innerHTML = `<span class="score">⭐ ${fmt3(s.maxQuality)}</span><span>📸 ${s.imageCount}</span>`;
-        const chips = document.createElement('div');
-        chips.className = 'chips';
-        for (const sp of s.species.slice(0,3)) {
-          const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
-        }
-        if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
-
-        // Scene name editor inline
-        const nameRow = document.createElement('div');
-        nameRow.className = 'inline';
-        const nameInput = document.createElement('input'); nameInput.type='text'; nameInput.placeholder='Scene name…'; nameInput.value=s.sceneName||'';
-        const nameBtn = document.createElement('button'); nameBtn.textContent = 'Apply';
-        nameBtn.addEventListener('click', () => applySceneName(s.id, nameInput.value));
-        nameRow.appendChild(nameInput); nameRow.appendChild(nameBtn);
-
-        body.appendChild(title);
-        body.appendChild(meta);
-        body.appendChild(chips);
-        // Scene name editor inline removed from toolbar; enable if set via settings
-        if (getSetting('inlineSceneName', false)) body.appendChild(nameRow);
-        card.appendChild(body);
-
-        card.addEventListener('click', () => openSceneDialog(s.id));
-        frag.appendChild(card);
-      }
-      sceneGrid.appendChild(frag);
-      await sleep(16);
+    // Group by folder (rootPath)
+    const folderGroups = new Map();
+    const groupOrder = [];
+    for (const s of visibleScenes) {
+      const rp = s.representative?.__rootPath || '';
+      if (!folderGroups.has(rp)) { folderGroups.set(rp, []); groupOrder.push(rp); }
+      folderGroups.get(rp).push(s);
     }
+    const multiFolder = folderGroups.size > 1;
+
+    function buildCard(s) {
+      const card = document.createElement('article');
+      card.className = 'card';
+      card.dataset.sceneId = String(s.id);
+      if (selectedSceneIds.has(String(s.id))) card.classList.add('selected');
+
+      const th = document.createElement('div');
+      th.className = 'thumb';
+      const img = document.createElement('img');
+      img.alt = s.representative?.filename || '';
+      img.loading = 'lazy';
+      (async () => {
+        const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path, s.representative?.__rootPath);
+        if (url) img.src = url;
+      })();
+      th.appendChild(img);
+      card.appendChild(th);
+
+      const body = document.createElement('div');
+      body.className = 'body';
+      const title = document.createElement('div');
+      title.className = 'title';
+      const _localNum = String(s.id).split(':').pop();
+      const _folderName = folderBaseName(s.representative?.__rootPath || '');
+      // Show folder name in title only when a single folder is loaded;
+      // in multi-folder mode the folder group header already shows it.
+      const _titleHtml = (_folderName && !multiFolder)
+        ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
+        : `<b>#${_localNum}</b>`;
+      title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${escapeHtml(s.sceneName)}</span>` : '');
+      title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      for (const sp of s.species.slice(0,3)) {
+        const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
+      }
+      if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
+      body.appendChild(title);
+      body.appendChild(meta);
+      body.appendChild(chips);
+      card.appendChild(body);
+
+      card.addEventListener('click', (ev) => {
+        const sid = String(s.id);
+        if (ev.shiftKey && _lastSelectedIdx >= 0) {
+          // Range-select from last clicked to this
+          const idx = _visibleSceneOrder.indexOf(sid);
+          if (idx >= 0) {
+            const lo = Math.min(_lastSelectedIdx, idx);
+            const hi = Math.max(_lastSelectedIdx, idx);
+            for (let i = lo; i <= hi; i++) selectedSceneIds.add(_visibleSceneOrder[i]);
+          }
+          updateSelectionUI();
+          ev.preventDefault(); return;
+        }
+        if (ev.ctrlKey || ev.metaKey) {
+          // Toggle individual
+          if (selectedSceneIds.has(sid)) selectedSceneIds.delete(sid); else selectedSceneIds.add(sid);
+          _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
+          updateSelectionUI();
+          ev.preventDefault(); return;
+        }
+        if (selectedSceneIds.size > 0) {
+          // In selection mode: plain click also toggles
+          if (selectedSceneIds.has(sid)) selectedSceneIds.delete(sid); else selectedSceneIds.add(sid);
+          _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
+          updateSelectionUI();
+          return;
+        }
+        // Normal: open scene dialog
+        _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
+        openSceneDialog(sid);
+      });
+      return card;
+    }
+
+    const batch = 24;
+    for (const rp of groupOrder) {
+      const groupScenes = folderGroups.get(rp);
+      let gridEl;
+
+      if (multiFolder) {
+        const folderName = folderBaseName(rp) || rp || '(unknown folder)';
+        const collapsed = collapsedFolders.has(rp);
+        const groupEl = document.createElement('div');
+        groupEl.className = 'folder-group';
+
+        const hdr = document.createElement('div');
+        hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
+        hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${groupScenes.length} scene${groupScenes.length===1?'':'s'}</span>`;
+
+        gridEl = document.createElement('div');
+        gridEl.className = 'folder-group-grid grid' + (collapsed ? ' hidden' : '');
+
+        const _rp = rp, _gridEl = gridEl, _hdr = hdr;
+        hdr.addEventListener('click', () => {
+          if (collapsedFolders.has(_rp)) collapsedFolders.delete(_rp); else collapsedFolders.add(_rp);
+          _hdr.classList.toggle('collapsed');
+          _gridEl.classList.toggle('hidden');
+        });
+        groupEl.appendChild(hdr);
+        groupEl.appendChild(gridEl);
+        sceneGrid.appendChild(groupEl);
+      } else {
+        gridEl = document.createElement('div');
+        gridEl.className = 'grid';
+        sceneGrid.appendChild(gridEl);
+      }
+
+      for (let i = 0; i < groupScenes.length; i += batch) {
+        if (myVer !== _renderScenesVersion) return;
+        const slice = groupScenes.slice(i, i + batch);
+        const frag = document.createDocumentFragment();
+        for (const s of slice) frag.appendChild(buildCard(s));
+        gridEl.appendChild(frag);
+        await sleep(16);
+      }
+    }
+  }
+
+  // Update card highlights and show/hide floating action bar based on current selection
+  function updateSelectionUI() {
+    const n = selectedSceneIds.size;
+    document.querySelectorAll('.card[data-scene-id]').forEach(c => {
+      c.classList.toggle('selected', selectedSceneIds.has(c.dataset.sceneId));
+    });
+    const bar = document.getElementById('selectActionBar');
+    if (!bar) return;
+    if (n >= 2) {
+      bar.classList.remove('hidden');
+      const lbl = document.getElementById('selectActionLabel');
+      if (lbl) lbl.textContent = `${n} scene${n===1?'':'s'} selected`;
+    } else {
+      bar.classList.add('hidden');
+    }
+  }
+
+  // Merge all currently selected scenes (must all be in same folder)
+  function executeSelectionMerge() {
+    const ids = Array.from(selectedSceneIds);
+    if (ids.length < 2) return;
+    const parsed = ids.map(id => {
+      const parts = String(id).split(':');
+      const count = parts.pop();
+      const slot = parts.length ? parseInt(parts[0], 10) : 0;
+      return { id, slot, count };
+    });
+    const slots = new Set(parsed.map(p => p.slot));
+    if (slots.size > 1) {
+      alert('Cannot merge scenes from different folders.\nSelect scenes from the same folder only.');
+      return;
+    }
+    const target = parsed.slice().sort((a,b) => parseNumber(a.count) - parseNumber(b.count))[0];
+    const slot = target.slot;
+    const targetCount = target.count;
+    let changed = 0;
+    for (const r of rows) {
+      if ((r.__folderSlot ?? 0) !== slot) continue;
+      if (parsed.some(p => p.count === String(r.scene_count)) && String(r.scene_count) !== targetCount) {
+        r.scene_count = targetCount; changed++;
+      }
+    }
+    if (changed) {
+      dirty = true;
+      el('#saveCsv').disabled = false;
+      setStatus(`Merged ${ids.length} scenes into #${targetCount}. ${changed} rows updated.`);
+    }
+    selectedSceneIds.clear();
+    _lastSelectedIdx = -1;
+    updateSelectionUI();
+    renderScenes();
   }
 
   // Render images inside the scene dialog, honoring the manual-rated filter and stable ordering
@@ -1838,8 +1987,13 @@
   el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
   el('#speciesConf').addEventListener('change', () => renderScenes());
   el('#sortBy').addEventListener('change', () => renderScenes());
-  // Wire merge scenes button
-  el('#openMerge').addEventListener('click', () => openMergeDialog());
+
+  // Multi-select merge action bar
+  const selectMergeBtn = document.getElementById('selectMergeBtn');
+  if (selectMergeBtn) selectMergeBtn.addEventListener('click', executeSelectionMerge);
+  const selectClearBtn = document.getElementById('selectClearBtn');
+  if (selectClearBtn) selectClearBtn.addEventListener('click', () => { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && selectedSceneIds.size > 0 && !document.querySelector('dialog[open]')) { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); }});
 
   const zoomInBtn = el('#zoomIn');
   const zoomOutBtn = el('#zoomOut');
