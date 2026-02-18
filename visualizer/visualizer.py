@@ -504,6 +504,25 @@ class Api:
             print(f"[API] list_subfolders() -> Error: {e}", flush=True)
             return {'success': False, 'tree': [], 'error': str(e)}
 
+    def write_kestrel_csv(self, folder_path: str, csv_content: str):
+        """Write CSV content back to .kestrel/kestrel_database.csv for the given folder."""
+        try:
+            folder_name = os.path.basename(folder_path)
+            if folder_name == '.kestrel':
+                csv_path = os.path.join(folder_path, 'kestrel_database.csv')
+            else:
+                csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
+            if not os.path.exists(csv_path):
+                print(f'[API] write_kestrel_csv({folder_path!r}) -> CSV not found: {csv_path}', flush=True)
+                return {'success': False, 'error': f'CSV not found: {csv_path}'}
+            with open(csv_path, 'w', encoding='utf-8', newline='') as f:
+                f.write(csv_content)
+            print(f'[API] write_kestrel_csv({folder_path!r}) -> {len(csv_content)} bytes written to {csv_path}', flush=True)
+            return {'success': True, 'path': csv_path}
+        except Exception as e:
+            print(f'[API] write_kestrel_csv({folder_path!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
     def open_folder(self, path: str):
         """Open a folder in the system file browser (pywebview desktop mode)."""
         try:

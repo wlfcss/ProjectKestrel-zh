@@ -128,6 +128,7 @@
   /* .meta > :first-child duplicate rule retained earlier above */
     .inline input[type="text"] { min-width: 0; }
     .card .body { padding-bottom: 14px; }
+    .card .body .meta { justify-content: center; gap: 14px; }
 
     /* Prevent text clipping with truncation */
     .title { display: flex; gap: 6px; align-items: center; }
@@ -966,9 +967,14 @@
         title.className = 'title';
         const _localNum = String(s.id).split(':').pop();
         const _folderName = folderBaseName(s.representative?.__rootPath || '');
-        const _label = _folderName ? `${escapeHtml(_folderName)} / #${_localNum}` : `Scene ${s.id}`;
-        title.innerHTML = `<b>${_label}</b>${s.sceneName ? ` <span class="name">— ${escapeHtml(s.sceneName)}</span>` : ''} <span class="score">⭐ ${fmt3(s.maxQuality)}</span> <span class="muted">📸 ${s.imageCount}</span>`;
+        const _titleHtml = _folderName
+          ? `<i>${escapeHtml(_folderName)}</i> / <b>#${_localNum}</b>`
+          : `<b>Scene ${s.id}</b>`;
+        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">— ${escapeHtml(s.sceneName)}</span>` : '');
         title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` — ${s.sceneName}` : '');
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = `<span class="score">⭐ ${fmt3(s.maxQuality)}</span><span>📸 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         for (const sp of s.species.slice(0,3)) {
@@ -985,6 +991,7 @@
         nameRow.appendChild(nameInput); nameRow.appendChild(nameBtn);
 
         body.appendChild(title);
+        body.appendChild(meta);
         body.appendChild(chips);
         // Scene name editor inline removed from toolbar; enable if set via settings
         if (getSetting('inlineSceneName', false)) body.appendChild(nameRow);
@@ -1102,8 +1109,17 @@
 
   function applySceneName(sceneId, name) {
     const newName = String(name||'').trim();
+    // sceneId may be slot-prefixed (e.g. "0:3"); split to get slot + raw scene_count
+    const parts = String(sceneId).split(':');
+    const sceneCount = parts.pop();
+    const slot = parts.length ? parseInt(parts[0], 10) : null;
     let changed = 0;
-    for (const r of rows) if (String(r.scene_count) === String(sceneId)) { if ((r.scene_name||'') !== newName) { r.scene_name = newName; changed++; } }
+    for (const r of rows) {
+      const slotMatch = slot === null || (r.__folderSlot ?? 0) === slot;
+      if (slotMatch && String(r.scene_count) === sceneCount) {
+        if ((r.scene_name||'') !== newName) { r.scene_name = newName; changed++; }
+      }
+    }
     if (changed) { dirty = true; el('#saveCsv').disabled = false; renderScenes(); }
   }
 
@@ -1186,28 +1202,55 @@
   }
 
   async function saveCsv() {
-    if (!csvFileHandle) { alert('No CSV opened.'); return; }
-    // Keep header order; ensure extra columns exist
     ensureSceneNameColumn();
     ensureRatingColumns();
-    const cols = header.slice();
-    if (!cols.includes('scene_name')) cols.push('scene_name');
-    if (!cols.includes('rating')) cols.push('rating');
-    if (!cols.includes('rating_origin')) cols.push('rating_origin');
+    const allCols = header.slice();
+    if (!allCols.includes('scene_name')) allCols.push('scene_name');
+    if (!allCols.includes('rating')) allCols.push('rating');
+    if (!allCols.includes('rating_origin')) allCols.push('rating_origin');
 
-    const lines = [];
-    lines.push(cols.join(','));
-    for (const r of rows) {
-      const vals = cols.map(k => csvEscape(k in r ? r[k] : ''));
-      lines.push(vals.join(','));
+    // Serialize a list of rows (excluding internal __ keys) to CSV string
+    function rowsToCsvString(colList, rowList) {
+      const lines = [colList.join(',')];
+      for (const r of rowList) lines.push(colList.map(k => csvEscape(k in r ? r[k] : '')).join(','));
+      return lines.join('\r\n');
     }
-    const content = lines.join('\r\n');
 
-    const writable = await csvFileHandle.createWritable();
-    await writable.write(content);
-    await writable.close();
-    dirty = false; el('#saveCsv').disabled = true;
-    setStatus('Saved changes to kestrel_database.csv');
+    // FSAPI mode (browser): single file handle
+    if (csvFileHandle) {
+      const content = rowsToCsvString(allCols, rows);
+      const writable = await csvFileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      dirty = false; el('#saveCsv').disabled = true;
+      setStatus('Saved changes to kestrel_database.csv');
+      return;
+    }
+
+    // Pywebview desktop mode: partition rows by __rootPath and save each CSV separately
+    if (window.pywebview?.api) {
+      const groups = new Map();
+      for (const r of rows) {
+        const rp = r.__rootPath || '';
+        if (!groups.has(rp)) groups.set(rp, []);
+        groups.get(rp).push(r);
+      }
+      let saved = 0, failed = 0;
+      for (const [rp, groupRows] of groups) {
+        if (!rp) { failed++; continue; }
+        const content = rowsToCsvString(allCols, groupRows);
+        try {
+          const res = await window.pywebview.api.write_kestrel_csv(rp, content);
+          if (res.success) saved++;
+          else { failed++; console.warn('[save] Failed for', rp, res.error); }
+        } catch (e) { failed++; console.warn('[save] Error for', rp, e); }
+      }
+      dirty = false; el('#saveCsv').disabled = true;
+      setStatus(failed > 0 ? `Saved ${saved} folder(s), ${failed} failed` : `Saved changes to ${saved} folder(s)`);
+      return;
+    }
+
+    alert('No CSV opened and no save method available.');
   }
 
   // Warn user on unsaved changes when attempting to close/refresh
