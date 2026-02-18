@@ -203,6 +203,7 @@
     .tree-node-row.active .tree-label { color: #fff; font-weight: 700; }
     .tree-node-row.active { background: #10293d; }
     .tree-children { padding-left: 14px; }
+    .tree-cb { flex: 0 0 13px; width: 13px; height: 13px; margin: 0; cursor: pointer; accent-color: #3a84e6; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -227,6 +228,7 @@
         <div id="folderTreeWrap" class="folder-tree-wrap hidden">
           <div class="folder-tree-header">
             <span class="tree-title">Folder Tree</span>
+            <button id="treeLoadSelected" disabled title="Load all checked folders together">Load checked</button>
             <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
           </div>
           <div id="folderTree"></div>
@@ -605,13 +607,14 @@
   // Blob URL cache per path
   const blobUrlCache = new Map();
   
-  async function getBlobUrlForPath(relOrAbsPath) {
+  async function getBlobUrlForPath(relOrAbsPath, rootOverride) {
+    const effectiveRoot = rootOverride || rootPath;
     console.log('[DEBUG] getBlobUrlForPath called with:', relOrAbsPath);
-    console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi, 'rootPath:', rootPath);
+    console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi, 'effectiveRoot:', effectiveRoot);
     
     // PRIORITY 1: Python API (desktop app - all platforms)
     // Use this when available for consistent behavior across Windows/macOS/Linux
-    if (hasPywebviewApi && window.pywebview?.api?.read_image_file && rootPath) {
+    if (hasPywebviewApi && window.pywebview?.api?.read_image_file && effectiveRoot) {
       console.log('[DEBUG] Using Python API for image loading');
       
       let rel = null;
@@ -639,15 +642,15 @@
       
       if (!rel) return null;
       
-      // Check cache first
-      const cacheKey = `pyapi:${rel}`;
+      // Check cache first (key includes root so multi-folder caches stay separate)
+      const cacheKey = `pyapi:${effectiveRoot}:${rel}`;
       if (blobUrlCache.has(cacheKey)) {
         console.log('[DEBUG] Using cached image:', rel);
         return blobUrlCache.get(cacheKey);
       }
       
       try {
-        const result = await window.pywebview.api.read_image_file(rel, rootPath);
+        const result = await window.pywebview.api.read_image_file(rel, effectiveRoot);
         if (result && result.success && result.data) {
           console.log('[DEBUG] Successfully loaded image via Python API:', rel);
           // Create data URL from base64
@@ -781,7 +784,8 @@
   function aggregateScenes(minSpeciesConf, searchTerm, sortBy, includeSecondary, includeFamilies) {
     const groups = new Map();
     for (const r of rows) {
-      const id = r.scene_count; // group identifier
+      // Prefix with folderSlot so scenes from different folders never collide
+      const id = (r.__folderSlot != null ? r.__folderSlot + ':' : '') + r.scene_count;
       if (!groups.has(id)) groups.set(id, []);
       groups.get(id).push(r);
     }
@@ -943,7 +947,7 @@
         img.loading = 'lazy';
         // Set src asynchronously to keep order stable
         (async () => {
-          const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path);
+          const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path, s.representative?.__rootPath);
           if (url) img.src = url;
         })();
         th.appendChild(img);
@@ -1005,7 +1009,7 @@
         const th = document.createElement('div'); th.className='thumb';
         const img = document.createElement('img'); img.alt = r.filename||''; img.loading='lazy';
         (async () => {
-          const url = await getBlobUrlForPath(r.export_path || r.crop_path);
+          const url = await getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath);
           if (url) img.src = url;
         })();
         th.appendChild(img); card.appendChild(th);
@@ -1021,7 +1025,7 @@
         card.addEventListener('mouseenter', async () => {
           const pv = el('#previewBox'); pv.innerHTML='';
           const pimg = document.createElement('img');
-          const purl = await getBlobUrlForPath(r.crop_path || r.export_path);
+          const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
           if (purl) { pimg.src = purl; pv.appendChild(pimg); }
           else { pv.innerHTML = '<span class="muted">No preview</span>'; }
           const info = el('#previewInfo');
@@ -1376,11 +1380,13 @@
   }
 
   // ── Folder Tree ──────────────────────────────────────────────────────────────
-  let folderTreeRoot = null;  // absolute path of the scanned tree root
-  let folderTreeData = null;  // raw tree from API
-  let folderTreeRootHasKestrel = false; // true if the scanned root itself has .kestrel
-  let treeExpandedPaths = new Set(); // paths that are open
-  let treeActivePath = null;  // currently loaded folder
+  let folderTreeRoot = null;       // absolute path of the scanned tree root
+  let folderTreeData = null;       // raw children array from API
+  let folderTreeRootNode = null;   // synthetic root node {name, path, has_kestrel, children}
+  let folderTreeRootHasKestrel = false;
+  let treeExpandedPaths = new Set();
+  let treeActivePath = null;       // currently single-loaded folder
+  let checkedFolderPaths = new Set(); // folders checked for multi-load
 
   async function scanFolderTree(rootPath) {
     if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return false;
@@ -1397,6 +1403,16 @@
       }
       folderTreeData = result.tree;
       folderTreeRootHasKestrel = !!result.root_has_kestrel;
+      // Build a synthetic root node so the tree shows the top-level folder too
+      const rootName = rootPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() || rootPath;
+      folderTreeRootNode = {
+        name: rootName,
+        path: rootPath,
+        has_kestrel: folderTreeRootHasKestrel,
+        children: folderTreeData,
+      };
+      // Auto-expand the root
+      treeExpandedPaths.add(rootPath);
       renderFolderTree();
       document.getElementById('folderTreeWrap').classList.remove('hidden');
       return true;
@@ -1408,9 +1424,9 @@
 
   function renderFolderTree() {
     const container = document.getElementById('folderTree');
-    if (!container || !folderTreeData) return;
+    if (!container || !folderTreeRootNode) return;
     container.innerHTML = '';
-    folderTreeData.forEach(node => container.appendChild(buildTreeNode(node)));
+    container.appendChild(buildTreeNode(folderTreeRootNode));
   }
 
   function buildTreeNode(node) {
@@ -1433,6 +1449,22 @@
       arrow.textContent = '▶';
     }
 
+    // Checkbox (only on .kestrel folders)
+    let checkbox = null;
+    if (node.has_kestrel) {
+      checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'tree-cb';
+      checkbox.title = 'Include in multi-folder load';
+      checkbox.checked = checkedFolderPaths.has(node.path);
+      checkbox.addEventListener('change', (e) => {
+        e.stopPropagation();
+        if (checkbox.checked) checkedFolderPaths.add(node.path);
+        else checkedFolderPaths.delete(node.path);
+        updateLoadSelectedBtn();
+      });
+    }
+
     // Folder icon
     const icon = document.createElement('span');
     icon.className = 'tree-icon';
@@ -1445,6 +1477,7 @@
     label.title = node.path;
 
     row.appendChild(arrow);
+    if (checkbox) row.appendChild(checkbox);
     row.appendChild(icon);
     row.appendChild(label);
     wrap.appendChild(row);
@@ -1493,6 +1526,55 @@
   // ── End Folder Tree ───────────────────────────────────────────────────────────
 
   // Helper function to load folder using native path (for pywebview API)
+  // Loads a single folder. For multi-folder loading, see loadMultipleFolders().
+
+  function updateLoadSelectedBtn() {
+    const btn = document.getElementById('treeLoadSelected');
+    if (btn) btn.disabled = checkedFolderPaths.size === 0;
+  }
+
+  async function loadMultipleFolders(paths) {
+    if (!paths || paths.length === 0) return;
+    blobUrlCache.clear();
+    rows = [];
+    header = [];
+    let loadedCount = 0;
+    let slot = 0;
+    for (const p of paths) {
+      try {
+        const result = await window.pywebview.api.read_kestrel_csv(p);
+        if (!result.success) { console.warn('[multi] Skipping', p, result.error); continue; }
+        const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
+        const newRows = parsed.data || [];
+        const newFields = parsed.meta.fields || [];
+        for (const f of newFields) if (!header.includes(f)) header.push(f);
+        const root = result.root || p;
+        const currentSlot = slot++;
+        for (const r of newRows) { r.__rootPath = root; r.__folderSlot = currentSlot; }
+        rows = rows.concat(newRows);
+        loadedCount++;
+      } catch (e) {
+        console.warn('[multi] Failed to load', p, e);
+      }
+    }
+    if (loadedCount === 0) { setStatus('No folders could be loaded'); return; }
+    // For single-folder image-loading compat: set rootPath to first loaded root.
+    // Per-row __rootPath handles multi-folder image loading in getBlobUrlForPath.
+    const firstRow = rows.find(r => r.__rootPath);
+    if (firstRow) rootPath = firstRow.__rootPath;
+    rootDirHandle = null;
+    ensureSceneNameColumn();
+    ensureRatingColumns();
+    dirty = false;
+    const mergeBtn = document.getElementById('openMerge');
+    if (mergeBtn) mergeBtn.disabled = true;
+    treeActivePath = paths.length === 1 ? paths[0] : null;
+    renderFolderTree();
+    await renderScenes();
+    const label = loadedCount === 1 ? paths[0].replace(/.*[/\\]/, '') : `${loadedCount} folders`;
+    setStatus(`Loaded ${label} — ${rows.length} images`);
+  }
+
   async function loadFolderFromPath(folderPath) {
     if (!folderPath) return;
     
@@ -1507,12 +1589,14 @@
       // Parse the CSV data
       const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
       header = parsed.meta.fields || [];
-      rows = parsed.data || [];
+      const loadedRoot = result.root || folderPath;
+      rows = (parsed.data || []).map(r => ({ ...r, __rootPath: loadedRoot, __folderSlot: 0 }));
       ensureSceneNameColumn();
       ensureRatingColumns();
+      blobUrlCache.clear(); // new folder — clear stale cache entries
       
       // IMPORTANT: Set rootPath BEFORE renderScenes so image loading works
-      rootPath = result.root || folderPath;
+      rootPath = loadedRoot;
       rootDirHandle = null; // Clear handle since we're using Python API
       rootIsKestrel = false;
       
@@ -1810,6 +1894,8 @@
       const folderPath = await window.pywebview.api.choose_directory();
       if (folderPath) {
         treeExpandedPaths.clear();
+        checkedFolderPaths.clear();
+        updateLoadSelectedBtn();
         const treeScanned = await scanFolderTree(folderPath);
         if (treeScanned && !folderTreeRootHasKestrel) {
           setStatus('Select a folder from the tree below to load its scenes');
@@ -1819,6 +1905,15 @@
       } else {
         setStatus('Folder selection cancelled');
       }
+    });
+  }
+
+  // Wire "Load checked" button
+  const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');
+  if (treeLoadSelectedBtn) {
+    treeLoadSelectedBtn.addEventListener('click', async () => {
+      if (checkedFolderPaths.size === 0) return;
+      await loadMultipleFolders(Array.from(checkedFolderPaths));
     });
   }
 
