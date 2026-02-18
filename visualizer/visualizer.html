@@ -97,7 +97,7 @@
       transition: transform .12s ease, border-color .12s ease, background .12s ease;
     }
     .card:hover { transform: translateY(-2px); border-color: #2a3040; background: #191d28; }
-    .thumb { aspect-ratio: 16/10; background: #0e1117; display:flex; align-items:center; justify-content:center; overflow: hidden; }
+    .thumb { aspect-ratio: 16/10; background: #0e1117; display:flex; align-items:center; justify-content:center; overflow: hidden; position: relative; }
     .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .card .body { padding: 10px 12px 14px; display: grid; gap: 6px; }
     .meta { display:flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; white-space: normal; gap: 8px; }
@@ -212,6 +212,10 @@
     .star.filled.auto { color: #6aa0ff; }
     .star.filled.manual { color: #f5c542; }
     .star:hover { color: #8fb6ff; }
+
+    /* Thumbnail badges (quality & image count) */
+    .thumb .badge { position: absolute; top: 8px; left: 8px; background: #10293d; border: 1px solid #1d3e5e; color: #a9c9ee; padding: 4px 8px; border-radius: 999px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+    .thumb .badge.count { left: auto; right: 8px; }
 
     /* Folder tree panel */
     .folder-tree-wrap { border-top: 1px solid #1d2230; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -587,10 +591,22 @@
   function applyZoom() {
     const zoomEl = document.getElementById('mainZoom');
     if (!zoomEl) return;
-    const z = uiZoom.toFixed(2);
-    zoomEl.style.transform = `scale(${z})`;
-    zoomEl.style.width = `calc(100% / ${z})`;
-    zoomEl.style.height = `calc(100% / ${z})`;
+    const z = uiZoom;
+    // Use non-transform zoom so position:sticky on headers continues to work.
+    // Prefer CSS `zoom` when available; fall back to transform-only if not supported.
+    try {
+      zoomEl.style.zoom = z.toFixed(2);
+      // Ensure no transform is set (transform can break sticky behavior)
+      zoomEl.style.transform = '';
+      zoomEl.style.width = '';
+      zoomEl.style.height = '';
+    } catch (e) {
+      // Fallback: use transform if browser doesn't support zoom (sticky may be affected)
+      const s = uiZoom.toFixed(2);
+      zoomEl.style.transform = `scale(${s})`;
+      zoomEl.style.width = `calc(100% / ${s})`;
+      zoomEl.style.height = `calc(100% / ${s})`;
+    }
   }
 
   function sanitizePath(p) {
@@ -1009,6 +1025,15 @@
         if (url) img.src = url;
       })();
       th.appendChild(img);
+      // Badges: quality and image count (visible on thumbnail)
+      const qBadge = document.createElement('div');
+      qBadge.className = 'badge quality';
+      qBadge.textContent = `⭐ ${fmt3(s.maxQuality)}`;
+      th.appendChild(qBadge);
+      const cBadge = document.createElement('div');
+      cBadge.className = 'badge count';
+      cBadge.textContent = `📸 ${s.imageCount}`;
+      th.appendChild(cBadge);
       card.appendChild(th);
 
       const body = document.createElement('div');
