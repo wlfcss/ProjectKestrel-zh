@@ -223,6 +223,14 @@
           <button id="openMerge" disabled>Merge scenes…</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
+        <!-- Folder tree panel (populated after scanning a root folder) -->
+        <div id="folderTreeWrap" class="folder-tree-wrap hidden">
+          <div class="folder-tree-header">
+            <span class="tree-title">Folder Tree</span>
+            <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
+          </div>
+          <div id="folderTree"></div>
+        </div>
         <div class="toolbar-row filters">
           <div class="filter-panel" aria-label="Filtering options">
             <div class="filter-title">Filtering Options</div>
@@ -256,14 +264,6 @@
         <div class="toolbar-row status">
           <div id="versionBadge" class="version-badge">Version: —</div>
         </div>
-      </div>
-      <!-- Folder tree panel (populated after scanning a root folder) -->
-      <div id="folderTreeWrap" class="folder-tree-wrap hidden">
-        <div class="folder-tree-header">
-          <span class="tree-title">Folder Tree</span>
-          <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
-        </div>
-        <div id="folderTree"></div>
       </div>
       <div class="spacer"></div>
       <div class="sidebar-footer" aria-label="Zoom controls">
