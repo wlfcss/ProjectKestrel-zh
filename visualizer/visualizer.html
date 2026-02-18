@@ -129,6 +129,9 @@
     .inline input[type="text"] { min-width: 0; }
     .card .body { padding-bottom: 14px; }
     .card .body .meta { justify-content: center; gap: 14px; }
+    .title-score, .title-count { font-size: 12px; flex-shrink: 0; }
+    .title-score { color: #a9c9ee; }
+    .title-count { color: var(--muted); }
 
     /* Prevent text clipping with truncation */
     .title { display: flex; gap: 4px; align-items: center; overflow: hidden; white-space: nowrap; }
@@ -243,6 +246,7 @@
             <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder is analyzed with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
           </button>
           <button id="openSettings">Default Editor Options…</button>
+          <button id="revertCsv" disabled title="Discard all unsaved changes">Revert Changes</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
         <!-- Folder tree panel (populated after scanning a root folder) -->
@@ -425,6 +429,7 @@
   let header = [];               // CSV header fields
   let scenes = [];               // Aggregated scene objects
   let dirty = false;             // Track unsaved edits
+  let _cleanSnapshot = null;      // Snapshot of rows+header at last clean state (load or save)
   let selectedSceneIds = new Set(); // Multi-select: selected scene IDs ("slot:count")
   let collapsedFolders = new Set(); // rootPaths of collapsed folder groups
   let _lastSelectedIdx = -1;        // Shift-click range: last clicked index in _visibleSceneOrder
@@ -905,7 +910,7 @@
     if (changed) {
       row.rating = v;
       row.rating_origin = newOrigin;
-      dirty = true; el('#saveCsv').disabled = false;
+      dirty = true; el('#saveCsv').disabled = false; el('#revertCsv').disabled = false;
       // If filter is active, refresh the image grid so items appear/disappear accordingly
       if (typeof window.refreshSceneFilter === 'function') window.refreshSceneFilter();
     }
@@ -1019,7 +1024,6 @@
       }
       if (s.species.length>3) { const more = document.createElement('span'); more.className='chip badge'; more.textContent = `+${s.species.length-3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
       body.appendChild(title);
-      body.appendChild(meta);
       body.appendChild(chips);
       card.appendChild(body);
 
@@ -1119,7 +1123,7 @@
   }
 
   // Merge all currently selected scenes (must all be in same folder)
-  function executeSelectionMerge() {
+  async function executeSelectionMerge() {
     const ids = Array.from(selectedSceneIds);
     if (ids.length < 2) return;
     const parsed = ids.map(id => {
@@ -1136,6 +1140,7 @@
     const target = parsed.slice().sort((a,b) => parseNumber(a.count) - parseNumber(b.count))[0];
     const slot = target.slot;
     const targetCount = target.count;
+    const mergedSceneId = String(slot != null ? slot + ':' + targetCount : targetCount);
     let changed = 0;
     for (const r of rows) {
       if ((r.__folderSlot ?? 0) !== slot) continue;
@@ -1146,12 +1151,16 @@
     if (changed) {
       dirty = true;
       el('#saveCsv').disabled = false;
+      el('#revertCsv').disabled = false;
       setStatus(`Merged ${ids.length} scenes into #${targetCount}. ${changed} rows updated.`);
     }
     selectedSceneIds.clear();
     _lastSelectedIdx = -1;
     updateSelectionUI();
-    renderScenes();
+    await renderScenes();
+    // Scroll to the merged scene card; fall back to current scroll position
+    const mergedCard = document.querySelector(`.card[data-scene-id="${CSS.escape(mergedSceneId)}"]`);
+    if (mergedCard) mergedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // Render images inside the scene dialog, honoring the manual-rated filter and stable ordering
@@ -1269,12 +1278,30 @@
         if ((r.scene_name||'') !== newName) { r.scene_name = newName; changed++; }
       }
     }
-    if (changed) { dirty = true; el('#saveCsv').disabled = false; renderScenes(); }
+    if (changed) { dirty = true; el('#saveCsv').disabled = false; el('#revertCsv').disabled = false; renderScenes(); }
   }
 
   function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
   function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
+
+  // Snapshot helpers for revert
+  function takeSnapshot() {
+    _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice() };
+    const btn = el('#revertCsv');
+    if (btn) btn.disabled = true;
+  }
+  function applySnapshot() {
+    if (!_cleanSnapshot) return;
+    rows = _cleanSnapshot.rows.map(r => ({ ...r }));
+    header = _cleanSnapshot.header.slice();
+    dirty = false;
+    el('#saveCsv').disabled = true;
+    el('#revertCsv').disabled = true;
+    blobUrlCache.clear();
+    renderScenes();
+    setStatus('Reverted to last saved state.');
+  }
 
   // CSV IO
   async function loadCsvFromHandle(fileHandle) {
@@ -1287,6 +1314,7 @@
     ensureSceneNameColumn();
     ensureRatingColumns();
     dirty = false; el('#saveCsv').disabled = true;
+    takeSnapshot();
     await renderScenes();
   }
 
@@ -1372,6 +1400,7 @@
       await writable.write(content);
       await writable.close();
       dirty = false; el('#saveCsv').disabled = true;
+      takeSnapshot();
       setStatus('Saved changes to kestrel_database.csv');
       return;
     }
@@ -1395,6 +1424,7 @@
         } catch (e) { failed++; console.warn('[save] Error for', rp, e); }
       }
       dirty = false; el('#saveCsv').disabled = true;
+      takeSnapshot();
       setStatus(failed > 0 ? `Saved ${saved} folder(s), ${failed} failed` : `Saved changes to ${saved} folder(s)`);
       return;
     }
@@ -1799,6 +1829,7 @@
     ensureSceneNameColumn();
     ensureRatingColumns();
     dirty = false;
+    takeSnapshot();
     const mergeBtn = document.getElementById('openMerge');
     if (mergeBtn) mergeBtn.disabled = true;
     treeActivePath = paths.length === 1 ? paths[0] : null;
@@ -1994,6 +2025,13 @@
   const selectClearBtn = document.getElementById('selectClearBtn');
   if (selectClearBtn) selectClearBtn.addEventListener('click', () => { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && selectedSceneIds.size > 0 && !document.querySelector('dialog[open]')) { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); }});
+  // Revert button
+  const revertBtn = el('#revertCsv');
+  if (revertBtn) revertBtn.addEventListener('click', () => {
+    if (!_cleanSnapshot) return;
+    if (!confirm('Discard all unsaved changes and revert to the last saved state?')) return;
+    applySnapshot();
+  });
 
   const zoomInBtn = el('#zoomIn');
   const zoomOutBtn = el('#zoomOut');
