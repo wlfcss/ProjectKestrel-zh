@@ -497,8 +497,9 @@ class Api:
                 return result
 
             tree = _scan(root_path, max_depth)
-            print(f"[API] list_subfolders() -> {node_count[0]} nodes found", flush=True)
-            return {'success': True, 'tree': tree, 'error': ''}
+            root_has_kestrel = os.path.isfile(os.path.join(root_path, '.kestrel', 'kestrel_database.csv'))
+            print(f"[API] list_subfolders() -> {node_count[0]} nodes found, root_has_kestrel={root_has_kestrel}", flush=True)
+            return {'success': True, 'tree': tree, 'root_has_kestrel': root_has_kestrel, 'error': ''}
         except Exception as e:
             print(f"[API] list_subfolders() -> Error: {e}", flush=True)
             return {'success': False, 'tree': [], 'error': str(e)}

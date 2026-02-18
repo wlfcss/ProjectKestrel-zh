@@ -1378,12 +1378,13 @@
   // ── Folder Tree ──────────────────────────────────────────────────────────────
   let folderTreeRoot = null;  // absolute path of the scanned tree root
   let folderTreeData = null;  // raw tree from API
+  let folderTreeRootHasKestrel = false; // true if the scanned root itself has .kestrel
   let treeExpandedPaths = new Set(); // paths that are open
   let treeActivePath = null;  // currently loaded folder
 
   async function scanFolderTree(rootPath) {
-    if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return;
-    if (!rootPath) return;
+    if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return false;
+    if (!rootPath) return false;
 
     folderTreeRoot = rootPath;
     const depth = getSetting('treeScanDepth', 3);
@@ -1392,13 +1393,16 @@
       const result = await window.pywebview.api.list_subfolders(rootPath, depth);
       if (!result.success) {
         console.warn('[tree] list_subfolders failed:', result.error);
-        return;
+        return false;
       }
       folderTreeData = result.tree;
+      folderTreeRootHasKestrel = !!result.root_has_kestrel;
       renderFolderTree();
       document.getElementById('folderTreeWrap').classList.remove('hidden');
+      return true;
     } catch (e) {
       console.error('[tree] scanFolderTree error:', e);
+      return false;
     }
   }
 
@@ -1566,13 +1570,19 @@
           const folderPath = await window.pywebview.api.choose_directory();
           if (folderPath) {
             // Scan the selected folder as the tree root (user may have picked a parent
-            // folder with multiple analyzed sub-folders, or a leaf folder directly)
+            // folder with multiple analyzed sub-folders, or a leaf folder directly).
             treeExpandedPaths.clear();
-            await scanFolderTree(folderPath);
-            // Check if the selected folder itself has .kestrel; if not, check if tree
-            // has any entries — the user likely picked a parent. Either way, also try
-            // loading the CSV (it will fail gracefully if no .kestrel here).
-            await loadFolderFromPath(folderPath);
+            const treeScanned = await scanFolderTree(folderPath);
+            // Use the root_has_kestrel flag returned directly by scanFolderTree
+            // (folderTreeRootHasKestrel is set inside scanFolderTree).
+            // Only attempt CSV load if the root itself is an analyzed folder.
+            if (treeScanned && !folderTreeRootHasKestrel) {
+              // Tree scan succeeded but root has no .kestrel — it's a parent folder.
+              setStatus('Select a folder from the tree below to load its scenes');
+            } else {
+              // Either scan wasn't available, or the root itself has .kestrel — load it.
+              await loadFolderFromPath(folderPath);
+            }
             return; // Success - Python API handled everything
           } else {
             setStatus('Folder selection cancelled');
@@ -1800,9 +1810,12 @@
       const folderPath = await window.pywebview.api.choose_directory();
       if (folderPath) {
         treeExpandedPaths.clear();
-        await scanFolderTree(folderPath);
-        // Also try loading that folder (harmless if it has no .kestrel)
-        await loadFolderFromPath(folderPath);
+        const treeScanned = await scanFolderTree(folderPath);
+        if (treeScanned && !folderTreeRootHasKestrel) {
+          setStatus('Select a folder from the tree below to load its scenes');
+        } else {
+          await loadFolderFromPath(folderPath);
+        }
       } else {
         setStatus('Folder selection cancelled');
       }
