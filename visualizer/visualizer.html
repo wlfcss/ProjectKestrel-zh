@@ -134,12 +134,17 @@
     .title-count { color: var(--muted); }
 
     /* Prevent text clipping with truncation */
-    .title { display: flex; gap: 4px; align-items: center; overflow: hidden; white-space: nowrap; }
+    .title { display: flex; gap: 6px; align-items: center; min-width: 0; }
     .title i.folder-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; max-width: 9em; display: inline-block; vertical-align: middle; font-style: italic; }
     .title .title-sep { flex-shrink: 0; }
     .title b { flex-shrink: 0; }
     .title .name { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .title-score { font-size: 12px; flex-shrink: 0; color: #a9c9ee; background: #10293d; border: 1px solid #1d3e5e; padding: 1px 7px; border-radius: 999px; }
+    .title-count { font-size: 12px; flex-shrink: 0; color: var(--muted); }
     .meta .truncate { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    /* Sticky folder group headers */
+    .folder-group-header { position: sticky; top: 0; z-index: 10; background: var(--bg); }
 
     /* Multi-select: selected scene card */
     .card.selected { background: #1a2540 !important; border-color: #3a84e6 !important; outline: 2px solid rgba(58,132,230,.5); }
@@ -274,6 +279,10 @@
               <input id="includeSecondarySpecies" type="checkbox" />
               <span class="muted">Multi-subject mode</span>
               <span class="help-tip" data-tip="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability." aria-label="Multi-subject mode help" title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
+            </label>
+            <label class="inline">
+              <input id="groupByFolder" type="checkbox" checked />
+              <span class="muted">Group by folder</span>
             </label>
           </div>
           <div class="inline" aria-label="Sort order">
@@ -959,6 +968,7 @@
     const search = el('#search').value;
     const sortBy = el('#sortBy').value;
     const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
+    const groupByFolder = document.getElementById('groupByFolder')?.checked ?? getSetting('groupByFolder', true);
     const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
     const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
     const includeFamilies = true;
@@ -973,15 +983,15 @@
     // Flat index for shift-click range selection
     _visibleSceneOrder = visibleScenes.map(s => String(s.id));
 
-    // Group by folder (rootPath)
+    // Group by folder (rootPath) — only when groupByFolder is enabled AND multiple folders are loaded
     const folderGroups = new Map();
     const groupOrder = [];
     for (const s of visibleScenes) {
-      const rp = s.representative?.__rootPath || '';
+      const rp = (groupByFolder && s.representative?.__rootPath) ? s.representative.__rootPath : '__single__';
       if (!folderGroups.has(rp)) { folderGroups.set(rp, []); groupOrder.push(rp); }
       folderGroups.get(rp).push(s);
     }
-    const multiFolder = folderGroups.size > 1;
+    const multiFolder = groupByFolder && folderGroups.size > 1;
 
     function buildCard(s) {
       const card = document.createElement('article');
@@ -2018,6 +2028,16 @@
   el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
   el('#speciesConf').addEventListener('change', () => renderScenes());
   el('#sortBy').addEventListener('change', () => renderScenes());
+
+  // Group-by-folder toggle
+  (function initGroupByFolder() {
+    const t = document.getElementById('groupByFolder');
+    if (!t) return;
+    try { t.checked = getSetting('groupByFolder', true); } catch {}
+    t.addEventListener('change', () => {
+      const s = loadSettings(); s.groupByFolder = !!t.checked; saveSettings(s); renderScenes();
+    });
+  })();
 
   // Multi-select merge action bar
   const selectMergeBtn = document.getElementById('selectMergeBtn');
