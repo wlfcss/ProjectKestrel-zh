@@ -31,7 +31,7 @@
 
     header {
       position: relative; z-index: 5;
-      width: 320px; flex: 0 0 320px; height: 100vh;
+      width: 400px; flex: 0 0 400px; height: 100vh;
       background: linear-gradient(180deg, rgba(17,19,24,.95), rgba(17,19,24,.85));
       backdrop-filter: blur(8px);
       border-right: 1px solid #1d2230;
@@ -188,9 +188,9 @@
     .folder-tree-header { display: flex; align-items: center; gap: 6px; }
     .folder-tree-header .tree-title { font-size: 12px; color: var(--muted); letter-spacing: .3px; flex: 1 1 auto; }
     .folder-tree-header button { padding: 2px 7px; font-size: 11px; height: auto; }
-    #folderTree { max-height: 38vh; overflow-y: auto; overflow-x: hidden; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; }
-    .tree-node { display: flex; flex-direction: column; }
-    .tree-node-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; cursor: default; user-select: none; min-width: 0; }
+    #folderTree { max-height: 38vh; overflow: auto; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; }
+    .tree-node { display: flex; flex-direction: column; min-width: max-content; }
+    .tree-node-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; cursor: default; user-select: none; white-space: nowrap; }
     .tree-node-row:hover { background: #0e1117; }
     .tree-arrow { flex: 0 0 14px; font-size: 10px; color: var(--muted); transition: transform .15s ease; line-height: 1; text-align: center; }
     .tree-arrow.open { transform: rotate(90deg); }
@@ -228,7 +228,7 @@
         <div id="folderTreeWrap" class="folder-tree-wrap hidden">
           <div class="folder-tree-header">
             <span class="tree-title">Folder Tree</span>
-            <button id="treeLoadSelected" disabled title="Load all checked folders together">Load checked</button>
+            <button id="treeCheckAll" title="Check all analyzed folders">Check all</button>
             <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
           </div>
           <div id="folderTree"></div>
@@ -462,6 +462,15 @@
   function setStatus(msg) { statusEl.textContent = msg; }
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  // Generic debounce helper
+  function debounce(fn, ms) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+  }
+
+  // Version counter so concurrent renderScenes calls can bail out early
+  let _renderScenesVersion = 0;
 
   function loadVersionBadge() {
     if (!versionBadge) return;
@@ -913,6 +922,7 @@
 
   // Render: Scenes (fix ordering by appending synchronously; load images async)
   async function renderScenes() {
+    const myVer = ++_renderScenesVersion;
     const minC = parseFloat(el('#speciesConf').value)||0;
     const search = el('#search').value;
     const sortBy = el('#sortBy').value;
@@ -932,6 +942,7 @@
     // Incremental render for responsiveness and consistent ordering
     const batch = 24;
     for (let i=0; i<visibleScenes.length; i+=batch) {
+      if (myVer !== _renderScenesVersion) return; // superseded by newer call
       const slice = visibleScenes.slice(i, i+batch);
       const frag = document.createDocumentFragment();
       // Synchronous DOM append in desired order
@@ -1461,7 +1472,7 @@
         e.stopPropagation();
         if (checkbox.checked) checkedFolderPaths.add(node.path);
         else checkedFolderPaths.delete(node.path);
-        updateLoadSelectedBtn();
+        debouncedAutoLoad();
       });
     }
 
@@ -1528,9 +1539,40 @@
   // Helper function to load folder using native path (for pywebview API)
   // Loads a single folder. For multi-folder loading, see loadMultipleFolders().
 
-  function updateLoadSelectedBtn() {
-    const btn = document.getElementById('treeLoadSelected');
-    if (btn) btn.disabled = checkedFolderPaths.size === 0;
+  // Auto-load: fires after a short debounce whenever checkboxes change.
+  // If nothing is checked, clears the view gracefully.
+  const debouncedAutoLoad = debounce(async () => {
+    if (checkedFolderPaths.size > 0) {
+      await loadMultipleFolders(Array.from(checkedFolderPaths));
+    } else {
+      rows = []; header = []; scenes = [];
+      sceneGrid.innerHTML = '';
+      setStatus('No folders selected — check folders in the tree to load scenes');
+    }
+  }, 400);
+
+  // Collect all kestrel paths from the tree (recursively) for check-all
+  function collectKestrelPaths(node, out = []) {
+    if (!node) return out;
+    if (node.has_kestrel) out.push(node.path);
+    (node.children || []).forEach(c => collectKestrelPaths(c, out));
+    return out;
+  }
+
+  function checkAllTreeFolders() {
+    const all = collectKestrelPaths(folderTreeRootNode);
+    const btn = document.getElementById('treeCheckAll');
+    // If all are already checked, uncheck all; otherwise check all
+    const allChecked = all.length > 0 && all.every(p => checkedFolderPaths.has(p));
+    if (allChecked) {
+      checkedFolderPaths.clear();
+      if (btn) btn.textContent = 'Check all';
+    } else {
+      all.forEach(p => checkedFolderPaths.add(p));
+      if (btn) btn.textContent = 'Check none';
+    }
+    renderFolderTree(); // re-render so checkbox DOM matches state
+    debouncedAutoLoad();
   }
 
   async function loadMultipleFolders(paths) {
@@ -1751,7 +1793,7 @@
   });
 
   el('#saveCsv').addEventListener('click', saveCsv);
-  el('#search').addEventListener('input', () => renderScenes());
+  el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
   el('#speciesConf').addEventListener('change', () => renderScenes());
   el('#sortBy').addEventListener('change', () => renderScenes());
   // Wire merge scenes button
@@ -1895,7 +1937,8 @@
       if (folderPath) {
         treeExpandedPaths.clear();
         checkedFolderPaths.clear();
-        updateLoadSelectedBtn();
+        const treeCheckAllBtn = document.getElementById('treeCheckAll');
+        if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
         const treeScanned = await scanFolderTree(folderPath);
         if (treeScanned && !folderTreeRootHasKestrel) {
           setStatus('Select a folder from the tree below to load its scenes');
@@ -1908,7 +1951,11 @@
     });
   }
 
-  // Wire "Load checked" button
+  // Wire "Check all / Check none" button
+  const treeCheckAllBtn = document.getElementById('treeCheckAll');
+  if (treeCheckAllBtn) treeCheckAllBtn.addEventListener('click', checkAllTreeFolders);
+
+  // Wire "Load checked" button (removed from HTML; kept as no-op guard)
   const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');
   if (treeLoadSelectedBtn) {
     treeLoadSelectedBtn.addEventListener('click', async () => {

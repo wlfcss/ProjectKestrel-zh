@@ -697,7 +697,7 @@ def main():
         try:
             log('Starting windowed UI via pywebview...')
             api = Api()
-            webview.create_window('Kestrel Visualizer', url, js_api=api)
+            webview.create_window('Kestrel Visualizer', url, js_api=api, fullscreen=True)
             webview.start()
         except Exception as e:
             log('Windowed mode failed at runtime; falling back to browser:', repr(e))
