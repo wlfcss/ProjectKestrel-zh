@@ -1703,7 +1703,17 @@
     wrap.className = 'tree-node';
 
     const row = document.createElement('div');
-    row.className = 'tree-node-row ' + (node.has_kestrel ? 'has-kestrel' : 'no-kestrel');
+    // If this node or any descendant has a .kestrel folder, treat it as "active" (not grayed out).
+    function subtreeHasKestrel(n) {
+      if (!n) return false;
+      if (n.has_kestrel) return true;
+      if (!n.children) return false;
+      for (const c of n.children) if (subtreeHasKestrel(c)) return true;
+      return false;
+    }
+
+    const effectiveHasKestrel = subtreeHasKestrel(node);
+    row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel');
     if (node.path === treeActivePath) row.classList.add('active');
 
     // Arrow toggle (only if children exist)
@@ -1718,7 +1728,7 @@
       arrow.textContent = '▶';
     }
 
-    // Checkbox (only on .kestrel folders)
+    // Checkbox (only on nodes that actually have a .kestrel folder)
     let checkbox = null;
     if (node.has_kestrel) {
       checkbox = document.createElement('input');
@@ -1775,7 +1785,7 @@
       });
     }
 
-    // Click label/row to load if it has kestrel
+    // Click label/row to load only if THIS node has kestrel (not just descendants).
     if (node.has_kestrel) {
       label.addEventListener('click', async () => {
         treeActivePath = node.path;
