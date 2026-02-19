@@ -402,7 +402,7 @@
             <span class="help-tip" data-tip="Open the folder that contains your bird photos after the folder is analyzed with Kestrel." aria-label="Folder selection help" title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
           </button>
           <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">Analyze Folders…</button>
-          <button id="openSettings">Default Editor Options…</button>
+          <button id="openSettings">Settings</button>
           <button id="revertCsv" disabled title="Discard all unsaved changes">Revert Changes</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
@@ -515,7 +515,7 @@
           </div>
           <div class="welcome-tip">
             <span class="welcome-tip-icon">&#x1F4A1;</span>
-            <span>Want to open photos in your preferred editor? Double-click any photo in a scene &mdash; or configure your editor via <span class="welcome-link" id="welcomeSettingsLink">Default Editor Options&hellip;</span></span>
+            <span>Want to open photos in your preferred editor? Double-click any photo in a scene &mdash; or configure your editor via <span class="welcome-link" id="welcomeSettingsLink">Settings&hellip;</span></span>
           </div>
         </div>
 
@@ -586,15 +586,8 @@
   <!-- Settings dialog -->
   <dialog id="settingsDlg">
     <div class="settings">
-      <h3 style="margin:0">Editor Integration</h3>
-      <div class="row">
-        <label for="backendUrl">Bridge URL</label>
-        <input id="backendUrl" type="text" placeholder="http://127.0.0.1:8765" />
-      </div>
-      <div class="row">
-        <label for="rootHint">Local Root (hint)</label>
-        <input id="rootHint" type="text" placeholder="/path/to/your/photos" />
-      </div>
+      <h3 style="margin:0">Settings</h3>
+
       <div class="row">
         <label for="editorChoice">Preferred Editor</label>
         <select id="editorChoice">
@@ -603,10 +596,25 @@
           <option value="lightroom">Lightroom</option>
         </select>
       </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Choose which editor Kestrel should use when opening originals. "System Default" will use your OS default application.</div>
+
+      <div class="row">
+        <label for="backendUrl">Bridge URL</label>
+        <input id="backendUrl" type="text" placeholder="http://127.0.0.1:8765" />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">URL for the local visualizer bridge (used when opening images in external editors). Leave as the default unless you changed the bridge port.</div>
+
+      <div class="row">
+        <label for="rootHint">Local Root (hint)</label>
+        <input id="rootHint" type="text" placeholder="/path/to/your/photos" />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Optional path hint to speed up locating your photo library (helps the folder tree). Not required.</div>
+
       <div class="row">
         <label for="treeScanDepth">Tree scan depth</label>
         <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" title="How many folder levels to scan when building the folder tree (1–6)" />
       </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">How many subfolder levels to scan when building the folder tree (1–6). Higher values may increase scan time.</div>
       <div class="row" style="justify-content:flex-end; margin-top: 4px;">
         <button id="settingsCancel">Cancel</button>
         <button id="settingsSave" class="primary">Save</button>
