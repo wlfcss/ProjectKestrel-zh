@@ -7,3 +7,5 @@ large_files/
 dist/
 release/
 .venv-macos/
+analyzer/build/
+analyzer/dist/

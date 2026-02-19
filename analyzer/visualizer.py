@@ -1194,7 +1194,21 @@ def main():
     # When visualizer.py is run from inside analyzer/ (merged layout) set
     # the working directory to the repository root so assets and shared
     # files (assets/, visualizer files) are served correctly.
-    os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') or '.')
+    # If frozen by PyInstaller (onedir), prefer the bundled _internal folder
+    # inside the distribution so static assets (visualizer.html, logos) are
+    # served from the on-disk bundle.
+    if getattr(sys, 'frozen', False):
+        meipass = getattr(sys, '_MEIPASS', None) or os.path.dirname(sys.executable)
+        candidate = os.path.join(meipass, '_internal')
+        if os.path.isdir(candidate):
+            os.chdir(candidate)
+        elif meipass and os.path.isdir(meipass):
+            os.chdir(meipass)
+        else:
+            # Fallback to repo-root relative when running unpacked
+            os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') or '.')
+    else:
+        os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') or '.')
     server = ThreadingHTTPServer((HOST, args.port), Handler)
     log(f'Serving visualizer at http://{HOST}:{args.port}/  (Press Ctrl+C to stop)')
     log('Ephemeral bridge token (auto-injected):', AUTH_TOKEN[:8] + '…')
