@@ -355,6 +355,36 @@
     .ldc-family  { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .high-conf { font-weight: 700; color: #d0eaff !important; }
     .low-conf  { font-style: italic; color: #606878 !important; }
+
+    /* ── Welcome / Quick-Start Panel ───────────────────────────── */
+    #welcomePanel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 48px);
+      padding: 48px 32px;
+      gap: 28px;
+      text-align: center;
+    }
+    #welcomePanel h2 { font-size: 26px; font-weight: 700; letter-spacing: -.3px; margin: 0; }
+    .welcome-subtitle { font-size: 14px; color: var(--muted); margin: -12px 0 0; }
+    .welcome-cards { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; max-width: 840px; width: 100%; }
+    .welcome-card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 22px 22px 18px; max-width: 390px; flex: 1 1 280px; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+    .welcome-card-icon { font-size: 26px; line-height: 1; }
+    .welcome-card-title { font-size: 15px; font-weight: 600; }
+    .welcome-card p { font-size: 13px; color: var(--muted); line-height: 1.55; margin: 0; flex: 1 1 auto; }
+    .welcome-action-btn { display: inline-flex; align-items: center; gap: 6px; background: #1d5aa8; border: 1px solid #2b6ec8; color: #e7e9ee; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; align-self: flex-start; user-select: none; }
+    .welcome-action-btn:hover { background: #1f63b8; border-color: #3a84e6; }
+    .welcome-tips { display: flex; flex-direction: column; gap: 9px; max-width: 720px; width: 100%; }
+    .welcome-tip { background: #0e1117; border: 1px solid #1d2230; border-radius: 10px; padding: 10px 16px; font-size: 13px; color: #cbd2dc; text-align: left; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
+    .welcome-tip-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .welcome-link { color: var(--brand); cursor: pointer; text-decoration: underline; }
+    .welcome-link:hover { color: #7bbfff; }
+    .welcome-footer { font-size: 13px; color: var(--muted); }
+    .welcome-footer a { color: var(--brand); text-decoration: none; }
+    .welcome-footer a:hover { text-decoration: underline; }
+    kbd { background: #161922; border: 1px solid #2a3040; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: monospace; color: #cbd2dc; white-space: nowrap; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -449,6 +479,50 @@
       </div>
 
       <section id="sceneGrid"></section>
+
+      <!-- Welcome / Quick-Start panel — visible only when no folder is loaded -->
+      <div id="welcomePanel">
+        <h2>Welcome to Kestrel &#x1F985;</h2>
+        <p class="welcome-subtitle">What would you like to do?</p>
+
+        <div class="welcome-cards">
+          <div class="welcome-card">
+            <div class="welcome-card-icon">&#x1F52C;</div>
+            <div class="welcome-card-title">First time using Kestrel?</div>
+            <p>Get started by adding your photo folders to the Analysis Queue. Kestrel will automatically detect birds, identify species, and score image quality across your entire library.</p>
+            <span class="welcome-action-btn" id="welcomeAnalyzeBtn">Analyze Photos&#x2026;</span>
+          </div>
+          <div class="welcome-card">
+            <div class="welcome-card-icon">&#x1F4C2;</div>
+            <div class="welcome-card-title">Returning to review your photos?</div>
+            <p>Open a folder you&rsquo;ve already analyzed with Kestrel. Use the search and filtering options on the left to find specific species or sort by image quality.</p>
+            <span class="welcome-action-btn" id="welcomeOpenBtn">Open Folder&#x2026;</span>
+          </div>
+        </div>
+
+        <div class="welcome-tips">
+          <div class="welcome-tip">
+            <span class="welcome-tip-icon">&#x1F4A1;</span>
+            <span>Load multiple folders at once! Open a parent folder and explore your entire library using the <b>Folder Tree</b> on the left.</span>
+          </div>
+          <div class="welcome-tip">
+            <span class="welcome-tip-icon">&#x1F4A1;</span>
+            <span>Hold <kbd>Ctrl</kbd> and click scenes to select multiple &mdash; then merge them into a single scene with one click.</span>
+          </div>
+          <div class="welcome-tip">
+            <span class="welcome-tip-icon">&#x1F4A1;</span>
+            <span>Found a photo you love? Double-click any scene to view it, rate photos with &#x2B50; stars, and hit <b>Save Changes</b> to keep your ratings. Use the <b>Only show manually-rated scenes</b> filter to find them again later.</span>
+          </div>
+          <div class="welcome-tip">
+            <span class="welcome-tip-icon">&#x1F4A1;</span>
+            <span>Want to open photos in your preferred editor? Double-click any photo in a scene &mdash; or configure your editor via <span class="welcome-link" id="welcomeSettingsLink">Default Editor Options&hellip;</span></span>
+          </div>
+        </div>
+
+        <div class="welcome-footer">
+          Stuck? Visit <a id="welcomeTutorialLink" href="https://projectkestrel.org/#tutorial" target="_blank" rel="noopener noreferrer">projectkestrel.org/#tutorial</a> for a video walkthrough.
+        </div>
+      </div>
     </div>
     <!-- Floating multi-select action bar -->
     <div id="selectActionBar" class="select-action-bar hidden">
@@ -1293,6 +1367,10 @@
 
     updateStatusBar(visibleScenes);
     sceneGrid.innerHTML = '';
+
+    // Show welcome panel when no data is loaded; hide it once a folder is open
+    const _welcomePanel = document.getElementById('welcomePanel');
+    if (_welcomePanel) _welcomePanel.classList.toggle('hidden', rows.length > 0);
 
     // Flat index for shift-click range selection
     _visibleSceneOrder = visibleScenes.map(s => String(s.id));
@@ -3280,6 +3358,30 @@
       }
     });
   }
+
+  // ── Welcome Panel action wiring ──────────────────────────────────────────────
+  (function () {
+    const wOpen = document.getElementById('welcomeOpenBtn');
+    if (wOpen) wOpen.addEventListener('click', () => el('#pickFolder').click());
+
+    const wAnalyze = document.getElementById('welcomeAnalyzeBtn');
+    if (wAnalyze) wAnalyze.addEventListener('click', () => el('#analyzeQueueBtn').click());
+
+    const wSettings = document.getElementById('welcomeSettingsLink');
+    if (wSettings) wSettings.addEventListener('click', () => el('#openSettings').click());
+
+    const wTutorial = document.getElementById('welcomeTutorialLink');
+    if (wTutorial) {
+      wTutorial.addEventListener('click', async (e) => {
+        // In pywebview desktop mode use the Python API to open in the system browser
+        if (hasPywebviewApi && window.pywebview?.api?.open_url) {
+          e.preventDefault();
+          try { await window.pywebview.api.open_url('https://projectkestrel.org/#tutorial'); } catch (_) {}
+        }
+        // Otherwise the default href / target="_blank" handles it
+      });
+    }
+  })();
 
   // Queue panel header: toggle expand / collapse
   const queuePanelHeader = document.getElementById('queuePanelHeader');

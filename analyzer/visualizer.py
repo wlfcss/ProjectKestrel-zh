@@ -918,6 +918,16 @@ class Api:
             print(f'[API] open_folder({path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
 
+    def open_url(self, url: str):
+        """Open a URL in the system default browser (pywebview desktop mode)."""
+        try:
+            webbrowser.open(url)
+            print(f'[API] open_url({url!r}) -> success', flush=True)
+            return {'success': True}
+        except Exception as e:
+            print(f'[API] open_url({url!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
     # ------------------------------------------------------------------ #
     #  Analysis Queue API (called from JavaScript in pywebview mode)       #
     # ------------------------------------------------------------------ #
