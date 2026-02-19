@@ -4,7 +4,7 @@
 #define MyAppName "Project Kestrel"
 #define MyAppPublisher "Project Kestrel"
 #define MyAppURL "https://github.com/sirspongelord/ProjectKestrel"
-#define TutorialURL "https://projectkestrel.org/tutorial"
+#define TutorialURL "https://projectkestrel.org/#tutorial"
 
 #ifndef AppVersion
   #define AppVersion "alpha-YYYY.MM.DD.HH.MM"
@@ -18,9 +18,7 @@
   #define ReleaseDir "..\\release"
 #endif
 
-; WebView2 runtime (Evergreen bootstrapper)
-#define WebView2URL "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
-#define WebView2Installer "MicrosoftEdgeWebView2Setup.exe"
+; WebView2 runtime installation removed to reduce installer failures
 
 [Setup]
 AppId=org.ProjectKestrel
@@ -50,7 +48,6 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon_projectkestrel"; Description: "Create desktop shortcut for Project Kestrel"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
-Name: "installwebview2"; Description: "Install Microsoft Edge WebView2 Runtime (required for Visualizer)"; GroupDescription: "Dependencies:"; Flags: checkedonce
 
 [Files]
 ; Unified Project Kestrel bundle (one-dir from PyInstaller)
@@ -62,16 +59,13 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu icon (single unified app)
-Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"
+Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; IconFilename: "{app}\ProjectKestrel\logo.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop icon
-Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel
+Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel; IconFilename: "{app}\ProjectKestrel\logo.ico"
 
 [Run]
-; Run WebView2 Runtime installer if task selected and installer was downloaded
-Filename: "{tmp}\{#WebView2Installer}"; Parameters: "/silent /install"; StatusMsg: "Installing WebView2 Runtime..."; Flags: waituntilterminated; Tasks: installwebview2; Check: WebView2InstallerExists
-
 ; Open tutorial webpage after install
 Filename: "{#TutorialURL}"; Description: "View online tutorial"; Flags: shellexec postinstall skipifsilent nowait
 
