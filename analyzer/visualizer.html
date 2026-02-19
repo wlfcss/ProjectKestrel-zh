@@ -252,6 +252,8 @@
     .tree-node-row.has-kestrel .tree-label { color: #a9c9ee; cursor: pointer; }
     .tree-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
     .tree-node-row.no-kestrel { opacity: 0.38; }
+    /* Improve visibility on macOS where icons look similar: bold non-analyzed folders */
+    .tree-node-row.no-kestrel .tree-label { font-weight: 700; color: #cbd2dc; }
     .tree-node-row.active .tree-label { color: #fff; font-weight: 700; }
     .tree-node-row.active { background: #10293d; }
     .tree-children { padding-left: 14px; }

@@ -547,7 +547,10 @@ def _extension_allowed(path: str) -> bool:
 
 
 def launch(path: str, editor: str):
+    path = os.path.abspath(path)
+    print(f"[LAUNCH] requested path={path!r} editor={editor!r} platform={sys.platform}", flush=True)
     if not os.path.exists(path):
+        print(f"[LAUNCH] ERROR: path does not exist: {path}", flush=True)
         raise FileNotFoundError(path)
     # Windows
     if sys.platform.startswith('win'):
@@ -576,14 +579,55 @@ def launch(path: str, editor: str):
         return
     # macOS
     if sys.platform == 'darwin':
+        # Try editor-specific bundles first
         if editor == 'darktable':
-            try: subprocess.Popen(['open', '-a', 'darktable', path]); return
-            except Exception: pass
+            try:
+                cmd = ['open', '-a', 'darktable', path]
+                print(f"[LAUNCH] macOS: running: {cmd}", flush=True)
+                subprocess.Popen(cmd)
+                return
+            except Exception as e:
+                print(f"[LAUNCH] macOS darktable launch failed: {e}", flush=True)
         if editor == 'lightroom':
-            # macOS Lightroom app bundle name (Classic)
-            try: subprocess.Popen(['open', '-a', 'Adobe Lightroom Classic', path]); return
-            except Exception: pass
-        subprocess.Popen(['open', path]); return
+            try:
+                cmd = ['open', '-a', 'Adobe Lightroom Classic', path]
+                print(f"[LAUNCH] macOS: running: {cmd}", flush=True)
+                subprocess.Popen(cmd)
+                return
+            except Exception as e:
+                print(f"[LAUNCH] macOS lightroom launch failed: {e}", flush=True)
+
+        # System default: try a couple of strategies and log results
+        try:
+            cmd = ['open', path]
+            print(f"[LAUNCH] macOS: trying system open: {cmd}", flush=True)
+            p = subprocess.run(cmd, check=False)
+            print(f"[LAUNCH] macOS: open returned code {p.returncode}", flush=True)
+            if p.returncode == 0:
+                return
+        except Exception as e:
+            print(f"[LAUNCH] macOS: open() raised: {e}", flush=True)
+
+        # Fallback: try AppleScript via osascript to make Finder open the file (sometimes works when 'open' prompts)
+        try:
+            script = f'tell application "Finder" to open (POSIX file "{path}")'
+            print(f"[LAUNCH] macOS: trying osascript: {script}", flush=True)
+            p = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+            print(f"[LAUNCH] macOS: osascript rc={p.returncode} stdout={p.stdout!r} stderr={p.stderr!r}", flush=True)
+            if p.returncode == 0:
+                return
+        except Exception as e:
+            print(f"[LAUNCH] macOS: osascript failed: {e}", flush=True)
+
+        # Last resort: reveal the file in Finder
+        try:
+            cmd = ['open', '-R', path]
+            print(f"[LAUNCH] macOS: fallback reveal: {cmd}", flush=True)
+            subprocess.Popen(cmd)
+            return
+        except Exception as e:
+            print(f"[LAUNCH] macOS: reveal fallback failed: {e}", flush=True)
+        return
     # Linux / other
     if editor == 'darktable':
         try: subprocess.Popen(['flatpak', 'run', 'org.darktable.Darktable', path]); return
