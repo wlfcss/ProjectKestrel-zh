@@ -47,6 +47,179 @@ from typing import Set
 
 HOST = '127.0.0.1'
 
+# ---------------------------------------------------------------------------
+# Optional: import AnalysisPipeline from the sibling analyzer module so the
+# visualizer can drive the analysis queue without launching a separate process.
+# ---------------------------------------------------------------------------
+_PIPELINE_AVAILABLE = False
+_pipeline_import_error = ''
+try:
+    _script_dir = os.path.dirname(os.path.abspath(__file__))
+    for _candidate in [
+        os.path.join(_script_dir, '..', 'analyzer'),
+        os.path.join(_script_dir, 'analyzer'),
+        _script_dir,
+    ]:
+        _candidate = os.path.normpath(_candidate)
+        if os.path.isdir(os.path.join(_candidate, 'kestrel_analyzer')):
+            if _candidate not in sys.path:
+                sys.path.insert(0, _candidate)
+            break
+    from kestrel_analyzer.pipeline import AnalysisPipeline as _AnalysisPipeline  # type: ignore
+    _PIPELINE_AVAILABLE = True
+except ImportError as _ie:
+    _pipeline_import_error = str(_ie)
+except Exception as _pie:
+    _pipeline_import_error = str(_pie)
+
+
+# ---------------------------------------------------------------------------
+# Analysis Queue
+# ---------------------------------------------------------------------------
+class _QueueItem:
+    __slots__ = ('path', 'name', 'status', 'processed', 'total', 'error')
+
+    def __init__(self, path: str, name: str):
+        self.path = path
+        self.name = name
+        self.status = 'pending'   # pending | running | done | error | cancelled
+        self.processed = 0
+        self.total = 0
+        self.error = ''
+
+    def to_dict(self) -> dict:
+        return {
+            'path': self.path,
+            'name': self.name,
+            'status': self.status,
+            'processed': self.processed,
+            'total': self.total,
+            'error': self.error,
+        }
+
+
+class QueueManager:
+    """Thread-safe manager for the sequential folder-analysis queue."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._items: list = []          # list[_QueueItem]
+        self._pause_event = threading.Event()
+        self._pause_event.set()         # set = NOT paused
+        self._cancel_flag = False
+        self._thread: threading.Thread | None = None
+        self._pipeline = None
+        self._use_gpu = True
+
+    # ---- public read-only properties ----
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    @property
+    def is_paused(self) -> bool:
+        return not self._pause_event.is_set()
+
+    def get_status(self) -> dict:
+        with self._lock:
+            return {
+                'available': _PIPELINE_AVAILABLE,
+                'unavailable_reason': _pipeline_import_error if not _PIPELINE_AVAILABLE else '',
+                'running': self.is_running,
+                'paused': self.is_paused,
+                'items': [it.to_dict() for it in self._items],
+            }
+
+    # ---- control ----
+
+    def enqueue(self, paths: list, use_gpu: bool = True) -> dict:
+        if not _PIPELINE_AVAILABLE:
+            return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
+        with self._lock:
+            existing = {it.path for it in self._items}
+            added = 0
+            for p in paths:
+                if p not in existing:
+                    name = os.path.basename(p.rstrip('/\\')) or p
+                    self._items.append(_QueueItem(p, name))
+                    existing.add(p)
+                    added += 1
+        if not self.is_running:
+            self._cancel_flag = False
+            self._pause_event.set()
+            self._use_gpu = use_gpu
+            self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
+            self._thread.start()
+        return {'success': True, 'added': added}
+
+    def pause(self) -> dict:
+        self._pause_event.clear()
+        return {'success': True, 'paused': True}
+
+    def resume(self) -> dict:
+        self._pause_event.set()
+        return {'success': True, 'paused': False}
+
+    def cancel(self) -> dict:
+        self._cancel_flag = True
+        self._pause_event.set()  # unblock any pause-wait so thread can exit
+        with self._lock:
+            for it in self._items:
+                if it.status == 'pending':
+                    it.status = 'cancelled'
+        return {'success': True}
+
+    def clear_done(self) -> dict:
+        with self._lock:
+            self._items = [it for it in self._items if it.status not in ('done', 'error', 'cancelled')]
+        return {'success': True}
+
+    # ---- internal ----
+
+    def _run(self):
+        if self._pipeline is None:
+            self._pipeline = _AnalysisPipeline(use_gpu=self._use_gpu)
+
+        while not self._cancel_flag:
+            with self._lock:
+                item = next((it for it in self._items if it.status == 'pending'), None)
+            if item is None:
+                break
+
+            with self._lock:
+                item.status = 'running'
+
+            try:
+                def _on_progress(processed, total, _it=item):
+                    with self._lock:
+                        _it.processed = processed
+                        _it.total = total
+
+                def _on_status(msg, _it=item):
+                    log(f'[queue:{_it.name}]', msg)
+
+                self._pipeline.process_folder(
+                    item.path,
+                    pause_event=self._pause_event,
+                    callbacks={'on_status': _on_status, 'on_progress': _on_progress},
+                    analyzer_name='visualizer-queue',
+                )
+                with self._lock:
+                    item.status = 'done'
+                    if item.total > 0:
+                        item.processed = item.total
+            except Exception as exc:
+                log(f'[queue] Error processing {item.path!r}:', exc)
+                with self._lock:
+                    item.status = 'error'
+                    item.error = str(exc)
+
+        log('[queue] Run thread finished.')
+
+
+_queue_manager = QueueManager()
+
 # --- Security / behavior configuration (env override matches editor_bridge) ---
 ALLOWED_ROOT = os.environ.get('KESTREL_ALLOWED_ROOT')
 if ALLOWED_ROOT:
@@ -553,6 +726,47 @@ class Api:
             print(f'[API] open_folder({path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
 
+    # ------------------------------------------------------------------ #
+    #  Analysis Queue API (called from JavaScript in pywebview mode)       #
+    # ------------------------------------------------------------------ #
+
+    def start_analysis_queue(self, paths, use_gpu=True):
+        """Enqueue folders for analysis. ``paths`` may be a JSON string or list."""
+        try:
+            if isinstance(paths, str):
+                paths = json.loads(paths)
+            if not isinstance(paths, list):
+                return {'success': False, 'error': 'paths must be a list'}
+            paths = [str(p).strip() for p in paths if p]
+            return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu))
+        except Exception as e:
+            print(f'[API] start_analysis_queue() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
+    def pause_analysis_queue(self):
+        """Pause the running analysis queue."""
+        return _queue_manager.pause()
+
+    def resume_analysis_queue(self):
+        """Resume a paused analysis queue."""
+        return _queue_manager.resume()
+
+    def cancel_analysis_queue(self):
+        """Cancel the analysis queue (marks pending items as cancelled)."""
+        return _queue_manager.cancel()
+
+    def get_queue_status(self):
+        """Return the current state of the analysis queue."""
+        return _queue_manager.get_status()
+
+    def clear_queue_done(self):
+        """Remove finished/errored/cancelled items from the queue list."""
+        return _queue_manager.clear_done()
+
+    def is_analysis_running(self):
+        """Return True if the analysis queue is actively running."""
+        return {'running': _queue_manager.is_running}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
@@ -580,6 +794,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path == '/settings':
             self._json(200, {'ok': True, 'settings': load_persisted_settings()})
             return
+        if self.path == '/queue/status':
+            self._json(200, _queue_manager.get_status())
+            return
         if self.path in ('/', '/index.html'):
             if os.path.exists('visualizer.html'):
                 self.path = '/visualizer.html'
@@ -603,6 +820,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.handle_settings()
         elif parsed.path == '/shutdown':
             self.handle_shutdown()
+        elif parsed.path == '/queue/start':
+            self.handle_queue_start()
+        elif parsed.path in ('/queue/pause', '/queue/resume', '/queue/cancel', '/queue/clear'):
+            self.handle_queue_control(parsed.path)
         else:
             self.send_response(404); self.end_headers(); self.wfile.write(b'{}')
 
@@ -706,6 +927,43 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._json(400, {'ok': False, 'error': str(e)})
 
+    def _check_auth(self) -> bool:
+        """Return True if authenticated (or no token required). Sends 401 and returns False on failure."""
+        if AUTH_TOKEN:
+            token = self.headers.get('X-Bridge-Token') or ''
+            if token != AUTH_TOKEN:
+                self._json(401, {'ok': False, 'error': 'Unauthorized'})
+                return False
+        return True
+
+    def handle_queue_start(self):
+        if not self._check_auth():
+            return
+        try:
+            payload = self._read_json()
+            paths = payload.get('paths', []) if isinstance(payload, dict) else []
+            use_gpu = bool(payload.get('use_gpu', True)) if isinstance(payload, dict) else True
+            if not isinstance(paths, list):
+                self._json(400, {'ok': False, 'error': '"paths" must be a list'}); return
+            result = _queue_manager.enqueue(paths, use_gpu=use_gpu)
+            self._json(200, {'ok': result['success'], **result})
+        except Exception as e:
+            self._json(400, {'ok': False, 'error': str(e)})
+
+    def handle_queue_control(self, path: str):
+        if not self._check_auth():
+            return
+        if path == '/queue/pause':
+            self._json(200, {'ok': True, **_queue_manager.pause()})
+        elif path == '/queue/resume':
+            self._json(200, {'ok': True, **_queue_manager.resume()})
+        elif path == '/queue/cancel':
+            self._json(200, {'ok': True, **_queue_manager.cancel()})
+        elif path == '/queue/clear':
+            self._json(200, {'ok': True, **_queue_manager.clear_done()})
+        else:
+            self._json(404, {'ok': False, 'error': 'Not found'})
+
 
 def parse_args():
     ap = argparse.ArgumentParser(description='Serve Kestrel visualizer with local /open bridge.')
@@ -746,7 +1004,25 @@ def main():
         try:
             log('Starting windowed UI via pywebview...')
             api = Api() # start maximized
-            webview.create_window('Kestrel Visualizer', url, js_api=api, maximized=True)
+            win = webview.create_window('Kestrel Visualizer', url, js_api=api, maximized=True)
+
+            # When the analysis queue is running, intercept the close event so the
+            # window minimizes to the taskbar instead of killing mid-analysis.
+            def _on_closing():
+                if _queue_manager.is_running:
+                    log('Analysis queue is running – minimizing to taskbar instead of closing.')
+                    try:
+                        win.minimize()
+                    except Exception:
+                        pass
+                    return False  # cancel the window close
+                return True  # allow normal close
+
+            try:
+                win.events.closing += _on_closing
+            except Exception:
+                pass  # older pywebview versions may not support this event
+
             webview.start()
         except Exception as e:
             log('Windowed mode failed at runtime; falling back to browser:', repr(e))

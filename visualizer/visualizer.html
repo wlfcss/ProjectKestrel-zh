@@ -249,6 +249,73 @@
     .tree-node-row.active { background: #10293d; }
     .tree-children { padding-left: 14px; }
     .tree-cb { flex: 0 0 13px; width: 13px; height: 13px; margin: 0; cursor: pointer; accent-color: #3a84e6; }
+
+    /* Queue selection checkboxes (for folders not yet analyzed) */
+    .tree-queue-cb { flex: 0 0 13px; width: 13px; height: 13px; margin: 0; cursor: pointer; accent-color: #f39c12; }
+    .tree-node-row.queue-selected { background: rgba(243,156,18,.1) !important; }
+    .tree-node-row.queue-selected .tree-label { color: #f5c542 !important; }
+
+    /* Analyze-queued button row in tree panel */
+    .tree-analyze-row { display: flex; gap: 6px; align-items: center; padding-top: 4px; flex-wrap: wrap; }
+    .tree-analyze-row button { flex: 1; font-size: 12px; height: 28px; }
+    .tree-analyze-count { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+    /* ── Analysis Queue floating notification panel ────────────────── */
+    .queue-panel {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 330px;
+      background: #111318;
+      border: 1px solid #2a3040;
+      border-radius: 12px;
+      box-shadow: 0 8px 36px rgba(0,0,0,.7);
+      z-index: 400;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .queue-panel.hidden { display: none !important; }
+    .queue-panel-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px;
+      background: #161922;
+      border-bottom: 1px solid #1d2230;
+      cursor: pointer; user-select: none;
+    }
+    .queue-panel-title { flex: 1; font-size: 13px; font-weight: 600; }
+    .queue-panel-badge {
+      font-size: 11px; padding: 1px 7px; border-radius: 999px;
+      background: #1d5aa8; border: 1px solid #2b6ec8; color: #c8dcf5;
+    }
+    .queue-panel-badge.paused  { background: #3a2408; border-color: #7a5010; color: #f5c542; }
+    .queue-panel-badge.done    { background: #0a2218; border-color: #1a5e36; color: #2ecc71; }
+    .queue-panel-toggle { font-size: 10px; color: var(--muted); transition: transform .15s; }
+    .queue-panel-toggle.open { transform: rotate(180deg); }
+    .queue-panel-body {
+      padding: 8px; max-height: 280px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .queue-panel-controls {
+      display: flex; gap: 6px; padding: 6px 8px;
+      border-top: 1px solid #1d2230; flex-wrap: wrap;
+    }
+    .queue-panel-controls button { flex: 1; font-size: 12px; height: 28px; min-width: 60px; }
+    .queue-item {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 6px 8px; background: #0e1117; border: 1px solid #1d2230; border-radius: 8px;
+    }
+    .queue-item.done-item { opacity: .7; }
+    .queue-item-header { display: flex; align-items: center; gap: 6px; }
+    .queue-item-name { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .queue-item-status { font-size: 11px; padding: 1px 6px; border-radius: 999px; flex-shrink: 0; white-space: nowrap; }
+    .queue-item-status.pending   { background: #1d2230; color: var(--muted); }
+    .queue-item-status.running   { background: #0f2b4d; color: #4aa3ff; border: 1px solid #1d4f8c; }
+    .queue-item-status.done      { background: #0a2218; color: #2ecc71; border: 1px solid #1a5e36; }
+    .queue-item-status.error     { background: #2a0a0a; color: #e74c3c; border: 1px solid #5e1a1a; }
+    .queue-item-status.cancelled { background: #1d2230; color: #8a9099; }
+    .queue-item-progress { height: 3px; background: #1d2230; border-radius: 999px; overflow: hidden; margin-top: 2px; }
+    .queue-item-progress-fill { height: 100%; background: #3a84e6; border-radius: 999px; transition: width .35s ease; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -277,6 +344,11 @@
             <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
           </div>
           <div id="folderTree"></div>
+          <!-- Analyze queued folders -->
+          <div id="treeAnalyzeRow" class="tree-analyze-row hidden">
+            <button id="treeAnalyzeBtn" class="primary" title="Start the Kestrel analyzer on all queued folders">🔬 Analyze <span id="treeAnalyzeCountBadge">0</span> folder(s)</button>
+            <button id="treeClearQueueBtn" title="Clear queue selection">× Clear</button>
+          </div>
         </div>
         <div class="toolbar-row filters">
           <div class="filter-panel" aria-label="Filtering options">
@@ -348,6 +420,21 @@
       <span id="selectActionLabel" class="muted">0 scenes selected</span>
       <button id="selectMergeBtn" class="primary">Merge selected scenes</button>
       <button id="selectClearBtn">× Clear selection</button>
+    </div>
+
+    <!-- Analysis Queue floating notification panel -->
+    <div id="queuePanel" class="queue-panel hidden" role="region" aria-label="Analysis Queue">
+      <div class="queue-panel-header" id="queuePanelHeader" title="Click to expand / collapse">
+        <span class="queue-panel-title">🔬 Analysis Queue</span>
+        <span class="queue-panel-badge" id="queuePanelBadge">Idle</span>
+        <span class="queue-panel-toggle open" id="queuePanelToggle">▲</span>
+      </div>
+      <div class="queue-panel-body" id="queuePanelBody"></div>
+      <div class="queue-panel-controls" id="queuePanelControls">
+        <button id="queuePauseBtn" title="Pause / resume analysis">⏸ Pause</button>
+        <button id="queueCancelBtn" title="Cancel all pending items">⏹ Cancel</button>
+        <button id="queueClearBtn" title="Remove finished items from list">🗑 Clear done</button>
+      </div>
     </div>
   </main>
 
@@ -1504,10 +1591,14 @@
 
   // Warn user on unsaved changes when attempting to close/refresh
   window.addEventListener('beforeunload', (e) => {
-    if (dirty) {
+    const analysisRunning = window.__queueRunning;
+    if (dirty || analysisRunning) {
+      const msg = analysisRunning
+        ? 'Analysis is still running. Closing the page will stop the analysis.'
+        : 'You have unsaved changes. Are you sure you want to leave?';
       e.preventDefault();
-      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-      return 'You have unsaved changes. Are you sure you want to leave?';
+      e.returnValue = msg;
+      return msg;
     }
   });
 
@@ -1689,6 +1780,9 @@
   let treeExpandedPaths = new Set();
   let treeActivePath = null;       // currently single-loaded folder
   let checkedFolderPaths = new Set(); // folders checked for multi-load
+  let queuedFolderPaths = new Set(); // folders queued for analysis (shift-click or queue checkbox)
+  let _treeLastQueueClickPath = null; // last clicked path for shift-range queue selection
+  let _treeFlatOrder = [];           // flat ordered list of visible tree paths for range-select
 
   async function scanFolderTree(rootPath) {
     if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return false;
@@ -1727,16 +1821,23 @@
   function renderFolderTree() {
     const container = document.getElementById('folderTree');
     if (!container || !folderTreeRootNode) return;
+    // Rebuild the flat visible order for shift-range selection
+    _treeFlatOrder = [];
     container.innerHTML = '';
-    container.appendChild(buildTreeNode(folderTreeRootNode));
+    container.appendChild(buildTreeNode(folderTreeRootNode, _treeFlatOrder));
+    updateAnalyzeRow();
   }
 
-  function buildTreeNode(node) {
+  // Build a single tree node DOM element.
+  // flatOrder is mutated to collect visible paths in order (for range-select).
+  function buildTreeNode(node, flatOrder) {
+    flatOrder.push(node.path);
+
     const wrap = document.createElement('div');
     wrap.className = 'tree-node';
 
     const row = document.createElement('div');
-    // If this node or any descendant has a .kestrel folder, treat it as "active" (not grayed out).
+
     function subtreeHasKestrel(n) {
       if (!n) return false;
       if (n.has_kestrel) return true;
@@ -1748,8 +1849,9 @@
     const effectiveHasKestrel = subtreeHasKestrel(node);
     row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel');
     if (node.path === treeActivePath) row.classList.add('active');
+    if (queuedFolderPaths.has(node.path)) row.classList.add('queue-selected');
 
-    // Arrow toggle (only if children exist)
+    // Arrow toggle
     const arrow = document.createElement('span');
     arrow.className = 'tree-arrow';
     const hasChildren = node.children && node.children.length > 0;
@@ -1761,21 +1863,39 @@
       arrow.textContent = '▶';
     }
 
-    // Checkbox (only on nodes that actually have a .kestrel folder)
-    let checkbox = null;
+    // Checkbox for loading ANALYZED folders (green accent)
+    let loadCheckbox = null;
     if (node.has_kestrel) {
-      checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'tree-cb';
-      checkbox.title = 'Include in multi-folder load';
-      checkbox.checked = checkedFolderPaths.has(node.path);
-      checkbox.addEventListener('change', (e) => {
+      loadCheckbox = document.createElement('input');
+      loadCheckbox.type = 'checkbox';
+      loadCheckbox.className = 'tree-cb';
+      loadCheckbox.title = 'Include in multi-folder view';
+      loadCheckbox.checked = checkedFolderPaths.has(node.path);
+      loadCheckbox.addEventListener('change', (e) => {
         e.stopPropagation();
-        if (checkbox.checked) checkedFolderPaths.add(node.path);
+        if (loadCheckbox.checked) checkedFolderPaths.add(node.path);
         else checkedFolderPaths.delete(node.path);
         debouncedAutoLoad();
       });
     }
+
+    // Checkbox for queuing UN-ANALYZED folders for analysis (amber accent)
+    // Also available on analyzed folders (to re-analyze them)
+    const queueCheckbox = document.createElement('input');
+    queueCheckbox.type = 'checkbox';
+    queueCheckbox.className = 'tree-queue-cb';
+    queueCheckbox.title = node.has_kestrel
+      ? 'Re-queue for analysis'
+      : 'Add to analysis queue';
+    queueCheckbox.checked = queuedFolderPaths.has(node.path);
+    queueCheckbox.addEventListener('change', (e) => {
+      e.stopPropagation();
+      if (queueCheckbox.checked) queuedFolderPaths.add(node.path);
+      else queuedFolderPaths.delete(node.path);
+      updateAnalyzeRow();
+      // Refresh row highlighting without full tree rebuild
+      row.classList.toggle('queue-selected', queuedFolderPaths.has(node.path));
+    });
 
     // Folder icon
     const icon = document.createElement('span');
@@ -1789,7 +1909,8 @@
     label.title = node.path;
 
     row.appendChild(arrow);
-    if (checkbox) row.appendChild(checkbox);
+    if (loadCheckbox) row.appendChild(loadCheckbox);
+    row.appendChild(queueCheckbox);
     row.appendChild(icon);
     row.appendChild(label);
     wrap.appendChild(row);
@@ -1800,7 +1921,7 @@
       childWrap = document.createElement('div');
       childWrap.className = 'tree-children';
       if (!treeExpandedPaths.has(node.path)) childWrap.classList.add('hidden');
-      node.children.forEach(child => childWrap.appendChild(buildTreeNode(child)));
+      node.children.forEach(child => childWrap.appendChild(buildTreeNode(child, flatOrder)));
       wrap.appendChild(childWrap);
 
       arrow.addEventListener('click', (e) => {
@@ -1818,17 +1939,25 @@
       });
     }
 
-    // Click label/row to load only if THIS node has kestrel (not just descendants).
+    // Click label/icon to load (if this node has kestrel data)
     if (node.has_kestrel) {
-      label.addEventListener('click', async () => {
-        treeActivePath = node.path;
-        renderFolderTree(); // refresh active state
-        await loadFolderFromPath(node.path);
-      });
-      icon.addEventListener('click', async () => {
+      label.addEventListener('click', async (ev) => {
+        if (ev.shiftKey) { handleQueueShiftClick(node.path); return; }
         treeActivePath = node.path;
         renderFolderTree();
         await loadFolderFromPath(node.path);
+      });
+      icon.addEventListener('click', async (ev) => {
+        if (ev.shiftKey) { handleQueueShiftClick(node.path); return; }
+        treeActivePath = node.path;
+        renderFolderTree();
+        await loadFolderFromPath(node.path);
+      });
+    } else {
+      // Non-analyzed folders: shift-click queues them, plain click does nothing useful
+      label.style.cursor = 'default';
+      label.addEventListener('click', (ev) => {
+        if (ev.shiftKey) { handleQueueShiftClick(node.path); return; }
       });
     }
 
@@ -1836,6 +1965,201 @@
   }
 
   // ── End Folder Tree ───────────────────────────────────────────────────────────
+
+  // ── Analysis Queue Selection ──────────────────────────────────────────────────
+
+  /** Handle shift-click on a tree node: range-select paths for the queue. */
+  function handleQueueShiftClick(path) {
+    if (_treeLastQueueClickPath && _treeFlatOrder.length > 0) {
+      const a = _treeFlatOrder.indexOf(_treeLastQueueClickPath);
+      const b = _treeFlatOrder.indexOf(path);
+      if (a >= 0 && b >= 0) {
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        for (let i = lo; i <= hi; i++) queuedFolderPaths.add(_treeFlatOrder[i]);
+      } else {
+        queuedFolderPaths.add(path);
+      }
+    } else {
+      if (queuedFolderPaths.has(path)) queuedFolderPaths.delete(path);
+      else queuedFolderPaths.add(path);
+    }
+    _treeLastQueueClickPath = path;
+    renderFolderTree(); // refresh to show updated checkbox + highlight state
+  }
+
+  /** Show/hide and update the "Analyze X folders" button row. */
+  function updateAnalyzeRow() {
+    const row = document.getElementById('treeAnalyzeRow');
+    const badge = document.getElementById('treeAnalyzeCountBadge');
+    if (!row) return;
+    const n = queuedFolderPaths.size;
+    if (badge) badge.textContent = String(n);
+    row.classList.toggle('hidden', n === 0);
+  }
+
+  // ── Analysis Queue Panel / Polling ───────────────────────────────────────────
+
+  let _queuePollingTimer = null;
+  let _queuePanelExpanded = true;
+  let _queueLastDoneSet = new Set(); // track newly-done folders to auto-refresh tree
+
+  /** Call the backend (pywebview API or HTTP) to start the queue. */
+  async function apiStartQueue(paths, useGpu = true) {
+    if (hasPywebviewApi && window.pywebview?.api?.start_analysis_queue) {
+      return window.pywebview.api.start_analysis_queue(JSON.stringify(paths), useGpu);
+    }
+    // HTTP fallback (browser mode)
+    const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? {'X-Bridge-Token': window.__BRIDGE_TOKEN} : {}) };
+    const res = await fetch('/queue/start', { method: 'POST', headers, body: JSON.stringify({ paths, use_gpu: useGpu }) });
+    return res.json();
+  }
+
+  async function apiQueueControl(action) {
+    if (hasPywebviewApi && window.pywebview?.api) {
+      const fn = { pause: 'pause_analysis_queue', resume: 'resume_analysis_queue', cancel: 'cancel_analysis_queue', clear: 'clear_queue_done' }[action];
+      if (fn && window.pywebview.api[fn]) return window.pywebview.api[fn]();
+    }
+    const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? {'X-Bridge-Token': window.__BRIDGE_TOKEN} : {}) };
+    const res = await fetch(`/queue/${action}`, { method: 'POST', headers, body: '{}' });
+    return res.json();
+  }
+
+  async function apiGetQueueStatus() {
+    if (hasPywebviewApi && window.pywebview?.api?.get_queue_status) {
+      return window.pywebview.api.get_queue_status();
+    }
+    const headers = window.__BRIDGE_TOKEN ? {'X-Bridge-Token': window.__BRIDGE_TOKEN} : {};
+    const res = await fetch('/queue/status', { headers });
+    return res.json();
+  }
+
+  /** Render the queue panel from a status object. */
+  function renderQueuePanel(status) {
+    const panel = document.getElementById('queuePanel');
+    const badge = document.getElementById('queuePanelBadge');
+    const body = document.getElementById('queuePanelBody');
+    const controls = document.getElementById('queuePanelControls');
+    const pauseBtn = document.getElementById('queuePauseBtn');
+    if (!panel || !badge || !body) return;
+
+    const items = status.items || [];
+    const running = !!status.running;
+    const paused = !!status.paused;
+    const hasItems = items.length > 0;
+
+    if (!hasItems && !running) {
+      panel.classList.add('hidden');
+      stopPollingQueue();
+      return;
+    }
+
+    panel.classList.remove('hidden');
+
+    // Badge
+    const runningItems = items.filter(i => i.status === 'running');
+    const pendingItems = items.filter(i => i.status === 'pending');
+    const doneItems = items.filter(i => i.status === 'done');
+    if (paused) {
+      badge.textContent = 'Paused'; badge.className = 'queue-panel-badge paused';
+    } else if (running) {
+      const cur = runningItems[0];
+      if (cur && cur.total > 0) {
+        badge.textContent = `${cur.processed} / ${cur.total}`; badge.className = 'queue-panel-badge';
+      } else {
+        badge.textContent = `${pendingItems.length + runningItems.length} pending`; badge.className = 'queue-panel-badge';
+      }
+    } else if (doneItems.length === items.length && items.length > 0) {
+      badge.textContent = 'Done'; badge.className = 'queue-panel-badge done';
+    } else {
+      badge.textContent = `${pendingItems.length} pending`; badge.className = 'queue-panel-badge';
+    }
+
+    // Pause/resume button label
+    if (pauseBtn) pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+
+    if (!_queuePanelExpanded) { body.classList.add('hidden'); if (controls) controls.classList.add('hidden'); return; }
+    body.classList.remove('hidden'); if (controls) controls.classList.remove('hidden');
+
+    // Queue items
+    const frag = document.createDocumentFragment();
+    for (const item of items) {
+      const div = document.createElement('div');
+      div.className = 'queue-item' + (item.status === 'done' || item.status === 'cancelled' ? ' done-item' : '');
+      const hdr = document.createElement('div');
+      hdr.className = 'queue-item-header';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'queue-item-name';
+      nameEl.textContent = item.name;
+      nameEl.title = item.path;
+      const statusEl = document.createElement('span');
+      statusEl.className = `queue-item-status ${item.status}`;
+      const labels = { pending: '⏳ Waiting', running: '⚙ Analyzing', done: '✓ Done', error: '✗ Error', cancelled: '— Cancelled' };
+      statusEl.textContent = labels[item.status] || item.status;
+      if (item.status === 'error' && item.error) statusEl.title = item.error;
+      hdr.appendChild(nameEl); hdr.appendChild(statusEl);
+      div.appendChild(hdr);
+      if (item.status === 'running' && item.total > 0) {
+        const prog = document.createElement('div'); prog.className = 'queue-item-progress';
+        const fill = document.createElement('div'); fill.className = 'queue-item-progress-fill';
+        fill.style.width = Math.round((item.processed / item.total) * 100) + '%';
+        prog.appendChild(fill); div.appendChild(prog);
+      } else if (item.status === 'done' && item.total > 0) {
+        const prog = document.createElement('div'); prog.className = 'queue-item-progress';
+        const fill = document.createElement('div'); fill.className = 'queue-item-progress-fill';
+        fill.style.width = '100%'; fill.style.background = '#2ecc71';
+        prog.appendChild(fill); div.appendChild(prog);
+      }
+      frag.appendChild(div);
+    }
+    body.innerHTML = '';
+    body.appendChild(frag);
+
+    // Check if any folder newly finished — refresh tree to reflect new 📂 icons
+    const nowDone = new Set(items.filter(i => i.status === 'done').map(i => i.path));
+    for (const p of nowDone) {
+      if (!_queueLastDoneSet.has(p)) {
+        // A folder just became done — re-scan tree in background after brief delay
+        setTimeout(() => { if (folderTreeRoot) rescanFolderTree(folderTreeRoot); }, 1200);
+        break;
+      }
+    }
+    _queueLastDoneSet = nowDone;
+  }
+
+  function startPollingQueue() {
+    if (_queuePollingTimer) return;
+    _queuePollingTimer = setInterval(async () => {
+      try {
+        const status = await apiGetQueueStatus();
+        renderQueuePanel(status);
+        if (!status.running && (status.items || []).every(i => i.status !== 'pending' && i.status !== 'running')) {
+          stopPollingQueue();
+        }
+      } catch (_) {}
+    }, 1500);
+  }
+
+  function stopPollingQueue() {
+    if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
+  }
+
+  /** Re-scan the folder tree root without resetting the expanded/checked state. */
+  async function rescanFolderTree(rootPath) {
+    if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return;
+    try {
+      const depth = getSetting('treeScanDepth', 3);
+      const result = await window.pywebview.api.list_subfolders(rootPath, depth);
+      if (!result.success) return;
+      folderTreeData = result.tree;
+      folderTreeRootHasKestrel = !!result.root_has_kestrel;
+      const rootName = rootPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() || rootPath;
+      folderTreeRootNode = { name: rootName, path: rootPath, has_kestrel: folderTreeRootHasKestrel, children: folderTreeData };
+      renderFolderTree();
+    } catch (_) {}
+  }
+
+  // ── End Analysis Queue ────────────────────────────────────────────────────────
 
   // Helper function to load folder using native path (for pywebview API)
   // Loads a single folder. For multi-folder loading, see loadMultipleFolders().
@@ -2273,6 +2597,17 @@
   setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
   hydrateSettingsFromServer();
 
+  // If a queue was running before this page loaded (e.g. page refresh), re-attach the polling
+  (async () => {
+    try {
+      const status = await apiGetQueueStatus();
+      if (status && (status.items || []).length > 0) {
+        renderQueuePanel(status);
+        if (status.running) startPollingQueue();
+      }
+    } catch (_) {}
+  })();
+
   // Wire "Change root…" button in the tree panel
   const treeChangeRootBtn = document.getElementById('treeChangeRoot');
   if (treeChangeRootBtn) {
@@ -2310,6 +2645,114 @@
       await loadMultipleFolders(Array.from(checkedFolderPaths));
     });
   }
+
+  // ── Analysis Queue event wiring ───────────────────────────────────────────────
+
+  // "Analyze X folders" button in tree panel
+  const treeAnalyzeBtn = document.getElementById('treeAnalyzeBtn');
+  if (treeAnalyzeBtn) {
+    treeAnalyzeBtn.addEventListener('click', async () => {
+      const paths = Array.from(queuedFolderPaths);
+      if (paths.length === 0) return;
+      if (!hasPywebviewApi) {
+        alert('Analysis queue is only available in the desktop (pywebview) mode.\n\nRun kestrel_visualizer as a desktop app to use this feature.');
+        return;
+      }
+      treeAnalyzeBtn.disabled = true;
+      try {
+        const result = await apiStartQueue(paths, true);
+        if (result && result.success) {
+          queuedFolderPaths.clear();
+          renderFolderTree();
+          updateAnalyzeRow();
+          startPollingQueue();
+          // Immediately fetch and show status
+          const status = await apiGetQueueStatus();
+          renderQueuePanel(status);
+          setStatus(`Analysis queue started — ${result.added || paths.length} folder(s) queued`);
+        } else {
+          alert('Failed to start analysis queue:\n\n' + (result?.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Failed to start analysis queue:\n\n' + (e.message || e));
+      } finally {
+        treeAnalyzeBtn.disabled = false;
+      }
+    });
+  }
+
+  // "× Clear" button clears the queue selection
+  const treeClearQueueBtn = document.getElementById('treeClearQueueBtn');
+  if (treeClearQueueBtn) {
+    treeClearQueueBtn.addEventListener('click', () => {
+      queuedFolderPaths.clear();
+      _treeLastQueueClickPath = null;
+      renderFolderTree();
+      updateAnalyzeRow();
+    });
+  }
+
+  // Queue panel header: toggle expand / collapse
+  const queuePanelHeader = document.getElementById('queuePanelHeader');
+  if (queuePanelHeader) {
+    queuePanelHeader.addEventListener('click', () => {
+      _queuePanelExpanded = !_queuePanelExpanded;
+      const toggle = document.getElementById('queuePanelToggle');
+      const body = document.getElementById('queuePanelBody');
+      const controls = document.getElementById('queuePanelControls');
+      if (toggle) toggle.classList.toggle('open', _queuePanelExpanded);
+      if (body) body.classList.toggle('hidden', !_queuePanelExpanded);
+      if (controls) controls.classList.toggle('hidden', !_queuePanelExpanded);
+    });
+  }
+
+  // Pause / Resume button
+  const queuePauseBtn = document.getElementById('queuePauseBtn');
+  if (queuePauseBtn) {
+    queuePauseBtn.addEventListener('click', async () => {
+      try {
+        const status = await apiGetQueueStatus();
+        if (status.paused) await apiQueueControl('resume');
+        else await apiQueueControl('pause');
+      } catch (_) {}
+    });
+  }
+
+  // Cancel button
+  const queueCancelBtn = document.getElementById('queueCancelBtn');
+  if (queueCancelBtn) {
+    queueCancelBtn.addEventListener('click', async () => {
+      if (!confirm('Cancel the analysis queue? Pending folders will not be analyzed.')) return;
+      try { await apiQueueControl('cancel'); } catch (_) {}
+    });
+  }
+
+  // Clear done button
+  const queueClearBtn = document.getElementById('queueClearBtn');
+  if (queueClearBtn) {
+    queueClearBtn.addEventListener('click', async () => {
+      try {
+        await apiQueueControl('clear');
+        const status = await apiGetQueueStatus();
+        if (!(status.items || []).some(i => i.status === 'pending' || i.status === 'running')) {
+          document.getElementById('queuePanel')?.classList.add('hidden');
+          stopPollingQueue();
+        } else {
+          renderQueuePanel(status);
+        }
+      } catch (_) {}
+    });
+  }
+
+  // Periodically broadcast queue running state to window (for beforeunload guard)
+  setInterval(async () => {
+    try {
+      if (hasPywebviewApi && window.pywebview?.api?.is_analysis_running) {
+        const r = await window.pywebview.api.is_analysis_running();
+        window.__queueRunning = !!(r && r.running);
+      }
+    } catch (_) {}
+  }, 3000);
 
   </script>
 </body>
