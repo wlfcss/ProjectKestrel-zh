@@ -991,9 +991,28 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path in ('/', '/index.html'):
             # Prefer analyzer/visualizer.html when present (merged layout).
-            if os.path.exists(os.path.join('analyzer', 'visualizer.html')):
+            # In frozen/on-dir builds the working directory may differ, so
+            # check several possible locations (cwd, exe dir, PyInstaller _MEIPASS).
+            def _exists_rel(rel: str) -> bool:
+                # 1) check relative to CWD
+                if os.path.exists(os.path.join(os.getcwd(), rel)):
+                    return True
+                # 2) check relative to the executable directory
+                try:
+                    exe_dir = os.path.dirname(sys.executable)
+                    if exe_dir and os.path.exists(os.path.join(exe_dir, rel)):
+                        return True
+                except Exception:
+                    pass
+                # 3) check PyInstaller _MEIPASS (onefile mode)
+                meipass = getattr(sys, '_MEIPASS', None)
+                if meipass and os.path.exists(os.path.join(meipass, rel)):
+                    return True
+                return False
+
+            if _exists_rel(os.path.join('analyzer', 'visualizer.html')):
                 self.path = '/analyzer/visualizer.html'
-            elif os.path.exists('visualizer.html'):
+            elif _exists_rel('visualizer.html'):
                 self.path = '/visualizer.html'
         return super().do_GET()
 
