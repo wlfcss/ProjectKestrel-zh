@@ -163,7 +163,7 @@ class QueueManager:
         self._items: list = []          # list[_QueueItem]
         self._pause_event = threading.Event()
         self._pause_event.set()         # set = NOT paused
-        self._cancel_flag = False
+        self._cancel_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._pipeline = None
         self._use_gpu = True
@@ -225,7 +225,7 @@ class QueueManager:
                     self._items.append(new_item)
                     added += 1
         if not self.is_running:
-            self._cancel_flag = False
+            self._cancel_event.clear()
             self._pause_event.set()
             self._use_gpu = use_gpu
             self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
@@ -250,21 +250,18 @@ class QueueManager:
         return {'success': True, 'paused': False}
 
     def cancel(self) -> dict:
-        # Request cancellation of remaining work. If we're currently paused,
-        # interpret Cancel as cancelling the current running folder as well.
-        self._cancel_flag = True
-        self._pause_event.set()  # unblock any pause-wait so thread can exit
+        # Request cancellation of remaining work. Wake any paused worker so it
+        # can observe the cancel event and exit before starting the next image.
+        self._cancel_event.set()
+        self._pause_event.set()  # unblock any pause-wait so thread can observe cancel
         with self._lock:
             for it in self._items:
                 if it.status == 'pending':
                     it.status = 'cancelled'
-            # If user cancelled while paused, also cancel the running item
-            if self.is_paused:
-                running = next((it for it in self._items if it.status == 'running'), None)
-                if running is not None:
-                    running.status = 'cancelled'
-                    running.end_time = _time_mod.time()
-                    running.current_status_msg = 'Cancelled'
+            # Mark running item as cancelling so UI updates immediately
+            running = next((it for it in self._items if it.status == 'running'), None)
+            if running is not None:
+                running.current_status_msg = 'Cancelling…'
         return {'success': True}
 
     def clear_done(self) -> dict:
@@ -287,7 +284,7 @@ class QueueManager:
                 return
             self._pipeline = cls(use_gpu=self._use_gpu)
 
-        while not self._cancel_flag:
+        while not self._cancel_event.is_set():
             with self._lock:
                 item = next((it for it in self._items if it.status == 'pending'), None)
             if item is None:
@@ -376,6 +373,7 @@ class QueueManager:
                 self._pipeline.process_folder(
                     item.path,
                     pause_event=self._pause_event,
+                    cancel_event=self._cancel_event,
                     callbacks={
                         'on_status': _on_status,
                         'on_progress': _on_progress,
@@ -388,10 +386,14 @@ class QueueManager:
                     analyzer_name='visualizer-queue',
                 )
                 with self._lock:
-                    item.status = 'done'
-                    item.end_time = _time_mod.time()
-                    if item.total > 0:
-                        item.processed = item.total
+                    if self._cancel_event.is_set():
+                        item.status = 'cancelled'
+                        item.end_time = _time_mod.time()
+                    else:
+                        item.status = 'done'
+                        item.end_time = _time_mod.time()
+                        if item.total > 0:
+                            item.processed = item.total
             except Exception as exc:
                 log(f'[queue] Error processing {item.path!r}:', exc)
                 with self._lock:

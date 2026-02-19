@@ -80,6 +80,7 @@ class AnalysisPipeline:
         self,
         folder: str,
         pause_event=None,
+        cancel_event=None,
         callbacks: Optional[Dict[str, Callable]] = None,
         analyzer_name: str = "pipeline",
     ) -> None:
@@ -195,8 +196,19 @@ class AnalysisPipeline:
             scene_count = database["scene_count"].max() if not database.empty else 0
 
             for idx, raw_file in enumerate(new_files, start=1):
+                # Pause: wait until resume or until cancel_event is set.
                 if pause_event is not None:
-                    pause_event.wait()
+                    while not pause_event.is_set():
+                        if cancel_event is not None and cancel_event.is_set():
+                            if status_cb:
+                                status_cb('Cancelled')
+                            return
+                        # Wait with timeout to be interruptible
+                        pause_event.wait(timeout=0.5)
+                if cancel_event is not None and cancel_event.is_set():
+                    if status_cb:
+                        status_cb('Cancelled')
+                    return
 
                 entry = {
                     "filename": raw_file,

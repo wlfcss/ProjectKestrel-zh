@@ -492,7 +492,7 @@
   </dialog>
 
   <!-- Loading overlay shown while analyzer is importing models -->
-  <div id="loadingOverlay" class="hidden" style="position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:none;">
+  <div id="loadingOverlay" class="hidden" style="position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:12000;pointer-events:none;">
     <div style="background:rgba(10,12,15,0.96);border:1px solid #2a3040;padding:20px 26px;border-radius:12px;color:var(--text);pointer-events:auto;box-shadow:0 6px 30px rgba(0,0,0,.6);">
       <div style="font-weight:700;margin-bottom:6px">Loading Kestrel Analyzer…</div>
       <div style="color:var(--muted);font-size:13px">Please wait while models are loaded. This may take a minute on first run.</div>
@@ -500,7 +500,7 @@
   </div>
 
   <!-- Toast notification container -->
-  <div id="toastContainer" style="position:fixed;right:18px;bottom:18px;z-index:10000;pointer-events:none"></div>
+  <div id="toastContainer" style="position:fixed;right:18px;bottom:18px;z-index:20000;pointer-events:none"></div>
 
   <!-- Settings dialog -->
   <dialog id="settingsDlg">
@@ -2267,6 +2267,18 @@
       secsPerImage = cur.elapsed_seconds / cur.processed;
     }
 
+    // Show loading message if models are being loaded (early in run)
+    if (running && cur) {
+      const overallEl = overallEtaEl;
+      const loadingMsg = (cur.current_status_msg || '').toLowerCase().includes('load');
+      if (loadingMsg || (cur.processed === 0 && cur.current_status_msg)) {
+        if (overallEl) { overallEl.textContent = `⏳ ${cur.current_status_msg || 'Loading analyzer... please wait'}`; overallEl.classList.remove('hidden'); }
+        try { showLoadingAnalyzer(); } catch (e) {}
+      } else {
+        try { hideLoadingAnalyzer(); } catch (e) {}
+      }
+    }
+
     // Overall ETA
     if (overallEtaEl && secsPerImage !== null) {
       let totalRemaining = 0;
@@ -2376,16 +2388,16 @@
 
     // Async: load thumbnails for any img[data-thumb-rel] elements (cache avoids reload flash)
     body.querySelectorAll('img[data-thumb-rel]').forEach(async img => {
-      const key = img.dataset.thumbRel + '|' + img.dataset.thumbRoot;
-      if (_thumbCache.has(key)) {
-        img.src = _thumbCache.get(key);
-        return;
-      }
       try {
-        const result = await window.pywebview.api.read_image_file(img.dataset.thumbRel, img.dataset.thumbRoot);
+        const rel = img.dataset.thumbRel || '';
+        const root = img.dataset.thumbRoot || '';
+        const key = rel + '|' + root;
+        const isLive = rel.indexOf('__live_') >= 0;
+        if (!isLive && _thumbCache.has(key)) { img.src = _thumbCache.get(key); return; }
+        const result = await window.pywebview.api.read_image_file(rel, root);
         if (result && result.success && result.data) {
           const url = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
-          _thumbCache.set(key, url);
+          if (!isLive) _thumbCache.set(key, url);
           img.src = url;
         }
       } catch (_) {}
@@ -2445,12 +2457,13 @@
   async function _loadImg(imgEl, relPath, rootPath) {
     if (!relPath || !rootPath || !hasPywebviewApi) return;
     const key = relPath + '|' + rootPath;
-    if (_thumbCache.has(key)) { imgEl.src = _thumbCache.get(key); return; }
+    const isLive = String(relPath).indexOf('__live_') >= 0;
+    if (!isLive && _thumbCache.has(key)) { imgEl.src = _thumbCache.get(key); return; }
     try {
       const r = await window.pywebview.api.read_image_file(relPath, rootPath);
       if (r && r.success && r.data) {
         const url = `data:${r.mime || 'image/jpeg'};base64,${r.data}`;
-        _thumbCache.set(key, url);
+        if (!isLive) _thumbCache.set(key, url);
         imgEl.src = url;
       }
     } catch (_) {}
@@ -2487,7 +2500,14 @@
     if (overlayEl) {
       if (item.current_overlay_rel) {
         const k = item.current_overlay_rel + '|' + item.path;
-        if (_liveLastOverlayKey !== k) { _liveLastOverlayKey = k; _loadImg(overlayEl, item.current_overlay_rel, item.path); }
+        // Always reload live overlay images (they are overwritten in place).
+        const isLiveOverlay = String(item.current_overlay_rel).indexOf('__live_') >= 0;
+        if (isLiveOverlay) {
+          _liveLastOverlayKey = k + '|' + Date.now();
+          _loadImg(overlayEl, item.current_overlay_rel, item.path);
+        } else if (_liveLastOverlayKey !== k) {
+          _liveLastOverlayKey = k; _loadImg(overlayEl, item.current_overlay_rel, item.path);
+        }
         overlayEl.style.visibility = '';
       } else {
         overlayEl.style.visibility = 'hidden';
@@ -2538,7 +2558,11 @@
       if (hasCrop) {
         const k = crops[i] + '|' + item.path;
         const prev = _liveLastCropKeys[i] || '';
-        if (prev !== k) { _liveLastCropKeys[i] = k; _loadImg(imgEl, crops[i], item.path); }
+        const isLiveCrop = String(crops[i]).indexOf('__live_') >= 0;
+        if (isLiveCrop) {
+          _liveLastCropKeys[i] = k + '|' + Date.now();
+          _loadImg(imgEl, crops[i], item.path);
+        } else if (prev !== k) { _liveLastCropKeys[i] = k; _loadImg(imgEl, crops[i], item.path); }
       } else {
         if (imgEl.src) imgEl.removeAttribute('src');
         _liveLastCropKeys[i] = '';
@@ -3175,9 +3199,9 @@
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
           setStatus(`Analysis queue started — ${result.added || paths.length} folder(s) queued`);
-          // Wait for the pipeline to actually begin processing before hiding the loader
-          const ready = await _waitForPipelineReady(30000);
-          hideLoadingAnalyzer();
+          // Start polling; renderQueuePanel will hide the loader when processing begins.
+          // As a safety, hide the loader after 30s if nothing starts.
+          setTimeout(() => { try { hideLoadingAnalyzer(); } catch (e) {} }, 30000);
         } else {
           hideLoadingAnalyzer();
           alert('Failed to start analysis queue:\n\n' + (result?.error || 'Unknown error'));
