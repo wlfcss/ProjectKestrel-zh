@@ -40,6 +40,7 @@ import subprocess
 import webbrowser
 
 import secrets
+import time as _time_mod
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import threading
 from urllib.parse import urlparse
@@ -77,7 +78,9 @@ except Exception as _pie:
 # Analysis Queue
 # ---------------------------------------------------------------------------
 class _QueueItem:
-    __slots__ = ('path', 'name', 'status', 'processed', 'total', 'error')
+    __slots__ = ('path', 'name', 'status', 'processed', 'total', 'error',
+                 'start_time', 'end_time',
+                 'current_filename', 'current_export_path', 'current_status_msg')
 
     def __init__(self, path: str, name: str):
         self.path = path
@@ -86,8 +89,19 @@ class _QueueItem:
         self.processed = 0
         self.total = 0
         self.error = ''
+        self.start_time: float | None = None
+        self.end_time: float | None = None
+        self.current_filename: str = ''
+        self.current_export_path: str = ''
+        self.current_status_msg: str = ''
 
     def to_dict(self) -> dict:
+        elapsed = 0.0
+        if self.start_time is not None:
+            if self.end_time is not None:
+                elapsed = self.end_time - self.start_time
+            else:
+                elapsed = _time_mod.time() - self.start_time
         return {
             'path': self.path,
             'name': self.name,
@@ -95,6 +109,10 @@ class _QueueItem:
             'processed': self.processed,
             'total': self.total,
             'error': self.error,
+            'elapsed_seconds': round(elapsed, 1),
+            'current_filename': self.current_filename,
+            'current_export_path': self.current_export_path,
+            'current_status_msg': self.current_status_msg,
         }
 
 
@@ -189,6 +207,7 @@ class QueueManager:
 
             with self._lock:
                 item.status = 'running'
+                item.start_time = _time_mod.time()
 
             try:
                 def _on_progress(processed, total, _it=item):
@@ -197,22 +216,45 @@ class QueueManager:
                         _it.total = total
 
                 def _on_status(msg, _it=item):
+                    with self._lock:
+                        _it.current_status_msg = msg
                     log(f'[queue:{_it.name}]', msg)
+
+                def _on_thumbnail(data, _it=item):
+                    with self._lock:
+                        _it.current_filename = data.get('filename', '')
+                        abs_export = data.get('export_path', '')
+                        # Store path relative to the folder root so JS can call
+                        # read_image_file(rel, item.path) without needing absolute paths
+                        if abs_export:
+                            try:
+                                rel = os.path.relpath(abs_export, _it.path).replace('\\', '/')
+                            except ValueError:
+                                rel = abs_export
+                            _it.current_export_path = rel
+                        else:
+                            _it.current_export_path = ''
 
                 self._pipeline.process_folder(
                     item.path,
                     pause_event=self._pause_event,
-                    callbacks={'on_status': _on_status, 'on_progress': _on_progress},
+                    callbacks={
+                        'on_status': _on_status,
+                        'on_progress': _on_progress,
+                        'on_thumbnail': _on_thumbnail,
+                    },
                     analyzer_name='visualizer-queue',
                 )
                 with self._lock:
                     item.status = 'done'
+                    item.end_time = _time_mod.time()
                     if item.total > 0:
                         item.processed = item.total
             except Exception as exc:
                 log(f'[queue] Error processing {item.path!r}:', exc)
                 with self._lock:
                     item.status = 'error'
+                    item.end_time = _time_mod.time()
                     item.error = str(exc)
 
         log('[queue] Run thread finished.')
