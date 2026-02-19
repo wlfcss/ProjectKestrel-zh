@@ -18,13 +18,22 @@ from .config import (
     KESTREL_DIR_NAME,
 )
 from .database import load_database, save_database
+print("Importing read_image from image_utils...")
 from .image_utils import read_image
+print("read_image imported successfully.")
 from .ratings import quality_to_rating
+print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze
 from .logging_utils import get_log_path, log_event, log_exception, log_warning
+print("Utility functions imported successfully.")
+
+print("Importing ML models... Starting with MaskRCNNWrapper...")
 from .ml.mask_rcnn import MaskRCNNWrapper
+print("MaskRCNNWrapper imported successfully. Now importing BirdSpeciesClassifier...")
 from .ml.bird_species import BirdSpeciesClassifier
+print("BirdSpeciesClassifier imported successfully. Now importing QualityClassifier...")
 from .ml.quality import QualityClassifier
+print("QualityClassifier imported successfully. All ML models imported.")
 
 
 class AnalysisPipeline:

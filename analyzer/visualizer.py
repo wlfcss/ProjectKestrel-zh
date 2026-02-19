@@ -88,10 +88,13 @@ if not _PIPELINE_AVAILABLE:
 def _get_pipeline_class():
     """Import and cache AnalysisPipeline on first call (deferred ML import)."""
     global _AnalysisPipeline, _PIPELINE_AVAILABLE, _pipeline_import_error
+    log("_get_pipeline_class() called, available:", _PIPELINE_AVAILABLE)
     if _AnalysisPipeline is not None:
         return _AnalysisPipeline
     try:
+        log("Importing AnalysisPipeline from kestrel_analyzer.pipeline...")
         from kestrel_analyzer.pipeline import AnalysisPipeline  # type: ignore  # noqa: PLC0415
+        log("AnalysisPipeline imported successfully.")
         _AnalysisPipeline = AnalysisPipeline
         _PIPELINE_AVAILABLE = True
         return _AnalysisPipeline

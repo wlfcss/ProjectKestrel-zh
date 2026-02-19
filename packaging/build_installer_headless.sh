@@ -52,7 +52,7 @@ printf "%s\n" "========================================"
 echo
 
 pushd analyzer || exit 1
-python -m PyInstaller ProjectKestrel.spec
+python -m PyInstaller ProjectKestrel-macos.spec
 popd
 
 DIST_DIR="analyzer/dist/ProjectKestrel"
