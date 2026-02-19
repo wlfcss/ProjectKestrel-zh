@@ -53,7 +53,9 @@ echo Running PyInstaller (onedir) ...
 echo ========================================
 echo.
 
-python -m PyInstaller analyzer\ProjectKestrel.spec
+pushd analyzer || exit /b 1
+python -m PyInstaller ProjectKestrel.spec
+popd
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

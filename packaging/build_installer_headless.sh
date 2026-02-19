@@ -51,7 +51,9 @@ printf "%s\n" "Running PyInstaller (onedir) ..."
 printf "%s\n" "========================================"
 echo
 
-python -m PyInstaller analyzer/ProjectKestrel.spec
+pushd analyzer || exit 1
+python -m PyInstaller ProjectKestrel.spec
+popd
 
 DIST_DIR="analyzer/dist/ProjectKestrel"
 if [[ ! -f "${DIST_DIR}/ProjectKestrel" ]]; then
