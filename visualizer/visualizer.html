@@ -85,6 +85,13 @@
     }
     .tooltip-layer.visible { opacity: 1; transform: translateY(0); }
 
+    /* Ensure dialog backdrops sit below floating toasts */
+    dialog::backdrop { z-index: 10000; }
+    /* Place dialogs below the toasts */
+    dialog { z-index: 11000; }
+    /* Toasts should always be on top */
+    #toastContainer { z-index: 9999999; pointer-events: none; position: fixed !important; }
+
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
     .version-badge { color: var(--muted); padding: 4px 2px 8px; font-size: 12px; }
 
@@ -492,10 +499,10 @@
   </dialog>
 
   <!-- Loading overlay shown while analyzer is importing models -->
-  <div id="loadingOverlay" class="hidden" style="position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:12000;pointer-events:none;">
-    <div style="background:rgba(10,12,15,0.96);border:1px solid #2a3040;padding:20px 26px;border-radius:12px;color:var(--text);pointer-events:auto;box-shadow:0 6px 30px rgba(0,0,0,.6);">
-      <div style="font-weight:700;margin-bottom:6px">Loading Kestrel Analyzer…</div>
-      <div style="color:var(--muted);font-size:13px">Please wait while models are loaded. This may take a minute on first run.</div>
+  <div id="loadingOverlay" class="hidden" style="position:fixed;right:18px;bottom:72px;display:flex;align-items:center;justify-content:center;z-index:20010;pointer-events:none;">
+    <div style="background:rgba(10,12,15,0.96);border:1px solid #2a3040;padding:10px 14px;border-radius:10px;color:var(--text);pointer-events:auto;box-shadow:0 6px 18px rgba(0,0,0,.5);min-width:240px;">
+      <div style="font-weight:700;margin-bottom:4px;font-size:13px">Loading Kestrel Analyzer…</div>
+      <div style="color:var(--muted);font-size:12px">Models are loading. Analysis will start shortly.</div>
     </div>
   </div>
 
@@ -700,15 +707,54 @@
   // Temporary toast notification (clickable) — default 5s
   function showToast(msg, timeout = 5000, onclick) {
     try {
-      const container = document.getElementById('toastContainer');
-      if (!container) return;
+      // Determine where to attach the container: prefer the topmost open dialog
+      const openDialogs = Array.from(document.querySelectorAll('dialog[open]'));
+      let attachParent = document.body;
+      if (openDialogs.length > 0) {
+        // Use the last-opened dialog (assumed topmost) so toast is visible above it
+        attachParent = openDialogs[openDialogs.length - 1];
+      }
+
+      let container = document.getElementById('toastContainer');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        // ensure basic layout
+        container.style.position = 'fixed';
+        container.style.right = '18px';
+        container.style.bottom = '18px';
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '8px';
+        container.style.zIndex = '2147483647';
+        container.style.pointerEvents = 'none';
+      }
+
+      // If the container isn't in the preferred parent, move it there.
+      if (container.parentNode !== attachParent) {
+        attachParent.appendChild(container);
+      }
+
+      container.style.zIndex = '2147483647';
+
       const el = document.createElement('div');
       el.className = 'toast';
-      el.style = 'background:#111318;border:1px solid #2a3040;color:var(--text);padding:10px 14px;border-radius:8px;margin-top:8px;pointer-events:auto;cursor:pointer;min-width:160px;box-shadow:0 6px 18px rgba(0,0,0,.6)';
       el.textContent = msg;
-      el.onclick = (e) => { try { if (onclick) onclick(e); } catch (e) {} };
+      el.style.background = '#111318';
+      el.style.border = '1px solid #2a3040';
+      el.style.color = 'var(--text)';
+      el.style.padding = '10px 14px';
+      el.style.borderRadius = '8px';
+      el.style.marginTop = '8px';
+      el.style.pointerEvents = 'auto';
+      el.style.cursor = onclick ? 'pointer' : 'default';
+      el.style.minWidth = '160px';
+      el.style.boxShadow = '0 6px 18px rgba(0,0,0,.6)';
+
+      if (onclick) el.addEventListener('click', (e) => { try { onclick(e); } catch (_) {} el.remove(); });
+
       container.appendChild(el);
-      setTimeout(() => { try { el.remove(); } catch (e) {} }, timeout);
+      if (timeout && timeout > 0) setTimeout(() => { try { el.remove(); } catch (_) {} }, timeout);
     } catch (e) { console.warn('showToast failed', e); }
   }
 
@@ -1534,7 +1580,27 @@
       const fp = scene.representative?.__rootPath || '';
       folderPathEl.textContent = fp || '—';
       folderPathEl.title = fp ? 'Double-click to open folder in file explorer' : '';
-      folderPathEl.ondblclick = fp ? () => { if (window.pywebview?.api) window.pywebview.api.open_folder(fp); } : null;
+      if (fp) {
+        folderPathEl.ondblclick = async (ev) => {
+          try {
+            ev?.preventDefault(); ev?.stopPropagation();
+            if (window.pywebview?.api && window.pywebview.api.open_folder) {
+              const res = await window.pywebview.api.open_folder(fp);
+              // pywebview may return a dict-like result; check for failure
+              if (res && typeof res === 'object' && res.success === false) {
+                showToast('Failed to open folder: ' + (res.error || 'Unknown'), 5000, () => showSettings());
+              }
+            } else {
+              showToast('Open folder not supported in this mode', 4000);
+            }
+          } catch (e) {
+            console.error('open_folder failed', e);
+            showToast('Error opening folder', 5000);
+          }
+        };
+      } else {
+        folderPathEl.ondblclick = null;
+      }
     }
 
     renderSceneImages(scene);
