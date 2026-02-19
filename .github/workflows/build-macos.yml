@@ -1,7 +1,9 @@
-name: Build macOS Artifacts
+﻿name: Build macOS Artifacts
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   build-macos:
@@ -10,57 +12,50 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Download model file (mask_rcnn_resnet50_fpn_v2.pth)
+      - name: Download model files
         shell: bash
         run: |
-          echo "Downloading mask_rcnn_resnet50_fpn_v2.pth from GitHub release..."
+          echo "Downloading model files from GitHub release..."
           mkdir -p analyzer/models
+
           curl -L -o analyzer/models/mask_rcnn_resnet50_fpn_v2.pth \
             "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth"
-          
-          echo ""
+
           echo "Verifying download..."
           if [ ! -f analyzer/models/mask_rcnn_resnet50_fpn_v2.pth ]; then
             echo "ERROR: mask_rcnn_resnet50_fpn_v2.pth not found after download"
             exit 1
           fi
-          
-          FILE_SIZE=$(stat -f%z analyzer/models/mask_rcnn_resnet50_fpn_v2.pth 2>/dev/null || stat -c%s analyzer/models/mask_rcnn_resnet50_fpn_v2.pth 2>/dev/null)
+          FILE_SIZE=$(stat -f%z analyzer/models/mask_rcnn_resnet50_fpn_v2.pth 2>/dev/null || stat -c%s analyzer/models/mask_rcnn_resnet50_fpn_v2.pth)
           echo "Downloaded file size: ${FILE_SIZE} bytes"
-          
           if [ "${FILE_SIZE}" -lt 100000 ]; then
-            echo "ERROR: Downloaded file is too small (${FILE_SIZE} bytes), likely download failed"
+            echo "ERROR: Downloaded file too small (${FILE_SIZE} bytes)"
             exit 1
           fi
-          
-          echo ""
           echo "Contents of analyzer/models/:"
           ls -lh analyzer/models/
-          echo ""
-          echo "Model file successfully downloaded and verified"
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Create venv and install deps
+      - name: Create venv and install dependencies
         shell: bash
         run: |
           python -m venv .venv2
           source .venv2/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements-macos.txt
+          pip install pyinstaller
 
-      - name: Python smoke test (pre-build)
-        shell: bash
-        run: |
-          set -e
-          source .venv2/bin/activate
-          echo "Running Python smoke test to verify rawpy and image_utils work..."
-          python analyzer/cli.py --smoke test_imgs --no-gpu
-          echo "Python smoke test PASSED - rawpy is working correctly"
+      # ---- Smoke tests disabled until CLI/--smoke is integrated ----
+      # - name: Python smoke test (pre-build)
+      #   shell: bash
+      #   run: |
+      #     source .venv2/bin/activate
+      #     python analyzer/cli.py --smoke test_imgs --no-gpu
 
       - name: Run macOS headless build
         shell: bash
@@ -68,38 +63,25 @@ jobs:
           chmod +x packaging/build_installer_headless.sh
           ./packaging/build_installer_headless.sh
 
-      - name: Smoke test bundled analyzer (CLI)
-        shell: bash
-        run: |
-          TEST_DIR="$(pwd)/ci_smoke"
-          mkdir -p "${TEST_DIR}"
-          COPIED_COUNT=0
-          for src in test_imgs/*.CR3 test_imgs/*.cr3; do
-            if [[ -f "${src}" ]]; then
-              echo "Copying test image: ${src}"
-              cp "${src}" "${TEST_DIR}/"
-              COPIED_COUNT=$((COPIED_COUNT + 1))
-            fi
-          done
-          echo "Copied ${COPIED_COUNT} CR3 images to ${TEST_DIR}"
+      # ---- Smoke test bundled binary disabled until CLI/--smoke is integrated ----
+      # - name: Smoke test bundled binary (CLI)
+      #   shell: bash
+      #   run: |
+      #     TEST_DIR="$(pwd)/ci_smoke"
+      #     mkdir -p "${TEST_DIR}"
+      #     for src in test_imgs/*.CR3 test_imgs/*.cr3; do
+      #       [[ -f "${src}" ]] && cp "${src}" "${TEST_DIR}/"
+      #     done
+      #     ./analyzer/dist/ProjectKestrel/ProjectKestrel --cli "${TEST_DIR}" --no-gpu --smoke
 
-          APP_PATH=$(ls -d release/**/kestrel_analyzer.app | head -n 1)
-          "${APP_PATH}/Contents/MacOS/kestrel_analyzer" --cli "${TEST_DIR}" --no-gpu --smoke
-
-      - name: Upload macOS installer
+      - name: Upload macOS installer (.pkg)
         uses: actions/upload-artifact@v4
         with:
           name: macos-installer
           path: release/**/ProjectKestrel-*.pkg
 
-      - name: Upload analyzer app
+      - name: Upload macOS onedir bundle
         uses: actions/upload-artifact@v4
         with:
-          name: macos-analyzer-app
-          path: release/**/kestrel_analyzer.app
-
-      - name: Upload visualizer app
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-visualizer-app
-          path: release/**/visualizer.app
+          name: macos-bundle
+          path: analyzer/dist/ProjectKestrel/

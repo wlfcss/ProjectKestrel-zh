@@ -1,8 +1,10 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 # ========================================
 # Project Kestrel macOS Builder (Headless)
+# Builds unified ProjectKestrel onedir bundle + .pkg installer
+# Called by CI (GitHub Actions) or run locally
 # ========================================
 
 echo
@@ -13,116 +15,96 @@ echo
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="${SCRIPT_DIR}/.."
-RELEASE_ROOT="${PROJECT_ROOT}/release"
-
-RELEASE_TS="$(date "+%Y.%m.%d.%H.%M")"
-RELEASE_NAME="Project Kestrel a${RELEASE_TS}"
-APP_VERSION="alpha-${RELEASE_TS}"
-
-printf "Using release name: %s\n" "${RELEASE_NAME}"
-printf "Using app version: %s\n" "${APP_VERSION}"
 
 cd "${PROJECT_ROOT}"
 
-# Create VERSION.txt and copy into analyzer/visualizer
-VERSION_FILE="VERSION.txt"
+# Version strings (can be injected by caller; fall back to timestamp)
+RELEASE_TS="${RELEASE_TS:-$(date "+%Y.%m.%d.%H.%M")}"
+RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
+APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
+
+printf "Using release name: %s\n" "${RELEASE_NAME}"
+printf "Using app version:  %s\n" "${APP_VERSION}"
+echo
+
+# Write version info into the analyzer folder
 {
   echo "Build: ${RELEASE_TS}"
   echo "Version: ${APP_VERSION}"
-} > "${VERSION_FILE}"
-cp -f "${VERSION_FILE}" "analyzer/VERSION.txt"
-cp -f "${VERSION_FILE}" "visualizer/VERSION.txt"
+} > "analyzer/VERSION.txt"
+echo "[OK] VERSION.txt written to analyzer/"
 
-# Create release directory based on version
-RELEASE_DIR="${RELEASE_ROOT}/${APP_VERSION}"
+# ----------------------------------------
+# Activate Python virtual environment
+# ----------------------------------------
+if [[ -f ".venv2/bin/activate" ]]; then
+  # shellcheck disable=SC1091
+  source ".venv2/bin/activate"
+  echo "[OK] Activated .venv2"
+else
+  echo "[WARNING] .venv2 not found - using system/activated Python"
+fi
+
+echo
+printf "%s\n" "========================================"
+printf "%s\n" "Running PyInstaller (onedir) ..."
+printf "%s\n" "========================================"
+echo
+
+python -m PyInstaller --onedir \
+  --paths=. \
+  --runtime-hook "analyzer/runtime_hook.py" \
+  --hidden-import pywebview \
+  --add-data "analyzer/models:models" \
+  --add-data "analyzer/gui_app.py:." \
+  --add-data "analyzer/gui_helpers.py:." \
+  --add-data "analyzer/cli.py:." \
+  --add-data "analyzer/VERSION.txt:." \
+  --add-data "analyzer/kestrel_analyzer:kestrel_analyzer" \
+  --add-data "analyzer/visualizer.html:." \
+  --add-data "analyzer/logo.png:." \
+  --collect-binaries torch \
+  --collect-binaries onnxruntime \
+  --collect-binaries tensorflow \
+  --name "ProjectKestrel" \
+  --distpath "analyzer/dist" \
+  --workpath "analyzer/build" \
+  --specpath "analyzer" \
+  analyzer/visualizer.py
+
+DIST_DIR="analyzer/dist/ProjectKestrel"
+if [[ ! -f "${DIST_DIR}/ProjectKestrel" ]]; then
+  echo "[ERROR] ProjectKestrel binary not found after build."
+  exit 1
+fi
+echo "[OK] PyInstaller onedir build complete: ${DIST_DIR}/"
+
+echo
+printf "%s\n" "========================================"
+printf "%s\n" "Building macOS installer (.pkg) ..."
+printf "%s\n" "========================================"
+echo
+
+RELEASE_DIR="${PROJECT_ROOT}/release/${APP_VERSION}"
 mkdir -p "${RELEASE_DIR}"
-
-echo "Checking prerequisites..."
-echo
-
-ensure_venv() {
-  if [[ -n "${VIRTUAL_ENV:-}" && "${VIRTUAL_ENV}" == *"/.venv2" ]]; then
-    return 0
-  fi
-
-  if [[ -f "${PROJECT_ROOT}/.venv2/bin/activate" ]]; then
-    # shellcheck disable=SC1091
-    source "${PROJECT_ROOT}/.venv2/bin/activate"
-  else
-    echo "[WARNING] .venv2 not found at ${PROJECT_ROOT}/.venv2"
-    echo "[WARNING] Create it and install requirements-macos.txt before running."
-  fi
-}
-
-build_component() {
-  local component_name="$1"
-  local component_artifact="$2"
-  local component_spec="$3"
-  local component_build_label="$4"
-
-  ensure_venv
-
-  pushd "${component_name}" >/dev/null
-  pyinstaller "${component_spec}"
-  popd >/dev/null
-
-  local dist_path="${component_name}/dist/${component_artifact}"
-  if [[ ! -e "${dist_path}" ]]; then
-    local fallback_app="${component_name}/dist/${component_name}.app"
-    local fallback_bin="${component_name}/dist/${component_name}"
-    if [[ -e "${fallback_app}" ]]; then
-      dist_path="${fallback_app}"
-    elif [[ -e "${fallback_bin}" ]]; then
-      dist_path="${fallback_bin}"
-    else
-      echo "[ERROR] ${component_name} artifact not found at ${dist_path}"
-      return 1
-    fi
-  fi
-
-  cp -R "${dist_path}" "${RELEASE_DIR}/"
-
-  if [[ -d "${component_name}/build/${component_name}" ]]; then
-    cp -R "${component_name}/build/${component_name}" "${RELEASE_DIR}/${component_build_label}"
-  fi
-}
-
-build_component "analyzer" "kestrel_analyzer.app" "analyzer.spec" "analyzer_build"
-build_component "visualizer" "visualizer.app" "visualizer.spec" "visualizer_build"
-
-echo
-printf "%s\n" "========================================"
-printf "%s\n" "Building macOS installer (.pkg)"
-printf "%s\n" "========================================"
-echo
 
 PKG_ROOT="${RELEASE_DIR}/pkgroot"
 APP_INSTALL_DIR="${PKG_ROOT}/Applications/Project Kestrel"
 PKG_OUTPUT="${RELEASE_DIR}/ProjectKestrel-${APP_VERSION}.pkg"
 PKG_SCRIPTS="${RELEASE_DIR}/pkg-scripts"
 
-rm -rf "${PKG_ROOT}"
-rm -rf "${PKG_SCRIPTS}"
+rm -rf "${PKG_ROOT}" "${PKG_SCRIPTS}"
 mkdir -p "${APP_INSTALL_DIR}"
 mkdir -p "${PKG_SCRIPTS}"
-cp -R "${RELEASE_DIR}/kestrel_analyzer.app" "${APP_INSTALL_DIR}/"
-cp -R "${RELEASE_DIR}/visualizer.app" "${APP_INSTALL_DIR}/"
 
+# Copy the entire onedir bundle into the install location
+cp -R "${DIST_DIR}/." "${APP_INSTALL_DIR}/ProjectKestrel/"
+
+# Minimal postinstall script - makes the binary executable
 cat > "${PKG_SCRIPTS}/postinstall" <<'EOS'
 #!/bin/bash
 set -euo pipefail
-
-IM_URL="https://imagemagick.org/script/download.php"
-if command -v magick >/dev/null 2>&1; then
-  exit 0
-fi
-
-if /usr/bin/osascript <<EOF
-display dialog "ImageMagick was not detected.\n\nProject Kestrel can use ImageMagick for RAW image support.\nWould you like to open the download page now?" buttons {"Cancel","Open Download"} default button "Open Download"
-EOF
-then
-  /usr/bin/open "${IM_URL}" || true
-fi
+chmod +x "/Applications/Project Kestrel/ProjectKestrel/ProjectKestrel" 2>/dev/null || true
 EOS
 chmod +x "${PKG_SCRIPTS}/postinstall"
 
@@ -136,8 +118,8 @@ pkgbuild \
 
 echo
 printf "%s\n" "========================================"
-printf "%s\n" "Build completed"
+printf "%s\n" "Build complete!"
 printf "%s\n" "========================================"
 echo
-printf "Artifacts in: %s\n" "${RELEASE_DIR}"
+printf "Bundle:    %s/\n" "${DIST_DIR}"
 printf "Installer: %s\n" "${PKG_OUTPUT}"

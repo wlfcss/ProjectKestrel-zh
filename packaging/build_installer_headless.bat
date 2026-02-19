@@ -1,165 +1,132 @@
 @echo off
 REM ========================================
-REM Project Kestrel Installer Builder (Headless)
+REM Project Kestrel - Headless Build Script (Windows)
+REM Builds unified ProjectKestrel onedir bundle + Inno Setup installer
+REM Called by CI (GitHub Actions) or run locally without prompts
 REM ========================================
 
 setlocal enabledelayedexpansion
 
 echo.
 echo ========================================
-echo Project Kestrel Installer Builder (Headless)
+echo Project Kestrel Headless Builder (Windows)
 echo ========================================
 echo.
 
 set PROJECT_ROOT=%~dp0..
-set RELEASE_ROOT=%PROJECT_ROOT%\release
 set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
-REM Build default release name: Project Kestrel aYYYY.MM.DD.HH.MM
-for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format \"yyyy.MM.dd.HH.mm\""') do set "RELEASE_TS=%%I"
-set "RELEASE_NAME=Project Kestrel a%RELEASE_TS%"
-set "APP_VERSION=alpha-%RELEASE_TS%"
+REM Allow caller to inject version strings; otherwise auto-generate
+if not defined RELEASE_TS (
+    for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format \"yyyy.MM.dd.HH.mm\""') do set "RELEASE_TS=%%I"
+)
+if not defined RELEASE_NAME set "RELEASE_NAME=Project Kestrel a%RELEASE_TS%"
+if not defined APP_VERSION   set "APP_VERSION=alpha-%RELEASE_TS%"
 
 echo Using release name: %RELEASE_NAME%
-echo Using app version: %APP_VERSION%
+echo Using app version:  %APP_VERSION%
+echo.
 
-REM Change to project root directory
+REM Change to project root
 cd /d "%PROJECT_ROOT%"
 
-REM Create VERSION.txt and copy into analyzer/visualizer
-set "VERSION_FILE=VERSION.txt"
+REM Write version info into the analyzer folder
 (
     echo Build: %RELEASE_TS%
     echo Version: %APP_VERSION%
-) > "%VERSION_FILE%"
-copy /Y "%VERSION_FILE%" "analyzer\VERSION.txt" >nul
-copy /Y "%VERSION_FILE%" "visualizer\VERSION.txt" >nul
+) > "analyzer\VERSION.txt"
+echo [OK] VERSION.txt written to analyzer\
 
-REM Create release directory based on version
-set "RELEASE_DIR=%RELEASE_ROOT%\%APP_VERSION%"
-if not exist "%RELEASE_ROOT%" mkdir "%RELEASE_ROOT%"
-if not exist "%RELEASE_DIR%" mkdir "%RELEASE_DIR%"
+REM ----------------------------------------
+REM Activate Python virtual environment
+REM ----------------------------------------
+if exist ".venv2\Scripts\activate.bat" (
+    call ".venv2\Scripts\activate.bat"
+    echo [OK] Activated .venv2
+) else (
+    echo [WARNING] .venv2 not found - using system/activated Python
+)
 
-echo Checking prerequisites...
+echo.
+echo ========================================
+echo Running PyInstaller (onedir) ...
+echo ========================================
 echo.
 
-REM Check if Inno Setup is installed
+python -m PyInstaller --onedir ^
+    --paths=. ^
+    --runtime-hook "analyzer/runtime_hook.py" ^
+    --hidden-import pywebview ^
+    --add-data "analyzer/models;models" ^
+    --add-data "analyzer/gui_app.py;." ^
+    --add-data "analyzer/gui_helpers.py;." ^
+    --add-data "analyzer/cli.py;." ^
+    --add-data "analyzer/VERSION.txt;." ^
+    --add-data "analyzer/kestrel_analyzer;kestrel_analyzer" ^
+    --add-data "analyzer/visualizer.html;." ^
+    --add-data "analyzer/logo.png;." ^
+    --add-data "analyzer/logo.ico;." ^
+    --collect-all msvc-runtime ^
+    --collect-binaries torch ^
+    --collect-binaries onnxruntime ^
+    --collect-binaries tensorflow ^
+    --name "ProjectKestrel" ^
+    --distpath "analyzer/dist" ^
+    --workpath "analyzer/build" ^
+    --specpath "analyzer" ^
+    analyzer/visualizer.py
+
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [ERROR] PyInstaller build failed!
+    exit /b 1
+)
+
+if not exist "analyzer\dist\ProjectKestrel\ProjectKestrel.exe" (
+    echo [ERROR] ProjectKestrel.exe not found after build.
+    exit /b 1
+)
+echo [OK] PyInstaller onedir build complete: analyzer\dist\ProjectKestrel\
+
+echo.
+echo ========================================
+echo Checking Inno Setup ...
+echo ========================================
+echo.
+
 if not exist %INNO_COMPILER% (
     echo [ERROR] Inno Setup 6 not found at %INNO_COMPILER%
-    echo.
-    echo Please install Inno Setup 6 from: https://jrsoftware.org/isinfo.php
-    echo.
+    echo Please install from: https://jrsoftware.org/isinfo.php
     exit /b 1
 )
 echo [OK] Inno Setup 6 found
 
-call :build_component analyzer "kestrel_analyzer.exe" "analyzer.spec" "analyzer_build"
-if %ERRORLEVEL% NEQ 0 goto :fail
-
-call :build_component visualizer "visualizer.exe" "visualizer.spec" "visualizer_build"
-if %ERRORLEVEL% NEQ 0 goto :fail
-
-REM Check if LICENSE exists
-if not exist "LICENSE" (
-    echo [WARNING] LICENSE file not found - creating placeholder
-    echo MIT License > "LICENSE"
-)
-
-REM Create output directory
-if not exist "dist\installer" (
-    echo Creating output directory...
-    mkdir "dist\installer"
-)
+if not exist "dist\installer" mkdir "dist\installer"
 
 echo.
 echo ========================================
-echo Building installer...
+echo Building Inno Setup installer ...
 echo ========================================
 echo.
 
-REM Run Inno Setup compiler from packaging directory
-%INNO_COMPILER% /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" /DReleaseDir="%RELEASE_DIR%" "packaging\kestrel_installer.iss"
+%INNO_COMPILER% ^
+    /DReleaseName="%RELEASE_NAME%" ^
+    /DAppVersion="%APP_VERSION%" ^
+    "packaging\kestrel_installer.iss"
 
-if %ERRORLEVEL% EQU 0 (
-    echo.
-    echo ========================================
-    echo Installer built successfully!
-    echo ========================================
-    echo.
-    echo Output location:
-    echo %CD%\dist\installer\
-    echo.
-    
-    REM List the output file
-    for %%F in ("dist\installer\*.exe") do (
-        echo Created: %%~nxF
-        echo Size: %%~zF bytes
-    )
-
-    echo.
-    echo.
-    echo ========================================
-    echo Moving build artifacts to release...
-    echo ========================================
-    echo.
-
-    move /Y "dist\installer\*.exe" "%RELEASE_DIR%\" >nul
-    echo [OK] Installer moved to %RELEASE_DIR%
-) else (
-    echo.
-    echo [ERROR] Installer build failed!
-    echo Check the error messages above for details.
-    echo.
-)
-
-exit /b 0
-
-:fail
-echo.
-echo [ERROR] Build stopped due to an earlier failure.
-echo.
-exit /b 1
-
-:build_component
-set "COMPONENT_NAME=%~1"
-set "COMPONENT_EXE=%~2"
-set "COMPONENT_SPEC=%~3"
-set "COMPONENT_BUILD_LABEL=%~4"
-
-call :ensure_venv
-if %ERRORLEVEL% NEQ 0 exit /b 1
-
-pushd "%COMPONENT_NAME%"
-pyinstaller "%COMPONENT_SPEC%"
 if %ERRORLEVEL% NEQ 0 (
-    popd
+    echo.
+    echo [ERROR] Inno Setup build failed!
     exit /b 1
 )
-popd
 
-set "DIST_EXE=%COMPONENT_NAME%\dist\%COMPONENT_EXE%"
-if not exist "%DIST_EXE%" (
-    echo [ERROR] %COMPONENT_NAME% executable not found at %DIST_EXE%
-    exit /b 1
+echo.
+echo ========================================
+echo Build complete!
+echo ========================================
+echo.
+for %%F in ("dist\installer\*.exe") do (
+    echo Installer: %%~nxF  ^(%%~zF bytes^)
 )
-move /Y "%DIST_EXE%" "%RELEASE_DIR%\%COMPONENT_EXE%" >nul
-
-if exist "%COMPONENT_NAME%\build\%COMPONENT_NAME%" (
-    move /Y "%COMPONENT_NAME%\build\%COMPONENT_NAME%" "%RELEASE_DIR%\%COMPONENT_BUILD_LABEL%" >nul
-)
-
-exit /b 0
-
-:ensure_venv
-set "VENV_OK="
-if defined VIRTUAL_ENV (
-    echo %VIRTUAL_ENV% | findstr /I "\\.venv2" >nul && set "VENV_OK=1"
-)
-if not defined VENV_OK (
-    if exist "%PROJECT_ROOT%\.venv2\Scripts\activate.bat" (
-        call "%PROJECT_ROOT%\.venv2\Scripts\activate.bat"
-    ) else (
-        echo [WARNING] .venv2 not found at %PROJECT_ROOT%\.venv2
-    )
-)
+echo.
 exit /b 0

@@ -1,4 +1,4 @@
-name: Build Windows Installer
+﻿name: Build Windows Installer
 
 on:
   workflow_dispatch:
@@ -11,81 +11,65 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      
-      - name: Download model file (mask_rcnn_resnet50_fpn_v2.pth)
+
+      - name: Download model files
         shell: powershell
         run: |
-          Write-Host "Downloading mask_rcnn_resnet50_fpn_v2.pth from GitHub release..."
+          Write-Host "Downloading model files from GitHub release..."
           New-Item -ItemType Directory -Force -Path "analyzer\models" | Out-Null
-          Invoke-WebRequest -Uri "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth" `
-            -OutFile "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth"
-          
-          Write-Host ""
-          Write-Host "Verifying download..."
-          if (-not (Test-Path "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth")) {
-            Write-Host "ERROR: mask_rcnn_resnet50_fpn_v2.pth not found after download"
-            exit 1
+
+          $models = @(
+            @{ name = "mask_rcnn_resnet50_fpn_v2.pth"; url = "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth" }
+          )
+
+          foreach ($m in $models) {
+            Write-Host "  -> $($m.name)"
+            Invoke-WebRequest -Uri $m.url -OutFile "analyzer\models\$($m.name)"
+            $size = (Get-Item "analyzer\models\$($m.name)").Length
+            if ($size -lt 100000) { throw "Downloaded $($m.name) is too small ($size bytes)" }
+            Write-Host "     OK ($size bytes)"
           }
-          
-          $fileSize = (Get-Item "analyzer\models\mask_rcnn_resnet50_fpn_v2.pth").Length
-          Write-Host "Downloaded file size: $fileSize bytes"
-          
-          if ($fileSize -lt 100000) {
-            Write-Host "ERROR: Downloaded file is too small ($fileSize bytes), likely download failed"
-            exit 1
-          }
-          
+
           Write-Host ""
           Write-Host "Contents of analyzer\models\:"
           Get-ChildItem "analyzer\models\" | Format-Table Name, Length, LastWriteTime
-          Write-Host ""
-          Write-Host "Model file successfully downloaded and verified"
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Create venv
+      - name: Create venv and install dependencies
         shell: powershell
         run: |
           python -m venv .venv2
           .\.venv2\Scripts\Activate.ps1
           python -m pip install --upgrade pip
-
-      - name: Install Python dependencies
-        shell: powershell
-        run: |
-          .\.venv2\Scripts\Activate.ps1
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install Inno Setup
+      - name: Install Inno Setup 6
         shell: powershell
         run: |
           Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
           Start-Process -FilePath .\is.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -Wait
-          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { throw "Inno Setup not found" }
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup not found after install"
+          }
+          Write-Host "Inno Setup 6 installed."
 
-      - name: Run installer build
-        shell: powershell
-        run: |
-          .\packaging\build_installer_headless.bat
+      - name: Build ProjectKestrel (onedir + installer)
+        shell: cmd
+        run: packaging\build_installer_headless.bat
 
-      - name: Upload installer
+      - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: installer
-          path: release/**/*-Setup.exe
+          name: windows-installer
+          path: dist/installer/*.exe
 
-      - name: Upload analyzer executable
+      - name: Upload ProjectKestrel onedir bundle
         uses: actions/upload-artifact@v4
         with:
-          name: analyzer-exe
-          path: release/**/kestrel_analyzer.exe
-
-      - name: Upload visualizer executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: visualizer-exe
-          path: release/**/visualizer.exe
+          name: windows-bundle
+          path: analyzer/dist/ProjectKestrel/
