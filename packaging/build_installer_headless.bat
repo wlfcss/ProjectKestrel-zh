@@ -53,28 +53,7 @@ echo Running PyInstaller (onedir) ...
 echo ========================================
 echo.
 
-python -m PyInstaller --onedir ^
-    --paths=. ^
-    --runtime-hook "analyzer/runtime_hook.py" ^
-    --hidden-import pywebview ^
-    --add-data "analyzer/models;models" ^
-    --add-data "analyzer/gui_app.py;." ^
-    --add-data "analyzer/gui_helpers.py;." ^
-    --add-data "analyzer/cli.py;." ^
-    --add-data "analyzer/VERSION.txt;." ^
-    --add-data "analyzer/kestrel_analyzer;kestrel_analyzer" ^
-    --add-data "analyzer/visualizer.html;." ^
-    --add-data "analyzer/logo.png;." ^
-    --add-data "analyzer/logo.ico;." ^
-    --collect-all msvc-runtime ^
-    --collect-binaries torch ^
-    --collect-binaries onnxruntime ^
-    --collect-binaries tensorflow ^
-    --name "ProjectKestrel" ^
-    --distpath "analyzer/dist" ^
-    --workpath "analyzer/build" ^
-    --specpath "analyzer" ^
-    analyzer/visualizer.py
+python -m PyInstaller analyzer\ProjectKestrel.spec
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
