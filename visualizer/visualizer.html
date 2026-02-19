@@ -88,6 +88,12 @@
     .status { color: var(--muted); padding: 8px 2px; font-size: 13px; }
     .version-badge { color: var(--muted); padding: 4px 2px 8px; font-size: 12px; }
 
+    /* Folder-load progress bar */
+    .load-progress { display: flex; flex-direction: column; gap: 5px; padding: 4px 2px 2px; }
+    .load-progress-label { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .load-progress-track { height: 4px; background: #1d2230; border-radius: 999px; overflow: hidden; }
+    .load-progress-fill { height: 100%; width: 0%; background: #3a84e6; border-radius: 999px; transition: width .18s ease; }
+
     .sidebar-footer { display: flex; gap: 8px; align-items: center; justify-content: flex-start; }
 
     /* Grid */
@@ -305,6 +311,12 @@
         </div>
         <div class="toolbar-row status">
           <div id="status" class="status">Idle</div>
+        </div>
+        <div class="toolbar-row status hidden" id="loadProgressRow">
+          <div class="load-progress" style="width:100%">
+            <div id="loadProgressLabel" class="load-progress-label">Loading…</div>
+            <div class="load-progress-track"><div id="loadProgressFill" class="load-progress-fill"></div></div>
+          </div>
         </div>
         <div class="toolbar-row status">
           <div id="versionBadge" class="version-badge">Version: —</div>
@@ -1843,6 +1855,20 @@
     debouncedAutoLoad();
   }
 
+  // Progress bar helpers
+  function showProgress(label, pct) {
+    const row = document.getElementById('loadProgressRow');
+    const lbl = document.getElementById('loadProgressLabel');
+    const fill = document.getElementById('loadProgressFill');
+    if (row) row.classList.remove('hidden');
+    if (lbl) lbl.textContent = label;
+    if (fill) fill.style.width = Math.round(Math.max(0, Math.min(100, pct))) + '%';
+  }
+  function hideProgress() {
+    const row = document.getElementById('loadProgressRow');
+    if (row) row.classList.add('hidden');
+  }
+
   async function loadMultipleFolders(paths) {
     if (!paths || paths.length === 0) return;
     blobUrlCache.clear();
@@ -1850,7 +1876,12 @@
     header = [];
     let loadedCount = 0;
     let slot = 0;
-    for (const p of paths) {
+    const total = paths.length;
+    showProgress(`Loading 0 / ${total} folders…`, 0);
+    for (let i = 0; i < paths.length; i++) {
+      const p = paths[i];
+      const folderName = p.replace(/.*[/\\]/, '');
+      showProgress(`Loading ${i + 1} / ${total}: ${folderName}`, (i / total) * 90);
       try {
         const result = await window.pywebview.api.read_kestrel_csv(p);
         if (!result.success) { console.warn('[multi] Skipping', p, result.error); continue; }
@@ -1867,7 +1898,8 @@
         console.warn('[multi] Failed to load', p, e);
       }
     }
-    if (loadedCount === 0) { setStatus('No folders could be loaded'); return; }
+    if (loadedCount === 0) { hideProgress(); setStatus('No folders could be loaded'); return; }
+    showProgress(`Building scenes from ${loadedCount} folder${loadedCount === 1 ? '' : 's'}…`, 95);
     // For single-folder image-loading compat: set rootPath to first loaded root.
     // Per-row __rootPath handles multi-folder image loading in getBlobUrlForPath.
     const firstRow = rows.find(r => r.__rootPath);
@@ -1882,6 +1914,9 @@
     treeActivePath = paths.length === 1 ? paths[0] : null;
     renderFolderTree();
     await renderScenes();
+    showProgress('Done', 100);
+    await sleep(400);
+    hideProgress();
     const label = loadedCount === 1 ? paths[0].replace(/.*[/\\]/, '') : `${loadedCount} folders`;
     setStatus(`Loaded ${label} — ${rows.length} images`);
   }
