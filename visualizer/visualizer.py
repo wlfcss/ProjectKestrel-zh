@@ -250,12 +250,21 @@ class QueueManager:
         return {'success': True, 'paused': False}
 
     def cancel(self) -> dict:
+        # Request cancellation of remaining work. If we're currently paused,
+        # interpret Cancel as cancelling the current running folder as well.
         self._cancel_flag = True
         self._pause_event.set()  # unblock any pause-wait so thread can exit
         with self._lock:
             for it in self._items:
                 if it.status == 'pending':
                     it.status = 'cancelled'
+            # If user cancelled while paused, also cancel the running item
+            if self.is_paused:
+                running = next((it for it in self._items if it.status == 'running'), None)
+                if running is not None:
+                    running.status = 'cancelled'
+                    running.end_time = _time_mod.time()
+                    running.current_status_msg = 'Cancelled'
         return {'success': True}
 
     def clear_done(self) -> dict:
@@ -1184,13 +1193,71 @@ def main():
             # When the analysis queue is running, intercept the close event so the
             # window minimizes to the taskbar instead of killing mid-analysis.
             def _on_closing():
-                if _queue_manager.is_running:
-                    log('Analysis queue is running – minimizing to taskbar instead of closing.')
+                # When an analysis is running or paused, prompt the user with
+                # options to Minimize, Exit (cancel) or Cancel the close.
+                if _queue_manager.is_running or _queue_manager.is_paused:
                     try:
-                        win.minimize()
+                        # Use native Windows MessageBox if available for a simple
+                        # three-button prompt. Fallback to tkinter dialog when not.
+                        if sys.platform.startswith('win'):
+                            import ctypes
+                            MB_YESNOCANCEL = 0x00000003
+                            MB_ICONQUESTION = 0x00000020
+                            title = 'Analysis in progress'
+                            if _queue_manager.is_paused:
+                                msg = 'Analysis is paused. Exit Project Kestrel? You can re-open later to resume.'
+                            else:
+                                msg = 'Analysis is in progress. Cancel analysis and exit?'
+                            resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNOCANCEL | MB_ICONQUESTION)
+                            # IDYES=6 -> Exit (cancel analysis and close)
+                            # IDNO=7  -> Minimize instead of closing
+                            # IDCANCEL=2 -> Do not close
+                            if resp == 6:
+                                try:
+                                    _queue_manager.cancel()
+                                except Exception:
+                                    pass
+                                return True
+                            if resp == 7:
+                                try:
+                                    win.minimize()
+                                except Exception:
+                                    pass
+                                return False
+                            return False
+                        else:
+                            # Tkinter fallback
+                            import tkinter as _tk
+                            from tkinter import messagebox as _mb
+                            root = _tk.Tk()
+                            root.withdraw()
+                            if _queue_manager.is_paused:
+                                msg = 'Analysis is paused. Exit Project Kestrel? You can re-open later to resume.'
+                            else:
+                                msg = 'Analysis is in progress. Cancel analysis and exit?'
+                            res = _mb.askyesnocancel('Analysis in progress', msg)
+                            root.destroy()
+                            # askyesnocancel returns True=Yes, False=No, None=Cancel
+                            if res is True:
+                                try:
+                                    _queue_manager.cancel()
+                                except Exception:
+                                    pass
+                                return True
+                            if res is False:
+                                try:
+                                    win.minimize()
+                                except Exception:
+                                    pass
+                                return False
+                            return False
                     except Exception:
-                        pass
-                    return False  # cancel the window close
+                        # If the prompt fails, fall back to minimizing when running
+                        try:
+                            win.minimize()
+                        except Exception:
+                            pass
+                        return False
                 return True  # allow normal close
 
             try:

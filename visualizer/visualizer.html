@@ -491,6 +491,17 @@
     </div>
   </dialog>
 
+  <!-- Loading overlay shown while analyzer is importing models -->
+  <div id="loadingOverlay" class="hidden" style="position:fixed;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:none;">
+    <div style="background:rgba(10,12,15,0.96);border:1px solid #2a3040;padding:20px 26px;border-radius:12px;color:var(--text);pointer-events:auto;box-shadow:0 6px 30px rgba(0,0,0,.6);">
+      <div style="font-weight:700;margin-bottom:6px">Loading Kestrel Analyzer…</div>
+      <div style="color:var(--muted);font-size:13px">Please wait while models are loaded. This may take a minute on first run.</div>
+    </div>
+  </div>
+
+  <!-- Toast notification container -->
+  <div id="toastContainer" style="position:fixed;right:18px;bottom:18px;z-index:10000;pointer-events:none"></div>
+
   <!-- Settings dialog -->
   <dialog id="settingsDlg">
     <div class="settings">
@@ -685,6 +696,43 @@
 
   // Utilities
   function setStatus(msg) { statusEl.textContent = msg; }
+
+  // Temporary toast notification (clickable) — default 5s
+  function showToast(msg, timeout = 5000, onclick) {
+    try {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.style = 'background:#111318;border:1px solid #2a3040;color:var(--text);padding:10px 14px;border-radius:8px;margin-top:8px;pointer-events:auto;cursor:pointer;min-width:160px;box-shadow:0 6px 18px rgba(0,0,0,.6)';
+      el.textContent = msg;
+      el.onclick = (e) => { try { if (onclick) onclick(e); } catch (e) {} };
+      container.appendChild(el);
+      setTimeout(() => { try { el.remove(); } catch (e) {} }, timeout);
+    } catch (e) { console.warn('showToast failed', e); }
+  }
+
+  function showLoadingAnalyzer() {
+    const o = document.getElementById('loadingOverlay'); if (!o) return; o.classList.remove('hidden'); o.style.pointerEvents = 'auto';
+  }
+  function hideLoadingAnalyzer() {
+    const o = document.getElementById('loadingOverlay'); if (!o) return; o.classList.add('hidden'); o.style.pointerEvents = 'none';
+  }
+
+  async function _waitForPipelineReady(timeoutMs = 30000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const s = await apiGetQueueStatus();
+        if (s && s.items && s.items.length > 0) {
+          const cur = s.items.find(i => i.status === 'running');
+          if (cur && (cur.processed > 0 || (cur.current_export_path && cur.current_export_path.length>0))) return true;
+        }
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 500));
+    }
+    return false;
+  }
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -1842,7 +1890,10 @@
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      if (data && data.ok) setStatus('Opened in editor'); else throw new Error(data && data.error || 'Launch failed');
+      if (data && data.ok) {
+        setStatus('Opened in editor');
+        showToast('Opened in ' + editor, 5000, () => showSettings());
+      } else throw new Error(data && data.error || 'Launch failed');
     } catch (e) {
       setStatus('Failed to open in editor. Check Settings and server.');
     }
@@ -3114,6 +3165,8 @@
       document.getElementById('analyzeQueueDlg').close();
       analyzeDlgAdd.disabled = true;
       try {
+        // Show loading overlay while analyzer imports models (lazy-load)
+        showLoadingAnalyzer();
         const result = await apiStartQueue(paths, useGpu);
         if (result && result.success) {
           queuedFolderPaths.clear();
@@ -3122,10 +3175,15 @@
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
           setStatus(`Analysis queue started — ${result.added || paths.length} folder(s) queued`);
+          // Wait for the pipeline to actually begin processing before hiding the loader
+          const ready = await _waitForPipelineReady(30000);
+          hideLoadingAnalyzer();
         } else {
+          hideLoadingAnalyzer();
           alert('Failed to start analysis queue:\n\n' + (result?.error || 'Unknown error'));
         }
       } catch (e) {
+        hideLoadingAnalyzer();
         alert('Failed to start analysis queue:\n\n' + (e.message || e));
       } finally {
         analyzeDlgAdd.disabled = false;

@@ -260,10 +260,9 @@ class AnalysisPipeline:
                         thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path_rel})
 
                     stage_ctx["stage"] = "mask_rcnn_prediction"
-                    # Pause checkpoint: MaskRCNN inference can take many seconds;
-                    # honour the pause signal before starting it.
-                    if pause_event is not None:
-                        pause_event.wait()
+                    # MaskRCNN inference can take many seconds. Pause semantics are
+                    # handled at the start of each image loop so we do not check
+                    # repeatedly inside the image processing path.
                     masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
                     if masks is None or len(masks) == 0:
                         if detection_cb:
@@ -335,10 +334,8 @@ class AnalysisPipeline:
                         stage_ctx["stage"] = "process_bird"
                         items = []
                         for i in indices:
-                            # Pause checkpoint: quality + species classifiers are
-                            # expensive per crop; honour the pause signal between crops.
-                            if pause_event is not None:
-                                pause_event.wait()
+                            # Process per-crop results. Pause is checked at the
+                            # top of the image loop so we avoid pausing mid-image.
                             species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img)
                             quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
                             items.append(
@@ -556,6 +553,28 @@ class AnalysisPipeline:
 
                 if progress_cb:
                     progress_cb(idx + processed_count, total)
+
+                # Explicitly clear large temporary variables after each image
+                # so that pausing between images doesn't retain large buffers.
+                try:
+                    try: del masks
+                    except Exception: pass
+                    try: del pred_boxes
+                    except Exception: pass
+                    try: del pred_class
+                    except Exception: pass
+                    try: del pred_score
+                    except Exception: pass
+                    try: del img
+                    except Exception: pass
+                    try: del crop_img
+                    except Exception: pass
+                    try: del items
+                    except Exception: pass
+                    try: del bird_items
+                    except Exception: pass
+                except Exception:
+                    pass
 
         except Exception as e:
             log_exception(
