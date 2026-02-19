@@ -49,29 +49,51 @@ from typing import Set
 HOST = '127.0.0.1'
 
 # ---------------------------------------------------------------------------
-# Optional: import AnalysisPipeline from the sibling analyzer module so the
-# visualizer can drive the analysis queue without launching a separate process.
+# Optional: AnalysisPipeline from the sibling analyzer module.
+# We do a lightweight directory check at import time but defer the actual
+# pipeline/ML import until analysis is first requested, so the visualizer
+# starts quickly when the user only wants to browse already-analyzed photos.
 # ---------------------------------------------------------------------------
-_PIPELINE_AVAILABLE = False
 _pipeline_import_error = ''
-try:
-    _script_dir = os.path.dirname(os.path.abspath(__file__))
-    for _candidate in [
-        os.path.join(_script_dir, '..', 'analyzer'),
-        os.path.join(_script_dir, 'analyzer'),
-        _script_dir,
+_AnalysisPipeline = None   # populated lazily on first use
+
+
+def _ensure_pipeline_path() -> bool:
+    """Insert the analyzer package directory into sys.path if present."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    for candidate in [
+        os.path.join(script_dir, '..', 'analyzer'),
+        os.path.join(script_dir, 'analyzer'),
+        script_dir,
     ]:
-        _candidate = os.path.normpath(_candidate)
-        if os.path.isdir(os.path.join(_candidate, 'kestrel_analyzer')):
-            if _candidate not in sys.path:
-                sys.path.insert(0, _candidate)
-            break
-    from kestrel_analyzer.pipeline import AnalysisPipeline as _AnalysisPipeline  # type: ignore
-    _PIPELINE_AVAILABLE = True
-except ImportError as _ie:
-    _pipeline_import_error = str(_ie)
-except Exception as _pie:
-    _pipeline_import_error = str(_pie)
+        candidate = os.path.normpath(candidate)
+        if os.path.isdir(os.path.join(candidate, 'kestrel_analyzer')):
+            if candidate not in sys.path:
+                sys.path.insert(0, candidate)
+            return True
+    return False
+
+
+# Lightweight check: just look for the kestrel_analyzer directory (no ML imports)
+_PIPELINE_AVAILABLE = _ensure_pipeline_path()
+if not _PIPELINE_AVAILABLE:
+    _pipeline_import_error = 'kestrel_analyzer package not found alongside the visualizer'
+
+
+def _get_pipeline_class():
+    """Import and cache AnalysisPipeline on first call (deferred ML import)."""
+    global _AnalysisPipeline, _PIPELINE_AVAILABLE, _pipeline_import_error
+    if _AnalysisPipeline is not None:
+        return _AnalysisPipeline
+    try:
+        from kestrel_analyzer.pipeline import AnalysisPipeline  # type: ignore  # noqa: PLC0415
+        _AnalysisPipeline = AnalysisPipeline
+        _PIPELINE_AVAILABLE = True
+        return _AnalysisPipeline
+    except Exception as exc:
+        _pipeline_import_error = str(exc)
+        _PIPELINE_AVAILABLE = False
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -155,13 +177,28 @@ class QueueManager:
         if not _PIPELINE_AVAILABLE:
             return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
         with self._lock:
-            existing = {it.path for it in self._items}
+            path_to_item = {it.path: it for it in self._items}
             added = 0
             for p in paths:
-                if p not in existing:
+                existing_item = path_to_item.get(p)
+                if existing_item is not None:
+                    if existing_item.status in ('done', 'error', 'cancelled'):
+                        # Reset finalized item so it can be re-processed
+                        existing_item.status = 'pending'
+                        existing_item.processed = 0
+                        existing_item.total = 0
+                        existing_item.error = ''
+                        existing_item.start_time = None
+                        existing_item.end_time = None
+                        existing_item.current_filename = ''
+                        existing_item.current_export_path = ''
+                        existing_item.current_status_msg = ''
+                        added += 1
+                    # If already pending/running, leave it alone
+                else:
                     name = os.path.basename(p.rstrip('/\\')) or p
-                    self._items.append(_QueueItem(p, name))
-                    existing.add(p)
+                    new_item = _QueueItem(p, name)
+                    self._items.append(new_item)
                     added += 1
         if not self.is_running:
             self._cancel_flag = False
@@ -197,7 +234,16 @@ class QueueManager:
 
     def _run(self):
         if self._pipeline is None:
-            self._pipeline = _AnalysisPipeline(use_gpu=self._use_gpu)
+            cls = _get_pipeline_class()
+            if cls is None:
+                with self._lock:
+                    for it in self._items:
+                        if it.status in ('pending', 'running'):
+                            it.status = 'error'
+                            it.error = f'Pipeline unavailable: {_pipeline_import_error}'
+                log('[queue] Pipeline unavailable, aborting:', _pipeline_import_error)
+                return
+            self._pipeline = cls(use_gpu=self._use_gpu)
 
         while not self._cancel_flag:
             with self._lock:
@@ -223,17 +269,11 @@ class QueueManager:
                 def _on_thumbnail(data, _it=item):
                     with self._lock:
                         _it.current_filename = data.get('filename', '')
-                        abs_export = data.get('export_path', '')
-                        # Store path relative to the folder root so JS can call
-                        # read_image_file(rel, item.path) without needing absolute paths
-                        if abs_export:
-                            try:
-                                rel = os.path.relpath(abs_export, _it.path).replace('\\', '/')
-                            except ValueError:
-                                rel = abs_export
-                            _it.current_export_path = rel
-                        else:
-                            _it.current_export_path = ''
+                        # pipeline.py already computes export_path as a relative
+                        # path from the folder root (via os.path.relpath).  Just
+                        # normalise the separator; do NOT re-apply relpath.
+                        export_rel = data.get('export_path', '')
+                        _it.current_export_path = export_rel.replace('\\', '/')
 
                 self._pipeline.process_folder(
                     item.path,

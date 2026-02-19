@@ -2190,7 +2190,10 @@
     const frag = document.createDocumentFragment();
     for (const item of items) {
       const div = document.createElement('div');
-      div.className = 'queue-item' + (item.status === 'done' || item.status === 'cancelled' ? ' done-item' : '');
+      const isDone = item.status === 'done';
+      const isAlreadyAnalyzed = isDone &&
+        (item.current_status_msg || '').toLowerCase().includes('no new files');
+      div.className = 'queue-item' + (isDone || item.status === 'cancelled' ? ' done-item' : '');
 
       // Header row: name + status badge
       const hdr = document.createElement('div');
@@ -2201,7 +2204,13 @@
       nameEl.title = item.path;
       const statusEl = document.createElement('span');
       statusEl.className = `queue-item-status ${item.status}`;
-      const labels = { pending: '⏳ In Queue', running: '⚙ Analyzing', done: '✓ Done', error: '✗ Error', cancelled: '— Cancelled' };
+      const labels = {
+        pending: '⏳ In Queue',
+        running: '⚙ Analyzing',
+        done: isAlreadyAnalyzed ? '✓ Already analyzed' : '✓ Done',
+        error: '✗ Error',
+        cancelled: '— Cancelled',
+      };
       statusEl.textContent = labels[item.status] || item.status;
       if (item.status === 'error' && item.error) statusEl.title = item.error;
       hdr.appendChild(nameEl); hdr.appendChild(statusEl);
