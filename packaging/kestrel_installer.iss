@@ -49,30 +49,24 @@ WizardSmallImageFile=..\assets\logo.png
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon_analyzer"; Description: "Create desktop shortcut for Kestrel Analyzer"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
-Name: "desktopicon_visualizer"; Description: "Create desktop shortcut for Kestrel Visualizer"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
+Name: "desktopicon_projectkestrel"; Description: "Create desktop shortcut for Project Kestrel"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
 Name: "installwebview2"; Description: "Install Microsoft Edge WebView2 Runtime (required for Visualizer)"; GroupDescription: "Dependencies:"; Flags: checkedonce
 
 [Files]
-; Kestrel Analyzer files
-Source: "{#ReleaseDir}\kestrel_analyzer.exe"; DestDir: "{app}\Analyzer"; Flags: ignoreversion
-
-; Kestrel Visualizer files  
-Source: "{#ReleaseDir}\visualizer.exe"; DestDir: "{app}\Visualizer"; Flags: ignoreversion
+; Unified Project Kestrel bundle (one-dir from PyInstaller)
+Source: "..\analyzer\dist\ProjectKestrel\*"; DestDir: "{app}\ProjectKestrel"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 ; Documentation
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-; Start Menu icons
-Name: "{group}\Kestrel Analyzer"; Filename: "{app}\Analyzer\kestrel_analyzer.exe"; WorkingDir: "{app}\Analyzer"
-Name: "{group}\Kestrel Visualizer"; Filename: "{app}\Visualizer\visualizer.exe"; WorkingDir: "{app}\Visualizer"
+; Start Menu icon (single unified app)
+Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
-; Desktop icons
-Name: "{autodesktop}\Kestrel Analyzer"; Filename: "{app}\Analyzer\kestrel_analyzer.exe"; WorkingDir: "{app}\Analyzer"; Tasks: desktopicon_analyzer
-Name: "{autodesktop}\Kestrel Visualizer"; Filename: "{app}\Visualizer\visualizer.exe"; WorkingDir: "{app}\Visualizer"; Tasks: desktopicon_visualizer
+; Desktop icon
+Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel
 
 [Run]
 ; Run WebView2 Runtime installer if task selected and installer was downloaded
@@ -81,9 +75,8 @@ Filename: "{tmp}\{#WebView2Installer}"; Parameters: "/silent /install"; StatusMs
 ; Open tutorial webpage after install
 Filename: "{#TutorialURL}"; Description: "View online tutorial"; Flags: shellexec postinstall skipifsilent nowait
 
-; Option to launch after install
-Filename: "{app}\Analyzer\kestrel_analyzer.exe"; Description: "Launch Kestrel Analyzer"; Flags: nowait postinstall skipifsilent unchecked
-Filename: "{app}\Visualizer\visualizer.exe"; Description: "Launch Kestrel Visualizer"; Flags: nowait postinstall skipifsilent unchecked
+; Option to launch after install (unified)
+Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; Description: "Launch Project Kestrel"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 var
