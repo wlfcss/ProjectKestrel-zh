@@ -1,44 +1,31 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_all
+from PyInstaller.utils.hooks import collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_all
 
-block_cipher = None
-
-datas = [
-    ('models', 'models'),
-    ('gui_app.py', '.'),
-    ('gui_helpers.py', '.'),
-    ('cli.py', '.'),
-    ('VERSION.txt', '.'),
-    ('kestrel_analyzer', 'kestrel_analyzer'),
-    # include analyzer-specific UI assets so onedir contains them
-    (os.path.join('analyzer', 'visualizer.html'), 'analyzer'),
-    (os.path.join('analyzer', 'logo.png'), 'analyzer'),
-    (os.path.join('analyzer', 'logo.ico'), 'analyzer'),
-]
-
+datas = [('models', 'models'), ('gui_app.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
 binaries = []
 hiddenimports = ['pywebview']
-
-# Collect runtime binaries used by major ML libs
 binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('onnxruntime')
 binaries += collect_dynamic_libs('tensorflow')
+tmp_ret = collect_all('msvc-runtime')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
 
 a = Analysis(
-    ['analyzer/visualizer.py'],
+    ['visualizer.py'],
     pathex=['.'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=['analyzer/runtime_hook.py'],
+    runtime_hooks=['runtime_hook.py'],
     excludes=[],
     noarchive=False,
+    optimize=0,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -50,15 +37,19 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )
-
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
     strip=False,
     upx=True,
+    upx_exclude=[],
     name='ProjectKestrel',
 )
