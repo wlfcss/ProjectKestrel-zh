@@ -525,6 +525,30 @@
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+  // ── Lazy image loader ───────────────────────────────────────────────────────
+  // Defers the async getBlobUrlForPath call until the <img> element is within
+  // the viewport (+ a 200 px root-margin buffer).  Just call:
+  //   lazyLoadImg(img, pathResolver)
+  // where pathResolver is an async () => string | null that resolves the URL.
+  // The observer detaches automatically once the image is loaded.
+  const _lazyObserver = new IntersectionObserver((entries, obs) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const img = entry.target;
+      obs.unobserve(img);
+      const resolve = img._lazyResolve;
+      if (!resolve) continue;
+      delete img._lazyResolve;
+      resolve().then(url => { if (url) img.src = url; }).catch(() => {});
+    }
+  }, { rootMargin: '200px' });
+
+  function lazyLoadImg(img, resolverFn) {
+    img._lazyResolve = resolverFn;
+    _lazyObserver.observe(img);
+  }
+  // ── End lazy image loader ────────────────────────────────────────────────────
+
   // Generic debounce helper
   function debounce(fn, ms) {
     let timer;
@@ -1037,10 +1061,10 @@
       const img = document.createElement('img');
       img.alt = s.representative?.filename || '';
       img.loading = 'lazy';
-      (async () => {
-        const url = await getBlobUrlForPath(s.representative?.export_path || s.representative?.crop_path, s.representative?.__rootPath);
-        if (url) img.src = url;
-      })();
+      lazyLoadImg(img, () => getBlobUrlForPath(
+        s.representative?.export_path || s.representative?.crop_path,
+        s.representative?.__rootPath
+      ));
       th.appendChild(img);
       card.appendChild(th);
 
@@ -1227,10 +1251,7 @@
         const card = document.createElement('article'); card.className='card';
         const th = document.createElement('div'); th.className='thumb';
         const img = document.createElement('img'); img.alt = r.filename||''; img.loading='lazy';
-        (async () => {
-          const url = await getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath);
-          if (url) img.src = url;
-        })();
+        lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
         th.appendChild(img); card.appendChild(th);
         const body = document.createElement('div'); body.className='body';
         body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename||'')}"><b>${escapeHtml(r.filename||'')}</b></div>
