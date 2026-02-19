@@ -7,7 +7,7 @@ binaries = []
 hiddenimports = ['pywebview']
 binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('onnxruntime')
-binaries += collect_dynamic_libs('tensorflow-macos')
+binaries += collect_dynamic_libs('tensorflow')
 tmp_ret = collect_all('msvc-runtime')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 

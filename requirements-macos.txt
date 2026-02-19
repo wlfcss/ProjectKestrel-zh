@@ -1,7 +1,7 @@
 # Core ML/AI Dependencies
 torch==2.6.0
 torchvision==0.21.0
-tensorflow-macos
+tensorflow
 onnxruntime==1.23.2
 
 numpy==2.1.3
