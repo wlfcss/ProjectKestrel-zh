@@ -328,6 +328,26 @@
     .queue-live-info .ql-species { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .queue-live-info .ql-detail  { font-size: 11px; color: var(--muted); }
     .queue-overall-eta { font-size: 11px; color: var(--muted); padding: 3px 8px 5px; text-align: right; }
+    /* ── Live Analysis Details dialog ───────────────────────────────────── */
+    .live-dlg { display: flex; flex-direction: column; gap: 12px; padding: 16px; width: min(900px, 96vw); max-height: 94vh; overflow: hidden; }
+    .live-dlg-hdr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .live-dlg-title { font-size: 15px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .live-dlg-fname { font-size: 12px; color: #6a8aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
+    .live-dlg-status-bar { font-size: 12px; color: var(--muted); min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live-dlg-preview-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .live-dlg-img-cell { background: #05080f; border: 1px solid #1d2230; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .live-dlg-img-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .live-dlg-img { width: 100%; aspect-ratio: 4/3; object-fit: contain; background: #020508; border-radius: 4px; display: block; }
+    .live-dlg-section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+    .live-dlg-crops-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .live-dlg-crop-card { background: #080d12; border: 1px solid #1d2230; border-radius: 8px; padding: 7px; display: flex; flex-direction: column; gap: 3px; transition: opacity .2s; }
+    .live-dlg-crop-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: #020508; border-radius: 5px; display: block; }
+    .ldc-conf   { font-size: 11px; color: var(--muted); }
+    .ldc-stars  { font-size: 13px; letter-spacing: .05em; }
+    .ldc-species { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ldc-family  { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .high-conf { font-weight: 700; color: #d0eaff !important; }
+    .low-conf  { font-style: italic; color: #606878 !important; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -443,6 +463,7 @@
         <button id="queuePauseBtn" title="Pause / resume analysis">⏸ Pause</button>
         <button id="queueCancelBtn" title="Cancel all pending items">⏹ Cancel</button>
         <button id="queueClearBtn" title="Remove finished items from list">🗑 Clear done</button>
+        <button id="queueLiveBtn" title="See live analysis details">👁 Live</button>
       </div>
     </div>
   </main>
@@ -560,6 +581,30 @@
         <button id="analyzeDlgCancel">Cancel</button>
         <button id="analyzeDlgAdd" class="primary" disabled>➕ Add to Queue</button>
       </div>
+    </div>
+  </dialog>
+
+  <!-- Live Analysis Details dialog -->
+  <dialog id="liveAnalysisDlg">
+    <div class="live-dlg">
+      <div class="live-dlg-hdr">
+        <span class="live-dlg-title">👁 Live Analysis: <span id="liveDlgFolderName">–</span></span>
+        <span class="live-dlg-fname" id="liveDlgFilename"></span>
+        <button id="liveDlgClose">× Close</button>
+      </div>
+      <div class="live-dlg-status-bar" id="liveDlgStatus"></div>
+      <div class="live-dlg-preview-row">
+        <div class="live-dlg-img-cell">
+          <span class="live-dlg-img-label">Thumbnail</span>
+          <img id="liveDlgThumb" class="live-dlg-img" alt="" />
+        </div>
+        <div class="live-dlg-img-cell">
+          <span class="live-dlg-img-label">Detections</span>
+          <img id="liveDlgOverlay" class="live-dlg-img" alt="" />
+        </div>
+      </div>
+      <span class="live-dlg-section-label">Top Detections</span>
+      <div class="live-dlg-crops-row" id="liveDlgCrops"></div>
     </div>
   </dialog>
 
@@ -2066,6 +2111,13 @@
   let _queuePollingTimer = null;
   let _queuePanelExpanded = true;
   let _queueLastDoneSet = new Set(); // track newly-done folders to auto-refresh tree
+  const _thumbCache = new Map();    // relPath+'|'+rootPath → dataUrl (avoids reload flash)
+  let _liveAnalysisDlgOpen = false;
+  let _liveLastThumbKey = '';
+  let _liveLastOverlayKey = '';
+  let _liveLastCropKeys = [];
+  const CONF_HIGH = 0.75;
+  const CONF_LOW  = 0.30;
 
   /** Call the backend (pywebview API or HTTP) to start the queue. */
   async function apiStartQueue(paths, useGpu = true) {
@@ -2223,12 +2275,18 @@
         fill.style.width = Math.round((item.processed / item.total) * 100) + '%';
         prog.appendChild(fill); div.appendChild(prog);
 
-        // ETA row for running item
-        if (secsPerImage !== null && item.total > item.processed) {
-          const remaining = secsPerImage * (item.total - item.processed);
+        // ETA / paused row
+        {
           const etaEl = document.createElement('div');
           etaEl.className = 'queue-item-eta';
-          etaEl.textContent = `${item.processed} / ${item.total} — est. ${formatDuration(remaining)} left`;
+          if (item.is_paused) {
+            etaEl.textContent = `${item.processed} / ${item.total} — ⏸ Paused`;
+          } else if (secsPerImage !== null && item.total > item.processed) {
+            const remaining = secsPerImage * (item.total - item.processed);
+            etaEl.textContent = `${item.processed} / ${item.total} — est. ${formatDuration(remaining)} left`;
+          } else {
+            etaEl.textContent = `${item.processed} / ${item.total}`;
+          }
           div.appendChild(etaEl);
         }
 
@@ -2265,12 +2323,19 @@
     body.innerHTML = '';
     body.appendChild(frag);
 
-    // Async: load thumbnails for any img[data-thumb-rel] elements
+    // Async: load thumbnails for any img[data-thumb-rel] elements (cache avoids reload flash)
     body.querySelectorAll('img[data-thumb-rel]').forEach(async img => {
+      const key = img.dataset.thumbRel + '|' + img.dataset.thumbRoot;
+      if (_thumbCache.has(key)) {
+        img.src = _thumbCache.get(key);
+        return;
+      }
       try {
         const result = await window.pywebview.api.read_image_file(img.dataset.thumbRel, img.dataset.thumbRoot);
         if (result && result.success && result.data) {
-          img.src = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
+          const url = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
+          _thumbCache.set(key, url);
+          img.src = url;
         }
       } catch (_) {}
     });
@@ -2288,6 +2353,12 @@
       setTimeout(() => { if (folderTreeRootNode) rescanFolderTree(folderTreeRootNode.path); }, 1200);
     }
     _queueLastDoneSet = nowDone;
+
+    // Update live dialog if open
+    if (_liveAnalysisDlgOpen) {
+      const runningItem = items.find(i => i.status === 'running') || null;
+      updateLiveAnalysisDlg(runningItem || items[items.length - 1] || null);
+    }
   }
 
   function startPollingQueue() {
@@ -2308,6 +2379,153 @@
     if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
     stopAutoRefresh();
   }
+
+  // ── Live Analysis Details dialog ──────────────────────────────────────────
+
+  function openLiveAnalysisDlg() {
+    _liveAnalysisDlgOpen = true;
+    document.getElementById('liveAnalysisDlg').showModal();
+  }
+
+  /**
+   * Load an image by relative path + root into an <img> element, using _thumbCache.
+   * Only issues a network/IPC call on cache miss.
+   */
+  async function _loadImg(imgEl, relPath, rootPath) {
+    if (!relPath || !rootPath || !hasPywebviewApi) return;
+    const key = relPath + '|' + rootPath;
+    if (_thumbCache.has(key)) { imgEl.src = _thumbCache.get(key); return; }
+    try {
+      const r = await window.pywebview.api.read_image_file(relPath, rootPath);
+      if (r && r.success && r.data) {
+        const url = `data:${r.mime || 'image/jpeg'};base64,${r.data}`;
+        _thumbCache.set(key, url);
+        imgEl.src = url;
+      }
+    } catch (_) {}
+  }
+
+  /** Update the live dialog with data from a running (or recently-finished) queue item. */
+  function updateLiveAnalysisDlg(item) {
+    const dlg = document.getElementById('liveAnalysisDlg');
+    if (!dlg || !dlg.open) { _liveAnalysisDlgOpen = false; return; }
+
+    // Header
+    const folderEl  = document.getElementById('liveDlgFolderName');
+    const fnameEl   = document.getElementById('liveDlgFilename');
+    const statusEl  = document.getElementById('liveDlgStatus');
+    if (folderEl) folderEl.textContent = item ? item.name : '–';
+    if (fnameEl)  fnameEl.textContent  = item ? (item.current_filename || '') : '';
+    if (statusEl) {
+      const msg = item ? (item.current_status_msg || '') : '';
+      const paused = item && item.is_paused;
+      statusEl.textContent = paused ? '⏸ Paused — ' + msg : msg;
+    }
+
+    if (!item) return;
+
+    // Thumbnail
+    const thumbEl = document.getElementById('liveDlgThumb');
+    if (thumbEl && item.current_export_path) {
+      const k = item.current_export_path + '|' + item.path;
+      if (_liveLastThumbKey !== k) { _liveLastThumbKey = k; _loadImg(thumbEl, item.current_export_path, item.path); }
+    }
+
+    // Detection overlay
+    const overlayEl = document.getElementById('liveDlgOverlay');
+    if (overlayEl) {
+      if (item.current_overlay_rel) {
+        const k = item.current_overlay_rel + '|' + item.path;
+        if (_liveLastOverlayKey !== k) { _liveLastOverlayKey = k; _loadImg(overlayEl, item.current_overlay_rel, item.path); }
+        overlayEl.style.visibility = '';
+      } else {
+        overlayEl.style.visibility = 'hidden';
+      }
+    }
+
+    // Crop cards
+    _updateLiveCropCards(item);
+  }
+
+  function _formatStars(rating) {
+    const r = Math.max(0, Math.min(5, Math.round(rating || 0)));
+    return '★'.repeat(r) + '☆'.repeat(5 - r);
+  }
+
+  function _updateLiveCropCards(item) {
+    const row = document.getElementById('liveDlgCrops');
+    if (!row) return;
+    const crops     = item.current_crops_rel       || [];
+    const dets      = item.current_detections      || [];
+    const quality   = item.current_quality_results || [];
+    const species   = item.current_species_results || [];
+
+    // Ensure exactly 5 card elements exist
+    while (row.children.length < 5) {
+      const card = document.createElement('div');
+      card.className = 'live-dlg-crop-card';
+      card.innerHTML = `
+        <img class="live-dlg-crop-img" alt="" />
+        <div class="ldc-conf">–</div>
+        <div class="ldc-stars">☆☆☆☆☆</div>
+        <div class="ldc-species">–</div>
+        <div class="ldc-family">–</div>`;
+      row.appendChild(card);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const card    = row.children[i];
+      const imgEl   = card.querySelector('.live-dlg-crop-img');
+      const confEl  = card.querySelector('.ldc-conf');
+      const starsEl = card.querySelector('.ldc-stars');
+      const spEl    = card.querySelector('.ldc-species');
+      const fmEl    = card.querySelector('.ldc-family');
+      const hasCrop = i < crops.length && crops[i];
+
+      card.style.opacity = hasCrop ? '1' : '0.3';
+
+      if (hasCrop) {
+        const k = crops[i] + '|' + item.path;
+        const prev = _liveLastCropKeys[i] || '';
+        if (prev !== k) { _liveLastCropKeys[i] = k; _loadImg(imgEl, crops[i], item.path); }
+      } else {
+        if (imgEl.src) imgEl.removeAttribute('src');
+        _liveLastCropKeys[i] = '';
+        confEl.textContent  = '–';
+        starsEl.textContent = '☆☆☆☆☆';
+        spEl.textContent    = '–'; spEl.className = 'ldc-species';
+        fmEl.textContent    = '–'; fmEl.className = 'ldc-family';
+        continue;
+      }
+
+      // Detection confidence
+      confEl.textContent = i < dets.length
+        ? `Conf: ${dets[i].confidence.toFixed(2)}`
+        : '–';
+
+      // Rating stars
+      starsEl.textContent = i < quality.length
+        ? _formatStars(quality[i].rating)
+        : (i < crops.length ? '…' : '☆☆☆☆☆');
+
+      // Species
+      if (i < species.length) {
+        const sp     = species[i];
+        const spConf = sp.species_confidence ?? 0;
+        const fmConf = sp.family_confidence  ?? 0;
+        spEl.textContent = `${sp.species || '–'} (${spConf.toFixed(2)})`;
+        spEl.className   = 'ldc-species ' + (spConf >= CONF_HIGH ? 'high-conf' : spConf < CONF_LOW ? 'low-conf' : '');
+        fmEl.textContent = sp.family ? `${sp.family} (${fmConf.toFixed(2)})` : '–';
+        fmEl.className   = 'ldc-family '  + (fmConf >= CONF_HIGH ? 'high-conf' : fmConf < CONF_LOW ? 'low-conf' : '');
+      } else {
+        spEl.textContent = i < crops.length ? 'Classifying…' : '–';
+        spEl.className   = i < crops.length ? 'ldc-species low-conf' : 'ldc-species';
+        fmEl.textContent = '–'; fmEl.className = 'ldc-family';
+      }
+    }
+  }
+
+  // ── End Live Analysis Dialog ─────────────────────────────────────────────────
 
   // ── Auto-refresh: silently reload CSV data for newly-analyzed folders ─────────
 
@@ -2976,6 +3194,25 @@
       }
     } catch (_) {}
   }, 3000);
+
+  // 👁 Live Analysis button
+  const queueLiveBtn = document.getElementById('queueLiveBtn');
+  if (queueLiveBtn) {
+    queueLiveBtn.addEventListener('click', openLiveAnalysisDlg);
+  }
+
+  // Live dialog close button + Escape handling
+  const liveDlgClose = document.getElementById('liveDlgClose');
+  if (liveDlgClose) {
+    liveDlgClose.addEventListener('click', () => {
+      _liveAnalysisDlgOpen = false;
+      document.getElementById('liveAnalysisDlg').close();
+    });
+  }
+  const liveAnalysisDlg = document.getElementById('liveAnalysisDlg');
+  if (liveAnalysisDlg) {
+    liveAnalysisDlg.addEventListener('close', () => { _liveAnalysisDlgOpen = false; });
+  }
 
   </script>
 </body>

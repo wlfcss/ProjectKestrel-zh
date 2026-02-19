@@ -260,6 +260,10 @@ class AnalysisPipeline:
                         thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path_rel})
 
                     stage_ctx["stage"] = "mask_rcnn_prediction"
+                    # Pause checkpoint: MaskRCNN inference can take many seconds;
+                    # honour the pause signal before starting it.
+                    if pause_event is not None:
+                        pause_event.wait()
                     masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
                     if masks is None or len(masks) == 0:
                         if detection_cb:
@@ -331,6 +335,10 @@ class AnalysisPipeline:
                         stage_ctx["stage"] = "process_bird"
                         items = []
                         for i in indices:
+                            # Pause checkpoint: quality + species classifiers are
+                            # expensive per crop; honour the pause signal between crops.
+                            if pause_event is not None:
+                                pause_event.wait()
                             species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img)
                             quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
                             items.append(

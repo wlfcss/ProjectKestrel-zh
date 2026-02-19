@@ -101,8 +101,10 @@ def _get_pipeline_class():
 # ---------------------------------------------------------------------------
 class _QueueItem:
     __slots__ = ('path', 'name', 'status', 'processed', 'total', 'error',
-                 'start_time', 'end_time',
-                 'current_filename', 'current_export_path', 'current_status_msg')
+                 'start_time', 'end_time', 'paused_duration', 'pause_start_time',
+                 'current_filename', 'current_export_path', 'current_status_msg',
+                 'current_overlay_rel', 'current_crops_rel', 'current_detections',
+                 'current_quality_results', 'current_species_results')
 
     def __init__(self, path: str, name: str):
         self.path = path
@@ -113,17 +115,26 @@ class _QueueItem:
         self.error = ''
         self.start_time: float | None = None
         self.end_time: float | None = None
+        self.paused_duration: float = 0.0
+        self.pause_start_time: float | None = None
         self.current_filename: str = ''
         self.current_export_path: str = ''
         self.current_status_msg: str = ''
+        self.current_overlay_rel: str = ''
+        self.current_crops_rel: list = []
+        self.current_detections: list = []
+        self.current_quality_results: list = []
+        self.current_species_results: list = []
 
     def to_dict(self) -> dict:
         elapsed = 0.0
         if self.start_time is not None:
-            if self.end_time is not None:
-                elapsed = self.end_time - self.start_time
-            else:
-                elapsed = _time_mod.time() - self.start_time
+            end = self.end_time if self.end_time is not None else _time_mod.time()
+            raw = end - self.start_time
+            paused = self.paused_duration
+            if self.pause_start_time is not None:
+                paused += _time_mod.time() - self.pause_start_time
+            elapsed = max(0.0, raw - paused)
         return {
             'path': self.path,
             'name': self.name,
@@ -132,9 +143,15 @@ class _QueueItem:
             'total': self.total,
             'error': self.error,
             'elapsed_seconds': round(elapsed, 1),
+            'is_paused': self.pause_start_time is not None,
             'current_filename': self.current_filename,
             'current_export_path': self.current_export_path,
             'current_status_msg': self.current_status_msg,
+            'current_overlay_rel': self.current_overlay_rel,
+            'current_crops_rel': list(self.current_crops_rel),
+            'current_detections': list(self.current_detections),
+            'current_quality_results': list(self.current_quality_results),
+            'current_species_results': list(self.current_species_results),
         }
 
 
@@ -190,9 +207,16 @@ class QueueManager:
                         existing_item.error = ''
                         existing_item.start_time = None
                         existing_item.end_time = None
+                        existing_item.paused_duration = 0.0
+                        existing_item.pause_start_time = None
                         existing_item.current_filename = ''
                         existing_item.current_export_path = ''
                         existing_item.current_status_msg = ''
+                        existing_item.current_overlay_rel = ''
+                        existing_item.current_crops_rel = []
+                        existing_item.current_detections = []
+                        existing_item.current_quality_results = []
+                        existing_item.current_species_results = []
                         added += 1
                     # If already pending/running, leave it alone
                 else:
@@ -210,9 +234,18 @@ class QueueManager:
 
     def pause(self) -> dict:
         self._pause_event.clear()
+        with self._lock:
+            running = next((it for it in self._items if it.status == 'running'), None)
+            if running is not None and running.pause_start_time is None:
+                running.pause_start_time = _time_mod.time()
         return {'success': True, 'paused': True}
 
     def resume(self) -> dict:
+        with self._lock:
+            running = next((it for it in self._items if it.status == 'running'), None)
+            if running is not None and running.pause_start_time is not None:
+                running.paused_duration += _time_mod.time() - running.pause_start_time
+                running.pause_start_time = None
         self._pause_event.set()
         return {'success': True, 'paused': False}
 
@@ -269,11 +302,67 @@ class QueueManager:
                 def _on_thumbnail(data, _it=item):
                     with self._lock:
                         _it.current_filename = data.get('filename', '')
-                        # pipeline.py already computes export_path as a relative
-                        # path from the folder root (via os.path.relpath).  Just
-                        # normalise the separator; do NOT re-apply relpath.
                         export_rel = data.get('export_path', '')
                         _it.current_export_path = export_rel.replace('\\', '/')
+                        # Reset per-image live fields when a new image starts
+                        _it.current_overlay_rel = ''
+                        _it.current_crops_rel = []
+                        _it.current_detections = []
+                        _it.current_quality_results = []
+                        _it.current_species_results = []
+
+                def _on_detection(data, _it=item):
+                    import cv2 as _cv2  # available: kestrel_analyzer loaded successfully
+                    overlay_np = data.get('overlay')
+                    rel = ''
+                    if overlay_np is not None:
+                        overlay_path = os.path.join(_it.path, '.kestrel', 'export',
+                                                     '__live_overlay.jpg')
+                        try:
+                            os.makedirs(os.path.dirname(overlay_path), exist_ok=True)
+                            _cv2.imwrite(overlay_path,
+                                         _cv2.cvtColor(overlay_np, _cv2.COLOR_RGB2BGR),
+                                         [_cv2.IMWRITE_JPEG_QUALITY, 80])
+                            rel = os.path.relpath(overlay_path, _it.path).replace('\\', '/')
+                        except Exception:
+                            pass
+                    with self._lock:
+                        _it.current_overlay_rel = rel
+
+                def _on_crops(data, _it=item):
+                    import cv2 as _cv2
+                    crops = data.get('crops') or []
+                    confidences = data.get('confidences') or []
+                    saved_rels = []
+                    export_dir = os.path.join(_it.path, '.kestrel', 'export')
+                    try:
+                        os.makedirs(export_dir, exist_ok=True)
+                    except Exception:
+                        pass
+                    for idx, crop in enumerate(crops[:5]):
+                        if crop is None:
+                            continue
+                        cp = os.path.join(export_dir, f'__live_crop_{idx}.jpg')
+                        try:
+                            _cv2.imwrite(cp,
+                                         _cv2.cvtColor(crop, _cv2.COLOR_RGB2BGR),
+                                         [_cv2.IMWRITE_JPEG_QUALITY, 85])
+                            saved_rels.append(
+                                os.path.relpath(cp, _it.path).replace('\\', '/'))
+                        except Exception:
+                            pass
+                    with self._lock:
+                        _it.current_crops_rel = saved_rels
+                        _it.current_detections = [
+                            {'confidence': float(c)} for c in confidences[:5]]
+
+                def _on_quality(data, _it=item):
+                    with self._lock:
+                        _it.current_quality_results = list(data.get('results') or [])
+
+                def _on_species(data, _it=item):
+                    with self._lock:
+                        _it.current_species_results = list(data.get('results') or [])
 
                 self._pipeline.process_folder(
                     item.path,
@@ -282,6 +371,10 @@ class QueueManager:
                         'on_status': _on_status,
                         'on_progress': _on_progress,
                         'on_thumbnail': _on_thumbnail,
+                        'on_detection': _on_detection,
+                        'on_crops': _on_crops,
+                        'on_quality': _on_quality,
+                        'on_species': _on_species,
                     },
                     analyzer_name='visualizer-queue',
                 )
