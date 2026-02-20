@@ -59,11 +59,11 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu icon (single unified app)
-Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; IconFilename: "{app}\ProjectKestrel\logo.ico"
+Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; IconFilename: "{app}\ProjectKestrel\_internal\\logo.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop icon
-Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel; IconFilename: "{app}\ProjectKestrel\logo.ico"
+Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel; IconFilename: "{app}\ProjectKestrel\_internal\\logo.ico"
 
 [Run]
 ; Open tutorial webpage after install

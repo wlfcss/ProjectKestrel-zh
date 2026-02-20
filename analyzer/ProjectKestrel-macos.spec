@@ -45,6 +45,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
@@ -53,4 +54,12 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name='ProjectKestrel',
+    icon='../assets/logo.ico',
+)
+
+app = BUNDLE(
+    coll,
+    name='Project Kestrel.app',
+    icon='../assets/logo.ico',
+    bundle_identifier='org.ProjectKestrel',
 )
