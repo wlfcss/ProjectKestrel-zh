@@ -2025,10 +2025,26 @@
   async function openInEditor(row){
     const origRel = (row.filename||'').replace(/^[\\/]+/, '');
     const settings = loadSettings();
-    let rootToSend = (settings.rootHint||'').trim();
+    
+    // Use the same root-finding logic as getBlobUrlForPath (which successfully loads thumbnails)
+    // PRIORITY 1: Row-specific root (set when loaded from a folder or multi-load)
+    let rootToSend = (row.__rootPath||'').trim();
+    
+    // PRIORITY 2: Global rootPath (set when loading CSV from a folder)
+    if (!rootToSend && rootPath) {
+      rootToSend = rootPath;
+    }
+    
+    // PRIORITY 3: Settings hint (explicit user configuration)
+    if (!rootToSend) {
+      rootToSend = (settings.rootHint||'').trim();
+    }
+    
+    // PRIORITY 4: Infer from absolute paths in CSV
     if (!rootToSend) {
       rootToSend = inferRootFromAbsPath(row.export_path) || inferRootFromAbsPath(row.crop_path) || '';
     }
+    
     if (!origRel) { setStatus('No filename available for this row.'); return; }
     if (!rootToSend) { setStatus('Set Local Root in Settings to enable launching originals.'); showSettings(); return; }
     const backendUrl = getSetting('backendUrl', window.location.origin);
