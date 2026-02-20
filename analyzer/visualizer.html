@@ -251,6 +251,9 @@
     .tree-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
     .tree-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
     .tree-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
+    /* Mirror has-kestrel styling for analyze dialog rows */
+    .adlg-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
+    .adlg-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
     .tree-node-row.no-kestrel { opacity: 0.38; }
     /* Bold non-analyzed folder labels for better visibility on all platforms */
     .tree-node-row.no-kestrel .tree-label { font-weight: 700 !important; color: #cbd2dc !important; }
@@ -2246,7 +2249,7 @@
     const row = document.createElement('div');
     const hasChildren = node.children && node.children.length > 0;
     const isExpanded = _dlgExpandedPaths.has(node.path);
-    row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '');
+    row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '') + (node.has_kestrel ? ' has-kestrel' : '');
 
     const arrow = document.createElement('span');
     arrow.className = 'tree-arrow' + (hasChildren ? (isExpanded ? ' open' : '') : ' leaf');
