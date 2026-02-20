@@ -74,13 +74,29 @@ jobs:
       #     done
       #     ./analyzer/dist/ProjectKestrel/ProjectKestrel --cli "${TEST_DIR}" --no-gpu --smoke
 
+      - name: Collect macOS .app at workspace root
+        shell: bash
+        run: |
+          set -e
+          mkdir -p artifact
+          # Find the first .app produced by the build (prefer dist output)
+          APP_PATH=$(find analyzer/dist -maxdepth 2 -name "*.app" | head -n 1 || true)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find release -type d -name "*.app" | head -n 1 || true)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found to upload"
+            exit 1
+          fi
+          echo "Found .app: $APP_PATH"
+          # Copy the .app directory into artifact/ so the artifact root is the .app
+          cp -a "$APP_PATH" artifact/
+
       - name: Upload macOS .app
         uses: actions/upload-artifact@v4
         with:
           name: macos-app
-          path: |
-            analyzer/dist/**/*.app
-            release/**/**/*.app
+          path: artifact/
 
       - name: Upload macOS installer (.pkg)
         uses: actions/upload-artifact@v4
