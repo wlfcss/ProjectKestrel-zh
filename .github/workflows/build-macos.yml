@@ -74,6 +74,14 @@ jobs:
       #     done
       #     ./analyzer/dist/ProjectKestrel/ProjectKestrel --cli "${TEST_DIR}" --no-gpu --smoke
 
+      - name: Upload macOS .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: |
+            analyzer/dist/**/*.app
+            release/**/**/*.app
+
       - name: Upload macOS installer (.pkg)
         uses: actions/upload-artifact@v4
         with:
@@ -85,3 +93,4 @@ jobs:
         with:
           name: macos-bundle
           path: analyzer/dist/ProjectKestrel/
+
