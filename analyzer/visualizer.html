@@ -2141,8 +2141,9 @@
     _treeFlatOrder = [];
     container.innerHTML = '';
     container.appendChild(buildTreeNode(folderTreeRootNode, _treeFlatOrder));
-    // Populate counts asynchronously after rendering to avoid blocking
-    populateVisibleFolderCounts();
+    // Note: Do NOT populate counts for main folder tree
+    // The main tree is only for selecting which analyzed folders to LOAD
+    // Colors and counts are only for the Analyze dialog tree
   }
 
   // Build a single tree node DOM element.
@@ -2262,13 +2263,14 @@
     return wrap;
   }
 
-  // Populate visible folder counts asynchronously by calling the backend
-  // `inspect_folder` API for each visible node. This avoids blocking the
-  // initial tree scan and lets each folder be inspected independently.
-  async function populateVisibleFolderCounts() {
+  // Populate folder counts ONLY for the Analyze Folders dialog tree.
+  // This function applies colors (blue/purple/green) based on analysis state,
+  // shows counts, and displays a progress bar.
+  async function populateAnalyzeFolderCounts() {
     if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folder) return;
     try {
-      const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
+      // Query ONLY the Analyze dialog tree nodes
+      const rows = Array.from(document.querySelectorAll('#analyzeDlgTree .adlg-node-row'));
       const norm = p => (p || '').replace(/\\/g, '/');
       const pathToRows = new Map(); // normalized path → [row, row, ...]
       const normToOriginal = new Map(); // normalized path → original path
@@ -2291,9 +2293,8 @@
       }
       if (paths.length === 0) return;
 
-      // Deduplicate (already done by Set, but explicit here)
+      // Deduplicate and sort by depth (shallow first)
       const uniq = Array.from(new Set(paths));
-      // Sort by depth (shallow first) then path length
       uniq.sort((a, b) => {
         const da = a.split('/').length;
         const db = b.split('/').length;
@@ -2304,14 +2305,10 @@
       const total = uniq.length;
       let completed = 0;
 
-      // Progress UI elements (main tree and dialog)
-      const treeProgWrap = document.getElementById('folderScanProgress');
-      const treeProgFill = document.getElementById('folderScanFill');
-      const treeProgLabel = document.getElementById('folderScanLabel');
+      // Progress UI elements (dialog only)
       const dlgProgWrap = document.getElementById('analyzeScanProgress');
       const dlgProgFill = document.getElementById('analyzeScanFill');
       const dlgProgLabel = document.getElementById('analyzeScanLabel');
-      if (treeProgWrap) treeProgWrap.classList.remove('hidden');
       if (dlgProgWrap) dlgProgWrap.classList.remove('hidden');
 
       // Concurrency-limited worker pool
@@ -2370,17 +2367,13 @@
                     row.classList.add('analyzed-partial');
                   }
                 }
-
-                // Legacy has_kestrel flags
-                row.classList.toggle('no-kestrel', !info.has_kestrel);
-                row.classList.toggle('has-kestrel', !!info.has_kestrel);
               } else {
                 span.textContent = '';
                 row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
               }
             }
           } catch (e) {
-            console.warn('[populateVisibleFolderCounts] error for', originalPath, e);
+            console.warn('[populateAnalyzeFolderCounts] error for', originalPath, e);
             const related = pathToRows.get(normalizedPath) || [];
             for (const row of related) {
               const span = row.querySelector('.tree-count');
@@ -2391,8 +2384,6 @@
           
           completed += 1;
           const pct = Math.round((completed / total) * 100);
-          if (treeProgFill) treeProgFill.style.width = pct + '%';
-          if (treeProgLabel) treeProgLabel.textContent = `Scanning folders… (${completed}/${total})`;
           if (dlgProgFill) dlgProgFill.style.width = pct + '%';
           if (dlgProgLabel) dlgProgLabel.textContent = `Scanning folders… (${completed}/${total})`;
         }
@@ -2404,17 +2395,12 @@
 
       // Hide progress after brief delay
       setTimeout(() => {
-        if (treeProgWrap) treeProgWrap.classList.add('hidden');
-        if (treeProgFill) treeProgFill.style.width = '0%';
-        if (treeProgLabel) treeProgLabel.textContent = 'Scanning folders…';
         if (dlgProgWrap) dlgProgWrap.classList.add('hidden');
         if (dlgProgFill) dlgProgFill.style.width = '0%';
         if (dlgProgLabel) dlgProgLabel.textContent = 'Scanning folders…';
       }, 400);
     } catch (e) {
-      console.warn('[tree] populateVisibleFolderCounts failed', e);
-      const progWrap = document.getElementById('folderScanProgress');
-      if (progWrap) progWrap.classList.add('hidden');
+      console.warn('[populateAnalyzeFolderCounts] failed', e);
       const dlgWrap = document.getElementById('analyzeScanProgress');
       if (dlgWrap) dlgWrap.classList.add('hidden');
     }
@@ -2519,8 +2505,8 @@
     const treeEl = document.getElementById('analyzeDlgTree');
     treeEl.innerHTML = '';
     treeEl.appendChild(buildAnalyzeDlgNode(folderTreeRootNode, _dlgSelected, refreshDlg));
-    // Populate counts for dialog nodes too
-    populateVisibleFolderCounts();
+    // Populate counts for dialog nodes with colors and progress bar
+    populateAnalyzeFolderCounts();
     refreshDlg();
     document.getElementById('analyzeQueueDlg').showModal();
   }
@@ -2815,8 +2801,8 @@
     stopAutoRefresh();
   }
 
-  // Poll the queue status frequently and update any visible folder rows with
-  // the running item's processed/total. This keeps per-folder counts live
+  // Poll the queue status frequently and update folder rows in the ANALYZE DIALOG ONLY
+  // with the running item's processed/total. This keeps per-folder counts live
   // while analysis is in progress.
   function startQueueCountsPoll() {
     if (_queueCountsTimer) return;
@@ -2827,7 +2813,8 @@
         const items = status.items;
         // Normalize helper
         const norm = p => (p || '').replace(/\\/g, '/');
-        const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
+        // Update ONLY the Analyze dialog tree rows (not the main folder tree)
+        const rows = Array.from(document.querySelectorAll('#analyzeDlgTree .adlg-node-row'));
         for (const it of items) {
           const ip = norm(it.path);
           const related = rows.filter(r => norm(r.dataset.path) === ip);
@@ -2837,7 +2824,7 @@
               if (it.total && it.total > 0) span.textContent = ` ${it.processed}/${it.total}`;
               else span.textContent = '';
             }
-            // Update analysis classes (partial/full/none)
+            // Update analysis classes (partial/full/none) - only for analyze dialog
             row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
             if (it.total && it.total > 0) {
               if ((it.processed || 0) === 0) row.classList.add('analyzed-none');
