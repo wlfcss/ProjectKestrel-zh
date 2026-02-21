@@ -252,6 +252,14 @@
     .tree-count { margin-left: 8px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
     .tree-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
     .tree-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
+    /* Analysis completion states */
+    .tree-node-row.analyzed-full .tree-label { color: var(--ok); cursor: pointer; font-weight: 700; }
+    .tree-node-row.analyzed-partial .tree-label { color: var(--brand); cursor: pointer; font-weight: 700; }
+    .tree-node-row.analyzed-none .tree-label { color: #b36bff; cursor: pointer; font-weight: 700; }
+    /* Mirror classes for analyze dialog rows */
+    .adlg-node-row.analyzed-full .tree-label { color: var(--ok); font-weight: 700; }
+    .adlg-node-row.analyzed-partial .tree-label { color: var(--brand); font-weight: 700; }
+    .adlg-node-row.analyzed-none .tree-label { color: #b36bff; font-weight: 700; }
     /* Mirror has-kestrel styling for analyze dialog rows */
     .adlg-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
     .adlg-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
@@ -2261,23 +2269,30 @@
     if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folder) return;
     try {
       const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
-      const pathToRows = new Map();
-      const paths = [];
+      const norm = p => (p || '').replace(/\\/g, '/');
+      const pathToRows = new Map(); // normalized path → [row, row, ...]
+      const normToOriginal = new Map(); // normalized path → original path
+      const paths = []; // normalized paths only
+      
+      // Collect rows and normalize paths immediately
       for (const row of rows) {
-        const p = row.dataset.path;
-        if (!p) continue;
-        if (!pathToRows.has(p)) {
-          pathToRows.set(p, []);
-          paths.push(p);
+        const origPath = row.dataset.path;
+        if (!origPath) continue;
+        const normalizedPath = norm(origPath);
+        if (!pathToRows.has(normalizedPath)) {
+          pathToRows.set(normalizedPath, []);
+          normToOriginal.set(normalizedPath, origPath);
+          paths.push(normalizedPath);
         }
-        pathToRows.get(p).push(row);
+        pathToRows.get(normalizedPath).push(row);
+        // Clear count placeholder initially
         const span = row.querySelector('.tree-count');
         if (span) span.textContent = '';
       }
       if (paths.length === 0) return;
 
-      // Normalize and dedupe
-      const uniq = Array.from(new Set(paths.map(p => p.replace(/\\/g, '/'))));
+      // Deduplicate (already done by Set, but explicit here)
+      const uniq = Array.from(new Set(paths));
       // Sort by depth (shallow first) then path length
       uniq.sort((a, b) => {
         const da = a.split('/').length;
@@ -2308,34 +2323,72 @@
           const i = idx;
           idx += 1;
           if (i >= total) break;
-          const p = uniq[i];
+          const normalizedPath = uniq[i];
+          const originalPath = normToOriginal.get(normalizedPath) || normalizedPath;
+          
           try {
             // Mark placeholder
-            const placeholders = pathToRows.get(p) || [];
+            const placeholders = pathToRows.get(normalizedPath) || [];
             for (const r of placeholders) {
-              const s = r.querySelector('.tree-count'); if (s) s.textContent = ' …';
+              const s = r.querySelector('.tree-count');
+              if (s) s.textContent = ' …';
             }
-            const res = await window.pywebview.api.inspect_folder(p);
+            
+            // Call inspect_folder with original path format
+            const res = await window.pywebview.api.inspect_folder(originalPath);
             const info = res && res.success ? res.info : null;
-            const related = pathToRows.get(p) || [];
+            
+            // Update all rows that correspond to this path
+            const related = pathToRows.get(normalizedPath) || [];
             for (const row of related) {
               const span = row.querySelector('.tree-count');
               if (!span) continue;
+              
               if (info) {
-                span.textContent = ` ${info.processed}/${info.total}`;
+                // Show processed/total when there are images
+                if ((info.total || 0) > 0) {
+                  span.textContent = ` ${info.processed}/${info.total}`;
+                } else {
+                  span.textContent = '';
+                }
+
+                // Clear previous analysis-state classes
+                row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
+                
+                // Determine analysis state based on processed/total counts
+                const totalImgs = info.total || 0;
+                const processedImgs = info.processed || 0;
+                if (totalImgs > 0) {
+                  if (processedImgs === 0) {
+                    // Purple: not analyzed at all
+                    row.classList.add('analyzed-none');
+                  } else if (processedImgs >= totalImgs) {
+                    // Green: fully analyzed
+                    row.classList.add('analyzed-full');
+                  } else {
+                    // Blue: partially analyzed
+                    row.classList.add('analyzed-partial');
+                  }
+                }
+
+                // Legacy has_kestrel flags
                 row.classList.toggle('no-kestrel', !info.has_kestrel);
                 row.classList.toggle('has-kestrel', !!info.has_kestrel);
-                if ((info.total || 0) === 0) span.textContent = '';
               } else {
                 span.textContent = '';
+                row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
               }
             }
           } catch (e) {
-            const related = pathToRows.get(p) || [];
+            console.warn('[populateVisibleFolderCounts] error for', originalPath, e);
+            const related = pathToRows.get(normalizedPath) || [];
             for (const row of related) {
-              const span = row.querySelector('.tree-count'); if (span) span.textContent = '';
+              const span = row.querySelector('.tree-count');
+              if (span) span.textContent = '';
+              row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
             }
           }
+          
           completed += 1;
           const pct = Math.round((completed / total) * 100);
           if (treeProgFill) treeProgFill.style.width = pct + '%';
@@ -2477,6 +2530,7 @@
   let _queuePollingTimer = null;
   let _queuePanelExpanded = true;
   let _queueLastDoneSet = new Set(); // track newly-done folders to auto-refresh tree
+  let _queueCountsTimer = null; // interval for updating folder counts from queue
   const _thumbCache = new Map();    // relPath+'|'+rootPath → dataUrl (avoids reload flash)
   let _liveAnalysisDlgOpen = false;
   let _liveLastThumbKey = '';
@@ -2540,6 +2594,9 @@
     const running = !!status.running;
     const paused = !!status.paused;
     const hasItems = items.length > 0;
+
+    // While the queue is running, keep a short-lived poll to update folder rows
+    if (running) startQueueCountsPoll(); else stopQueueCountsPoll();
 
     if (!hasItems && !running) {
       panel.classList.add('hidden');
@@ -2756,6 +2813,47 @@
   function stopPollingQueue() {
     if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
     stopAutoRefresh();
+  }
+
+  // Poll the queue status frequently and update any visible folder rows with
+  // the running item's processed/total. This keeps per-folder counts live
+  // while analysis is in progress.
+  function startQueueCountsPoll() {
+    if (_queueCountsTimer) return;
+    _queueCountsTimer = setInterval(async () => {
+      try {
+        const status = await apiGetQueueStatus();
+        if (!status || !status.items) return;
+        const items = status.items;
+        // Normalize helper
+        const norm = p => (p || '').replace(/\\/g, '/');
+        const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
+        for (const it of items) {
+          const ip = norm(it.path);
+          const related = rows.filter(r => norm(r.dataset.path) === ip);
+          for (const row of related) {
+            const span = row.querySelector('.tree-count');
+            if (span) {
+              if (it.total && it.total > 0) span.textContent = ` ${it.processed}/${it.total}`;
+              else span.textContent = '';
+            }
+            // Update analysis classes (partial/full/none)
+            row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
+            if (it.total && it.total > 0) {
+              if ((it.processed || 0) === 0) row.classList.add('analyzed-none');
+              else if ((it.processed || 0) >= it.total) row.classList.add('analyzed-full');
+              else row.classList.add('analyzed-partial');
+            }
+          }
+        }
+        // Stop polling if queue no longer running
+        if (!status.running) stopQueueCountsPoll();
+      } catch (_) {}
+    }, 1000);
+  }
+
+  function stopQueueCountsPoll() {
+    if (_queueCountsTimer) { clearInterval(_queueCountsTimer); _queueCountsTimer = null; }
   }
 
   // ── Live Analysis Details dialog ──────────────────────────────────────────
