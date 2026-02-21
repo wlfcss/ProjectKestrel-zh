@@ -765,6 +765,55 @@ class Api:
                 'path': '',
                 'data': ''
             }
+
+    def inspect_folder(self, folder_path: str):
+        """Return lightweight folder summary (total images, processed count).
+
+        This defers importing heavy modules until explicitly requested.
+        """
+        try:
+            import importlib
+            inspector = None
+            try:
+                inspector = importlib.import_module('analyzer.folder_inspector')
+            except Exception:
+                try:
+                    inspector = importlib.import_module('folder_inspector')
+                except Exception:
+                    inspector = None
+            if inspector is None or not hasattr(inspector, 'inspect_folder'):
+                return {'success': False, 'error': 'Inspector unavailable'}
+            info = inspector.inspect_folder(folder_path)
+            return {'success': True, 'info': info}
+        except Exception as e:
+            print(f"[API] inspect_folder() -> Error: {e}", flush=True)
+            return {'success': False, 'error': str(e)}
+
+    def inspect_folders(self, paths):
+        """Batch-inspect multiple folders. Expects a list of absolute paths."""
+        try:
+            import importlib
+            inspector = None
+            try:
+                inspector = importlib.import_module('analyzer.folder_inspector')
+            except Exception:
+                try:
+                    inspector = importlib.import_module('folder_inspector')
+                except Exception:
+                    inspector = None
+            if inspector is None or not hasattr(inspector, 'inspect_folders'):
+                return {'success': False, 'error': 'Inspector unavailable', 'results': {}}
+            if isinstance(paths, str):
+                import json
+                try:
+                    paths = json.loads(paths)
+                except Exception:
+                    paths = [paths]
+            results = inspector.inspect_folders(list(paths))
+            return {'success': True, 'results': results}
+        except Exception as e:
+            print(f"[API] inspect_folders() -> Error: {e}", flush=True)
+            return {'success': False, 'error': str(e), 'results': {}}
     
     def read_image_file(self, relative_path, root_path):
         """Read an image file and return it as base64-encoded data.
@@ -924,7 +973,14 @@ class Api:
                 print(f"[API] list_subfolders() -> Node limit reached ({MAX_NODES}); scan truncated at {node_count[0]} nodes", flush=True)
             else:
                 print(f"[API] list_subfolders() -> {node_count[0]} nodes found, root_has_kestrel={root_has_kestrel}", flush=True)
-            return {'success': True, 'tree': tree, 'root_has_kestrel': root_has_kestrel, 'error': '', 'nodes': node_count[0], 'truncated': bool(limit_reached[0])}
+            return {
+                'success': True,
+                'tree': tree,
+                'root_has_kestrel': root_has_kestrel,
+                'error': '',
+                'nodes': node_count[0],
+                'truncated': bool(limit_reached[0]),
+            }
         except Exception as e:
             print(f"[API] list_subfolders() -> Error: {e}", flush=True)
             return {'success': False, 'tree': [], 'error': str(e)}

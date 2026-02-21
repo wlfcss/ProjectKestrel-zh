@@ -249,6 +249,7 @@
     .tree-arrow.leaf { visibility: hidden; }
     .tree-icon { flex: 0 0 14px; font-size: 12px; line-height: 1; }
     .tree-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .tree-count { margin-left: 8px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
     .tree-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
     .tree-node-row.has-kestrel:hover .tree-label { color: #c8dcf5; }
     /* Mirror has-kestrel styling for analyze dialog rows */
@@ -417,6 +418,10 @@
             <span class="tree-title">Folder Tree</span>
             <button id="treeCheckAll" title="Check all analyzed folders">Check all</button>
             <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
+          </div>
+          <div id="folderScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
+            <div class="load-progress-label" id="folderScanLabel">Scanning folders…</div>
+            <div class="load-progress-track"><div id="folderScanFill" class="load-progress-fill" style="width:0%"></div></div>
           </div>
           <div id="folderTree"></div>
         </div>
@@ -2124,12 +2129,14 @@
     _treeFlatOrder = [];
     container.innerHTML = '';
     container.appendChild(buildTreeNode(folderTreeRootNode, _treeFlatOrder));
+    // Populate counts asynchronously after rendering to avoid blocking
+    populateVisibleFolderCounts();
   }
 
   // Build a single tree node DOM element.
   // flatOrder is mutated to collect visible paths in order (for range-select).
   function buildTreeNode(node, flatOrder) {
-    flatOrder.push(node.path);
+  flatOrder.push(node.path);
 
     const wrap = document.createElement('div');
     wrap.className = 'tree-node';
@@ -2187,10 +2194,19 @@
     label.textContent = node.name;
     label.title = node.path;
 
+    // Attach path to the row for async inspection
+    row.dataset.path = node.path;
+
+    // Count placeholder (populated asynchronously)
+    const countSpan = document.createElement('span');
+    countSpan.className = 'tree-count';
+    countSpan.textContent = '';
+
     row.appendChild(arrow);
     if (loadCheckbox) row.appendChild(loadCheckbox);
     row.appendChild(icon);
     row.appendChild(label);
+    row.appendChild(countSpan);
     wrap.appendChild(row);
 
     // Children container
@@ -2232,6 +2248,72 @@
     }
 
     return wrap;
+  }
+
+  // Populate visible folder counts asynchronously by calling the backend
+  // `inspect_folder` API for each visible node. This avoids blocking the
+  // initial tree scan and lets each folder be inspected independently.
+  async function populateVisibleFolderCounts() {
+    if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folders) return;
+    try {
+      const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
+      const pathToRows = new Map();
+      const paths = [];
+      for (const row of rows) {
+        const p = row.dataset.path;
+        if (!p) continue;
+        if (!pathToRows.has(p)) {
+          pathToRows.set(p, []);
+          paths.push(p);
+        }
+        pathToRows.get(p).push(row);
+        const span = row.querySelector('.tree-count');
+        if (span) span.textContent = '';
+      }
+      if (paths.length === 0) return;
+
+      // Show progress UI
+      const progWrap = document.getElementById('folderScanProgress');
+      const progFill = document.getElementById('folderScanFill');
+      const progLabel = document.getElementById('folderScanLabel');
+      if (progWrap) progWrap.classList.remove('hidden');
+      let completed = 0;
+
+      // Call the batch API (server will prioritize shallow paths)
+      const res = await window.pywebview.api.inspect_folders(paths);
+      if (!res || !res.success) {
+        if (progWrap) progWrap.classList.add('hidden');
+        return;
+      }
+      const results = res.results || {};
+      const total = paths.length;
+      for (const p of paths) {
+        const info = results[p] || null;
+        const related = pathToRows.get(p) || [];
+        for (const row of related) {
+          const span = row.querySelector('.tree-count');
+          if (!span) continue;
+          if (info) {
+            span.textContent = ` ${info.processed}/${info.total}`;
+            row.classList.toggle('no-kestrel', !info.has_kestrel);
+            row.classList.toggle('has-kestrel', !!info.has_kestrel);
+            // If folder has no images, show muted text
+            if ((info.total || 0) === 0) span.textContent = '';
+          } else {
+            span.textContent = '';
+          }
+        }
+        completed += 1;
+        if (progFill) progFill.style.width = Math.round((completed / total) * 100) + '%';
+        if (progLabel) progLabel.textContent = `Scanning folders… (${completed}/${total})`;
+      }
+      // Hide progress after a short delay so UI doesn't flicker
+      setTimeout(() => { if (progWrap) progWrap.classList.add('hidden'); if (progFill) progFill.style.width = '0%'; if (progLabel) progLabel.textContent = 'Scanning folders…'; }, 600);
+    } catch (e) {
+      console.warn('[tree] populateVisibleFolderCounts failed', e);
+      const progWrap = document.getElementById('folderScanProgress');
+      if (progWrap) progWrap.classList.add('hidden');
+    }
   }
 
   // ── End Folder Tree ───────────────────────────────────────────────────────────
@@ -2276,10 +2358,17 @@
     label.textContent = node.name;
     label.title = node.path;
 
+    // Attach path for async inspection and add count placeholder
+    row.dataset.path = node.path;
+    const countSpan = document.createElement('span');
+    countSpan.className = 'tree-count';
+    countSpan.textContent = '';
+
     row.appendChild(arrow);
     row.appendChild(cb);
     row.appendChild(icon);
     row.appendChild(label);
+    row.appendChild(countSpan);
     wrap.appendChild(row);
 
     if (hasChildren) {
@@ -2326,6 +2415,8 @@
     const treeEl = document.getElementById('analyzeDlgTree');
     treeEl.innerHTML = '';
     treeEl.appendChild(buildAnalyzeDlgNode(folderTreeRootNode, _dlgSelected, refreshDlg));
+    // Populate counts for dialog nodes too
+    populateVisibleFolderCounts();
     refreshDlg();
     document.getElementById('analyzeQueueDlg').showModal();
   }
