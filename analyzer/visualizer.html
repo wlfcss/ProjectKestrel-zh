@@ -679,6 +679,10 @@
       <p style="margin:0;font-size:13px;color:var(--muted)">Check folders to add to the analysis queue. 📁 = not yet analyzed &nbsp; 📂 = already analyzed (can re-run).</p>
       <div class="analyze-dlg-tree-wrap">
         <div id="analyzeDlgTree"></div>
+        <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
+          <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
+          <div class="load-progress-track"><div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div></div>
+        </div>
       </div>
       <div class="analyze-dlg-options">
         <label class="inline">
@@ -2254,7 +2258,7 @@
   // `inspect_folder` API for each visible node. This avoids blocking the
   // initial tree scan and lets each folder be inspected independently.
   async function populateVisibleFolderCounts() {
-    if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folders) return;
+    if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folder) return;
     try {
       const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row, #analyzeDlgTree .adlg-node-row'));
       const pathToRows = new Map();
@@ -2272,47 +2276,94 @@
       }
       if (paths.length === 0) return;
 
-      // Show progress UI
-      const progWrap = document.getElementById('folderScanProgress');
-      const progFill = document.getElementById('folderScanFill');
-      const progLabel = document.getElementById('folderScanLabel');
-      if (progWrap) progWrap.classList.remove('hidden');
+      // Normalize and dedupe
+      const uniq = Array.from(new Set(paths.map(p => p.replace(/\\/g, '/'))));
+      // Sort by depth (shallow first) then path length
+      uniq.sort((a, b) => {
+        const da = a.split('/').length;
+        const db = b.split('/').length;
+        if (da !== db) return da - db;
+        return a.length - b.length;
+      });
+
+      const total = uniq.length;
       let completed = 0;
 
-      // Call the batch API (server will prioritize shallow paths)
-      const res = await window.pywebview.api.inspect_folders(paths);
-      if (!res || !res.success) {
-        if (progWrap) progWrap.classList.add('hidden');
-        return;
-      }
-      const results = res.results || {};
-      const total = paths.length;
-      for (const p of paths) {
-        const info = results[p] || null;
-        const related = pathToRows.get(p) || [];
-        for (const row of related) {
-          const span = row.querySelector('.tree-count');
-          if (!span) continue;
-          if (info) {
-            span.textContent = ` ${info.processed}/${info.total}`;
-            row.classList.toggle('no-kestrel', !info.has_kestrel);
-            row.classList.toggle('has-kestrel', !!info.has_kestrel);
-            // If folder has no images, show muted text
-            if ((info.total || 0) === 0) span.textContent = '';
-          } else {
-            span.textContent = '';
+      // Progress UI elements (main tree and dialog)
+      const treeProgWrap = document.getElementById('folderScanProgress');
+      const treeProgFill = document.getElementById('folderScanFill');
+      const treeProgLabel = document.getElementById('folderScanLabel');
+      const dlgProgWrap = document.getElementById('analyzeScanProgress');
+      const dlgProgFill = document.getElementById('analyzeScanFill');
+      const dlgProgLabel = document.getElementById('analyzeScanLabel');
+      if (treeProgWrap) treeProgWrap.classList.remove('hidden');
+      if (dlgProgWrap) dlgProgWrap.classList.remove('hidden');
+
+      // Concurrency-limited worker pool
+      const concurrency = Math.min(8, Math.max(2, Math.ceil(total / 8)));
+      let idx = 0;
+
+      async function worker() {
+        while (true) {
+          const i = idx;
+          idx += 1;
+          if (i >= total) break;
+          const p = uniq[i];
+          try {
+            // Mark placeholder
+            const placeholders = pathToRows.get(p) || [];
+            for (const r of placeholders) {
+              const s = r.querySelector('.tree-count'); if (s) s.textContent = ' …';
+            }
+            const res = await window.pywebview.api.inspect_folder(p);
+            const info = res && res.success ? res.info : null;
+            const related = pathToRows.get(p) || [];
+            for (const row of related) {
+              const span = row.querySelector('.tree-count');
+              if (!span) continue;
+              if (info) {
+                span.textContent = ` ${info.processed}/${info.total}`;
+                row.classList.toggle('no-kestrel', !info.has_kestrel);
+                row.classList.toggle('has-kestrel', !!info.has_kestrel);
+                if ((info.total || 0) === 0) span.textContent = '';
+              } else {
+                span.textContent = '';
+              }
+            }
+          } catch (e) {
+            const related = pathToRows.get(p) || [];
+            for (const row of related) {
+              const span = row.querySelector('.tree-count'); if (span) span.textContent = '';
+            }
           }
+          completed += 1;
+          const pct = Math.round((completed / total) * 100);
+          if (treeProgFill) treeProgFill.style.width = pct + '%';
+          if (treeProgLabel) treeProgLabel.textContent = `Scanning folders… (${completed}/${total})`;
+          if (dlgProgFill) dlgProgFill.style.width = pct + '%';
+          if (dlgProgLabel) dlgProgLabel.textContent = `Scanning folders… (${completed}/${total})`;
         }
-        completed += 1;
-        if (progFill) progFill.style.width = Math.round((completed / total) * 100) + '%';
-        if (progLabel) progLabel.textContent = `Scanning folders… (${completed}/${total})`;
       }
-      // Hide progress after a short delay so UI doesn't flicker
-      setTimeout(() => { if (progWrap) progWrap.classList.add('hidden'); if (progFill) progFill.style.width = '0%'; if (progLabel) progLabel.textContent = 'Scanning folders…'; }, 600);
+
+      const workers = [];
+      for (let w = 0; w < concurrency; w++) workers.push(worker());
+      await Promise.all(workers);
+
+      // Hide progress after brief delay
+      setTimeout(() => {
+        if (treeProgWrap) treeProgWrap.classList.add('hidden');
+        if (treeProgFill) treeProgFill.style.width = '0%';
+        if (treeProgLabel) treeProgLabel.textContent = 'Scanning folders…';
+        if (dlgProgWrap) dlgProgWrap.classList.add('hidden');
+        if (dlgProgFill) dlgProgFill.style.width = '0%';
+        if (dlgProgLabel) dlgProgLabel.textContent = 'Scanning folders…';
+      }, 400);
     } catch (e) {
       console.warn('[tree] populateVisibleFolderCounts failed', e);
       const progWrap = document.getElementById('folderScanProgress');
       if (progWrap) progWrap.classList.add('hidden');
+      const dlgWrap = document.getElementById('analyzeScanProgress');
+      if (dlgWrap) dlgWrap.classList.add('hidden');
     }
   }
 
