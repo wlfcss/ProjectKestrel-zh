@@ -290,6 +290,7 @@ def send_folder_analytics(
             'folder_name_hash': _hash_folder_name(folder_path),
             'files_analyzed': files_analyzed,
             'avg_file_size_kb': round(avg_size, 1),
+            'file_sizes_kb': file_sizes_kb,
             'avg_analysis_speed_ms': round(avg_speed, 1),
             'file_formats': file_formats,
             'active_compute_time_s': round(active_compute_time_s, 1),
@@ -414,23 +415,32 @@ def collect_folder_stats(item_path: str, files_this_session: int, total_files: i
                 RAW_EXTENSIONS = {'.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf', '.rw2', '.raf'}
                 JPEG_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'}
 
+
         file_sizes_kb: List[float] = []
         file_formats: Dict[str, int] = {}
-        all_exts = RAW_EXTENSIONS | JPEG_EXTENSIONS
+        all_exts = {e.lower() for e in (RAW_EXTENSIONS | JPEG_EXTENSIONS)}
 
-        for fname in os.listdir(item_path):
-            fpath = os.path.join(item_path, fname)
-            if not os.path.isfile(fpath):
-                continue
-            ext = os.path.splitext(fname)[1].lower()
-            if ext not in all_exts:
-                continue
-            try:
-                size_kb = os.path.getsize(fpath) / 1024.0
-                file_sizes_kb.append(round(size_kb, 1))
-            except OSError:
-                pass
-            file_formats[ext] = file_formats.get(ext, 0) + 1
+        # Walk the directory tree to include files in subfolders (more robust).
+        # Cap collected entries to avoid excessive memory usage.
+        MAX_ENTRIES = 1000
+        for root, dirs, files in os.walk(item_path):
+            for fname in files:
+                if len(file_sizes_kb) >= MAX_ENTRIES:
+                    break
+                ext = os.path.splitext(fname)[1].lower()
+                if ext not in all_exts:
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    if not os.path.isfile(fpath):
+                        continue
+                    size_kb = os.path.getsize(fpath) / 1024.0
+                    file_sizes_kb.append(round(size_kb, 1))
+                except OSError:
+                    continue
+                file_formats[ext] = file_formats.get(ext, 0) + 1
+            if len(file_sizes_kb) >= MAX_ENTRIES:
+                break
 
         return {
             'file_sizes_kb': file_sizes_kb,
