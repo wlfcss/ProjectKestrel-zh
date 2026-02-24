@@ -46,6 +46,15 @@ import threading
 from urllib.parse import urlparse
 from typing import Set
 
+# Telemetry — failsafe import (never blocks startup)
+try:
+    import kestrel_telemetry as _telemetry
+except ImportError:
+    try:
+        from analyzer import kestrel_telemetry as _telemetry
+    except ImportError:
+        _telemetry = None  # type: ignore[assignment]
+
 HOST = '127.0.0.1'
 
 # ---------------------------------------------------------------------------
@@ -112,7 +121,8 @@ class _QueueItem:
                  'start_time', 'end_time', 'paused_duration', 'pause_start_time',
                  'current_filename', 'current_export_path', 'current_status_msg',
                  'current_overlay_rel', 'current_crops_rel', 'current_detections',
-                 'current_quality_results', 'current_species_results')
+                 'current_quality_results', 'current_species_results',
+                 'initial_processed')
 
     def __init__(self, path: str, name: str):
         self.path = path
@@ -133,6 +143,7 @@ class _QueueItem:
         self.current_detections: list = []
         self.current_quality_results: list = []
         self.current_species_results: list = []
+        self.initial_processed: int = 0  # files already done before this session
 
     def to_dict(self) -> dict:
         elapsed = 0.0
@@ -225,6 +236,7 @@ class QueueManager:
                         existing_item.current_detections = []
                         existing_item.current_quality_results = []
                         existing_item.current_species_results = []
+                        existing_item.initial_processed = 0
                         added += 1
                     # If already pending/running, leave it alone
                 else:
@@ -301,10 +313,16 @@ class QueueManager:
             with self._lock:
                 item.status = 'running'
                 item.start_time = _time_mod.time()
+                item.initial_processed = 0  # will be set by first progress callback
 
             try:
                 def _on_progress(processed, total, _it=item):
                     with self._lock:
+                        # Capture the initial processed count on the very first
+                        # progress callback — this represents files already
+                        # analyzed in previous sessions that were skipped.
+                        if _it.initial_processed == 0 and processed > 0 and _it.processed == 0:
+                            _it.initial_processed = processed
                         _it.processed = processed
                         _it.total = total
 
@@ -402,14 +420,58 @@ class QueueManager:
                         item.end_time = _time_mod.time()
                         if item.total > 0:
                             item.processed = item.total
+                # Send per-folder analytics (failsafe, non-blocking)
+                self._send_folder_analytics(item)
             except Exception as exc:
                 log(f'[queue] Error processing {item.path!r}:', exc)
                 with self._lock:
                     item.status = 'error'
                     item.end_time = _time_mod.time()
                     item.error = str(exc)
+                # Still send analytics for errored folders
+                self._send_folder_analytics(item)
 
         log('[queue] Run thread finished.')
+
+    def _send_folder_analytics(self, item):
+        """Send per-folder analytics if the user has opted in (failsafe)."""
+        try:
+            if _telemetry is None:
+                return
+            settings = load_persisted_settings()
+            if not settings.get('analytics_opted_in', False):
+                return
+
+            machine_id = _telemetry.get_machine_id(settings)
+            version = _telemetry._read_version()
+
+            # Compute active time excluding pauses
+            elapsed = 0.0
+            if item.start_time is not None:
+                end = item.end_time if item.end_time is not None else _time_mod.time()
+                elapsed = max(0.0, (end - item.start_time) - item.paused_duration)
+
+            # Only count files analyzed in THIS session
+            files_this_session = max(0, item.processed - item.initial_processed)
+
+            # Gather file stats from disk
+            stats = _telemetry.collect_folder_stats(
+                item.path, files_this_session, item.total
+            )
+
+            _telemetry.send_folder_analytics(
+                folder_path=item.path,
+                files_analyzed=files_this_session,
+                total_files=item.total,
+                active_compute_time_s=elapsed,
+                file_sizes_kb=stats.get('file_sizes_kb', []),
+                file_formats=stats.get('file_formats', {}),
+                was_cancelled=(item.status == 'cancelled'),
+                machine_id=machine_id,
+                version=version,
+            )
+        except Exception:
+            pass  # failsafe — never disrupt queue operation
 
 
 _queue_manager = QueueManager()
@@ -1032,6 +1094,66 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     # ------------------------------------------------------------------ #
+    #  Telemetry / Feedback API                                            #
+    # ------------------------------------------------------------------ #
+
+    def send_feedback(self, data):
+        """Send feedback / bug report (async, failsafe). Called from JS."""
+        try:
+            if _telemetry is None:
+                print('[API] send_feedback() -> telemetry unavailable', flush=True)
+                return {'success': False, 'error': 'Telemetry module not available'}
+            if not isinstance(data, dict):
+                return {'success': False, 'error': 'Invalid data'}
+            settings = load_persisted_settings()
+            machine_id = _telemetry.get_machine_id(settings)
+            # Try to include recent logs for bug reports
+            log_tail = ''
+            if data.get('include_logs', False):
+                log_tail = _telemetry.get_recent_log_tail()
+            _telemetry.send_feedback(
+                report_type=data.get('type', 'general'),
+                description=data.get('description', ''),
+                contact=data.get('contact', ''),
+                screenshot_b64=data.get('screenshot_b64', ''),
+                log_tail=log_tail,
+                machine_id=machine_id,
+                version=_telemetry._read_version(),
+            )
+            print(f'[API] send_feedback() -> queued ({data.get("type", "general")})', flush=True)
+            return {'success': True}
+        except Exception as e:
+            print(f'[API] send_feedback() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
+    def get_settings(self):
+        """Return persisted settings, ensuring machine_id and version exist."""
+        try:
+            settings = load_persisted_settings()
+            # Ensure machine_id exists
+            if _telemetry is not None:
+                _telemetry.get_machine_id(settings)
+            # Ensure version is current
+            if _telemetry is not None:
+                settings['version'] = _telemetry._read_version()
+            save_persisted_settings(settings)
+            return {'success': True, 'settings': settings}
+        except Exception as e:
+            print(f'[API] get_settings() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e), 'settings': {}}
+
+    def save_settings_data(self, settings_dict):
+        """Persist settings from JavaScript (wraps save_persisted_settings)."""
+        try:
+            if not isinstance(settings_dict, dict):
+                return {'success': False, 'error': 'Invalid settings'}
+            save_persisted_settings(settings_dict)
+            return {'success': True}
+        except Exception as e:
+            print(f'[API] save_settings_data() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e)}
+
+    # ------------------------------------------------------------------ #
     #  Analysis Queue API (called from JavaScript in pywebview mode)       #
     # ------------------------------------------------------------------ #
 
@@ -1145,6 +1267,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.handle_open()
         elif parsed.path == '/settings':
             self.handle_settings()
+        elif parsed.path == '/feedback':
+            self.handle_feedback()
         elif parsed.path == '/shutdown':
             self.handle_shutdown()
         elif parsed.path == '/queue/start':
@@ -1262,6 +1386,33 @@ class Handler(SimpleHTTPRequestHandler):
                 self._json(401, {'ok': False, 'error': 'Unauthorized'})
                 return False
         return True
+    def handle_feedback(self):
+        """Accept feedback/bug report submissions (browser-mode fallback)."""
+        if not self._check_auth():
+            return
+        try:
+            payload = self._read_json()
+            if not isinstance(payload, dict):
+                self._json(400, {'ok': False, 'error': 'Invalid payload'}); return
+            if _telemetry is None:
+                self._json(200, {'ok': True, 'note': 'Telemetry unavailable'}); return
+            settings = load_persisted_settings()
+            machine_id = _telemetry.get_machine_id(settings)
+            log_tail = ''
+            if payload.get('include_logs', False):
+                log_tail = _telemetry.get_recent_log_tail()
+            _telemetry.send_feedback(
+                report_type=payload.get('type', 'general'),
+                description=payload.get('description', ''),
+                contact=payload.get('contact', ''),
+                screenshot_b64=payload.get('screenshot_b64', ''),
+                log_tail=log_tail,
+                machine_id=machine_id,
+                version=_telemetry._read_version(),
+            )
+            self._json(200, {'ok': True})
+        except Exception as e:
+            self._json(400, {'ok': False, 'error': str(e)})
 
     def handle_queue_start(self):
         if not self._check_auth():
@@ -1325,6 +1476,17 @@ def main():
     server = ThreadingHTTPServer((HOST, args.port), Handler)
     log(f'Serving visualizer at http://{HOST}:{args.port}/  (Press Ctrl+C to stop)')
     log('Ephemeral bridge token (auto-injected):', AUTH_TOKEN[:8] + '…')
+
+    # ── Settings init: ensure machine_id and version are persisted ──
+    try:
+        if _telemetry is not None:
+            _init_settings = load_persisted_settings()
+            _telemetry.get_machine_id(_init_settings)
+            _init_settings['version'] = _telemetry._read_version()
+            save_persisted_settings(_init_settings)
+    except Exception:
+        pass  # failsafe
+
     if args.root:
         log('Default root (client-supplied):', args.root)
     url = f'http://{HOST}:{args.port}/'
@@ -1452,4 +1614,27 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    except Exception as _main_exc:
+        # Top-level crash handler — send crash report before re-raising
+        try:
+            import traceback as _tb
+            if _telemetry is not None:
+                _crash_settings = load_persisted_settings()
+                _crash_mid = _telemetry.get_machine_id(_crash_settings)
+                _telemetry.send_crash_report(
+                    exc=_main_exc,
+                    tb_str=_tb.format_exc(),
+                    log_tail=_telemetry.get_recent_log_tail(),
+                    machine_id=_crash_mid,
+                    version=_telemetry._read_version(),
+                )
+                # Give daemon thread a moment to fire off the HTTP request
+                import time as _t
+                _t.sleep(2)
+        except Exception:
+            pass  # crash handler itself must never hide the real error
+        raise
