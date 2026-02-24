@@ -12,6 +12,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install Windows SDK
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_community.exe -OutFile vs_community.exe
+          Start-Process vs_community.exe -ArgumentList "/passive /norestart /InstallDir C:\Program Files (x86)\Microsoft Visual Studio\2019\Community" -Wait
+
       - name: Download model files
         shell: powershell
         run: |
@@ -62,18 +68,6 @@ jobs:
         shell: cmd
         run: packaging\build_installer_headless.bat
 
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: dist/installer/*.exe
-
-      - name: Upload ProjectKestrel onedir bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-bundle
-          path: analyzer/dist/ProjectKestrel/
-
       - name: Create MSIX package
         shell: powershell
         run: |
@@ -96,3 +90,15 @@ jobs:
         with:
           name: windows-msix
           path: dist/installer/*.msix
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/*.exe
+
+      - name: Upload ProjectKestrel onedir bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: analyzer/dist/ProjectKestrel/
