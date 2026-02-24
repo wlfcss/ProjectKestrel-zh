@@ -73,3 +73,26 @@ jobs:
         with:
           name: windows-bundle
           path: analyzer/dist/ProjectKestrel/
+
+      - name: Create MSIX package
+        shell: powershell
+        run: |
+          Write-Host "Preparing MSIX staging folder..."
+          Remove-Item -Recurse -Force analyzer\msix -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path "analyzer\msix" | Out-Null
+          Copy-Item -Recurse analyzer\dist\ProjectKestrel\* analyzer\msix\
+          Copy-Item packaging\ProjectKestrel.appxmanifest analyzer\msix\AppxManifest.xml -Force
+          $makeappx = "C:\Program Files (x86)\Windows Kits\10\bin\x64\makeappx.exe"
+          if (Test-Path $makeappx) {
+            & $makeappx pack /d analyzer\msix /p dist\installer\ProjectKestrel.msix
+            Write-Host "MSIX package created at dist\\installer\\ProjectKestrel.msix"
+          } else {
+            Write-Host "MakeAppx not found on runner; skipping MSIX packaging."
+            Write-Host "Install the Windows 10 SDK or run on a self-hosted runner with MakeAppx available."
+          }
+
+      - name: Upload MSIX package
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix
+          path: dist/installer/*.msix
