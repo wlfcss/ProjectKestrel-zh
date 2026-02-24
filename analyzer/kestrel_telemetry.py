@@ -33,7 +33,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration — the shared secret and endpoint URL
 # ---------------------------------------------------------------------------
-KESTREL_API_URL = "https://kestrel-api-worker.projectkestrel.workers.dev"
+KESTREL_API_URL = "https://api.projectkestrel.org"  # production endpoint
 #KESTREL_API_URL = "http://127.0.0.1:8787"  # local testing endpoint
 KESTREL_SHARED_SECRET = "kestrel_secret_dev_shared"  # basic abuse-prevention
 
@@ -104,7 +104,9 @@ def _post_json(endpoint: str, payload: dict) -> None:
             data=data,
             headers={
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-Kestrel-Key': KESTREL_SHARED_SECRET,
+                'User-Agent': 'Mozilla/5.0 (KestrelTelemetry/1.0)',
             },
             method='POST',
         )
