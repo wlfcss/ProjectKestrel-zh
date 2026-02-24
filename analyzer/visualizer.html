@@ -399,6 +399,26 @@
     .welcome-footer a { color: var(--brand); text-decoration: none; }
     .welcome-footer a:hover { text-decoration: underline; }
     kbd { background: #161922; border: 1px solid #2a3040; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: monospace; color: #cbd2dc; white-space: nowrap; }
+
+    /* ── Feedback Dialog ───────────────────────────────────────────── */
+    .feedback-dlg { display: flex; flex-direction: column; gap: 12px; padding: 20px; width: min(540px, 96vw); }
+    .feedback-dlg h3 { margin: 0; font-size: 16px; }
+    .feedback-dlg .f-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
+    .feedback-dlg textarea { width: 100%; min-height: 100px; resize: vertical; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
+    .feedback-dlg textarea:focus { outline: none; border-color: var(--brand); }
+    .feedback-dlg input[type="email"] { width: 100%; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; color: var(--text); padding: 7px 10px; font-size: 13px; box-sizing: border-box; }
+    .feedback-dlg input[type="email"]:focus { outline: none; border-color: var(--brand); }
+    .feedback-dlg select { width: 100%; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; color: var(--text); padding: 7px 10px; font-size: 13px; box-sizing: border-box; }
+    .feedback-dlg select:focus { outline: none; border-color: var(--brand); }
+    .feedback-ss-preview { max-width: 100%; max-height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid #1d2230; background: #0a0d12; margin-top: 4px; }
+
+    /* ── Analytics Consent Dialog ─────────────────────────────────── */
+    .analytics-dlg { display: flex; flex-direction: column; gap: 14px; padding: 24px; width: min(480px, 96vw); }
+    .analytics-dlg h3 { margin: 0; font-size: 17px; }
+    .analytics-dlg p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+    .analytics-dlg ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.75; }
+    .analytics-dlg .analytics-note { font-size: 12px; color: #607080; }
+    .analytics-dlg .analytics-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -417,6 +437,7 @@
           </button>
           <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">Analyze Folders…</button>
           <button id="openSettings">Settings</button>
+          <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion">Feedback</button>
           <button id="revertCsv" disabled title="Discard all unsaved changes">Revert Changes</button>
           <button id="saveCsv" disabled>Save Changes</button>
         </div>
@@ -702,6 +723,72 @@
         <span class="analyze-dlg-selected-count" id="analyzeDlgCount">0 folders selected</span>
         <button id="analyzeDlgCancel">Cancel</button>
         <button id="analyzeDlgAdd" class="primary" disabled>➕ Add to Queue</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Feedback / Bug Report dialog -->
+  <dialog id="feedbackDlg" style="width:min(560px,96vw);height:auto;max-height:92vh;overflow:auto;">
+    <div class="feedback-dlg">
+      <h3>💬 Send Feedback</h3>
+      <div>
+        <label class="f-label" for="feedbackType">Type</label>
+        <select id="feedbackType">
+          <option value="bug">🐛 Bug Report</option>
+          <option value="suggestion">💡 Suggestion</option>
+          <option value="liked">❤️ Something I Liked</option>
+          <option value="general" selected>📝 General Feedback</option>
+        </select>
+      </div>
+      <div>
+        <label class="f-label" for="feedbackDesc">Description <span style="color:#e74c3c">*</span></label>
+        <textarea id="feedbackDesc" placeholder="Describe your feedback, what happened, or what you'd like to see…"></textarea>
+      </div>
+      <div>
+        <label class="f-label" for="feedbackContact">Contact email (optional)</label>
+        <input type="email" id="feedbackContact" placeholder="your@email.com" />
+      </div>
+      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap">
+        <label class="inline" style="font-size:13px">
+          <input type="checkbox" id="feedbackIncludeLogs" />
+          <span class="muted">Include recent analysis logs</span>
+        </label>
+        <label class="inline" style="font-size:13px">
+          <input type="checkbox" id="feedbackIncludeScreenshot" />
+          <span class="muted">Attach screenshot</span>
+        </label>
+        <input type="file" id="feedbackScreenshotFile" accept="image/*" style="display:none" />
+      </div>
+      <img id="feedbackSsPreview" class="feedback-ss-preview" alt="screenshot preview" style="display:none" />
+      <div id="feedbackStatus" style="font-size:13px; color:var(--muted); min-height:18px"></div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px">
+        <button id="feedbackCancel">Cancel</button>
+        <button id="feedbackSend" class="primary">Send</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Analytics Consent dialog (shown once after first successful analysis) -->
+  <dialog id="analyticsConsentDlg" style="width:min(500px,96vw);height:auto;max-height:88vh;overflow:auto;">
+    <div class="analytics-dlg">
+      <h3>📊 Help Improve Project Kestrel</h3>
+      <p>Would you like to share anonymous usage data to help improve the app? This is completely optional and you can change your mind at any time.</p>
+      <p><strong style="color:var(--text)">What would be shared (anonymously):</strong></p>
+      <ul>
+        <li>Number and size of images analyzed</li>
+        <li>File formats used (e.g. CR3, JPG)</li>
+        <li>Analysis duration</li>
+        <li>App version and OS type</li>
+      </ul>
+      <p><strong style="color:var(--text)">What is never shared:</strong></p>
+      <ul>
+        <li>Filenames, folder paths, or image content</li>
+        <li>Any personally identifiable information</li>
+      </ul>
+      <p class="analytics-note">Your machine is identified only by a random ID — no device name, username, or IP address is stored or sent.</p>
+      <div class="analytics-btns">
+        <button id="analyticsDecline">No thanks</button>
+        <button id="analyticsAccept" class="primary">Yes, I'd like to help</button>
       </div>
     </div>
   </dialog>
@@ -1995,6 +2082,122 @@
   document.getElementById('settingsSave').addEventListener('click', applySettings);
   document.getElementById('settingsCancel').addEventListener('click', () => document.getElementById('settingsDlg').close());
 
+  // ─── Telemetry helpers ────────────────────────────────────────────────────
+  /** Merge a single key into persisted settings (localStorage + pywebview). */
+  function mergeSetting(k, v) {
+    const s = loadSettings();
+    s[k] = v;
+    saveSettings(s);
+    if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
+      try { window.pywebview.api.save_settings_data(s); } catch (_) {}
+    }
+  }
+
+  // ─── Feedback dialog ──────────────────────────────────────────────────────
+  function openFeedbackDialog() {
+    document.getElementById('feedbackDesc').value = '';
+    document.getElementById('feedbackContact').value = '';
+    document.getElementById('feedbackStatus').textContent = '';
+    document.getElementById('feedbackIncludeLogs').checked = false;
+    document.getElementById('feedbackIncludeScreenshot').checked = false;
+    document.getElementById('feedbackScreenshotFile').value = '';
+    const preview = document.getElementById('feedbackSsPreview');
+    preview.src = ''; preview.style.display = 'none'; preview.dataset.b64 = '';
+    document.getElementById('feedbackDlg').showModal();
+  }
+
+  // Auto-check logs when Bug Report type is selected
+  document.getElementById('feedbackType').addEventListener('change', function () {
+    document.getElementById('feedbackIncludeLogs').checked = (this.value === 'bug');
+  });
+
+  // Screenshot file-picker wiring
+  document.getElementById('feedbackIncludeScreenshot').addEventListener('change', function () {
+    if (this.checked) {
+      document.getElementById('feedbackScreenshotFile').click();
+    } else {
+      const preview = document.getElementById('feedbackSsPreview');
+      preview.src = ''; preview.style.display = 'none'; preview.dataset.b64 = '';
+      document.getElementById('feedbackScreenshotFile').value = '';
+    }
+  });
+  document.getElementById('feedbackScreenshotFile').addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) { document.getElementById('feedbackIncludeScreenshot').checked = false; return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const b64 = (e.target.result || '').split(',')[1] || '';
+      const preview = document.getElementById('feedbackSsPreview');
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      preview.dataset.b64 = b64;
+      document.getElementById('feedbackIncludeScreenshot').checked = true;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  async function submitFeedback() {
+    const desc = document.getElementById('feedbackDesc').value.trim();
+    if (!desc) {
+      document.getElementById('feedbackStatus').textContent = '⚠ Please enter a description.';
+      document.getElementById('feedbackDesc').focus();
+      return;
+    }
+    const sendBtn = document.getElementById('feedbackSend');
+    sendBtn.disabled = true;
+    document.getElementById('feedbackStatus').textContent = 'Sending…';
+    const data = {
+      type: document.getElementById('feedbackType').value,
+      description: desc,
+      contact: document.getElementById('feedbackContact').value.trim(),
+      include_logs: document.getElementById('feedbackIncludeLogs').checked,
+      screenshot_b64: document.getElementById('feedbackSsPreview').dataset.b64 || '',
+    };
+    try {
+      let result;
+      if (hasPywebviewApi && window.pywebview?.api?.send_feedback) {
+        result = await window.pywebview.api.send_feedback(data);
+      } else {
+        const backendUrl = (getSetting('backendUrl', window.location.origin) || window.location.origin).replace(/\/$/, '');
+        const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
+        const res = await fetch(backendUrl + '/feedback', { method: 'POST', headers, body: JSON.stringify(data) });
+        result = await res.json();
+      }
+      if (result && result.success !== false) {
+        document.getElementById('feedbackStatus').textContent = '✓ Feedback sent — thank you!';
+        setTimeout(() => { try { document.getElementById('feedbackDlg').close(); } catch (_) {} }, 1200);
+      } else {
+        document.getElementById('feedbackStatus').textContent = '⚠ Could not send — please try again later.';
+      }
+    } catch (e) {
+      document.getElementById('feedbackStatus').textContent = '⚠ Send failed: ' + (e.message || e);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('openFeedback').addEventListener('click', openFeedbackDialog);
+  document.getElementById('feedbackCancel').addEventListener('click', () => document.getElementById('feedbackDlg').close());
+  document.getElementById('feedbackSend').addEventListener('click', submitFeedback);
+
+  // ─── Analytics Consent dialog ─────────────────────────────────────────────
+  function showAnalyticsConsentDialog() {
+    if (_analyticsConsentPending) return;
+    if (getSetting('analytics_consent_shown', false)) return;
+    _analyticsConsentPending = true;
+    document.getElementById('analyticsConsentDlg').showModal();
+  }
+
+  function handleAnalyticsConsent(optedIn) {
+    mergeSetting('analytics_opted_in', optedIn);
+    mergeSetting('analytics_consent_shown', true);
+    try { document.getElementById('analyticsConsentDlg').close(); } catch (_) {}
+    _analyticsConsentPending = false;
+  }
+
+  document.getElementById('analyticsAccept').addEventListener('click', () => handleAnalyticsConsent(true));
+  document.getElementById('analyticsDecline').addEventListener('click', () => handleAnalyticsConsent(false));
+
   // Info dialog: load kestrel_metadata.json from opened photo folder (.kestrel)
   async function getMetadataHandle(){
     if (!rootDirHandle) return null;
@@ -2516,6 +2719,7 @@
   let _queuePollingTimer = null;
   let _queuePanelExpanded = true;
   let _queueLastDoneSet = new Set(); // track newly-done folders to auto-refresh tree
+  let _analyticsConsentPending = false; // guard against showing consent dialog multiple times
   let _queueCountsTimer = null; // interval for updating folder counts from queue
   // Session state for ETA calculations: track baseline state from folder inspection
   let _queueSessionStartState = new Map(); // path -> { initialProcessed: int, totalImages: int, toAnalyze: int }
@@ -2801,6 +3005,8 @@
       if (!_queueLastDoneSet.has(p)) {
         treeRescanNeeded = true;
         scheduleAutoRefresh(p);
+        // First-time folder completion → offer analytics consent if not yet asked
+        if (!getSetting('analytics_consent_shown', false)) showAnalyticsConsentDialog();
       }
     }
     if (treeRescanNeeded) {
