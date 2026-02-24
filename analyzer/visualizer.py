@@ -453,7 +453,8 @@ class QueueManager:
 
             # Only count files analyzed in THIS session
             files_this_session = max(0, item.processed - item.initial_processed)
-
+            print("[analytics] Sending folder analytics for", item.path, "files_analyzed:", files_this_session, "elapsed_s:", round(elapsed, 1))
+            
             # Gather file stats from disk
             stats = _telemetry.collect_folder_stats(
                 item.path, files_this_session, item.total

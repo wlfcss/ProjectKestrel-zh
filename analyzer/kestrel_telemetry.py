@@ -404,47 +404,72 @@ def collect_folder_stats(item_path: str, files_this_session: int, total_files: i
     -------
     dict with keys: file_sizes_kb, file_formats
     """
+    print("[telemetry] collect_folder_stats: item_path:", item_path, "files_this_session:", files_this_session, "total_files:", total_files)
     try:
         # Import known extensions
         try:
             from kestrel_analyzer.config import RAW_EXTENSIONS, JPEG_EXTENSIONS
         except ImportError:
+            print("Failed to import kestrel_analyzer.config")
             try:
                 from analyzer.kestrel_analyzer.config import RAW_EXTENSIONS, JPEG_EXTENSIONS
             except ImportError:
+                print("Failed to import analyzer.kestrel_analyzer.config — using hardcoded extensions")
                 RAW_EXTENSIONS = {'.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf', '.rw2', '.raf'}
                 JPEG_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'}
-
-
+        
         file_sizes_kb: List[float] = []
         file_formats: Dict[str, int] = {}
-        all_exts = {e.lower() for e in (RAW_EXTENSIONS | JPEG_EXTENSIONS)}
+        # Ensure we can combine lists or sets without raising a TypeError
+        all_exts = {str(e).lower() for e in set(RAW_EXTENSIONS) | set(JPEG_EXTENSIONS)}
 
-        # Walk the directory tree to include files in subfolders (more robust).
-        # Cap collected entries to avoid excessive memory usage.
+        # Debug: surface the path being scanned and loaded extension sets
+        try:
+            print(f"[telemetry debug] collect_folder_stats: item_path={item_path!r} files_this_session={files_this_session} total_files={total_files}", flush=True)
+            print(f"[telemetry debug] RAW_EXTENSIONS={sorted(list(RAW_EXTENSIONS))}", flush=True)
+            print(f"[telemetry debug] JPEG_EXTENSIONS={sorted(list(JPEG_EXTENSIONS))}", flush=True)
+            print(f"[telemetry debug] all_exts={sorted(list(all_exts))}", flush=True)
+        except Exception:
+            pass
+
+        # Non-recursive: only inspect files at the top level of the
+        # provided folder to avoid scanning internal folders (e.g. .kestrel).
         MAX_ENTRIES = 1000
-        for root, dirs, files in os.walk(item_path):
-            for fname in files:
-                if len(file_sizes_kb) >= MAX_ENTRIES:
-                    break
-                ext = os.path.splitext(fname)[1].lower()
-                if ext not in all_exts:
-                    continue
-                fpath = os.path.join(root, fname)
-                try:
-                    if not os.path.isfile(fpath):
-                        continue
-                    size_kb = os.path.getsize(fpath) / 1024.0
-                    file_sizes_kb.append(round(size_kb, 1))
-                except OSError:
-                    continue
-                file_formats[ext] = file_formats.get(ext, 0) + 1
+        try:
+            entries = os.listdir(item_path)
+        except Exception:
+            entries = []
+
+        try:
+            print(f"[telemetry debug] listing top-level of {item_path!r} entries_count={len(entries)} sample={entries[:10]}", flush=True)
+        except Exception:
+            pass
+
+        for fname in entries:
             if len(file_sizes_kb) >= MAX_ENTRIES:
                 break
+            fpath = os.path.join(item_path, fname)
+            if not os.path.isfile(fpath):
+                continue
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in all_exts:
+                continue
+            try:
+                size_kb = os.path.getsize(fpath) / 1024.0
+                file_sizes_kb.append(round(size_kb, 1))
+            except OSError:
+                continue
+            file_formats[ext] = file_formats.get(ext, 0) + 1
+
+        try:
+            print(f"[telemetry debug] matched_count={len(file_sizes_kb)} file_formats={file_formats}", flush=True)
+        except Exception:
+            pass
 
         return {
             'file_sizes_kb': file_sizes_kb,
             'file_formats': file_formats,
         }
-    except Exception:
+    except Exception as e:
+        print(f"[telemetry error] collect_folder_stats failed: {e}")
         return {'file_sizes_kb': [], 'file_formats': {}}
