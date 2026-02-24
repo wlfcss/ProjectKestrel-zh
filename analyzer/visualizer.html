@@ -1039,6 +1039,19 @@
       .catch(() => {
         versionBadge.textContent = 'Version: unknown';
       });
+    // Also check remote service version and warn if it differs from the expected value
+    (async function checkRemoteVersion(){
+      try {
+        const resp = await fetch('https://api.projectkestrel.org/version', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const remote = (await resp.text()).trim();
+        if (remote && remote !== 'Sparrow') {
+          showToast('There is a new update available! Please download the latest version from www.projectkestrel.org', 15000);
+        }
+      } catch (e) {
+        // ignore network errors — offline use is fine
+      }
+    })();
   }
 
   // Tooltip layer so tips can render over the main image area

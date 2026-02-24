@@ -11,3 +11,4 @@ analyzer/build/
 analyzer/dist/
 cloudflare-workers/
 cloudflare-workers_secret/
+query_analytics/
