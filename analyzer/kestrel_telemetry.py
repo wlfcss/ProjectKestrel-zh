@@ -33,8 +33,8 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration — the shared secret and endpoint URL
 # ---------------------------------------------------------------------------
-#KESTREL_API_URL = "https://kestrel-api-worker.projectkestrel.workers.dev"
-KESTREL_API_URL = "http://127.0.0.1:8787"  # local testing endpoint
+KESTREL_API_URL = "https://kestrel-api-worker.projectkestrel.workers.dev"
+#KESTREL_API_URL = "http://127.0.0.1:8787"  # local testing endpoint
 KESTREL_SHARED_SECRET = "kestrel_secret_dev_shared"  # basic abuse-prevention
 
 _TIMEOUT_SECONDS = 10
@@ -94,9 +94,10 @@ def get_machine_id(settings: dict) -> str:
 def _post_json(endpoint: str, payload: dict) -> None:
     """POST JSON to the Cloudflare Worker (fire-and-forget, failsafe)."""
     if urllib is None:
+        print('[telemetry] urllib not available — skipping POST', flush=True)
         return
+    url = f"{KESTREL_API_URL}{endpoint}"
     try:
-        url = f"{KESTREL_API_URL}{endpoint}"
         data = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(
             url,
@@ -107,11 +108,17 @@ def _post_json(endpoint: str, payload: dict) -> None:
             },
             method='POST',
         )
+        print(f'[telemetry] POST {url}  key={KESTREL_SHARED_SECRET[:8]}…', flush=True)
         with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
-            _ = resp.read()  # drain response
-    except Exception:
-        # Silently swallow — no wifi, server down, etc.
-        pass
+            body = resp.read().decode('utf-8', errors='replace')
+            print(f'[telemetry] → {resp.status} {body[:200]}', flush=True)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
+        print(f'[telemetry] HTTP {e.code} from {url}: {body[:300]}', flush=True)
+    except urllib.error.URLError as e:
+        print(f'[telemetry] URLError posting to {url}: {e.reason}', flush=True)
+    except Exception as e:
+        print(f'[telemetry] Error posting to {url}: {e}', flush=True)
 
 
 def _post_json_async(endpoint: str, payload: dict) -> None:

@@ -188,6 +188,8 @@
     /* Modal */
     dialog { border:1px solid #2a3040; background: var(--panel); color: var(--text); border-radius: 14px; width: min(1200px, 96vw); max-height: 92vh; height: 92vh; overflow: hidden; }
     dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
+    /* Compact dialogs that should size to their content */
+    dialog.dlg-compact { width: auto; height: auto; max-height: 92vh; overflow-x: hidden; overflow-y: auto; }
     .modal { display: grid; grid-template-columns: minmax(0, 1fr) var(--divider-w) var(--right-w); gap: 0; height: 100%; }
     .modal .left { padding: 0; min-height: 60vh; overflow: auto; }
     .modal .right { border-left: 1px solid #2a3040; padding: 12px; display: grid; gap: 10px; grid-template-rows: auto auto 1fr auto; overflow: hidden; }
@@ -240,14 +242,9 @@
     .folder-tree-header { display: flex; align-items: center; gap: 6px; }
     .folder-tree-header .tree-title { font-size: 12px; color: var(--muted); letter-spacing: .3px; flex: 1 1 auto; }
     .folder-tree-header button { padding: 2px 7px; font-size: 11px; height: auto; }
-    #folderTree { max-height: 38vh; overflow: auto; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; }
-    .tree-node { display: flex; flex-direction: column; min-width: max-content; }
-    .tree-node-row { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; cursor: default; user-select: none; white-space: nowrap; }
-    .tree-node-row:hover { background: #0e1117; }
-    .tree-arrow { flex: 0 0 14px; font-size: 10px; color: var(--muted); transition: transform .15s ease; line-height: 1; text-align: center; }
-    .tree-arrow.open { transform: rotate(90deg); }
-    .tree-arrow.leaf { visibility: hidden; }
-    .tree-icon { flex: 0 0 14px; font-size: 12px; line-height: 1; }
+    #folderTree { max-height: 38vh; overflow-x: hidden; overflow-y: auto; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; }
+    /* Lock the sidebar width so long folder names can't blow it out */
+    .folder-tree-wrap { max-width: 100%; overflow: hidden; }
     .tree-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
     .tree-count { margin-left: 8px; color: var(--muted); font-size: 12px; flex-shrink: 0; }
     .tree-node-row.has-kestrel .tree-label { color: var(--ok); cursor: pointer; font-weight: 600; }
@@ -272,7 +269,7 @@
     .tree-cb { flex: 0 0 13px; width: 13px; height: 13px; margin: 0; cursor: pointer; accent-color: #3a84e6; }
 
     /* ── Analyze Folders dialog ──────────────────────────────────── */
-    .analyze-dlg { display: flex; flex-direction: column; gap: 10px; padding: 16px; width: min(560px, 96vw); max-height: 88vh; }
+    .analyze-dlg { display: flex; flex-direction: column; gap: 10px; padding: 16px; width: min(520px, 96vw); max-height: 88vh; box-sizing: border-box; }
     .analyze-dlg h3 { margin: 0; font-size: 16px; }
     .analyze-dlg-tree-wrap { flex: 1 1 auto; overflow: auto; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; padding: 4px 2px; max-height: 44vh; min-height: 120px; }
     .analyze-dlg-options { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
@@ -625,7 +622,7 @@
   <div id="toastContainer" style="position:fixed;right:18px;bottom:18px;z-index:20000;pointer-events:none"></div>
 
   <!-- Settings dialog -->
-  <dialog id="settingsDlg">
+  <dialog id="settingsDlg" class="dlg-compact">
     <div class="settings">
       <h3 style="margin:0">Settings</h3>
 
@@ -656,6 +653,17 @@
         <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" title="How many folder levels to scan when building the folder tree (1–6)" />
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">How many subfolder levels to scan when building the folder tree (1–6). Higher values may increase scan time.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
+        <label for="settingsAnalyticsOptIn" style="flex:1">Share anonymous usage analytics</label>
+        <label class="inline" style="gap:6px">
+          <input type="checkbox" id="settingsAnalyticsOptIn" />
+          <span class="muted" id="settingsAnalyticsLabel">Opt in</span>
+        </label>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Helps improve Kestrel. No filenames, paths, or images are ever shared. You can change this at any time.</div>
+
       <div class="row" style="justify-content:flex-end; margin-top: 4px;">
         <button id="settingsCancel">Cancel</button>
         <button id="settingsSave" class="primary">Save</button>
@@ -704,7 +712,7 @@
   </dialog>
 
   <!-- Analyze Folders dialog -->
-  <dialog id="analyzeQueueDlg">
+  <dialog id="analyzeQueueDlg" class="dlg-compact">
     <div class="analyze-dlg">
       <h3>🔬 Analyze Folders</h3>
       <p style="margin:0;font-size:13px;color:var(--muted)">Check folders to add to the analysis queue. 📁 = not yet analyzed &nbsp; 📂 = already analyzed (can re-run).</p>
@@ -2060,6 +2068,14 @@
     document.getElementById('rootHint').value = getSetting('rootHint', '');
     document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
     document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
+    const optedIn = getSetting('analytics_opted_in', null);
+    const consentShown = getSetting('analytics_consent_shown', false);
+    const cb = document.getElementById('settingsAnalyticsOptIn');
+    const lbl = document.getElementById('settingsAnalyticsLabel');
+    cb.checked = optedIn === true;
+    lbl.textContent = consentShown
+      ? (optedIn === true ? 'Opted in' : 'Not sharing')
+      : 'Not yet decided';
     dlg.showModal();
   }
   async function applySettings(){
@@ -2067,8 +2083,15 @@
     const rootHint = document.getElementById('rootHint').value.trim();
     const editor = document.getElementById('editorChoice').value || 'darktable';
     const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
-    const settings = { backendUrl, rootHint, editor, treeScanDepth };
-  saveSettings(settings);
+    const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
+    // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
+    const existing = loadSettings();
+    const settings = { ...existing, backendUrl, rootHint, editor, treeScanDepth,
+      analytics_opted_in: analyticsOptIn, analytics_consent_shown: true };
+    saveSettings(settings);
+    if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
+      try { await window.pywebview.api.save_settings_data(settings); } catch (_) {}
+    }
   try {
     const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
     await fetch(backendUrl.replace(/\/$/, '') + '/settings', {
