@@ -9,3 +9,5 @@ release/
 .venv-macos/
 analyzer/build/
 analyzer/dist/
+cloudflare-workers/
+cloudflare-workers_secret/

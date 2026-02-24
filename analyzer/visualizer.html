@@ -401,7 +401,7 @@
     kbd { background: #161922; border: 1px solid #2a3040; border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: monospace; color: #cbd2dc; white-space: nowrap; }
 
     /* ── Feedback Dialog ───────────────────────────────────────────── */
-    .feedback-dlg { display: flex; flex-direction: column; gap: 12px; padding: 20px; width: min(540px, 96vw); }
+    .feedback-dlg { display: flex; flex-direction: column; gap: 12px; padding: 20px; width: 100%; box-sizing: border-box; }
     .feedback-dlg h3 { margin: 0; font-size: 16px; }
     .feedback-dlg .f-label { font-size: 12px; color: var(--muted); margin-bottom: 3px; display: block; }
     .feedback-dlg textarea { width: 100%; min-height: 100px; resize: vertical; background: #0a0d12; border: 1px solid #1d2230; border-radius: 8px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
@@ -413,7 +413,7 @@
     .feedback-ss-preview { max-width: 100%; max-height: 120px; object-fit: contain; border-radius: 6px; border: 1px solid #1d2230; background: #0a0d12; margin-top: 4px; }
 
     /* ── Analytics Consent Dialog ─────────────────────────────────── */
-    .analytics-dlg { display: flex; flex-direction: column; gap: 14px; padding: 24px; width: min(480px, 96vw); }
+    .analytics-dlg { display: flex; flex-direction: column; gap: 14px; padding: 24px; width: 100%; box-sizing: border-box; }
     .analytics-dlg h3 { margin: 0; font-size: 17px; }
     .analytics-dlg p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
     .analytics-dlg ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); line-height: 1.75; }
@@ -437,9 +437,10 @@
           </button>
           <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">Analyze Folders…</button>
           <button id="openSettings">Settings</button>
-          <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion">Feedback</button>
-          <button id="revertCsv" disabled title="Discard all unsaved changes">Revert Changes</button>
-          <button id="saveCsv" disabled>Save Changes</button>
+          <div style="display:flex;gap:6px">
+            <button id="revertCsv" disabled title="Discard all unsaved changes" style="flex:1">Revert</button>
+            <button id="saveCsv" disabled style="flex:1">Save</button>
+          </div>
         </div>
         <!-- Folder tree panel (populated after scanning a root folder) -->
         <div id="folderTreeWrap" class="folder-tree-wrap hidden">
@@ -502,6 +503,7 @@
       <div class="sidebar-footer" aria-label="Zoom controls">
         <button id="zoomOut" title="Zoom out">Zoom −</button>
         <button id="zoomIn" title="Zoom in">Zoom +</button>
+        <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion" style="margin-left:auto;font-size:11px;padding:3px 8px;">Feedback</button>
       </div>
     </div>
   </header>
@@ -728,7 +730,7 @@
   </dialog>
 
   <!-- Feedback / Bug Report dialog -->
-  <dialog id="feedbackDlg" style="width:min(560px,96vw);height:auto;max-height:92vh;overflow:auto;">
+  <dialog id="feedbackDlg" style="width:min(640px,96vw);height:auto;max-height:92vh;overflow-x:hidden;overflow-y:auto;">
     <div class="feedback-dlg">
       <h3>💬 Send Feedback</h3>
       <div>
@@ -769,7 +771,7 @@
   </dialog>
 
   <!-- Analytics Consent dialog (shown once after first successful analysis) -->
-  <dialog id="analyticsConsentDlg" style="width:min(500px,96vw);height:auto;max-height:88vh;overflow:auto;">
+  <dialog id="analyticsConsentDlg" style="width:min(560px,96vw);height:auto;max-height:88vh;overflow-x:hidden;overflow-y:auto;">
     <div class="analytics-dlg">
       <h3>📊 Help Improve Project Kestrel</h3>
       <p>Would you like to share anonymous usage data to help improve the app? This is completely optional and you can change your mind at any time.</p>

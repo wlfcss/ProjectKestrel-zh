@@ -33,8 +33,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Configuration — the shared secret and endpoint URL
 # ---------------------------------------------------------------------------
-KESTREL_API_URL = "https://kestrel-api-worker.projectkestrel.workers.dev"
-KESTREL_SHARED_SECRET = "pk-kestrel-2026-shared-key"  # basic abuse-prevention
+#KESTREL_API_URL = "https://kestrel-api-worker.projectkestrel.workers.dev"
+KESTREL_API_URL = "http://127.0.0.1:8787"  # local testing endpoint
+KESTREL_SHARED_SECRET = "kestrel_secret_dev_shared"  # basic abuse-prevention
 
 _TIMEOUT_SECONDS = 10
 _MAX_LOG_ENTRIES = 50

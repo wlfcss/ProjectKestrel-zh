@@ -559,9 +559,22 @@ def save_persisted_settings(data: dict) -> None:
     path = _get_settings_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, sort_keys=True)
-    os.replace(tmp, path)
+    try:
+        # Remove any stale .tmp from a previous crash (Windows can't replace a locked file)
+        try:
+            os.remove(tmp)
+        except FileNotFoundError:
+            pass
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, sort_keys=True)
+        os.replace(tmp, path)
+    except OSError:
+        # Fallback: write directly — non-atomic but safe for settings
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+        except OSError as e:
+            print(f'[settings] Failed to save settings: {e}', file=sys.stderr)
 
 
 def log(*args):
@@ -1198,7 +1211,15 @@ class Api:
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
     def translate_path(self, path: str) -> str:  # type: ignore[override]
-        return super().translate_path(path)
+        resolved = super().translate_path(path)
+        # When the file isn't found at the root, check the analyzer/ subfolder.
+        # This lets logo.png and other assets embedded alongside visualizer.html
+        # be served correctly when the page is mounted at /.
+        if not os.path.exists(resolved):
+            alt = super().translate_path('/analyzer' + path)
+            if os.path.exists(alt):
+                return alt
+        return resolved
 
     def end_headers(self):  # Inject basic headers (no wildcard CORS; same-origin only)
         self.send_header('Cache-Control', 'no-store')
