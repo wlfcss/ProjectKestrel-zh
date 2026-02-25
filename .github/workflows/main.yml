@@ -12,11 +12,60 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install Windows SDK
+      - name: Locate makeappx.exe
+        id: find_makeappx
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_community.exe -OutFile vs_community.exe
-          Start-Process vs_community.exe -ArgumentList "/passive /norestart /InstallDir C:\Program Files (x86)\Microsoft Visual Studio\2019\Community" -Wait
+          Write-Host "Searching for makeappx.exe in common Windows SDK locations..."
+          Write-Host ""
+          
+          $locations = @(
+            "C:\Program Files (x86)\Windows Kits\10\bin\x64\makeappx.exe",
+            "C:\Program Files (x86)\Windows Kits\11\bin\x64\makeappx.exe",
+            "C:\Program Files\Windows Kits\10\bin\x64\makeappx.exe",
+            "C:\Program Files\Windows Kits\11\bin\x64\makeappx.exe",
+            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\makeappx.exe",
+            "C:\Program Files (x86)\Windows Kits\11\bin\11.0.0.0\x64\makeappx.exe"
+          )
+          
+          $found = $false
+          foreach ($location in $locations) {
+            Write-Host "  Checking: $location"
+            if (Test-Path $location) {
+              Write-Host "    ✓ FOUND!"
+              Write-Host "makeappx=$location" >> $env:GITHUB_OUTPUT
+              $found = $true
+              break
+            } else {
+              Write-Host "    ✗ Not found"
+            }
+          }
+          
+          if (-not $found) {
+            Write-Host ""
+            Write-Host "⚠ makeappx.exe not found in standard locations."
+            Write-Host "Checking Windows Kits directory structure..."
+            if (Test-Path "C:\Program Files (x86)\Windows Kits") {
+              Get-ChildItem -Recurse "C:\Program Files (x86)\Windows Kits" -Filter "makeappx.exe" -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host "  Found: $($_.FullName)"
+                Write-Host "makeappx=$($_.FullName)" >> $env:GITHUB_OUTPUT
+                $found = $true
+              }
+            }
+            if (-not $found) {
+              Write-Host "  No Windows Kits found in default location"
+            }
+          }
+          
+          Write-Host ""
+          Write-Host "Listing installed Windows SDK versions:"
+          if (Test-Path "C:\Program Files (x86)\Windows Kits") {
+            Get-ChildItem "C:\Program Files (x86)\Windows Kits" | ForEach-Object {
+              Write-Host "  - $($_.Name)"
+            }
+          } else {
+            Write-Host "  No Windows Kits directory found"
+          }
 
       - name: Download model files
         shell: powershell
@@ -76,13 +125,18 @@ jobs:
           New-Item -ItemType Directory -Force -Path "analyzer\msix" | Out-Null
           Copy-Item -Recurse analyzer\dist\ProjectKestrel\* analyzer\msix\
           Copy-Item packaging\ProjectKestrel.appxmanifest analyzer\msix\AppxManifest.xml -Force
-          $makeappx = "C:\Program Files (x86)\Windows Kits\10\bin\x64\makeappx.exe"
-          if (Test-Path $makeappx) {
+          
+          $makeappx = "${{ steps.find_makeappx.outputs.makeappx }}"
+          
+          if ($makeappx -and (Test-Path $makeappx)) {
+            Write-Host "Using makeappx from: $makeappx"
+            Write-Host "Creating MSIX package..."
+            New-Item -ItemType Directory -Force -Path "dist\installer" | Out-Null
             & $makeappx pack /d analyzer\msix /p dist\installer\ProjectKestrel.msix
-            Write-Host "MSIX package created at dist\\installer\\ProjectKestrel.msix"
+            Write-Host "✓ MSIX package created successfully at dist\installer\ProjectKestrel.msix"
           } else {
-            Write-Host "MakeAppx not found on runner; skipping MSIX packaging."
-            Write-Host "Install the Windows 10 SDK or run on a self-hosted runner with MakeAppx available."
+            Write-Host "⚠ makeappx.exe not found. MSIX packaging skipped."
+            Write-Host "The Windows SDK with MSIX tools may need to be installed on this runner."
           }
 
       - name: Upload MSIX package
