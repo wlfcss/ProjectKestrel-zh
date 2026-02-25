@@ -137,15 +137,19 @@ jobs:
           # Use -ErrorAction Ignore to be cleaner than SilentlyContinue
           Remove-Item -Recurse -Force "analyzer\msix" -ErrorAction Ignore
           New-Item -ItemType Directory -Force -Path "analyzer\msix" | Out-Null
+          New-Item -ItemType Directory -Force -Path "analyzer\msix\Assets\Squares" | Out-Null
 
           # Copying files
           Copy-Item -Recurse "analyzer\dist\ProjectKestrel\*" "analyzer\msix\"
           Copy-Item "packaging\ProjectKestrel.appxmanifest" "analyzer\msix\AppxManifest.xml" -Force
+          Copy-Item "assets\StoreLogo.png"                 "analyzer\msix\Assets\StoreLogo.png"
+          Copy-Item "assets\SplashScreen.png"              "analyzer\msix\Assets\SplashScreen.png"
+          Copy-Item "assets\Wide310x150Logo.png"           "analyzer\msix\Assets\Wide310x150Logo.png"
+          Copy-Item "assets\squares\Square44x44Logo.png"   "analyzer\msix\Assets\Squares\Square44x44Logo.png"
+          Copy-Item "assets\squares\Square150x150Logo.png" "analyzer\msix\Assets\Squares\Square150x150Logo.png"
 
           # Ensure the variable is captured as a string
-          $makeappx = @'
-          ${{ steps.find_makeappx.outputs.makeappx }}
-          '@
+          $makeappx = "${{ steps.find_makeappx.outputs.makeappx }}"
 
           if ($makeappx -and (Test-Path "$makeappx")) {
               Write-Host "Using makeappx from: $makeappx"
