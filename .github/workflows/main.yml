@@ -143,7 +143,9 @@ jobs:
           Copy-Item "packaging\ProjectKestrel.appxmanifest" "analyzer\msix\AppxManifest.xml" -Force
 
           # Ensure the variable is captured as a string
-          $makeappx = "${{ steps.find_makeappx.outputs.makeappx }}"
+          $makeappx = @'
+          ${{ steps.find_makeappx.outputs.makeappx }}
+          '@
 
           if ($makeappx -and (Test-Path "$makeappx")) {
               Write-Host "Using makeappx from: $makeappx"
