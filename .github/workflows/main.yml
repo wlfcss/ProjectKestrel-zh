@@ -133,23 +133,27 @@ jobs:
       - name: Create MSIX package
         shell: powershell
         run: |
-          Write-Host "Preparing MSIX staging folder..."
+          Write-Host 'Preparing MSIX staging folder...'
           Remove-Item -Recurse -Force analyzer\msix -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path "analyzer\msix" | Out-Null
+          New-Item -ItemType Directory -Force -Path 'analyzer\msix' | Out-Null
           Copy-Item -Recurse analyzer\dist\ProjectKestrel\* analyzer\msix\
           Copy-Item packaging\ProjectKestrel.appxmanifest analyzer\msix\AppxManifest.xml -Force
-          
+
           $makeappx = "${{ steps.find_makeappx.outputs.makeappx }}"
-          
+
           if ($makeappx -and (Test-Path $makeappx)) {
             Write-Host "Using makeappx from: $makeappx"
-            Write-Host "Creating MSIX package..."
-            New-Item -ItemType Directory -Force -Path "dist\installer" | Out-Null
+            Write-Host 'Creating MSIX package...'
+            New-Item -ItemType Directory -Force -Path 'dist\installer' | Out-Null
             & $makeappx pack /d analyzer\msix /p dist\installer\ProjectKestrel.msix
-            Write-Host "✓ MSIX package created successfully at dist\installer\ProjectKestrel.msix"
+            Write-Host 'MSIX package created successfully at dist\installer\ProjectKestrel.msix'
+            Write-Host 'Effective PATH:'
+            Write-Host $env:PATH
           } else {
-            Write-Host "⚠ makeappx.exe not found. MSIX packaging skipped."
-            Write-Host "The Windows SDK with MSIX tools may need to be installed on this runner."
+            Write-Host 'WARNING: makeappx.exe not found. MSIX packaging skipped.'
+            Write-Host 'The Windows SDK with MSIX tools may need to be installed on this runner.'
+            Write-Host 'Effective PATH:'
+            Write-Host $env:PATH
           }
 
       - name: Upload MSIX package
