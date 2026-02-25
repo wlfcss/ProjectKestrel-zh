@@ -25,46 +25,59 @@ jobs:
             'C:\Program Files\Windows Kits\10\bin\x64\makeappx.exe',
             'C:\Program Files\Windows Kits\11\bin\x64\makeappx.exe',
             'C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\makeappx.exe',
-            'C:\Program Files (x86)\Windows Kits\11\bin\11.0.0.0\x64\makeappx.exe'
+            'C:\Program Files (x86)\Windows Kits\11\bin\11.0.0.0\x64\makeappx.exe',
+            'C:\Program Files (x86)\Windows Kits\10\App Certification Kit\makeappx.exe'
           )
 
-          $found = $false
+          $foundPaths = @()
           foreach ($location in $locations) {
             Write-Host "  Checking: $location"
             if (Test-Path $location) {
-              Write-Host '    FOUND'
-              Add-Content -Path $env:GITHUB_OUTPUT -Value ("makeappx=$location")
-              $found = $true
-              break
-            } else {
-              Write-Host '    Not found'
+              Write-Host '    Found (standard)'
+              $foundPaths += (Get-Item $location).FullName
             }
           }
 
-          if (-not $found) {
+          if ($foundPaths.Count -eq 0 -and (Test-Path 'C:\Program Files (x86)\Windows Kits')) {
             Write-Host ''
-            Write-Host 'makeappx.exe not found in standard locations.'
-            Write-Host 'Checking Windows Kits directory structure...'
-            if (Test-Path 'C:\Program Files (x86)\Windows Kits') {
-              Get-ChildItem -Recurse 'C:\Program Files (x86)\Windows Kits' -Filter 'makeappx.exe' -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host ("  Found: $($_.FullName)")
-                Add-Content -Path $env:GITHUB_OUTPUT -Value ("makeappx=$($_.FullName)")
-                $found = $true
-              }
-            }
-            if (-not $found) {
-              Write-Host '  No Windows Kits found in default location'
+            Write-Host 'No standard hits; searching Windows Kits recursively for makeappx.exe (this may take a moment)...'
+            Get-ChildItem -Recurse 'C:\Program Files (x86)\Windows Kits' -Filter 'makeappx.exe' -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host ("  Found: $($_.FullName)")
+              $foundPaths += $_.FullName
             }
           }
 
-          Write-Host ''
-          Write-Host 'Listing installed Windows SDK versions:'
-          if (Test-Path 'C:\Program Files (x86)\Windows Kits') {
-            Get-ChildItem 'C:\Program Files (x86)\Windows Kits' | ForEach-Object {
-              Write-Host ("  - $($_.Name)")
-            }
+          if ($foundPaths.Count -eq 0) {
+            Write-Host ''
+            Write-Host 'No makeappx.exe found on runner.'
           } else {
-            Write-Host '  No Windows Kits directory found'
+            Write-Host ''
+            Write-Host 'Evaluating preferred makeappx.exe candidate...'
+
+            # Prefer versioned x64 path under a \bin\<version>\x64\makeappx.exe
+            $preferred = $foundPaths | Where-Object { $_ -match '\\bin\\[^\\]+\\x64\\makeappx.exe$' } | Select-Object -First 1
+
+            # Fallback: any x64 in a bin folder
+            if (-not $preferred) {
+              $preferred = $foundPaths | Where-Object { $_ -match '\\bin\\x64\\makeappx.exe$' } | Select-Object -First 1
+            }
+
+            # If multiple candidates, exclude App Certification Kit entry if others exist
+            if ($foundPaths.Count -gt 1) {
+              $nonCert = $foundPaths | Where-Object { $_ -notmatch 'App Certification Kit' }
+              if ($nonCert.Count -gt 0) { $foundPaths = $nonCert }
+            }
+
+            $choice = $preferred
+            if (-not $choice) { $choice = $foundPaths[0] }
+
+            Write-Host ("Selected: $choice")
+            Add-Content -Path $env:GITHUB_OUTPUT -Value ("makeappx=$choice")
+
+            # Add the directory containing makeappx.exe to PATH for subsequent steps
+            $dir = Split-Path $choice
+            Add-Content -Path $env:GITHUB_PATH -Value $dir
+            Write-Host ("Added $dir to PATH for later steps")
           }
 
       - name: Download model files
