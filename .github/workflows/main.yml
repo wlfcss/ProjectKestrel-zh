@@ -16,55 +16,55 @@ jobs:
         id: find_makeappx
         shell: powershell
         run: |
-          Write-Host "Searching for makeappx.exe in common Windows SDK locations..."
-          Write-Host ""
-          
+          Write-Host 'Searching for makeappx.exe in common Windows SDK locations...'
+          Write-Host ''
+
           $locations = @(
-            "C:\Program Files (x86)\Windows Kits\10\bin\x64\makeappx.exe",
-            "C:\Program Files (x86)\Windows Kits\11\bin\x64\makeappx.exe",
-            "C:\Program Files\Windows Kits\10\bin\x64\makeappx.exe",
-            "C:\Program Files\Windows Kits\11\bin\x64\makeappx.exe",
-            "C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\makeappx.exe",
-            "C:\Program Files (x86)\Windows Kits\11\bin\11.0.0.0\x64\makeappx.exe"
+            'C:\Program Files (x86)\Windows Kits\10\bin\x64\makeappx.exe',
+            'C:\Program Files (x86)\Windows Kits\11\bin\x64\makeappx.exe',
+            'C:\Program Files\Windows Kits\10\bin\x64\makeappx.exe',
+            'C:\Program Files\Windows Kits\11\bin\x64\makeappx.exe',
+            'C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\makeappx.exe',
+            'C:\Program Files (x86)\Windows Kits\11\bin\11.0.0.0\x64\makeappx.exe'
           )
-          
+
           $found = $false
           foreach ($location in $locations) {
             Write-Host "  Checking: $location"
             if (Test-Path $location) {
-              Write-Host "    ✓ FOUND!"
-              Write-Host "makeappx=$location" >> $env:GITHUB_OUTPUT
+              Write-Host '    FOUND'
+              Add-Content -Path $env:GITHUB_OUTPUT -Value ("makeappx=$location")
               $found = $true
               break
             } else {
-              Write-Host "    ✗ Not found"
+              Write-Host '    Not found'
             }
           }
-          
+
           if (-not $found) {
-            Write-Host ""
-            Write-Host "⚠ makeappx.exe not found in standard locations."
-            Write-Host "Checking Windows Kits directory structure..."
-            if (Test-Path "C:\Program Files (x86)\Windows Kits") {
-              Get-ChildItem -Recurse "C:\Program Files (x86)\Windows Kits" -Filter "makeappx.exe" -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "  Found: $($_.FullName)"
-                Write-Host "makeappx=$($_.FullName)" >> $env:GITHUB_OUTPUT
+            Write-Host ''
+            Write-Host 'makeappx.exe not found in standard locations.'
+            Write-Host 'Checking Windows Kits directory structure...'
+            if (Test-Path 'C:\Program Files (x86)\Windows Kits') {
+              Get-ChildItem -Recurse 'C:\Program Files (x86)\Windows Kits' -Filter 'makeappx.exe' -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host ("  Found: $($_.FullName)")
+                Add-Content -Path $env:GITHUB_OUTPUT -Value ("makeappx=$($_.FullName)")
                 $found = $true
               }
             }
             if (-not $found) {
-              Write-Host "  No Windows Kits found in default location"
+              Write-Host '  No Windows Kits found in default location'
             }
           }
-          
-          Write-Host ""
-          Write-Host "Listing installed Windows SDK versions:"
-          if (Test-Path "C:\Program Files (x86)\Windows Kits") {
-            Get-ChildItem "C:\Program Files (x86)\Windows Kits" | ForEach-Object {
-              Write-Host "  - $($_.Name)"
+
+          Write-Host ''
+          Write-Host 'Listing installed Windows SDK versions:'
+          if (Test-Path 'C:\Program Files (x86)\Windows Kits') {
+            Get-ChildItem 'C:\Program Files (x86)\Windows Kits' | ForEach-Object {
+              Write-Host ("  - $($_.Name)")
             }
           } else {
-            Write-Host "  No Windows Kits directory found"
+            Write-Host '  No Windows Kits directory found'
           }
 
       - name: Download model files
