@@ -4,7 +4,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
 binaries = []
-hiddenimports = ['pywebview']
+hiddenimports = ['pywebview', 'certifi']
 binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('onnxruntime')
 binaries += collect_dynamic_libs('tensorflow')

@@ -30,6 +30,8 @@ try:
 except ImportError:
     urllib = None  # type: ignore[assignment]
 
+import ssl
+import certifi # ensure we have a CA bundle for HTTPS requests, even in frozen/packaged environments
 # ---------------------------------------------------------------------------
 # Configuration — the shared secret and endpoint URL
 # ---------------------------------------------------------------------------
@@ -90,6 +92,10 @@ def get_machine_id(settings: dict) -> str:
     except Exception:
         return 'unknown'
 
+def _get_ssl_context():
+    """Return an SSL context using certifi's CA bundle (required for frozen macOS apps)."""
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return ctx
 
 def _post_json(endpoint: str, payload: dict) -> None:
     """POST JSON to the Cloudflare Worker (fire-and-forget, failsafe)."""
@@ -111,7 +117,7 @@ def _post_json(endpoint: str, payload: dict) -> None:
             method='POST',
         )
         print(f'[telemetry] POST {url}  key={KESTREL_SHARED_SECRET[:8]}…', flush=True)
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS, context=_get_ssl_context()) as resp:
             body = resp.read().decode('utf-8', errors='replace')
             print(f'[telemetry] → {resp.status} {body[:200]}', flush=True)
     except urllib.error.HTTPError as e:
