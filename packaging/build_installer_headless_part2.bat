@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo ========================================
-echo Project Kestrel Headless Builder (Windows) - PYINSTALLER STEP
+echo Project Kestrel Headless Builder (Windows) - INNO SETUP STEP
 echo ========================================
 echo.
 
@@ -47,26 +47,46 @@ if exist ".venv2\Scripts\activate.bat" (
     echo [WARNING] .venv2 not found - using system/activated Python
 )
 
+
 echo.
 echo ========================================
-echo Running PyInstaller (onedir) ...
+echo Checking Inno Setup ...
 echo ========================================
 echo.
 
-pushd analyzer || exit /b 1
-python -m PyInstaller ProjectKestrel.spec
-popd
+if not exist %INNO_COMPILER% (
+    echo [ERROR] Inno Setup 6 not found at %INNO_COMPILER%
+    echo Please install from: https://jrsoftware.org/isinfo.php
+    exit /b 1
+)
+echo [OK] Inno Setup 6 found
+
+if not exist "dist\installer" mkdir "dist\installer"
+
+echo.
+echo ========================================
+echo Building Inno Setup installer ...
+echo ========================================
+echo.
+
+%INNO_COMPILER% ^
+    /DReleaseName="%RELEASE_NAME%" ^
+    /DAppVersion="%APP_VERSION%" ^
+    "packaging\kestrel_installer.iss"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] PyInstaller build failed!
+    echo [ERROR] Inno Setup build failed!
     exit /b 1
 )
 
-if not exist "analyzer\dist\ProjectKestrel\ProjectKestrel.exe" (
-    echo [ERROR] ProjectKestrel.exe not found after build.
-    exit /b 1
+echo.
+echo ========================================
+echo Build complete!
+echo ========================================
+echo.
+for %%F in ("dist\installer\*.exe") do (
+    echo Installer: %%~nxF  ^(%%~zF bytes^)
 )
-echo [OK] PyInstaller onedir build complete: analyzer\dist\ProjectKestrel\
-
-
+echo.
+exit /b 0

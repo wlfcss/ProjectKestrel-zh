@@ -116,20 +116,11 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Install Inno Setup 6
-        shell: powershell
-        run: |
-          Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
-          Start-Process -FilePath .\is.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -Wait
-          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
-            throw "Inno Setup not found after install"
-          }
-          Write-Host "Inno Setup 6 installed."
-
-      - name: Build ProjectKestrel (onedir + installer)
+      - name: Build ProjectKestrel with PyInstaller
         shell: cmd
         run: packaging\build_installer_headless.bat
 
+        
       - name: Create MSIX package
         shell: powershell
         run: |
@@ -170,12 +161,26 @@ jobs:
               Write-Host "Effective PATH: $env:PATH"
               exit 1 # Failing the step is usually better than a silent warning in CI/CD
           }
-    
+              
       - name: Upload MSIX package
         uses: actions/upload-artifact@v4
         with:
           name: windows-msix
           path: dist/installer/*.msix
+
+      - name: Install Inno Setup 6
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
+          Start-Process -FilePath .\is.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -Wait
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            throw "Inno Setup not found after install"
+          }
+          Write-Host "Inno Setup 6 installed."
+
+      - name: Build ProjectKestrel Installer
+        shell: cmd
+        run: packaging\build_installer_headless_part2.bat
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
