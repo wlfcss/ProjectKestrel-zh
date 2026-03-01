@@ -248,6 +248,42 @@ def send_crash_report(
 
 
 # ---------------------------------------------------------------------------
+# Public API: Non-Optional Telemetry (Installation/Completion)
+# ---------------------------------------------------------------------------
+
+def send_installation_telemetry(machine_id: str, version: str = '') -> None:
+    """Send a notification when the software is installed (failsafe)."""
+    try:
+        payload = {
+            'machine_id': machine_id,
+            'version': version or _read_version(),
+            'os': _get_os_info(),
+            'platform': platform.platform(),
+        }
+        _post_json_async('/api/install', payload)
+    except Exception:
+        pass
+
+
+def send_analysis_completion_telemetry(
+    files_analyzed: int,
+    machine_id: str = '',
+    version: str = '',
+) -> None:
+    """Send total photos analyzed upon completion (non-optional, failsafe)."""
+    try:
+        payload = {
+            'machine_id': machine_id,
+            'version': version or _read_version(),
+            'os': _get_os_info(),
+            'files_analyzed': files_analyzed,
+        }
+        _post_json_async('/api/completion', payload)
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
 # Public API: Analytics
 # ---------------------------------------------------------------------------
 
