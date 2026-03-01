@@ -1373,6 +1373,72 @@ class Api:
             log(f'notify_main_window_refresh error: {e}')
             return {'success': False, 'error': str(e)}
 
+    def read_raw_full(self, filename: str, root_path: str):
+        """Process a RAW file and return full-resolution JPEG as base64.
+        Results are cached in {root}/.kestrel/culling_TMP/ for fast subsequent loads.
+        Falls back to read_image_file for non-RAW formats."""
+        import os
+        import base64
+        from io import BytesIO
+
+        try:
+            # Resolve and security-check path
+            full_path = os.path.join(root_path, filename)
+            full_path_real = os.path.realpath(full_path)
+            root_path_real = os.path.realpath(root_path)
+            if not full_path_real.startswith(root_path_real):
+                return {'success': False, 'error': 'Path escapes root directory'}
+            if not os.path.exists(full_path):
+                return {'success': False, 'error': f'File not found: {filename}'}
+
+            raw_extensions = {'.cr2', '.cr3', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.srw'}
+            ext = os.path.splitext(filename)[1].lower()
+
+            if ext not in raw_extensions:
+                # Not RAW — use existing image reader
+                return self.read_image_file(filename, root_path)
+
+            # Check disk cache first
+            cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
+            cache_name = os.path.splitext(os.path.basename(filename))[0] + '_preview.jpg'
+            cache_path = os.path.join(cache_dir, cache_name)
+
+            if os.path.exists(cache_path):
+                log(f'read_raw_full: Cache hit for {filename}')
+                with open(cache_path, 'rb') as f:
+                    b64 = base64.b64encode(f.read()).decode('ascii')
+                return {'success': True, 'data': b64}
+
+            # Process RAW with rawpy
+            import rawpy
+            from PIL import Image
+
+            log(f'read_raw_full: Processing RAW file {filename}')
+            with rawpy.imread(full_path) as raw:
+                rgb = raw.postprocess(
+                    use_camera_wb=True,
+                    no_auto_bright=False,
+                    output_bps=8,
+                    fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
+                )
+
+            img = Image.fromarray(rgb)
+
+            # Save to disk cache
+            os.makedirs(cache_dir, exist_ok=True)
+            buf = BytesIO()
+            img.save(buf, format='JPEG', quality=82, optimize=False, progressive=False)
+            jpg_bytes = buf.getvalue()
+            with open(cache_path, 'wb') as f:
+                f.write(jpg_bytes)
+
+            b64 = base64.b64encode(jpg_bytes).decode('ascii')
+            log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
+            return {'success': True, 'data': b64}
+        except Exception as e:
+            log(f'read_raw_full error: {e}')
+            return {'success': False, 'error': str(e)}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.

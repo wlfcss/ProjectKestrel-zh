@@ -24,6 +24,8 @@
       --reject-border: #e74c3c;
       --unrated-bg: rgba(255, 200, 0, 0.08);
       --unrated-border: #f0c040;
+      --card-width: 150px;
+      --preview-w: 350px;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -35,34 +37,59 @@
       flex-direction: column;
     }
 
-    /* ---- Top bar ---- */
+    /* ---- Top bar (merged: left title | center hints | right stats) ---- */
     .topbar {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      gap: 12px;
-      padding: 8px 16px;
+      padding: 5px 16px;
       background: var(--panel);
       border-bottom: 1px solid var(--card-border);
       flex-shrink: 0;
+      gap: 8px;
+      min-height: 34px;
     }
-    .topbar h1 {
-      font-size: 15px;
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .topbar-left h1 {
+      font-size: 14px;
       margin: 0;
       font-weight: 700;
       color: var(--brand);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .topbar .folder-name {
+    .topbar-left .folder-name {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .topbar .stats {
-      margin-left: auto;
+    .topbar-center {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .topbar-center kbd {
+      background: #222634;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      white-space: nowrap;
       color: var(--muted);
       font-size: 12px;
-      white-space: nowrap;
     }
 
     /* ---- Main layout ---- */
@@ -74,11 +101,10 @@
 
     /* ---- Culling pane (left 75%) ---- */
     .culling-pane {
-      flex: 3 1 0;
+      flex: 1 1 0;
       display: flex;
       flex-direction: column;
       min-width: 0;
-      border-right: 1px solid var(--card-border);
     }
 
     .culling-header {
@@ -151,7 +177,7 @@
 
     /* ---- Image card (compact) ---- */
     .cull-card {
-      width: 150px;
+      width: var(--card-width, 150px);
       background: var(--card);
       border: 1px solid var(--card-border);
       border-radius: 6px;
@@ -207,15 +233,21 @@
       line-height: 1;
       margin-top: 2px;
     }
-    .cull-card .cull-stars .star-filled { color: #f0c040; }
-    .cull-card .cull-stars .star-empty { color: #333; }
-    .cull-card .cull-stars .star-auto { color: #4aa3ff; }
+    .cull-stars .star {
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      color: #2a3040;
+      transition: color .12s ease;
+    }
+    .cull-stars .star.filled.auto { color: #6aa0ff; }
+    .cull-stars .star.filled.manual { color: #f5c542; }
+    .cull-stars .star:hover { color: #8fb6ff; }
 
     /* ---- Preview pane (right 25%) ---- */
     .preview-pane {
-      flex: 1 1 0;
-      min-width: 280px;
-      max-width: 400px;
+      flex: 0 0 var(--preview-w, 350px);
+      min-width: 200px;
       display: flex;
       flex-direction: column;
       padding: 12px;
@@ -342,38 +374,107 @@
     }
     .toast.show { opacity: 1; }
 
-    /* Instruction hint */
-    .hint-bar {
-      padding: 6px 14px;
-      font-size: 11px;
-      color: var(--muted);
-      background: var(--panel);
-      border-bottom: 1px solid var(--card-border);
+    /* ---- Resize divider ---- */
+    .resize-divider {
+      width: 6px;
+      background: #1f2533;
+      cursor: col-resize;
       flex-shrink: 0;
-      text-align: center;
+      transition: background 0.15s;
     }
-    .hint-bar kbd {
-      background: #222634;
+    .resize-divider:hover { background: #2a3040; }
+    .resize-divider:active { background: var(--brand); }
+
+    /* ---- Bottom bar zoom controls ---- */
+    .btn.icon-btn {
+      padding: 2px 9px;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .bottom-bar input[type="range"] {
+      width: 72px;
+      accent-color: var(--brand);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .bar-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--card-border);
+      flex-shrink: 0;
+    }
+
+    /* ---- Preview header with zoom control ---- */
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .preview-header h3 { margin-bottom: 0; }
+    .zoom-level-wrap {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      cursor: default;
+    }
+    .zoom-level-wrap input[type="range"] {
+      width: 60px;
+      accent-color: var(--brand);
+      cursor: pointer;
+    }
+
+    /* ---- Preview zoom mode ---- */
+    .preview-img-box { position: relative; }
+    .preview-img-box.zoom-active {
+      overflow: hidden;
+      cursor: crosshair;
+      border: 1px solid var(--brand);
+    }
+    .preview-img-box.zoom-active img {
+      max-width: none;
+      max-height: none;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: none;
+    }
+    .preview-img-box.raw-loaded::after {
+      content: 'RAW';
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: var(--brand);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
       padding: 1px 5px;
       border-radius: 3px;
-      font-family: inherit;
-      font-size: 11px;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top bar -->
+  <!-- Top bar (merged) -->
   <div class="topbar">
-    <h1>Culling Assistant</h1>
-    <span class="folder-name" id="folderName">Loading…</span>
-    <span class="stats" id="statsLabel"></span>
-  </div>
-
-  <div class="hint-bar">
-    <kbd>Shift+Click</kbd> an image to move it between Accept and Reject &nbsp;|&nbsp;
-    Hover an image to see its preview on the right &nbsp;|&nbsp;
-    Ratings are auto-saved as you work
+    <div class="topbar-left">
+      <h1>Culling Assistant</h1>
+      <span class="folder-name" id="folderName">Loading…</span>
+    </div>
+    <div class="topbar-center">
+      <kbd>Shift+Click</kbd> accept/reject &nbsp;·&nbsp;
+      Click <b>★</b> to rate &nbsp;·&nbsp;
+      <kbd>Drag</kbd> to zoom &nbsp;·&nbsp;
+      <kbd>Shift+Drag</kbd> to load RAW &amp; zoom
+    </div>
+    <div class="topbar-right">
+      <span id="statsLabel"></span>
+    </div>
   </div>
 
   <!-- Main layout -->
@@ -389,9 +490,19 @@
       </div>
     </div>
 
+    <!-- Resize divider -->
+    <div class="resize-divider" id="resizeDivider" title="Drag to resize"></div>
+
     <!-- Preview pane -->
     <div class="preview-pane">
-      <h3>Preview</h3>
+      <div class="preview-header">
+        <h3>Preview</h3>
+        <label class="zoom-level-wrap" title="RAW preview zoom (Shift+Drag on thumbnail)">
+          <span>RAW Zoom</span>
+          <input type="range" id="previewZoomSlider" min="2" max="10" value="5" step="1" />
+          <span id="previewZoomLabel">5×</span>
+        </label>
+      </div>
       <div class="preview-img-box" id="previewExport">
         <span class="muted">Hover an image…</span>
       </div>
@@ -405,9 +516,13 @@
 
   <!-- Bottom action bar -->
   <div class="bottom-bar">
+    <button class="btn icon-btn" id="cardZoomOut" title="Smaller cards">−</button>
+    <input type="range" id="cardZoomSlider" min="100" max="300" value="150" step="10" title="Card thumbnail size" />
+    <button class="btn icon-btn" id="cardZoomIn" title="Larger cards">+</button>
+    <div class="bar-sep"></div>
     <span class="status" id="statusLabel">Loading…</span>
-    <button class="btn" id="undoBtn" class="hidden" disabled style="display:none">↩ Undo Move</button>
-    <button class="btn primary" id="doneCullingBtn" disabled>Done Culling</button>
+    <button class="btn" id="undoBtn" disabled style="display:none">↩ Undo Move</button>
+    <button class="btn primary" id="doneCullingBtn" disabled>Done Culling, Proceed to Review</button>
   </div>
 
   <!-- Confirmation dialog -->
@@ -453,6 +568,7 @@
     let blobUrlCache = new Map();
     let rejectFilenames = [];    // for undo after move
     let moveCompleted = false;
+    let thumbDragPixels = 0;  // how many px the mouse moved during last thumb mousedown
 
     // ---- URL param ----
     function getUrlParam(name) {
@@ -541,19 +657,39 @@
       return cullingState.get(row.filename) === 'accept';
     }
 
-    // Stars HTML
-    function starsHtml(row) {
-      const r = getRating(row);
-      const origin = getOrigin(row);
-      let s = '';
-      for (let i = 1; i <= 5; i++) {
-        if (i <= r) {
-          s += `<span class="star-${origin === 'auto' ? 'auto' : 'filled'}">★</span>`;
-        } else {
-          s += `<span class="star-empty">☆</span>`;
-        }
+    // Interactive star bar (DOM-based, matching visualizer.html pattern)
+    function createStarBar(row) {
+      const wrap = document.createElement('div');
+      wrap.className = 'cull-stars';
+
+      function render(tempVal = null) {
+        const val = tempVal != null ? tempVal : getRating(row);
+        const origin = tempVal != null ? 'manual' : getOrigin(row);
+        Array.from(wrap.children).forEach((st, i) => {
+          const filled = i < val;
+          st.classList.toggle('filled', filled);
+          st.classList.toggle('manual', filled && origin === 'manual');
+          st.classList.toggle('auto', filled && origin !== 'manual');
+        });
       }
-      return s;
+
+      for (let i = 1; i <= 5; i++) {
+        const s = document.createElement('span');
+        s.className = 'star';
+        s.textContent = '\u2605';
+        s.title = `Set rating to ${i}`;
+        s.addEventListener('mouseenter', () => render(i));
+        s.addEventListener('mouseleave', () => render());
+        s.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          setRating(row, i, 'manual');
+          render();
+          debouncedSave();
+        });
+        wrap.appendChild(s);
+      }
+      render();
+      return wrap;
     }
 
     // ---- CSV helpers ----
@@ -664,17 +800,27 @@
       img.alt = row.filename || '';
       lazyLoadImg(img, () => getBlobUrl(row.export_path || row.crop_path, rootPath));
       thumb.appendChild(img);
+      // Drag on thumbnail to zoom preview; Shift+drag also loads RAW
+      thumb.addEventListener('mousedown', (ev) => {
+        if (ev.button !== 0) return;
+        ev.preventDefault();
+        startZoomPreview(row, thumb, ev, ev.shiftKey /* loadRaw */);
+      });
       card.appendChild(thumb);
 
       const info = document.createElement('div');
       info.className = 'cull-info';
-      info.innerHTML = `<div class="cull-filename" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</div>
-        <div class="cull-stars">${starsHtml(row)}</div>`;
+      const fnDiv = document.createElement('div');
+      fnDiv.className = 'cull-filename';
+      fnDiv.title = row.filename || '';
+      fnDiv.textContent = row.filename || '';
+      info.appendChild(fnDiv);
+      info.appendChild(createStarBar(row));
       card.appendChild(info);
 
-      // Shift+click to swap
+      // Shift+click (no drag) to swap; Shift+drag is handled by mousedown
       card.addEventListener('click', (ev) => {
-        if (ev.shiftKey) {
+        if (ev.shiftKey && thumbDragPixels < 5) {
           ev.preventDefault();
           swapImage(row);
           renderScene(row.scene_count);
@@ -782,18 +928,23 @@
       }
 
       // Metadata
-      const rating = getRating(row);
-      const origin = getOrigin(row);
       const side = cullingState.get(row.filename) || '—';
       const meta = el('#previewMeta');
       meta.innerHTML = `
         <div class="row"><span class="label">Filename</span><span class="value" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
         <div class="row"><span class="label">Species</span><span class="value">${escapeHtml(row.species || 'Unknown')} (${fmt3(row.species_confidence)})</span></div>
         <div class="row"><span class="label">Quality</span><span class="value">${fmt3(row.quality)}</span></div>
-        <div class="row"><span class="label">Rating</span><span class="value">${'★'.repeat(rating)}${'☆'.repeat(5-rating)} ${origin ? `(${origin})` : ''}</span></div>
+        <div class="row meta-rating-row"><span class="label">Rating</span></div>
         <div class="row"><span class="label">Status</span><span class="value" style="color:${side==='accept' ? 'var(--ok)' : 'var(--bad)'}">${side === 'accept' ? '✓ Accept' : '✗ Reject'}</span></div>
         <div class="row"><span class="label">Scene</span><span class="value">#${escapeHtml(String(row.scene_count || ''))}</span></div>
       `;
+      // Insert interactive star bar into the rating row
+      const ratingRow = meta.querySelector('.meta-rating-row');
+      if (ratingRow) {
+        const starWrap = createStarBar(row);
+        starWrap.style.cssText = 'display:flex;gap:2px;justify-content:flex-end;flex:1';
+        ratingRow.appendChild(starWrap);
+      }
     }
 
     // ---- Stats ----
@@ -981,6 +1132,191 @@
       renderAllScenes();
       updateStats();
     }
+
+    // ---- Card size zoom slider ----
+    (function setupCardZoom() {
+      const slider = document.getElementById('cardZoomSlider');
+      const zoomIn = document.getElementById('cardZoomIn');
+      const zoomOut = document.getElementById('cardZoomOut');
+      if (!slider) return;
+      const apply = () => document.documentElement.style.setProperty('--card-width', slider.value + 'px');
+      slider.addEventListener('input', apply);
+      zoomIn?.addEventListener('click', () => {
+        slider.value = Math.min(parseInt(slider.max), parseInt(slider.value) + parseInt(slider.step));
+        apply();
+      });
+      zoomOut?.addEventListener('click', () => {
+        slider.value = Math.max(parseInt(slider.min), parseInt(slider.value) - parseInt(slider.step));
+        apply();
+      });
+    })();
+
+    // ---- Resize divider between culling and preview pane ----
+    (function setupResizeDivider() {
+      const divider = document.getElementById('resizeDivider');
+      const layout = document.querySelector('.main-layout');
+      if (!divider || !layout) return;
+
+      divider.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const layoutRect = layout.getBoundingClientRect();
+        const onMove = (ev) => {
+          const newW = Math.round(layoutRect.right - ev.clientX);
+          const min = 200;
+          const max = Math.max(300, Math.floor(layoutRect.width * 0.6));
+          const clamped = Math.min(Math.max(newW, min), max);
+          document.documentElement.style.setProperty('--preview-w', clamped + 'px');
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        };
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      divider.addEventListener('dblclick', () => {
+        document.documentElement.style.setProperty('--preview-w', '350px');
+      });
+    })();
+
+    // ---- Preview zoom on click-drag ----
+    let zoomActive = false;
+    let zoomRow = null;
+    let rawCache = new Map();   // filename -> base64 data URL
+    let rawLoading = new Set(); // filenames currently loading
+
+    function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
+      zoomActive = true;
+      zoomRow = row;
+      thumbDragPixels = 0;
+
+      const exportBox = el('#previewExport');
+      const zoomSlider = el('#previewZoomSlider');
+      const getScale = () => zoomSlider ? parseInt(zoomSlider.value, 10) : 5;
+
+      exportBox.classList.add('zoom-active');
+
+      // Ensure the best available image is shown and zoomed
+      async function applyBestImage(clientX, clientY) {
+        let img = exportBox.querySelector('img');
+        const scale = getScale();
+        const cachedRaw = rawCache.get(row.filename);
+
+        if (cachedRaw && img?.dataset?.isRaw !== '1') {
+          // Upgrade to cached RAW immediately
+          exportBox.innerHTML = '';
+          img = document.createElement('img');
+          img.src = cachedRaw;
+          img.dataset.isRaw = '1';
+          exportBox.appendChild(img);
+          exportBox.classList.add('raw-loaded');
+        } else if (!img) {
+          // No preview loaded — load export jpg
+          const url = await getBlobUrl(row.export_path, rootPath);
+          if (!zoomActive || zoomRow !== row) return;
+          if (url) {
+            exportBox.innerHTML = '';
+            img = document.createElement('img');
+            img.src = url;
+            exportBox.appendChild(img);
+          }
+        }
+
+        if (img && zoomActive && zoomRow === row) {
+          applyZoomTransform(img, thumbEl, clientX, clientY, scale);
+        }
+      }
+
+      applyBestImage(mouseEv.clientX, mouseEv.clientY);
+
+      // Trigger RAW loading only on Shift+drag
+      if (loadRaw && !rawCache.has(row.filename) && !rawLoading.has(row.filename)) {
+        loadRawAsync(row);
+      }
+
+      const startX = mouseEv.clientX, startY = mouseEv.clientY;
+      const onMove = (ev) => {
+        if (!zoomActive) return;
+        thumbDragPixels = Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY);
+        const s = getScale();
+        const curImg = el('#previewExport')?.querySelector('img');
+        if (curImg) applyZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, s);
+      };
+
+      const onUp = () => {
+        zoomActive = false;
+        zoomRow = null;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        const box = el('#previewExport');
+        box.classList.remove('zoom-active');
+        box.classList.remove('raw-loaded');
+        const curImg = box.querySelector('img');
+        if (curImg) {
+          curImg.style.transform = '';
+          curImg.style.transformOrigin = '';
+          delete curImg.dataset.isRaw;
+        }
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }
+
+    function applyZoomTransform(img, thumbEl, clientX, clientY, scale) {
+      const rect = thumbEl.getBoundingClientRect();
+      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
+      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
+      img.style.transform = `scale(${scale})`;
+      img.style.transformOrigin = `${xPct}% ${yPct}%`;
+    }
+
+    async function loadRawAsync(row) {
+      rawLoading.add(row.filename);
+      try {
+        const res = await window.pywebview.api.read_raw_full(row.filename, rootPath);
+        if (res && res.success && res.data) {
+          const url = `data:image/jpeg;base64,${res.data}`;
+          rawCache.set(row.filename, url);
+          // If still zooming on this row, swap to the high-res source
+          if (zoomActive && zoomRow === row) {
+            const img = el('#previewExport')?.querySelector('img');
+            if (img) {
+              img.src = url;
+              img.dataset.isRaw = '1';
+              img.title = 'RAW (full resolution)';
+              el('#previewExport')?.classList.add('raw-loaded');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('loadRawAsync error:', e);
+      } finally {
+        rawLoading.delete(row.filename);
+      }
+    }
+
+    // Zoom slider live update while dragging
+    (function setupPreviewZoom() {
+      const slider = document.getElementById('previewZoomSlider');
+      const label = document.getElementById('previewZoomLabel');
+      if (!slider) return;
+      slider.addEventListener('input', () => {
+        if (label) label.textContent = slider.value + '\u00d7';
+        if (zoomActive) {
+          const img = el('#previewExport')?.querySelector('img');
+          if (img) {
+            const scale = parseInt(slider.value, 10);
+            img.style.transform = `scale(${scale})`;
+          }
+        }
+      });
+    })();
 
     // ---- Init ----
     async function init() {
