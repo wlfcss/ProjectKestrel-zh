@@ -457,6 +457,113 @@
       border-radius: 3px;
       pointer-events: none;
     }
+
+    /* ---- Tutorial overlay ---- */
+    #tutorialOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      pointer-events: none;
+      display: none;
+    }
+    #tutorialOverlay.active {
+      display: block;
+      pointer-events: all;
+    }
+    #tutorialOverlay.has-backdrop {
+      background: rgba(0,0,0,0.58);
+    }
+    #tutorialHighlight {
+      position: fixed;
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.60);
+      border: 2px solid var(--brand);
+      transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
+      pointer-events: none;
+      z-index: 10001;
+      display: none;
+    }
+    #tutorialCard {
+      position: fixed;
+      background: var(--panel);
+      border: 1px solid var(--brand);
+      border-radius: 12px;
+      padding: 18px 20px 14px;
+      width: 360px;
+      max-width: calc(100vw - 32px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+      z-index: 10002;
+      transition: top .22s ease, left .22s ease;
+    }
+    #tutorialCard h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brand);
+    }
+    .tutorial-counter {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .tutorial-progress {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .tutorial-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--card-border);
+      transition: background .2s;
+      flex-shrink: 0;
+    }
+    .tutorial-dot.active { background: var(--brand); }
+    .tutorial-body {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    .tutorial-body kbd {
+      background: #222634;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 12px;
+    }
+    .tutorial-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .tutorial-skip {
+      margin-right: auto;
+      color: var(--muted) !important;
+      font-size: 12px;
+      padding: 4px 10px;
+    }
+    .help-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--card-border);
+      background: none;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      flex-shrink: 0;
+      transition: color .15s, border-color .15s;
+      line-height: 1;
+    }
+    .help-btn:hover { color: var(--brand); border-color: var(--brand); }
   </style>
 </head>
 <body>
@@ -472,8 +579,9 @@
       Click <b>★</b> to rate &nbsp;·&nbsp;
       <kbd>Drag</kbd> thumbnail to zoom preview (loads RAW)
     </div>
-    <div class="topbar-right">
+    <div class="topbar-right" style="gap:8px">
       <span id="statsLabel"></span>
+      <button class="help-btn" id="helpBtn" title="Show tutorial">?</button>
     </div>
   </div>
 
@@ -534,6 +642,22 @@
       <button class="btn primary" id="confirmOk">Move Rejects &amp; Finish</button>
     </div>
   </dialog>
+
+  <!-- Tutorial overlay -->
+  <div id="tutorialOverlay">
+    <div id="tutorialHighlight"></div>
+    <div id="tutorialCard">
+      <div class="tutorial-counter" id="tutorialCounter"></div>
+      <div class="tutorial-progress" id="tutorialProgress"></div>
+      <h3 id="tutorialTitle"></h3>
+      <div class="tutorial-body" id="tutorialBody"></div>
+      <div class="tutorial-actions">
+        <button class="btn tutorial-skip" id="tutorialSkip">Skip Tour</button>
+        <button class="btn" id="tutorialBack">← Back</button>
+        <button class="btn primary" id="tutorialNext">Next →</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast -->
   <div class="toast" id="toast"></div>
@@ -1137,6 +1261,43 @@
       updateStats();
     }
 
+    // ====================================================================
+    // Persistent zoom settings
+    // ====================================================================
+    let _settingsSaveTimer = null;
+
+    async function loadCullingSettings() {
+      try {
+        const res = await window.pywebview.api.get_settings();
+        if (!res?.success) return;
+        const s = res.settings || {};
+        const cardZoom = parseInt(s.culling_card_zoom, 10);
+        const rawZoom  = parseInt(s.culling_raw_zoom,  10);
+        if (cardZoom >= 100 && cardZoom <= 300) {
+          const sl = document.getElementById('cardZoomSlider');
+          if (sl) { sl.value = cardZoom; document.documentElement.style.setProperty('--card-width', cardZoom + 'px'); }
+        }
+        if (rawZoom >= 2 && rawZoom <= 10) {
+          const sl = document.getElementById('previewZoomSlider');
+          const lb = document.getElementById('previewZoomLabel');
+          if (sl) { sl.value = rawZoom; if (lb) lb.textContent = rawZoom + '×'; }
+        }
+      } catch (e) { console.warn('loadCullingSettings:', e); }
+    }
+
+    function saveCullingSettings() {
+      clearTimeout(_settingsSaveTimer);
+      _settingsSaveTimer = setTimeout(async () => {
+        try {
+          const res = await window.pywebview.api.get_settings();
+          const s = (res?.success ? res.settings : {}) || {};
+          s.culling_card_zoom = parseInt(document.getElementById('cardZoomSlider')?.value, 10) || 150;
+          s.culling_raw_zoom  = parseInt(document.getElementById('previewZoomSlider')?.value, 10) || 5;
+          await window.pywebview.api.save_settings_data(s);
+        } catch (e) { console.warn('saveCullingSettings:', e); }
+      }, 1200);
+    }
+
     // ---- Card size zoom slider ----
     (function setupCardZoom() {
       const slider = document.getElementById('cardZoomSlider');
@@ -1144,14 +1305,14 @@
       const zoomOut = document.getElementById('cardZoomOut');
       if (!slider) return;
       const apply = () => document.documentElement.style.setProperty('--card-width', slider.value + 'px');
-      slider.addEventListener('input', apply);
+      slider.addEventListener('input', () => { apply(); saveCullingSettings(); });
       zoomIn?.addEventListener('click', () => {
         slider.value = Math.min(parseInt(slider.max), parseInt(slider.value) + parseInt(slider.step));
-        apply();
+        apply(); saveCullingSettings();
       });
       zoomOut?.addEventListener('click', () => {
         slider.value = Math.max(parseInt(slider.min), parseInt(slider.value) - parseInt(slider.step));
-        apply();
+        apply(); saveCullingSettings();
       });
     })();
 
@@ -1322,6 +1483,161 @@
       });
     })();
 
+    // ====================================================================
+    // Tutorial
+    // ====================================================================
+    const TUTORIAL_STEPS = [
+      {
+        title: 'Welcome to Culling Assistant!',
+        body: "Let's take a quick tour of the key features. Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
+        target: null,
+      },
+      {
+        title: 'Photos, Organized by Scene',
+        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.',
+        target: '#cullingScroll',
+        position: 'right',
+      },
+      {
+        title: 'Accept &amp; Reject Columns',
+        body: 'Each scene has two columns. <span style="color:var(--ok)"><b>Accept</b></span> holds 4–5★ photos; <span style="color:var(--bad)"><b>Reject</b></span> holds 1–3★. Photos with <b>no rating (0★)</b> show with a <span style="color:#f0c040"><b>yellow border</b></span> so you know they still need a decision.',
+        target: '.culling-header',
+        position: 'bottom',
+      },
+      {
+        title: 'Hover to Preview',
+        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.',
+        target: '.scene-columns',
+        position: 'right',
+      },
+      {
+        title: 'The Preview Pane',
+        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. Kestrel will automatically load the full-resolution <b>RAW file</b> after a few seconds for maximum detail.',
+        target: '.preview-pane',
+        position: 'left',
+      },
+      {
+        title: 'Move Photos with Shift+Click',
+        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.',
+        target: '.scene-columns',
+        position: 'right',
+      },
+      {
+        title: 'Manual Star Ratings',
+        body: '<b>Click the ★ stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel’s AI rating; <span style="color:#f5c542">gold stars</span> mean you’ve overridden it manually. The metadata panel on the right also has interactive stars.',
+        target: '.cull-info',
+        position: 'top',
+      },
+      {
+        title: 'Resize &amp; Zoom Controls',
+        body: 'Use the <b>− / + buttons</b> at the bottom-left to change card size. Drag the <b>divider</b> between the columns and preview panel to resize it. The <b>RAW Zoom</b> slider in the preview header adjusts zoom magnification when dragging thumbnails.',
+        target: '.bottom-bar',
+        position: 'top',
+      },
+      {
+        title: 'Done Culling',
+        body: 'When you’re ready, click <b>“Done Culling, Proceed to Review”</b>. Kestrel will move all Rejected photos to a <code style="background:#1a1e28;padding:1px 5px;border-radius:3px">_KESTREL_Rejects</code> folder.<br><br>🔒 <b>Kestrel never deletes your photos.</b><br><br><span style="color:var(--muted);font-size:11px">Coming soon: XMP sidecar export for Lightroom, Capture One, and more.</span>',
+        target: '#doneCullingBtn',
+        position: 'top',
+      },
+    ];
+
+    let _tutStep = 0;
+
+    async function checkTutorialSeen() {
+      try {
+        const res = await window.pywebview.api.get_settings();
+        return res?.settings?.culling_tutorial_seen === true;
+      } catch (e) { return false; }
+    }
+
+    async function markTutorialSeen() {
+      try {
+        const res = await window.pywebview.api.get_settings();
+        const s = (res?.success ? res.settings : {}) || {};
+        s.culling_tutorial_seen = true;
+        await window.pywebview.api.save_settings_data(s);
+      } catch (e) { console.warn('markTutorialSeen:', e); }
+    }
+
+    function startTutorial(fromStep = 0) {
+      _tutStep = fromStep;
+      el('#tutorialOverlay').classList.add('active');
+      _showTutStep(_tutStep);
+    }
+
+    function _closeTutorial() {
+      el('#tutorialOverlay').classList.remove('active', 'has-backdrop');
+      el('#tutorialHighlight').style.display = 'none';
+      markTutorialSeen();
+    }
+
+    function _showTutStep(idx) {
+      const step = TUTORIAL_STEPS[idx];
+      if (!step) { _closeTutorial(); return; }
+
+      const overlay  = el('#tutorialOverlay');
+      const hl       = el('#tutorialHighlight');
+      const card     = el('#tutorialCard');
+
+      // Update text
+      el('#tutorialCounter').textContent = `Step ${idx + 1} of ${TUTORIAL_STEPS.length}`;
+      el('#tutorialTitle').innerHTML = step.title;
+      el('#tutorialBody').innerHTML  = step.body;
+
+      // Dots
+      const dotsCont = el('#tutorialProgress');
+      dotsCont.innerHTML = '';
+      TUTORIAL_STEPS.forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'tutorial-dot' + (i === idx ? ' active' : '');
+        dotsCont.appendChild(d);
+      });
+
+      // Back / Next labels
+      el('#tutorialBack').disabled = (idx === 0);
+      el('#tutorialNext').textContent = idx === TUTORIAL_STEPS.length - 1 ? 'Finish ✓' : 'Next →';
+
+      const target = step.target ? document.querySelector(step.target) : null;
+
+      if (!target) {
+        // Center-screen card, full backdrop
+        hl.style.display = 'none';
+        overlay.classList.add('has-backdrop');
+        card.style.transform = 'translate(-50%, -50%)';
+        card.style.top  = '50%';
+        card.style.left = '50%';
+      } else {
+        hl.style.display = '';
+        overlay.classList.remove('has-backdrop');
+        card.style.transform = '';
+
+        const pad = 5;
+        const r = target.getBoundingClientRect();
+        hl.style.top    = (r.top  - pad) + 'px';
+        hl.style.left   = (r.left - pad) + 'px';
+        hl.style.width  = (r.width  + pad * 2) + 'px';
+        hl.style.height = (r.height + pad * 2) + 'px';
+
+        // Position card near target
+        const pos    = step.position || 'right';
+        const margin = 18;
+        const vw     = window.innerWidth;
+        const vh     = window.innerHeight;
+        const cw     = 360 + margin;
+        const ch     = card.offsetHeight || 200;
+        let top, left;
+        if (pos === 'right')  { left = r.right + margin;         top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'left')  { left = r.left - cw - margin;    top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'bottom'){ left = r.left + r.width / 2 - cw / 2; top = r.bottom + margin; }
+        else                      { left = r.left + r.width / 2 - cw / 2; top = r.top - ch - margin; }
+        left = Math.max(margin, Math.min(left, vw - cw - margin));
+        top  = Math.max(margin, Math.min(top,  vh - ch - margin));
+        card.style.left = left + 'px';
+        card.style.top  = top  + 'px';
+      }
+    }
+
     // ---- Init ----
     async function init() {
       rootPath = decodeURIComponent(getUrlParam('root'));
@@ -1339,10 +1655,16 @@
         return;
       }
 
+      await loadCullingSettings();
+
       try {
         await loadData();
         el('#doneCullingBtn').disabled = false;
         el('#statusLabel').textContent = 'Ready — Drag images to zoom (auto-loads RAW), Shift+Click to decide, Click ★ to rate';
+
+        // Auto-launch tutorial on first run
+        const seen = await checkTutorialSeen();
+        if (!seen) setTimeout(() => startTutorial(0), 600);
       } catch (e) {
         console.error('init error', e);
         el('#statusLabel').textContent = 'Error loading data: ' + e.message;
@@ -1363,6 +1685,17 @@
     el('#confirmOk').addEventListener('click', executeMove);
     el('#confirmCancel').addEventListener('click', () => el('#confirmDlg').close());
     el('#undoBtn').addEventListener('click', undoMove);
+    el('#helpBtn').addEventListener('click', () => startTutorial(0));
+    el('#tutorialNext').addEventListener('click', () => { _tutStep++; if (_tutStep >= TUTORIAL_STEPS.length) _closeTutorial(); else _showTutStep(_tutStep); });
+    el('#tutorialBack').addEventListener('click', () => { if (_tutStep > 0) { _tutStep--; _showTutStep(_tutStep); } });
+    el('#tutorialSkip').addEventListener('click', _closeTutorial);
+    // Keyboard navigation inside tutorial
+    document.addEventListener('keydown', (ev) => {
+      if (!el('#tutorialOverlay').classList.contains('active')) return;
+      if (ev.key === 'ArrowRight' || ev.key === 'Enter') el('#tutorialNext').click();
+      else if (ev.key === 'ArrowLeft') el('#tutorialBack').click();
+      else if (ev.key === 'Escape') _closeTutorial();
+    });
 
     // ---- Start ----
     init();
