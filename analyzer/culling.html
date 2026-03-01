@@ -581,24 +581,30 @@
     }
     .tutorial-nudge::before { content: '\203A\00A0'; font-size: 14px; }
     .help-btn {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
+      padding: 5px 9px;
+      height: auto;
+      width: auto;
+      border-radius: 5px;
       border: 1px solid var(--card-border);
-      background: none;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
+      background: rgba(74, 163, 255, 0.08);
+      color: var(--brand);
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 3px;
       padding: 0;
       flex-shrink: 0;
-      transition: color .15s, border-color .15s;
+      transition: color .15s, border-color .15s, background .15s;
       line-height: 1;
     }
-    .help-btn:hover { color: var(--brand); border-color: var(--brand); }
+    .help-btn:hover { 
+      background: rgba(74, 163, 255, 0.18);
+      color: var(--brand); 
+      border-color: var(--brand); 
+    }
   </style>
 </head>
 <body>
@@ -616,7 +622,7 @@
     </div>
     <div class="topbar-right" style="gap:8px">
       <span id="statsLabel"></span>
-      <button class="help-btn" id="helpBtn" title="Show tutorial">?</button>
+      <button class="help-btn" id="helpBtn" title="Show tutorial">❓ Help</button>
     </div>
   </div>
 

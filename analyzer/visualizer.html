@@ -1976,22 +1976,28 @@
     }
     .tutorial-nudge::before { content: '\203A\00A0'; font-size: 14px; }
     #helpBtnMain {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 1px solid #333;
-      background: none;
-      color: var(--muted);
+      padding: 6px 10px;
+      height: auto;
+      width: auto;
+      border-radius: 6px;
+      border: 1px solid var(--muted);
+      background: rgba(74, 163, 255, 0.08);
+      color: var(--brand);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 0;
+      gap: 4px;
       flex-shrink: 0;
+      transition: all .15s;
     }
-    #helpBtnMain:hover { border-color: var(--brand); color: var(--brand); }
+    #helpBtnMain:hover { 
+      background: rgba(74, 163, 255, 0.15);
+      border-color: var(--brand); 
+      color: var(--brand); 
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -2093,7 +2099,7 @@
       <div class="sidebar-footer" aria-label="Zoom controls">
         <button id="zoomOut" title="Zoom out">Zoom −</button>
         <button id="zoomIn" title="Zoom in">Zoom +</button>
-        <button id="helpBtnMain" title="Start guided tutorial">?</button>
+        <button id="helpBtnMain" title="Start guided tutorial">📖 Tutorial</button>
         <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion"
           style="margin-left:auto;font-size:11px;padding:3px 8px;">Feedback</button>
       </div>
