@@ -193,6 +193,7 @@
     }
     .cull-card.accept-card { border-left: 3px solid var(--accept-border); }
     .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
+    .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
     .cull-card.moved-card { opacity: 0.85; }
     .cull-card.moved-card::after {
       content: '\u21C4 moved';
@@ -738,6 +739,7 @@
         }
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
         const allUnrated = arr.every(r => getRating(r) === 0);
+        const hasAnyUnrated = arr.some(r => getRating(r) === 0);
         const hasDetections = arr.some(r => r.species && r.species !== 'No Bird' && r.species !== 'Unknown' && r.species !== '');
         list.push({
           id: sceneId,
@@ -747,6 +749,7 @@
           maxQuality: maxQ,
           sceneName: (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim(),
           allUnrated,
+          hasAnyUnrated,
           hasDetections,
         });
       }
@@ -787,9 +790,11 @@
 
     // ---- Build an image card ----
     function buildImageCard(row) {
+      const rating = getRating(row);
+      const isUnrated = rating === 0;
       const side = cullingState.get(row.filename) || 'accept';
       const card = document.createElement('div');
-      card.className = `cull-card ${side}-card`;
+      card.className = isUnrated ? 'cull-card unrated-card' : `cull-card ${side}-card`;
       if (manuallyMoved.has(row.filename)) card.classList.add('moved-card');
       card.style.position = 'relative'; // for ::after badge
 
@@ -868,7 +873,7 @@
         label.innerHTML = `<b>Scene #${escapeHtml(scene.id)}</b>` +
           (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
-          (scene.allUnrated ? ' <span class="unrated-badge">⚠ Unrated</span>' : '');
+          (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
         row.appendChild(label);
 
         // Columns
