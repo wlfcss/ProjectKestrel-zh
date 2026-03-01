@@ -1478,7 +1478,7 @@ class Api:
             folder_name = os.path.basename(root_path) if root_path else 'Unknown'
             port = self._server_port or 8765
             from urllib.parse import quote
-            culling_url = f'http://{HOST}:{port}/analyzer/culling.html?root={quote(root_path, safe="")}'
+            culling_url = f'http://{HOST}:{port}/culling.html?root={quote(root_path, safe="")}'
             
             # Debug: log available methods
             methods = [m for m in dir(self) if not m.startswith('_') and callable(getattr(self, m))]
