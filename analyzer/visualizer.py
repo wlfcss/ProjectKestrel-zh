@@ -1533,14 +1533,52 @@ class Api:
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
     def translate_path(self, path: str) -> str:  # type: ignore[override]
+        """Resolve file paths robustly across dev, frozen, and installed builds.
+        
+        Checks multiple locations:
+        1. Normal CWD-relative translation (for dev mode)
+        2. analyzer/ subfolder (for files like culling.html)
+        3. _internal/analyzer/ (for PyInstaller frozen install in Program Files)
+        """
+        # Try the normal translation first
         resolved = super().translate_path(path)
-        # When the file isn't found at the root, check the analyzer/ subfolder.
-        # This lets logo.png and other assets embedded alongside visualizer.html
-        # be served correctly when the page is mounted at /.
-        if not os.path.exists(resolved):
+        if os.path.exists(resolved):
+            return resolved
+        
+        # If not found and path doesn't already contain /analyzer, try analyzer/ prefix
+        if not path.startswith('/analyzer'):
             alt = super().translate_path('/analyzer' + path)
             if os.path.exists(alt):
                 return alt
+        
+        # For frozen builds, also check _internal subdirectories
+        if getattr(sys, 'frozen', False):
+            # Try <exe_dir>/_internal/analyzer/<file>
+            try:
+                exe_dir = os.path.dirname(sys.executable)
+                internal_dir = os.path.join(exe_dir, '_internal')
+                alt_path = path.lstrip('/')
+                alt = os.path.join(internal_dir, alt_path)
+                if os.path.exists(alt):
+                    return alt
+                # If path already has /analyzer, also check _internal/analyzer/<file>
+                if path.startswith('/analyzer'):
+                    alt_path = path[1:]  # Strip leading /
+                    alt = os.path.join(internal_dir, alt_path)
+                    if os.path.exists(alt):
+                        return alt
+            except Exception:
+                pass
+            
+            # Try _MEIPASS (PyInstaller temp extraction)
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                alt_path = path.lstrip('/')
+                alt = os.path.join(meipass, alt_path)
+                if os.path.exists(alt):
+                    return alt
+        
+        # Return the original resolution (will 404 if file doesn't exist)
         return resolved
 
     def end_headers(self):  # Inject basic headers (no wildcard CORS; same-origin only)
@@ -1569,29 +1607,43 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path in ('/', '/index.html'):
             # Prefer analyzer/visualizer.html when present (merged layout).
-            # In frozen/on-dir builds the working directory may differ, so
-            # check several possible locations (cwd, exe dir, PyInstaller _MEIPASS).
-            def _exists_rel(rel: str) -> bool:
-                # 1) check relative to CWD
-                if os.path.exists(os.path.join(os.getcwd(), rel)):
-                    return True
-                # 2) check relative to the executable directory
+            # Check multiple locations across dev, frozen, and installed builds.
+            def _find_visualizer():
+                # List of relative paths to try (from various base dirs)
+                candidates = [
+                    'analyzer/visualizer.html',
+                    'visualizer.html',
+                ]
+                
+                # Check from CWD
+                for rel in candidates:
+                    full = os.path.join(os.getcwd(), rel)
+                    if os.path.exists(full):
+                        return '/' + rel
+                
+                # Check from exe dir (frozen/installed)
                 try:
                     exe_dir = os.path.dirname(sys.executable)
-                    if exe_dir and os.path.exists(os.path.join(exe_dir, rel)):
-                        return True
+                    internal_dir = os.path.join(exe_dir, '_internal')
+                    for rel in candidates:
+                        full = os.path.join(internal_dir, rel)
+                        if os.path.exists(full):
+                            return '/' + rel
                 except Exception:
                     pass
-                # 3) check PyInstaller _MEIPASS (onefile mode)
+                
+                # Check PyInstaller _MEIPASS
                 meipass = getattr(sys, '_MEIPASS', None)
-                if meipass and os.path.exists(os.path.join(meipass, rel)):
-                    return True
-                return False
-
-            if _exists_rel(os.path.join('analyzer', 'visualizer.html')):
-                self.path = '/analyzer/visualizer.html'
-            elif _exists_rel('visualizer.html'):
-                self.path = '/visualizer.html'
+                if meipass:
+                    for rel in candidates:
+                        full = os.path.join(meipass, rel)
+                        if os.path.exists(full):
+                            return '/' + rel
+                
+                # Default fallback
+                return '/analyzer/visualizer.html'
+            
+            self.path = _find_visualizer()
         return super().do_GET()
 
     def do_OPTIONS(self):  # Minimal preflight (only allow same-origin JS; token still required)
