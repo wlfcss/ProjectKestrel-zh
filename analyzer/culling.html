@@ -579,7 +579,7 @@
       0%, 100% { opacity: 0.8; }
       50%      { opacity: 1; }
     }
-    .tutorial-nudge::before { content: '\261B'; font-size: 16px; }
+    .tutorial-nudge::before { content: '\203A\00A0'; font-size: 14px; }
     .help-btn {
       width: 22px;
       height: 22px;
@@ -1578,7 +1578,8 @@
       },
       {
         title: 'Done Culling',
-        body: 'When you\u2019re ready, click <b>\u201cDone Culling, Proceed to Review\u201d</b>. Kestrel will move all Rejected photos to a <code style="background:#1a1e28;padding:1px 5px;border-radius:3px">_KESTREL_Rejects</code> folder.<br><br>\U0001F512 <b>Kestrel never deletes your photos.</b>',
+        body: 'When you\u2019re ready, click <b>\u201cDone Culling, Proceed to Review\u201d</b>. Kestrel will move all Rejected photos to a <code style="background:#1a1e28;padding:1px 5px;border-radius:3px">_KESTREL_Rejects</code> folder.<br><br><b>Kestrel never deletes your original photos</b> \u2014 they are always safe.',
+
         target: '#doneCullingBtn',
         position: 'top',
       },
@@ -1719,11 +1720,15 @@
 
       // ---- Set up interactive waitFor listeners ----
       if (hasWaitFor && step.waitFor === 'hoverCard') {
-        // Wait for user to hover over any cull-card
+        // Wait for user to hover over any cull-card.
+        // Use a fired flag to prevent multiple rapid mouseenter events from multi-advancing.
+        var _hoverFired = false;
         var hoverHandler = function(ev) {
+          if (_hoverFired) return;
           var cardEl = ev.target.closest('.cull-card');
           if (cardEl) {
-            setTimeout(function() { _tutAdvance(); }, 300);
+            _hoverFired = true;
+            setTimeout(function() { _tutAdvance(); }, 500);
           }
         };
         document.addEventListener('mouseenter', hoverHandler, true);

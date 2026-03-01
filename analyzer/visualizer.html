@@ -1974,7 +1974,7 @@
       0%, 100% { opacity: 0.8; }
       50%      { opacity: 1; }
     }
-    .tutorial-nudge::before { content: '\u261B'; font-size: 16px; }
+    .tutorial-nudge::before { content: '\203A\00A0'; font-size: 14px; }
     #helpBtnMain {
       width: 24px;
       height: 24px;
@@ -5909,15 +5909,16 @@
       {
         title: 'Your Photos, Organized by Scene',
         body: 'The <b>Scene Grid</b> shows your photos grouped by when they were taken. Each card shows the best photo, species detected, and the AI quality rating.',
-        nudge: 'Click on any scene card to open it!',
-        target: '#sceneGrid',
-        position: 'left',
+        nudge: 'Click the highlighted scene card to open it!',
+        target: '#sceneGrid .card',  // highlights the first card
+        position: 'right',
         waitFor: 'clickScene',   // hide Next; require user to click a scene card
       },
       {
         title: 'Scene Detail View',
-        body: 'Inside a scene, photos are <b>sorted by quality</b> \u2014 the sharpest, best-composed shots appear first. Hover over a photo to preview it on the right.<br><br><b>Double-click</b> any photo to open it in your photo editor.',
+        body: 'Inside a scene, photos are <b>sorted by quality</b> \u2014 the sharpest, best-composed shots appear first. Hover over a photo to preview it on the right.<br><br>When you analyze your own photos, you can <b>double-click</b> any photo to open it in your photo editor.',
         target: '#sceneDlg',
+        highlightFirst: '#sceneDlg .card:first-child',
         position: 'left',
         inDialog: true,          // position relative to the dialog
       },
@@ -5925,7 +5926,7 @@
         title: 'Star Ratings',
         body: 'Click the <b>\u2605 stars</b> on any photo to set your own rating. <span style="color:#6aa0ff">Blue stars</span> = AI rating. <span style="color:#f5c542">Gold stars</span> = your manual override.',
         nudge: 'Try clicking a star on one of the photos!',
-        target: '.card .stars',
+        target: '#sceneDlg .card:first-child .stars',
         position: 'right',
         inDialog: true,
         waitFor: 'clickStar',    // wait for user to click a star
@@ -5966,6 +5967,7 @@
     let _tutPart = 0;               // 0 = not started, 1 = part1, 2 = part2
     let _tutSampleLoaded = false;    // track if we auto-loaded sample sets
     let _tutCleanupFn = null;        // cleanup function for current waitFor listeners
+    let _tutInDialog  = false;       // true while tutorial card is inside the scene dialog
 
     function _tutEl(sel) { return document.querySelector(sel); }
 
@@ -5994,6 +5996,14 @@
       });
       // Run cleanup for waitFor listeners
       if (_tutCleanupFn) { _tutCleanupFn(); _tutCleanupFn = null; }
+      // If tutorial card was moved inside the scene dialog (top layer), move it back
+      if (_tutInDialog) {
+        _tutInDialog = false;
+        var _ovl = _tutEl('#tutorialOverlay');
+        var _crd = _tutEl('#tutorialCard');
+        if (_crd && _ovl && _crd.parentElement !== _ovl) { _ovl.appendChild(_crd); }
+        if (_ovl) { _ovl.style.display = ''; }
+      }
     }
 
     function startMainTutorial(part, fromStep) {
@@ -6060,16 +6070,29 @@
       var target = step.target ? document.querySelector(step.target) : null;
 
       // For inDialog steps, check if the scene dialog is open
+      var _inDialogActive = false;
       if (step.inDialog) {
         var dlg = document.getElementById('sceneDlg');
         if (!dlg || !dlg.open) {
           // Dialog not open — show a message and allow Next to skip
-          _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first to see this in action, or press Next to continue.</span>';
+          _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first, then this step will highlight the right element.</span>';
           nudge.style.display = 'none';
           nextBtn.style.display = '';  // show Next even if waitFor was set
           target = null;  // treat as center
           hasWaitFor = false;
+        } else {
+          // Dialog is open — physically move the tutorial card into the dialog so it
+          // appears in the browser's top layer (above the modal dialog content)
+          _inDialogActive = true;
+          _tutInDialog = true;
+          if (card.parentElement !== dlg) { dlg.appendChild(card); }
+          overlay.style.display = 'none'; // hide the main-page dim; dialog has its own backdrop
         }
+      }
+      // For steps that have a separate first-element highlight target
+      if (step.highlightFirst && !_inDialogActive) {
+        var _hfEl = document.querySelector(step.highlightFirst);
+        if (_hfEl) _hfEl.classList.add('highlight-target');
       }
 
       if (!target || (target.offsetWidth === 0 && target.offsetHeight === 0)) {
@@ -6080,7 +6103,8 @@
         card.style.top  = '50%';
         card.style.left = '50%';
       } else {
-        hl.style.display = '';
+        // For inDialog active steps the card is inside the dialog (top layer); skip overlay hl
+        hl.style.display = _inDialogActive ? 'none' : '';
         overlay.classList.remove('has-backdrop');
         card.style.transform = '';
 
@@ -6089,10 +6113,12 @@
 
         var pad = 8;
         var r = target.getBoundingClientRect();
-        hl.style.top    = (r.top  - pad) + 'px';
-        hl.style.left   = (r.left - pad) + 'px';
-        hl.style.width  = (r.width  + pad * 2) + 'px';
-        hl.style.height = (r.height + pad * 2) + 'px';
+        if (!_inDialogActive) {
+          hl.style.top    = (r.top  - pad) + 'px';
+          hl.style.left   = (r.left - pad) + 'px';
+          hl.style.width  = (r.width  + pad * 2) + 'px';
+          hl.style.height = (r.height + pad * 2) + 'px';
+        }
 
         // Position card near target
         var pos    = step.position || 'right';
@@ -6168,6 +6194,9 @@
         var res = await window.pywebview.api.get_sample_sets_paths();
         if (res && res.success && res.paths && res.paths.length > 0) {
           _tutSampleLoaded = true;
+          // Scan the parent folder so the folder tree sidebar shows backyard_birds + forest_trail
+          var sampleParent = res.paths[0].replace(/[/\\][^/\\]+$/, '');
+          try { await scanFolderTree(sampleParent); } catch(e) {}
           await loadMultipleFolders(res.paths);
           // Small delay for render, then start Part 2
           setTimeout(function() { startMainTutorial(2, 0); }, 600);
