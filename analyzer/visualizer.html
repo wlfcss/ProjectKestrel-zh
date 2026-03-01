@@ -1839,39 +1839,40 @@
     }
     #tutorialOverlay.active {
       display: block;
+      /* pointer-events stays none so users can interact with UI underneath */
     }
     #tutorialOverlay.has-backdrop {
-      background: rgba(0,0,0,0.58);
+      background: rgba(0,0,0,0.6);
       pointer-events: all;
     }
     #tutorialHighlight {
       position: fixed;
       border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
-      border: 2px solid var(--accent);
-      transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.50);
+      border: 2px solid var(--brand);
+      transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease;
       pointer-events: none;
       z-index: 30001;
       display: none;
     }
     #tutorialCard {
       position: fixed;
-      background: var(--bg2);
-      border: 1px solid var(--accent);
-      border-radius: 12px;
-      padding: 18px 20px 14px;
+      background: #141820;
+      border: 1px solid var(--brand);
+      border-radius: 14px;
+      padding: 20px 22px 16px;
       width: 380px;
       max-width: calc(100vw - 32px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7);
       z-index: 30002;
       pointer-events: all;
-      transition: top .22s ease, left .22s ease;
+      transition: top .25s ease, left .25s ease;
     }
     #tutorialCard h3 {
       margin: 0 0 10px;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
-      color: var(--accent);
+      color: var(--brand);
     }
     .tutorial-counter {
       font-size: 11px;
@@ -1892,11 +1893,11 @@
       transition: background .2s;
       flex-shrink: 0;
     }
-    .tutorial-dot.active { background: var(--accent); }
+    .tutorial-dot.active { background: var(--brand); }
     .tutorial-body {
       font-size: 13px;
       line-height: 1.6;
-      color: var(--fg);
+      color: var(--text);
       margin-bottom: 16px;
     }
     .tutorial-body kbd {
@@ -1926,21 +1927,54 @@
       padding: 5px 14px;
       border-radius: 6px;
       border: 1px solid #333;
-      background: var(--bg2);
-      color: var(--fg);
+      background: #1a1e28;
+      color: var(--text);
       cursor: pointer;
       font-size: 13px;
       font-weight: 600;
       transition: background .15s, border-color .15s;
     }
-    .tut-btn:hover { background: #1d2230; border-color: var(--accent); }
+    .tut-btn:hover { background: #1d2230; border-color: var(--brand); }
     .tut-btn.primary {
       background: #1a3a5a;
-      border-color: var(--accent);
-      color: var(--accent);
+      border-color: var(--brand);
+      color: var(--brand);
     }
     .tut-btn.primary:hover { background: #1e4a6e; }
     .tut-btn:disabled { opacity: 0.4; cursor: default; }
+    /* Highlight-target pulsing animation for interactive steps */
+    @keyframes pulse-highlight {
+      0%   { box-shadow: 0 0 0 0 rgba(74,163,255,0.6); }
+      70%  { box-shadow: 0 0 0 12px rgba(74,163,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(74,163,255,0); }
+    }
+    .highlight-target {
+      z-index: 30001 !important;
+      position: relative !important;
+      animation: pulse-highlight 1.8s infinite;
+      border-color: var(--brand) !important;
+      pointer-events: auto !important;
+    }
+    /* Instruction nudge that appears below tutorial body for click-to-advance steps */
+    .tutorial-nudge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(74,163,255,0.12);
+      border: 1px solid rgba(74,163,255,0.25);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--brand);
+      margin-bottom: 14px;
+      animation: pulse-nudge 2s ease-in-out infinite;
+    }
+    @keyframes pulse-nudge {
+      0%, 100% { opacity: 0.8; }
+      50%      { opacity: 1; }
+    }
+    .tutorial-nudge::before { content: '\u261B'; font-size: 16px; }
     #helpBtnMain {
       width: 24px;
       height: 24px;
@@ -1957,7 +1991,7 @@
       padding: 0;
       flex-shrink: 0;
     }
-    #helpBtnMain:hover { border-color: var(--accent); color: var(--accent); }
+    #helpBtnMain:hover { border-color: var(--brand); color: var(--brand); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -2208,10 +2242,11 @@
       <div class="tutorial-progress" id="tutorialProgress"></div>
       <h3 id="tutorialTitle"></h3>
       <div class="tutorial-body" id="tutorialBody"></div>
+      <div class="tutorial-nudge" id="tutorialNudge" style="display:none"></div>
       <div class="tutorial-actions">
         <button class="tutorial-skip" id="tutorialSkip">Skip Tour</button>
-        <button class="tut-btn" id="tutorialBack">← Back</button>
-        <button class="tut-btn primary" id="tutorialNext">Next →</button>
+        <button class="tut-btn" id="tutorialBack">&larr; Back</button>
+        <button class="tut-btn primary" id="tutorialNext">Next &rarr;</button>
       </div>
     </div>
   </div>
@@ -5846,23 +5881,25 @@
 
     // ====================================================================
     // Tutorial System  (Part 1 = Analyze intro, Part 2 = Browse features)
+    // Interactive: some steps require user action before advancing.
+    // Inspired by the website try-it-out demo's waitFor/trigger pattern.
     // ====================================================================
 
     const TUTORIAL_PART1 = [
       {
         title: 'Welcome to Project Kestrel!',
-        body: "Let's take a quick guided tour. You can <b>interact with the UI</b> at any time while the tour is active.<br><br>Click <b>Next \u2192</b> or press the right-arrow key to continue. Press <b>Skip Tour</b> to jump straight in.",
+        body: "Let\u2019s take a quick guided tour of Kestrel. You can <b>interact with the UI at any time</b> while this tour is open.<br><br>Click <b>Next \u2192</b> or press the right-arrow key to continue.",
         target: null,
       },
       {
         title: 'Analyze Your Photos',
-        body: 'Click <b>Analyze Folders\u2026</b> to select folders of bird photos. Kestrel will scan them, detect birds using AI, identify species, and score image quality automatically.<br><br><span style="color:var(--muted)">Try clicking it now! You can pick a folder and start an analysis, or just explore the dialog and close it.</span>',
+        body: 'Click <b>Analyze Folders\u2026</b> to select folders of bird photos. Kestrel scans them, detects birds using AI, identifies species, and scores quality automatically.',
         target: '#analyzeQueueBtn',
         position: 'bottom',
       },
       {
         title: 'Open an Existing Folder',
-        body: 'Already analyzed a folder? Click <b>Open Folder\u2026</b> to load it. Kestrel will read the <code>.kestrel</code> database and display all your scenes.<br><br><span style="color:var(--muted)">We\u2019ll auto-load some sample photos next so you can explore!</span>',
+        body: 'Already analyzed a folder? Click <b>Open Folder\u2026</b> to browse it. Kestrel reads the <code>.kestrel</code> database and displays all your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
         target: '#pickFolder',
         position: 'bottom',
       },
@@ -5870,51 +5907,56 @@
 
     const TUTORIAL_PART2 = [
       {
-        title: 'Scene Grid',
-        body: 'This is the <b>Scene Grid</b> \u2014 your photos are automatically grouped into scenes based on when they were taken. Each card shows the best photo from that scene, the species detected, and the AI quality rating.<br><br><span style="color:var(--muted)">Try clicking on a scene card to open it!</span>',
+        title: 'Your Photos, Organized by Scene',
+        body: 'The <b>Scene Grid</b> shows your photos grouped by when they were taken. Each card shows the best photo, species detected, and the AI quality rating.',
+        nudge: 'Click on any scene card to open it!',
         target: '#sceneGrid',
         position: 'left',
+        waitFor: 'clickScene',   // hide Next; require user to click a scene card
       },
       {
         title: 'Scene Detail View',
-        body: 'When you click a scene, you see all the photos in that scene. They\u2019re <b>auto-sorted by quality rating</b> so the sharpest, best-composed shots come first.<br><br><b>Double-click</b> any photo to open it in your default photo editor.<br><br><span style="color:var(--muted)">Try opening a scene now if you haven\u2019t already!</span>',
+        body: 'Inside a scene, photos are <b>sorted by quality</b> \u2014 the sharpest, best-composed shots appear first. Hover over a photo to preview it on the right.<br><br><b>Double-click</b> any photo to open it in your photo editor.',
         target: '#sceneDlg',
         position: 'left',
-        requireOpen: 'sceneDlg',
+        inDialog: true,          // position relative to the dialog
+      },
+      {
+        title: 'Star Ratings',
+        body: 'Click the <b>\u2605 stars</b> on any photo to set your own rating. <span style="color:#6aa0ff">Blue stars</span> = AI rating. <span style="color:#f5c542">Gold stars</span> = your manual override.',
+        nudge: 'Try clicking a star on one of the photos!',
+        target: '.card .stars',
+        position: 'right',
+        inDialog: true,
+        waitFor: 'clickStar',    // wait for user to click a star
       },
       {
         title: 'Search & Filter',
-        body: 'Use the <b>Search</b> box to find photos by species or family name. Kestrel\u2019s AI has already identified every bird \u2014 just type a name!<br><br><span style="color:var(--muted)">Try searching for a species. The grid will filter in real time.</span>',
+        body: 'Type a species or family name in the <b>Search</b> box. The grid filters instantly as you type.',
         target: '#search',
         position: 'right',
       },
       {
-        title: 'Star Ratings',
-        body: 'Inside any scene, click the <b>\u2605 stars</b> on a photo to set your own rating. <span style="color:#6aa0ff">Blue stars</span> = AI rating. <span style="color:#f5c542">Gold stars</span> = your manual rating.<br><br>Use the <b>"Only show manually-rated scenes"</b> filter to quickly find your favorites later.',
-        target: '#filterScenesManualRated',
-        position: 'right',
-      },
-      {
         title: 'Sorting & Grouping',
-        body: 'Sort scenes by <b>Scene ID</b>, <b>Max Quality</b>, or <b>Image Count</b>. Toggle <b>Group by folder</b> to organize multi-folder libraries.<br><br>Use <b>Multi-subject mode</b> if your photos have multiple birds in one frame.',
+        body: 'Sort scenes by <b>Scene ID</b>, <b>Max Quality</b>, or <b>Image Count</b>. Toggle <b>Group by folder</b> to organize multi-folder libraries.',
         target: '#sortBy',
         position: 'right',
       },
       {
         title: 'Culling Assistant',
-        body: 'When you\u2019re ready to cull your photos, open any folder and look for the <b>\u2702 Culling Assistant</b> button in the folder header. It opens a dedicated workspace for quickly accepting/rejecting photos by scene.',
-        target: '#sceneGrid',
-        position: 'left',
+        body: 'When you\u2019re ready to select your best shots, click <b>Open Culling Assistant</b> in any folder\u2019s header bar. It opens a dedicated accept/reject workspace.',
+        target: '.culling-btn',
+        position: 'bottom',
       },
       {
         title: 'Settings',
-        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Darktable, Lightroom, or system default). Double-clicking a photo will open it in whichever editor you select.<br><br><span style="color:var(--muted)">Try opening Settings now!</span>',
+        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Darktable, Lightroom, or system default). Double-clicking a photo will open it there.',
         target: '#openSettings',
         position: 'bottom',
       },
       {
         title: 'You\u2019re All Set!',
-        body: 'That\u2019s the tour! Here\u2019s a quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Search</b> by species name<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br><br>Click the <b>?</b> button in the sidebar anytime to replay this tour. Happy birding! \ud83e\udd85',
+        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br><br>Click the <b>?</b> button anytime to replay this tour. Happy birding!',
         target: null,
       },
     ];
@@ -5923,28 +5965,39 @@
     let _tutSteps = [];
     let _tutPart = 0;               // 0 = not started, 1 = part1, 2 = part2
     let _tutSampleLoaded = false;    // track if we auto-loaded sample sets
+    let _tutCleanupFn = null;        // cleanup function for current waitFor listeners
 
     function _tutEl(sel) { return document.querySelector(sel); }
 
     async function checkMainTutorialSeen() {
       if (!hasPywebviewApi) return true;
       try {
-        const res = await window.pywebview.api.get_settings();
-        return res?.settings?.main_tutorial_seen === true;
+        var res = await window.pywebview.api.get_settings();
+        return res && res.settings && res.settings.main_tutorial_seen === true;
       } catch (e) { return false; }
     }
 
     async function markMainTutorialSeen() {
       if (!hasPywebviewApi) return;
       try {
-        const res = await window.pywebview.api.get_settings();
-        const s = (res?.success ? res.settings : {}) || {};
+        var res = await window.pywebview.api.get_settings();
+        var s = (res && res.success ? res.settings : {}) || {};
         s.main_tutorial_seen = true;
         await window.pywebview.api.save_settings_data(s);
       } catch (e) { console.warn('markMainTutorialSeen:', e); }
     }
 
+    function _tutCleanup() {
+      // Remove any highlight-target classes
+      document.querySelectorAll('.highlight-target').forEach(function(el) {
+        el.classList.remove('highlight-target');
+      });
+      // Run cleanup for waitFor listeners
+      if (_tutCleanupFn) { _tutCleanupFn(); _tutCleanupFn = null; }
+    }
+
     function startMainTutorial(part, fromStep) {
+      _tutCleanup();
       _tutPart = part || 1;
       _tutSteps = _tutPart === 1 ? TUTORIAL_PART1 : TUTORIAL_PART2;
       _tutStep = fromStep || 0;
@@ -5953,27 +6006,40 @@
     }
 
     function _closeMainTutorial() {
+      _tutCleanup();
       _tutEl('#tutorialOverlay').classList.remove('active', 'has-backdrop');
       _tutEl('#tutorialHighlight').style.display = 'none';
+      _tutEl('#tutorialNudge').style.display = 'none';
       if (_tutPart >= 2) markMainTutorialSeen();
       _tutPart = 0;
     }
 
     function _showMainTutStep(idx) {
-      const step = _tutSteps[idx];
+      _tutCleanup();
+      var step = _tutSteps[idx];
       if (!step) { _closeMainTutorial(); return; }
 
-      const overlay = _tutEl('#tutorialOverlay');
-      const hl      = _tutEl('#tutorialHighlight');
-      const card    = _tutEl('#tutorialCard');
+      var overlay = _tutEl('#tutorialOverlay');
+      var hl      = _tutEl('#tutorialHighlight');
+      var card    = _tutEl('#tutorialCard');
+      var nudge   = _tutEl('#tutorialNudge');
+      var nextBtn = _tutEl('#tutorialNext');
 
       // Text
       _tutEl('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + _tutSteps.length;
       _tutEl('#tutorialTitle').innerHTML = step.title;
       _tutEl('#tutorialBody').innerHTML  = step.body;
 
+      // Nudge (click-to-advance hint)
+      if (step.nudge) {
+        nudge.textContent = step.nudge;
+        nudge.style.display = '';
+      } else {
+        nudge.style.display = 'none';
+      }
+
       // Dots
-      const dotsCont = _tutEl('#tutorialProgress');
+      var dotsCont = _tutEl('#tutorialProgress');
       dotsCont.innerHTML = '';
       _tutSteps.forEach(function(_, i) {
         var d = document.createElement('div');
@@ -5984,18 +6050,27 @@
       // Back / Next labels
       _tutEl('#tutorialBack').disabled = (idx === 0);
       var isLast = (idx === _tutSteps.length - 1);
-      _tutEl('#tutorialNext').textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
+      nextBtn.textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
 
-      // If this step requires a dialog to be open, check for it
-      if (step.requireOpen) {
-        var dlg = document.getElementById(step.requireOpen);
-        if (dlg && !dlg.open) {
-          // Skip this step if dialog not open — just show a hint
-          _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--accent);font-weight:600">Open a scene first to see this in context, or press Next to continue.</span>';
+      // If this step uses waitFor, hide the Next button until the action completes
+      var hasWaitFor = !!step.waitFor;
+      nextBtn.style.display = hasWaitFor ? 'none' : '';
+
+      // Find the target element
+      var target = step.target ? document.querySelector(step.target) : null;
+
+      // For inDialog steps, check if the scene dialog is open
+      if (step.inDialog) {
+        var dlg = document.getElementById('sceneDlg');
+        if (!dlg || !dlg.open) {
+          // Dialog not open — show a message and allow Next to skip
+          _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first to see this in action, or press Next to continue.</span>';
+          nudge.style.display = 'none';
+          nextBtn.style.display = '';  // show Next even if waitFor was set
+          target = null;  // treat as center
+          hasWaitFor = false;
         }
       }
-
-      var target = step.target ? document.querySelector(step.target) : null;
 
       if (!target || (target.offsetWidth === 0 && target.offsetHeight === 0)) {
         // Center-screen card, full backdrop
@@ -6009,7 +6084,10 @@
         overlay.classList.remove('has-backdrop');
         card.style.transform = '';
 
-        var pad = 6;
+        // Add highlight-target class for the pulsing effect
+        target.classList.add('highlight-target');
+
+        var pad = 8;
         var r = target.getBoundingClientRect();
         hl.style.top    = (r.top  - pad) + 'px';
         hl.style.left   = (r.left - pad) + 'px';
@@ -6032,6 +6110,35 @@
         top  = Math.max(margin, Math.min(top,  vh - ch - margin));
         card.style.left = left + 'px';
         card.style.top  = top  + 'px';
+      }
+
+      // ---- Set up interactive waitFor listeners ----
+      if (hasWaitFor && step.waitFor === 'clickScene') {
+        // User must click any scene card in the grid. Listen on sceneGrid for clicks.
+        var sceneGridEl = document.getElementById('sceneGrid');
+        if (sceneGridEl) {
+          var handler = function(ev) {
+            var cardEl = ev.target.closest('.card');
+            if (cardEl) {
+              // Scene card was clicked — it will open the dialog via its own click handler.
+              // Wait a beat for the dialog to show, then advance.
+              setTimeout(function() { _tutAdvance(); }, 400);
+            }
+          };
+          sceneGridEl.addEventListener('click', handler, true);
+          _tutCleanupFn = function() { sceneGridEl.removeEventListener('click', handler, true); };
+        }
+      }
+      else if (hasWaitFor && step.waitFor === 'clickStar') {
+        // User must click a star in the scene dialog
+        var onStarClick = function(ev) {
+          var starEl = ev.target.closest('.star, .stars span');
+          if (starEl) {
+            setTimeout(function() { _tutAdvance(); }, 300);
+          }
+        };
+        document.addEventListener('click', onStarClick, true);
+        _tutCleanupFn = function() { document.removeEventListener('click', onStarClick, true); };
       }
     }
 
@@ -6065,7 +6172,7 @@
           // Small delay for render, then start Part 2
           setTimeout(function() { startMainTutorial(2, 0); }, 600);
         } else {
-          // No sample sets found — just start Part 2 anyway
+          // No sample sets found -- just start Part 2 anyway
           startMainTutorial(2, 0);
         }
       } catch (e) {
@@ -6097,7 +6204,14 @@
     // Keyboard navigation
     document.addEventListener('keydown', function(ev) {
       if (!_tutEl('#tutorialOverlay').classList.contains('active')) return;
-      if (ev.key === 'ArrowRight' || ev.key === 'Enter') { ev.preventDefault(); _tutAdvance(); }
+      if (_tutPart === 0) return;
+      var step = _tutSteps[_tutStep];
+      var hasWaitFor = step && step.waitFor;
+      if (ev.key === 'ArrowRight' || ev.key === 'Enter') {
+        ev.preventDefault();
+        // Don't advance with keyboard if a waitFor is active
+        if (!hasWaitFor) _tutAdvance();
+      }
       else if (ev.key === 'ArrowLeft') { ev.preventDefault(); _tutGoBack(); }
       else if (ev.key === 'Escape') { _closeMainTutorial(); }
     });

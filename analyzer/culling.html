@@ -471,35 +471,35 @@
       /* pointer-events stays none so users can interact with UI underneath */
     }
     #tutorialOverlay.has-backdrop {
-      background: rgba(0,0,0,0.58);
+      background: rgba(0,0,0,0.6);
       pointer-events: all;
     }
     #tutorialHighlight {
       position: fixed;
       border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.50);
       border: 2px solid var(--brand);
-      transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
+      transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease;
       pointer-events: none;
       z-index: 10001;
       display: none;
     }
     #tutorialCard {
       position: fixed;
-      background: var(--panel);
+      background: #141820;
       border: 1px solid var(--brand);
-      border-radius: 12px;
-      padding: 18px 20px 14px;
+      border-radius: 14px;
+      padding: 20px 22px 16px;
       width: 360px;
       max-width: calc(100vw - 32px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7);
       z-index: 10002;
       pointer-events: all;
-      transition: top .22s ease, left .22s ease;
+      transition: top .25s ease, left .25s ease;
     }
     #tutorialCard h3 {
       margin: 0 0 10px;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--brand);
     }
@@ -547,6 +547,39 @@
       font-size: 12px;
       padding: 4px 10px;
     }
+    /* Highlight-target pulsing animation for interactive steps */
+    @keyframes pulse-highlight {
+      0%   { box-shadow: 0 0 0 0 rgba(74,163,255,0.6); }
+      70%  { box-shadow: 0 0 0 12px rgba(74,163,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(74,163,255,0); }
+    }
+    .highlight-target {
+      z-index: 10001 !important;
+      position: relative !important;
+      animation: pulse-highlight 1.8s infinite;
+      border-color: var(--brand) !important;
+      pointer-events: auto !important;
+    }
+    /* Instruction nudge for click-to-advance steps */
+    .tutorial-nudge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(74,163,255,0.12);
+      border: 1px solid rgba(74,163,255,0.25);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--brand);
+      margin-bottom: 14px;
+      animation: pulse-nudge 2s ease-in-out infinite;
+    }
+    @keyframes pulse-nudge {
+      0%, 100% { opacity: 0.8; }
+      50%      { opacity: 1; }
+    }
+    .tutorial-nudge::before { content: '\261B'; font-size: 16px; }
     .help-btn {
       width: 22px;
       height: 22px;
@@ -653,10 +686,11 @@
       <div class="tutorial-progress" id="tutorialProgress"></div>
       <h3 id="tutorialTitle"></h3>
       <div class="tutorial-body" id="tutorialBody"></div>
+      <div class="tutorial-nudge" id="tutorialNudge" style="display:none"></div>
       <div class="tutorial-actions">
         <button class="btn tutorial-skip" id="tutorialSkip">Skip Tour</button>
-        <button class="btn" id="tutorialBack">← Back</button>
-        <button class="btn primary" id="tutorialNext">Next →</button>
+        <button class="btn" id="tutorialBack">&larr; Back</button>
+        <button class="btn primary" id="tutorialNext">Next &rarr;</button>
       </div>
     </div>
   </div>
@@ -1486,121 +1520,162 @@
     })();
 
     // ====================================================================
-    // Tutorial
+    // Tutorial  (Interactive — some steps require user action)
     // ====================================================================
     const TUTORIAL_STEPS = [
       {
         title: 'Welcome to Culling Assistant!',
-        body: "Let's take a quick tour of the key features. You can <b>interact with the UI</b> at any time — try hovering, clicking, and exploring while the tour is open!<br><br>Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
+        body: "Let\u2019s take a quick tour. You can <b>interact with the UI at any time</b> while this tour is open.<br><br>Click <b>Next</b> or press <kbd>\u2192</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
         target: null,
       },
       {
         title: 'Photos, Organized by Scene',
-        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.<br><br><span style="color:var(--muted)">Try scrolling through the list now!</span>',
+        body: 'Your photos are grouped into <b>scenes</b> \u2014 bursts taken close together in time. Kestrel\u2019s AI has sorted each scene by quality rating, so the best shots come first.',
         target: '#cullingScroll',
         position: 'right',
       },
       {
         title: 'Accept &amp; Reject Columns',
-        body: 'Each scene has two columns. <span style="color:var(--ok)"><b>Accept</b></span> holds 4–5★ photos; <span style="color:var(--bad)"><b>Reject</b></span> holds 1–3★. Photos with <b>no rating (0★)</b> show with a <span style="color:#f0c040"><b>yellow border</b></span> so you know they still need a decision.',
+        body: 'Each scene has two columns. <span style="color:var(--ok)"><b>Accept</b></span> holds 4\u20135\u2605 photos; <span style="color:var(--bad)"><b>Reject</b></span> holds 1\u20133\u2605. Photos with <b>no rating (0\u2605)</b> show with a <span style="color:#f0c040"><b>yellow border</b></span> so you know they still need a decision.',
         target: '.culling-header',
         position: 'bottom',
       },
       {
         title: 'Hover to Preview',
-        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.<br><br><span style="color:var(--muted)">Go ahead \u2014 hover over a card now to see it in action!</span>',
+        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.',
+        nudge: 'Hover over a photo card now to see it in action!',
         target: '.scene-columns',
         position: 'right',
+        waitFor: 'hoverCard',
       },
       {
         title: 'The Preview Pane',
-        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. Kestrel will automatically load the full-resolution <b>RAW file</b> after a few seconds for maximum detail.<br><br><span style="color:var(--muted)">Try it now \u2014 click & drag on a thumbnail!</span>',
+        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. Kestrel loads the full-resolution <b>RAW file</b> automatically for maximum detail.',
         target: '.preview-pane',
         position: 'left',
       },
       {
         title: 'Move Photos with Shift+Click',
-        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.<br><br><span style="color:var(--muted)">Try Shift+Clicking a photo now!</span>',
+        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.',
+        nudge: 'Try Shift+Clicking a photo now!',
         target: '.scene-columns',
         position: 'right',
+        waitFor: 'shiftClick',
       },
       {
         title: 'Manual Star Ratings',
-        body: '<b>Click the ★ stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel’s AI rating; <span style="color:#f5c542">gold stars</span> mean you’ve overridden it manually. The metadata panel on the right also has interactive stars.<br><br><span style="color:var(--muted)">Try clicking a star on one of the cards!</span>',
+        body: '<b>Click the \u2605 stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel\u2019s AI rating; <span style="color:#f5c542">gold stars</span> mean you\u2019ve overridden it manually.',
+        nudge: 'Click a star on one of the cards!',
         target: '.cull-info',
         position: 'top',
+        waitFor: 'clickStar',
       },
       {
         title: 'Resize &amp; Zoom Controls',
-        body: 'Use the <b>− / + buttons</b> at the bottom-left to change card size. Drag the <b>divider</b> between the columns and preview panel to resize it. The <b>RAW Zoom</b> slider in the preview header adjusts zoom magnification when dragging thumbnails.',
+        body: 'Use the <b>\u2212 / + buttons</b> at the bottom-left to change card size. Drag the <b>divider</b> between the columns and preview panel to resize it. The <b>RAW Zoom</b> slider in the preview header adjusts zoom magnification when dragging thumbnails.',
         target: '.bottom-bar',
         position: 'top',
       },
       {
         title: 'Done Culling',
-        body: 'When you’re ready, click <b>“Done Culling, Proceed to Review”</b>. Kestrel will move all Rejected photos to a <code style="background:#1a1e28;padding:1px 5px;border-radius:3px">_KESTREL_Rejects</code> folder.<br><br>🔒 <b>Kestrel never deletes your photos.</b><br><br><span style="color:var(--muted);font-size:11px">Coming soon: XMP sidecar export for Lightroom, Capture One, and more.</span>',
+        body: 'When you\u2019re ready, click <b>\u201cDone Culling, Proceed to Review\u201d</b>. Kestrel will move all Rejected photos to a <code style="background:#1a1e28;padding:1px 5px;border-radius:3px">_KESTREL_Rejects</code> folder.<br><br>\U0001F512 <b>Kestrel never deletes your photos.</b>',
         target: '#doneCullingBtn',
         position: 'top',
       },
     ];
 
     let _tutStep = 0;
+    let _tutCleanupFn = null;
 
     async function checkTutorialSeen() {
       try {
         const res = await window.pywebview.api.get_settings();
-        return res?.settings?.culling_tutorial_seen === true;
+        return res && res.settings && res.settings.culling_tutorial_seen === true;
       } catch (e) { return false; }
     }
 
     async function markTutorialSeen() {
       try {
         const res = await window.pywebview.api.get_settings();
-        const s = (res?.success ? res.settings : {}) || {};
+        const s = (res && res.success ? res.settings : {}) || {};
         s.culling_tutorial_seen = true;
         await window.pywebview.api.save_settings_data(s);
       } catch (e) { console.warn('markTutorialSeen:', e); }
     }
 
-    function startTutorial(fromStep = 0) {
-      _tutStep = fromStep;
+    function _tutCleanup() {
+      document.querySelectorAll('.highlight-target').forEach(function(e) { e.classList.remove('highlight-target'); });
+      if (_tutCleanupFn) { _tutCleanupFn(); _tutCleanupFn = null; }
+    }
+
+    function startTutorial(fromStep) {
+      _tutCleanup();
+      _tutStep = fromStep || 0;
       el('#tutorialOverlay').classList.add('active');
       _showTutStep(_tutStep);
     }
 
     function _closeTutorial() {
+      _tutCleanup();
       el('#tutorialOverlay').classList.remove('active', 'has-backdrop');
       el('#tutorialHighlight').style.display = 'none';
+      el('#tutorialNudge').style.display = 'none';
       markTutorialSeen();
     }
 
+    function _tutAdvance() {
+      _tutStep++;
+      if (_tutStep >= TUTORIAL_STEPS.length) _closeTutorial();
+      else _showTutStep(_tutStep);
+    }
+
+    function _tutGoBack() {
+      if (_tutStep > 0) { _tutStep--; _showTutStep(_tutStep); }
+    }
+
     function _showTutStep(idx) {
-      const step = TUTORIAL_STEPS[idx];
+      _tutCleanup();
+      var step = TUTORIAL_STEPS[idx];
       if (!step) { _closeTutorial(); return; }
 
-      const overlay  = el('#tutorialOverlay');
-      const hl       = el('#tutorialHighlight');
-      const card     = el('#tutorialCard');
+      var overlay  = el('#tutorialOverlay');
+      var hl       = el('#tutorialHighlight');
+      var card     = el('#tutorialCard');
+      var nudge    = el('#tutorialNudge');
+      var nextBtn  = el('#tutorialNext');
 
       // Update text
-      el('#tutorialCounter').textContent = `Step ${idx + 1} of ${TUTORIAL_STEPS.length}`;
+      el('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + TUTORIAL_STEPS.length;
       el('#tutorialTitle').innerHTML = step.title;
       el('#tutorialBody').innerHTML  = step.body;
 
+      // Nudge (click-to-advance hint)
+      if (step.nudge) {
+        nudge.textContent = step.nudge;
+        nudge.style.display = '';
+      } else {
+        nudge.style.display = 'none';
+      }
+
       // Dots
-      const dotsCont = el('#tutorialProgress');
+      var dotsCont = el('#tutorialProgress');
       dotsCont.innerHTML = '';
-      TUTORIAL_STEPS.forEach((_, i) => {
-        const d = document.createElement('div');
+      TUTORIAL_STEPS.forEach(function(_, i) {
+        var d = document.createElement('div');
         d.className = 'tutorial-dot' + (i === idx ? ' active' : '');
         dotsCont.appendChild(d);
       });
 
       // Back / Next labels
       el('#tutorialBack').disabled = (idx === 0);
-      el('#tutorialNext').textContent = idx === TUTORIAL_STEPS.length - 1 ? 'Finish ✓' : 'Next →';
+      var isLast = (idx === TUTORIAL_STEPS.length - 1);
+      nextBtn.textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
 
-      const target = step.target ? document.querySelector(step.target) : null;
+      // If this step uses waitFor, hide the Next button until the action completes
+      var hasWaitFor = !!step.waitFor;
+      nextBtn.style.display = hasWaitFor ? 'none' : '';
+
+      var target = step.target ? document.querySelector(step.target) : null;
 
       if (!target) {
         // Center-screen card, full backdrop
@@ -1614,29 +1689,69 @@
         overlay.classList.remove('has-backdrop');
         card.style.transform = '';
 
-        const pad = 5;
-        const r = target.getBoundingClientRect();
+        // Pulsing highlight on target
+        target.classList.add('highlight-target');
+
+        var pad = 6;
+        var r = target.getBoundingClientRect();
         hl.style.top    = (r.top  - pad) + 'px';
         hl.style.left   = (r.left - pad) + 'px';
         hl.style.width  = (r.width  + pad * 2) + 'px';
         hl.style.height = (r.height + pad * 2) + 'px';
 
         // Position card near target
-        const pos    = step.position || 'right';
-        const margin = 18;
-        const vw     = window.innerWidth;
-        const vh     = window.innerHeight;
-        const cw     = 360 + margin;
-        const ch     = card.offsetHeight || 200;
-        let top, left;
-        if (pos === 'right')  { left = r.right + margin;         top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'left')  { left = r.left - cw - margin;    top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'bottom'){ left = r.left + r.width / 2 - cw / 2; top = r.bottom + margin; }
-        else                      { left = r.left + r.width / 2 - cw / 2; top = r.top - ch - margin; }
+        var pos    = step.position || 'right';
+        var margin = 18;
+        var vw     = window.innerWidth;
+        var vh     = window.innerHeight;
+        var cw     = 360 + margin;
+        var ch     = card.offsetHeight || 200;
+        var top, left;
+        if (pos === 'right')       { left = r.right + margin;               top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'left')   { left = r.left - cw - margin;           top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'bottom') { left = r.left + r.width / 2 - cw / 2;  top = r.bottom + margin; }
+        else                       { left = r.left + r.width / 2 - cw / 2;  top = r.top - ch - margin; }
         left = Math.max(margin, Math.min(left, vw - cw - margin));
         top  = Math.max(margin, Math.min(top,  vh - ch - margin));
         card.style.left = left + 'px';
         card.style.top  = top  + 'px';
+      }
+
+      // ---- Set up interactive waitFor listeners ----
+      if (hasWaitFor && step.waitFor === 'hoverCard') {
+        // Wait for user to hover over any cull-card
+        var hoverHandler = function(ev) {
+          var cardEl = ev.target.closest('.cull-card');
+          if (cardEl) {
+            setTimeout(function() { _tutAdvance(); }, 300);
+          }
+        };
+        document.addEventListener('mouseenter', hoverHandler, true);
+        _tutCleanupFn = function() { document.removeEventListener('mouseenter', hoverHandler, true); };
+      }
+      else if (hasWaitFor && step.waitFor === 'shiftClick') {
+        // Wait for user to Shift+Click a cull-card
+        var shiftHandler = function(ev) {
+          if (ev.shiftKey) {
+            var cardEl = ev.target.closest('.cull-card');
+            if (cardEl) {
+              setTimeout(function() { _tutAdvance(); }, 300);
+            }
+          }
+        };
+        document.addEventListener('click', shiftHandler, true);
+        _tutCleanupFn = function() { document.removeEventListener('click', shiftHandler, true); };
+      }
+      else if (hasWaitFor && step.waitFor === 'clickStar') {
+        // Wait for user to click a star
+        var starHandler = function(ev) {
+          var starEl = ev.target.closest('.star, .stars span');
+          if (starEl) {
+            setTimeout(function() { _tutAdvance(); }, 300);
+          }
+        };
+        document.addEventListener('click', starHandler, true);
+        _tutCleanupFn = function() { document.removeEventListener('click', starHandler, true); };
       }
     }
 
@@ -1662,11 +1777,11 @@
       try {
         await loadData();
         el('#doneCullingBtn').disabled = false;
-        el('#statusLabel').textContent = 'Ready — Drag images to zoom (auto-loads RAW), Shift+Click to decide, Click ★ to rate';
+        el('#statusLabel').textContent = 'Ready \u2014 Drag images to zoom (auto-loads RAW), Shift+Click to decide, Click \u2605 to rate';
 
         // Auto-launch tutorial on first run
         const seen = await checkTutorialSeen();
-        if (!seen) setTimeout(() => startTutorial(0), 600);
+        if (!seen) setTimeout(function() { startTutorial(0); }, 600);
       } catch (e) {
         console.error('init error', e);
         el('#statusLabel').textContent = 'Error loading data: ' + e.message;
@@ -1688,14 +1803,19 @@
     el('#confirmCancel').addEventListener('click', () => el('#confirmDlg').close());
     el('#undoBtn').addEventListener('click', undoMove);
     el('#helpBtn').addEventListener('click', () => startTutorial(0));
-    el('#tutorialNext').addEventListener('click', () => { _tutStep++; if (_tutStep >= TUTORIAL_STEPS.length) _closeTutorial(); else _showTutStep(_tutStep); });
-    el('#tutorialBack').addEventListener('click', () => { if (_tutStep > 0) { _tutStep--; _showTutStep(_tutStep); } });
+    el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
+    el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
     el('#tutorialSkip').addEventListener('click', _closeTutorial);
     // Keyboard navigation inside tutorial
-    document.addEventListener('keydown', (ev) => {
+    document.addEventListener('keydown', function(ev) {
       if (!el('#tutorialOverlay').classList.contains('active')) return;
-      if (ev.key === 'ArrowRight' || ev.key === 'Enter') el('#tutorialNext').click();
-      else if (ev.key === 'ArrowLeft') el('#tutorialBack').click();
+      var step = TUTORIAL_STEPS[_tutStep];
+      var hasWaitFor = step && step.waitFor;
+      if (ev.key === 'ArrowRight' || ev.key === 'Enter') {
+        ev.preventDefault();
+        if (!hasWaitFor) _tutAdvance();
+      }
+      else if (ev.key === 'ArrowLeft') { ev.preventDefault(); _tutGoBack(); }
       else if (ev.key === 'Escape') _closeTutorial();
     });
 
