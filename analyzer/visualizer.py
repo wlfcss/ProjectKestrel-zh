@@ -1331,7 +1331,6 @@ class Api:
             # 4) If still nothing, do a last-resort search in common Windows Program Files locations
             if not candidates and sys.platform.startswith('win'):
                 debug_info.append('[fallback] Starting Program Files search...')
-                import os.path
                 pf_paths = [
                     os.environ.get('ProgramFiles'),
                     os.environ.get('ProgramFiles(x86)'),
