@@ -469,8 +469,7 @@
     <div class="topbar-center">
       <kbd>Shift+Click</kbd> accept/reject &nbsp;·&nbsp;
       Click <b>★</b> to rate &nbsp;·&nbsp;
-      <kbd>Drag</kbd> to zoom &nbsp;·&nbsp;
-      <kbd>Shift+Drag</kbd> to load RAW &amp; zoom
+      <kbd>Drag</kbd> thumbnail to zoom preview (loads RAW)
     </div>
     <div class="topbar-right">
       <span id="statsLabel"></span>
@@ -804,7 +803,7 @@
       thumb.addEventListener('mousedown', (ev) => {
         if (ev.button !== 0) return;
         ev.preventDefault();
-        startZoomPreview(row, thumb, ev, ev.shiftKey /* loadRaw */);
+        startZoomPreview(row, thumb, ev, true /* always loadRaw */);
       });
       card.appendChild(thumb);
 
@@ -1338,11 +1337,20 @@
       try {
         await loadData();
         el('#doneCullingBtn').disabled = false;
-        el('#statusLabel').textContent = 'Ready — Shift+Click images to move between Accept and Reject';
+        el('#statusLabel').textContent = 'Ready — Drag images to zoom (auto-loads RAW), Shift+Click to decide, Click ★ to rate';
       } catch (e) {
         console.error('init error', e);
         el('#statusLabel').textContent = 'Error loading data: ' + e.message;
       }
+
+      // On window close/unload, clean up the culling_TMP cache
+      window.addEventListener('beforeunload', async () => {
+        try {
+          await window.pywebview.api.cleanup_culling_cache(rootPath);
+        } catch (e) {
+          console.warn('cleanup_culling_cache error:', e);
+        }
+      });
     }
 
     // ---- Wire up buttons ----

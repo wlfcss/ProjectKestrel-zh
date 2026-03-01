@@ -1439,6 +1439,22 @@ class Api:
             log(f'read_raw_full error: {e}')
             return {'success': False, 'error': str(e)}
 
+    def cleanup_culling_cache(self, root_path: str):
+        """Remove the .kestrel/culling_TMP folder to free up space."""
+        import os
+        import shutil
+
+        try:
+            cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
+            if os.path.exists(cache_dir):
+                shutil.rmtree(cache_dir)
+                log(f'cleanup_culling_cache: Removed {cache_dir}')
+                return {'success': True}
+            return {'success': True}  # Already doesn't exist
+        except Exception as e:
+            log(f'cleanup_culling_cache error: {e}')
+            return {'success': False, 'error': str(e)}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
