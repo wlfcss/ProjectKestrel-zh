@@ -1225,7 +1225,15 @@ class Api:
             paths = []
             for name in sorted(os.listdir(sample_root)):
                 full = os.path.join(sample_root, name)
-                if os.path.isdir(full) and os.path.isdir(os.path.join(full, '.kestrel')):
+                kestrel_dir = os.path.join(full, '.kestrel')
+                if os.path.isdir(full) and os.path.isdir(kestrel_dir):
+                    # Restore the read-only snapshot so tutorial changes don't persist
+                    readonly_src = os.path.join(kestrel_dir, 'kestrel_database_readonly.csv')
+                    db_dst       = os.path.join(kestrel_dir, 'kestrel_database.csv')
+                    if os.path.isfile(readonly_src):
+                        import shutil
+                        shutil.copy2(readonly_src, db_dst)
+                        print(f'[API] Restored sample DB: {db_dst}', flush=True)
                     paths.append(full)
             print(f'[API] get_sample_sets_paths() -> {len(paths)} sets from {sample_root}', flush=True)
             return {'success': True, 'paths': paths}

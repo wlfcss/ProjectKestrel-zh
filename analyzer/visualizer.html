@@ -2021,8 +2021,8 @@
           <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">Analyze Folders…</button>
           <button id="openSettings">Settings</button>
           <div style="display:flex;gap:6px">
-            <button id="revertCsv" disabled title="Discard all unsaved changes" style="flex:1">Revert</button>
-            <button id="saveCsv" disabled style="flex:1">Save</button>
+            <button id="revertCsv" disabled title="Discard all unsaved changes" style="flex:1">Revert Changes</button>
+            <button id="saveCsv" disabled style="flex:1">Save Changes</button>
           </div>
         </div>
         <!-- Folder tree panel (populated after scanning a root folder) -->
@@ -5942,6 +5942,12 @@
         body: 'Sort scenes by <b>Scene ID</b>, <b>Max Quality</b>, or <b>Image Count</b>. Toggle <b>Group by folder</b> to organize multi-folder libraries.',
         target: '#sortBy',
         position: 'right',
+      },
+      {
+        title: 'Merging Scenes',
+        body: 'Did Kestrel split a burst into two scene cards? Hold <kbd>Ctrl</kbd> and click to <b>select multiple scenes</b>, then hit <b>Merge selected scenes</b> to combine them into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
+        target: '#sceneGrid',
+        position: 'left',
       },
       {
         title: 'Culling Assistant',
