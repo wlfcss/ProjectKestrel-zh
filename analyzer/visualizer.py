@@ -1200,10 +1200,31 @@ class Api:
         """
         try:
             candidates = []
-            # 1) Frozen build: look inside sys._MEIPASS or its _internal subfolder
+            # 1) Frozen build: look inside several likely locations.
+            #    PyInstaller may set sys._MEIPASS (a temp extraction dir) which
+            #    doesn't contain the installer-installed _internal folder. When
+            #    installed under Program Files we bundle sample_sets under
+            #    <exe_dir>/_internal/sample_sets — so check both the _MEIPASS
+            #    path and the real executable directory and its _internal subdir.
             if getattr(sys, 'frozen', False):
-                meipass = getattr(sys, '_MEIPASS', None) or os.path.dirname(sys.executable)
-                for base in [os.path.join(meipass, '_internal'), meipass]:
+                meipass = getattr(sys, '_MEIPASS', None)
+                exe_dir = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else None
+                candidates_checked = []
+                bases = []
+                # Prefer _MEIPASS first (when present), but also check exe dir and exe_dir/_internal
+                if meipass:
+                    bases.append(meipass)
+                    bases.append(os.path.join(meipass, '_internal'))
+                if exe_dir:
+                    bases.append(exe_dir)
+                    bases.append(os.path.join(exe_dir, '_internal'))
+                # Also consider a folder relative to this source file (fallback)
+                sources_internal = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '_internal'))
+                bases.append(sources_internal)
+                for base in bases:
+                    if not base or base in candidates_checked:
+                        continue
+                    candidates_checked.append(base)
                     d = os.path.join(base, 'sample_sets')
                     if os.path.isdir(d):
                         candidates.append(d)
