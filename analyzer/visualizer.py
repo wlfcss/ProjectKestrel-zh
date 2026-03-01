@@ -35,6 +35,7 @@ except Exception:
 import argparse
 import json
 import os
+import shutil
 import sys
 import subprocess
 import webbrowser
@@ -1228,6 +1229,141 @@ class Api:
         """Return True if the analysis queue is actively running."""
         return {'running': _queue_manager.is_running}
 
+    # ------------------------------------------------------------------ #
+    #  Culling Assistant API                                               #
+    # ------------------------------------------------------------------ #
+
+    _main_window = None
+    _culling_window = None
+    _server_port = None
+
+    def open_culling_window(self, root_path: str):
+        """Open a new pywebview window for the Culling Assistant."""
+        try:
+            if not WEBVIEW_IMPORT_SUCCESS:
+                return {'success': False, 'error': 'pywebview not available'}
+            import webview as _wv
+            folder_name = os.path.basename(root_path) if root_path else 'Unknown'
+            port = self._server_port or 8765
+            from urllib.parse import quote
+            culling_url = f'http://{HOST}:{port}/analyzer/culling.html?root={quote(root_path, safe="")}'
+            log(f'Opening Culling Assistant for {root_path!r} at {culling_url}')
+            win = _wv.create_window(
+                f'Culling Assistant \u2014 {folder_name}',
+                culling_url,
+                js_api=self,
+                width=1400,
+                height=900,
+            )
+            self._culling_window = win
+            return {'success': True}
+        except Exception as e:
+            log(f'open_culling_window error: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def move_rejects_to_folder(self, root_path: str, filenames):
+        """Move original photo files into _KESTREL_Rejects subfolder."""
+        try:
+            if not root_path or not os.path.isdir(root_path):
+                return {'success': False, 'error': 'Invalid root path'}
+            reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+            os.makedirs(reject_dir, exist_ok=True)
+            moved = []
+            errors = []
+            for fn in (filenames or []):
+                src = os.path.join(root_path, fn)
+                dst = os.path.join(reject_dir, fn)
+                try:
+                    if os.path.exists(src):
+                        shutil.move(src, dst)
+                        moved.append(fn)
+                    else:
+                        errors.append(f'{fn}: file not found')
+                except Exception as e:
+                    errors.append(f'{fn}: {e}')
+            log(f'move_rejects: moved {len(moved)}, errors {len(errors)}')
+            return {'success': True, 'moved': len(moved), 'errors': errors, 'reject_folder': reject_dir}
+        except Exception as e:
+            log(f'move_rejects_to_folder error: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def undo_reject_move(self, root_path: str, filenames):
+        """Move files back from _KESTREL_Rejects to the root folder."""
+        try:
+            reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+            if not os.path.isdir(reject_dir):
+                return {'success': False, 'error': '_KESTREL_Rejects folder not found'}
+            restored = []
+            errors = []
+            for fn in (filenames or []):
+                src = os.path.join(reject_dir, fn)
+                dst = os.path.join(root_path, fn)
+                try:
+                    if os.path.exists(src):
+                        shutil.move(src, dst)
+                        restored.append(fn)
+                    else:
+                        errors.append(f'{fn}: not found in rejects')
+                except Exception as e:
+                    errors.append(f'{fn}: {e}')
+            log(f'undo_reject_move: restored {len(restored)}, errors {len(errors)}')
+            return {'success': True, 'restored': len(restored), 'errors': errors}
+        except Exception as e:
+            log(f'undo_reject_move error: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def backup_kestrel_csv(self, root_path: str):
+        """Copy kestrel_database.csv to kestrel_database_old.csv as backup."""
+        try:
+            kestrel_dir = os.path.join(root_path, '.kestrel')
+            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
+            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
+            if not os.path.exists(csv_path):
+                return {'success': False, 'error': 'kestrel_database.csv not found'}
+            shutil.copy2(csv_path, backup_path)
+            log(f'backup_kestrel_csv: backed up to {backup_path}')
+            return {'success': True, 'backup_path': backup_path}
+        except Exception as e:
+            log(f'backup_kestrel_csv error: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def restore_kestrel_csv_backup(self, root_path: str):
+        """Restore kestrel_database_old.csv back to kestrel_database.csv."""
+        try:
+            kestrel_dir = os.path.join(root_path, '.kestrel')
+            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
+            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
+            if not os.path.exists(backup_path):
+                return {'success': False, 'error': 'kestrel_database_old.csv not found'}
+            shutil.copy2(backup_path, csv_path)
+            log(f'restore_kestrel_csv_backup: restored from {backup_path}')
+            return {'success': True}
+        except Exception as e:
+            log(f'restore_kestrel_csv_backup error: {e}')
+            return {'success': False, 'error': str(e)}
+
+    def open_reject_folder(self, root_path: str):
+        """Open the _KESTREL_Rejects folder in the system file browser."""
+        reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+        if os.path.isdir(reject_dir):
+            return self.open_folder(reject_dir)
+        return {'success': False, 'error': '_KESTREL_Rejects folder not found'}
+
+    def notify_main_window_refresh(self):
+        """Tell the main visualizer window to reload its data."""
+        try:
+            if not WEBVIEW_IMPORT_SUCCESS:
+                return {'success': False, 'error': 'pywebview not available'}
+            import webview as _wv
+            if _wv.windows and len(_wv.windows) > 0:
+                main_win = _wv.windows[0]
+                main_win.evaluate_js('if(window.reloadCurrentFolders) window.reloadCurrentFolders();')
+                return {'success': True}
+            return {'success': False, 'error': 'No main window found'}
+        except Exception as e:
+            log(f'notify_main_window_refresh error: {e}')
+            return {'success': False, 'error': str(e)}
+
 
 class Handler(SimpleHTTPRequestHandler):
     # Serve from directory of this script (project root) by default.
@@ -1552,7 +1688,9 @@ def main():
         try:
             log('Starting windowed UI via pywebview...')
             api = Api() # start maximized
+            api._server_port = args.port
             win = webview.create_window('Project Kestrel', url, js_api=api, maximized=True)
+            api._main_window = win
 
             # When the analysis queue is running, intercept the close event so the
             # window minimizes to the taskbar instead of killing mid-analysis.

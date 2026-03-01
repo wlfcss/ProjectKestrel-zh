@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Culling Assistant — Project Kestrel</title>
+  <link rel="icon" href="data:," />
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0c0f;
+      --panel: #111318;
+      --muted: #8a9099;
+      --text: #e7e9ee;
+      --brand: #4aa3ff;
+      --ok: #2ecc71;
+      --warn: #f39c12;
+      --bad: #e74c3c;
+      --card: #161922;
+      --card-border: #222634;
+      --accept: #1a3a1a;
+      --accept-border: #2ecc71;
+      --reject: #3a1a1a;
+      --reject-border: #e74c3c;
+      --unrated-bg: rgba(255, 200, 0, 0.08);
+      --unrated-border: #f0c040;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.35 system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- Top bar ---- */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
+    .topbar h1 {
+      font-size: 15px;
+      margin: 0;
+      font-weight: 700;
+      color: var(--brand);
+    }
+    .topbar .folder-name {
+      color: var(--muted);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .topbar .stats {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    /* ---- Main layout ---- */
+    .main-layout {
+      display: flex;
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    /* ---- Culling pane (left 75%) ---- */
+    .culling-pane {
+      flex: 3 1 0;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      border-right: 1px solid var(--card-border);
+    }
+
+    .culling-header {
+      display: flex;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .culling-header .col-header {
+      flex: 1;
+      padding: 6px 14px;
+      font-weight: 700;
+      font-size: 13px;
+      text-align: center;
+    }
+    .culling-header .col-header.accept { color: var(--ok); background: rgba(46,204,113,0.06); }
+    .culling-header .col-header.reject { color: var(--bad); background: rgba(231,76,60,0.06); }
+
+    .culling-scroll {
+      flex: 1 1 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* ---- Scene row ---- */
+    .scene-row {
+      border-bottom: 1px solid var(--card-border);
+    }
+    .scene-row.unrated {
+      background: var(--unrated-bg);
+      border-left: 3px solid var(--unrated-border);
+    }
+    .scene-label {
+      padding: 5px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .scene-label b { color: var(--text); font-weight: 600; }
+    .scene-label .unrated-badge {
+      background: rgba(240,192,64,0.18);
+      color: #f0c040;
+      padding: 1px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .scene-columns {
+      display: flex;
+      min-height: 60px;
+    }
+    .scene-col {
+      flex: 1;
+      padding: 6px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-content: flex-start;
+    }
+    .scene-col.accept-col { background: rgba(46,204,113,0.03); }
+    .scene-col.reject-col { background: rgba(231,76,60,0.03); }
+    .scene-col-divider {
+      width: 1px;
+      background: var(--card-border);
+      flex-shrink: 0;
+    }
+
+    /* ---- Image card (compact) ---- */
+    .cull-card {
+      width: 150px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s, opacity 0.2s;
+      user-select: none;
+      flex-shrink: 0;
+    }
+    .cull-card:hover {
+      border-color: var(--brand);
+      transform: translateY(-1px);
+    }
+    .cull-card.accept-card { border-left: 3px solid var(--accept-border); }
+    .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
+    .cull-card.moved-card { opacity: 0.85; }
+    .cull-card.moved-card::after {
+      content: '\u21C4 moved';
+      position: absolute;
+      top: 2px;
+      right: 3px;
+      font-size: 9px;
+      background: rgba(0,0,0,0.7);
+      color: #aaa;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .cull-card .cull-thumb {
+      width: 100%;
+      aspect-ratio: 16/10;
+      overflow: hidden;
+      background: #0a0b0d;
+      position: relative;
+    }
+    .cull-card .cull-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .cull-card .cull-info {
+      padding: 4px 6px;
+    }
+    .cull-card .cull-filename {
+      font-size: 11px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cull-card .cull-stars {
+      font-size: 12px;
+      line-height: 1;
+      margin-top: 2px;
+    }
+    .cull-card .cull-stars .star-filled { color: #f0c040; }
+    .cull-card .cull-stars .star-empty { color: #333; }
+    .cull-card .cull-stars .star-auto { color: #4aa3ff; }
+
+    /* ---- Preview pane (right 25%) ---- */
+    .preview-pane {
+      flex: 1 1 0;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      padding: 12px;
+      overflow-y: auto;
+      background: var(--panel);
+    }
+    .preview-pane h3 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .preview-img-box {
+      width: 100%;
+      aspect-ratio: 16/10;
+      background: #0a0b0d;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-img-box img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    .preview-img-box .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .preview-meta {
+      font-size: 12px;
+      color: var(--text);
+    }
+    .preview-meta .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .preview-meta .label { color: var(--muted); }
+    .preview-meta .value { font-weight: 600; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ---- Bottom action bar ---- */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--panel);
+      border-top: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
+    .bottom-bar .status {
+      color: var(--muted);
+      font-size: 12px;
+      flex: 1;
+    }
+    .btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: #1d2230; border-color: #3a84e6; }
+    .btn.primary {
+      background: #1a4a1a;
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+    .btn.primary:hover { background: #1e5a1e; }
+    .btn.danger {
+      background: #3a1a1a;
+      border-color: var(--bad);
+      color: var(--bad);
+    }
+    .btn.danger:hover { background: #4a2020; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ---- Dialogs ---- */
+    dialog {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 520px;
+      width: 90%;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.6); }
+    dialog h2 { margin: 0 0 12px 0; font-size: 16px; }
+    dialog p { margin: 6px 0; font-size: 13px; color: var(--text); line-height: 1.5; }
+    dialog .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+      justify-content: flex-end;
+    }
+
+    .hidden { display: none !important; }
+
+    /* toast */
+    .toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      background: #1d2230;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Instruction hint */
+    .hint-bar {
+      padding: 6px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--panel);
+      border-bottom: 1px solid var(--card-border);
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .hint-bar kbd {
+      background: #222634;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: inherit;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <h1>Culling Assistant</h1>
+    <span class="folder-name" id="folderName">Loading…</span>
+    <span class="stats" id="statsLabel"></span>
+  </div>
+
+  <div class="hint-bar">
+    <kbd>Shift+Click</kbd> an image to move it between Accept and Reject &nbsp;|&nbsp;
+    Hover an image to see its preview on the right &nbsp;|&nbsp;
+    Ratings are auto-saved as you work
+  </div>
+
+  <!-- Main layout -->
+  <div class="main-layout">
+    <!-- Culling pane -->
+    <div class="culling-pane">
+      <div class="culling-header">
+        <div class="col-header accept">✓ Accept (4-5 ★)</div>
+        <div class="col-header reject">✗ Reject (1-3 ★)</div>
+      </div>
+      <div class="culling-scroll" id="cullingScroll">
+        <!-- Scene rows rendered here -->
+      </div>
+    </div>
+
+    <!-- Preview pane -->
+    <div class="preview-pane">
+      <h3>Preview</h3>
+      <div class="preview-img-box" id="previewExport">
+        <span class="muted">Hover an image…</span>
+      </div>
+      <h3>Crop</h3>
+      <div class="preview-img-box" id="previewCrop">
+        <span class="muted">—</span>
+      </div>
+      <div class="preview-meta" id="previewMeta"></div>
+    </div>
+  </div>
+
+  <!-- Bottom action bar -->
+  <div class="bottom-bar">
+    <span class="status" id="statusLabel">Loading…</span>
+    <button class="btn" id="undoBtn" class="hidden" disabled style="display:none">↩ Undo Move</button>
+    <button class="btn primary" id="doneCullingBtn" disabled>Done Culling</button>
+  </div>
+
+  <!-- Confirmation dialog -->
+  <dialog id="confirmDlg">
+    <h2>Finish Culling</h2>
+    <div id="confirmBody"></div>
+    <div class="actions">
+      <button class="btn" id="confirmCancel">Cancel</button>
+      <button class="btn primary" id="confirmOk">Move Rejects &amp; Finish</button>
+    </div>
+  </dialog>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ====================================================================
+    // Culling Assistant — Project Kestrel
+    // ====================================================================
+
+    // ---- Helpers ----
+    function el(sel) { return document.querySelector(sel); }
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function parseNumber(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : -1; }
+    function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
+
+    let toastTimer = null;
+    function showToast(msg, ms = 3000) {
+      const t = el('#toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    // ---- State ----
+    let rootPath = '';
+    let rows = [];
+    let header = [];
+    let scenes = [];            // [{id, images[], species, ...}]
+    let cullingState = new Map(); // filename -> 'accept' | 'reject'
+    let manuallyMoved = new Set(); // filenames the user has shift-clicked
+    let blobUrlCache = new Map();
+    let rejectFilenames = [];    // for undo after move
+    let moveCompleted = false;
+
+    // ---- URL param ----
+    function getUrlParam(name) {
+      const u = new URL(window.location.href);
+      return u.searchParams.get(name) || '';
+    }
+
+    // ---- Wait for pywebview ----
+    function waitForPywebview(timeout = 3000) {
+      return new Promise((resolve) => {
+        if (window.pywebview?.api) { resolve(true); return; }
+        const start = Date.now();
+        const iv = setInterval(() => {
+          if (window.pywebview?.api) { clearInterval(iv); resolve(true); }
+          else if (Date.now() - start > timeout) { clearInterval(iv); resolve(false); }
+        }, 50);
+      });
+    }
+
+    // ---- Image loading ----
+    async function getBlobUrl(relPath, root) {
+      if (!relPath) return '';
+      const key = `${root}:${relPath}`;
+      if (blobUrlCache.has(key)) return blobUrlCache.get(key);
+      try {
+        const res = await window.pywebview.api.read_image_file(relPath, root);
+        if (res && res.success && res.data) {
+          const url = `data:${res.mime || 'image/jpeg'};base64,${res.data}`;
+          blobUrlCache.set(key, url);
+          return url;
+        }
+      } catch (e) { console.warn('getBlobUrl error', e); }
+      blobUrlCache.set(key, '');
+      return '';
+    }
+
+    // Lazy-load images via IntersectionObserver
+    const _lazyObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          const loader = img._lazyLoader;
+          if (loader) { loader(); delete img._lazyLoader; }
+          _lazyObserver.unobserve(img);
+        }
+      }
+    }, { rootMargin: '300px' });
+
+    function lazyLoadImg(img, resolverFn) {
+      img._lazyLoader = async () => {
+        const url = await resolverFn();
+        if (url) img.src = url;
+      };
+      _lazyObserver.observe(img);
+    }
+
+    // ---- Rating helpers ----
+    function getRating(row) {
+      const n = parseInt(row?.rating, 10);
+      return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+    }
+    function getOrigin(row) {
+      const s = String(row?.rating_origin || '').toLowerCase();
+      return s === 'manual' ? 'manual' : (s === 'auto' ? 'auto' : '');
+    }
+    function setRating(row, val, origin = 'manual') {
+      row.rating = String(Math.max(0, Math.min(5, parseInt(val, 10) || 0)));
+      row.rating_origin = origin;
+    }
+
+    function isAccept(row) {
+      return cullingState.get(row.filename) === 'accept';
+    }
+
+    // Stars HTML
+    function starsHtml(row) {
+      const r = getRating(row);
+      const origin = getOrigin(row);
+      let s = '';
+      for (let i = 1; i <= 5; i++) {
+        if (i <= r) {
+          s += `<span class="star-${origin === 'auto' ? 'auto' : 'filled'}">★</span>`;
+        } else {
+          s += `<span class="star-empty">☆</span>`;
+        }
+      }
+      return s;
+    }
+
+    // ---- CSV helpers ----
+    function csvEscape(v) {
+      const s = String(v ?? '');
+      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }
+
+    function rowsToCsvString(cols, rowList) {
+      const lines = [cols.join(',')];
+      for (const r of rowList) {
+        lines.push(cols.map(k => csvEscape(k in r ? r[k] : '')).join(','));
+      }
+      return lines.join('\r\n');
+    }
+
+    // ---- Ensure columns ----
+    function ensureColumns() {
+      if (!header.includes('rating')) header.push('rating');
+      if (!header.includes('rating_origin')) header.push('rating_origin');
+      if (!header.includes('scene_name')) header.push('scene_name');
+      for (const r of rows) {
+        if (r.rating === undefined || r.rating === '') r.rating = '0';
+        if (r.rating_origin === undefined) r.rating_origin = '';
+      }
+    }
+
+    // ---- Aggregate scenes ----
+    function aggregateScenes() {
+      const groups = new Map();
+      for (const r of rows) {
+        const id = String(r.scene_count || '0');
+        if (!groups.has(id)) groups.set(id, []);
+        groups.get(id).push(r);
+      }
+      const list = [];
+      for (const [sceneId, arr] of groups) {
+        // representative by max quality
+        let rep = arr[0];
+        for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
+        const speciesSet = new Set();
+        for (const r of arr) {
+          if (r.species && r.species !== 'No Bird' && r.species !== 'Unknown') speciesSet.add(r.species);
+        }
+        const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+        const allUnrated = arr.every(r => getRating(r) === 0);
+        const hasDetections = arr.some(r => r.species && r.species !== 'No Bird' && r.species !== 'Unknown' && r.species !== '');
+        list.push({
+          id: sceneId,
+          images: arr.slice().sort((a, b) => parseNumber(b.quality) - parseNumber(a.quality)),
+          representative: rep,
+          species: Array.from(speciesSet).sort(),
+          maxQuality: maxQ,
+          sceneName: (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim(),
+          allUnrated,
+          hasDetections,
+        });
+      }
+      // Sort by scene_count ascending (chronological)
+      list.sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
+      return list;
+    }
+
+    // ---- Initialize culling state from ratings ----
+    function initCullingState() {
+      cullingState.clear();
+      manuallyMoved.clear();
+      for (const r of rows) {
+        const rating = getRating(r);
+        if (rating >= 4) {
+          cullingState.set(r.filename, 'accept');
+        } else if (rating >= 1 && rating <= 3) {
+          cullingState.set(r.filename, 'reject');
+        } else {
+          // Unrated (0): default to accept
+          cullingState.set(r.filename, 'accept');
+        }
+      }
+    }
+
+    // ---- Swap image between accept/reject ----
+    function swapImage(row) {
+      const current = cullingState.get(row.filename);
+      if (current === 'accept') {
+        cullingState.set(row.filename, 'reject');
+        setRating(row, 3, 'manual');
+      } else {
+        cullingState.set(row.filename, 'accept');
+        setRating(row, 4, 'manual');
+      }
+      manuallyMoved.add(row.filename);
+    }
+
+    // ---- Build an image card ----
+    function buildImageCard(row) {
+      const side = cullingState.get(row.filename) || 'accept';
+      const card = document.createElement('div');
+      card.className = `cull-card ${side}-card`;
+      if (manuallyMoved.has(row.filename)) card.classList.add('moved-card');
+      card.style.position = 'relative'; // for ::after badge
+
+      const thumb = document.createElement('div');
+      thumb.className = 'cull-thumb';
+      const img = document.createElement('img');
+      img.alt = row.filename || '';
+      lazyLoadImg(img, () => getBlobUrl(row.export_path || row.crop_path, rootPath));
+      thumb.appendChild(img);
+      card.appendChild(thumb);
+
+      const info = document.createElement('div');
+      info.className = 'cull-info';
+      info.innerHTML = `<div class="cull-filename" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</div>
+        <div class="cull-stars">${starsHtml(row)}</div>`;
+      card.appendChild(info);
+
+      // Shift+click to swap
+      card.addEventListener('click', (ev) => {
+        if (ev.shiftKey) {
+          ev.preventDefault();
+          swapImage(row);
+          renderScene(row.scene_count);
+          updateStats();
+          debouncedSave();
+        }
+      });
+
+      // Hover: update preview
+      card.addEventListener('mouseenter', () => updatePreview(row));
+
+      return card;
+    }
+
+    // ---- Render a single scene row ----
+    function renderScene(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      const el = document.getElementById(`scene-row-${sceneId}`);
+      if (!el) return;
+
+      const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
+      const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
+
+      const acceptCol = el.querySelector('.accept-col');
+      const rejectCol = el.querySelector('.reject-col');
+      if (acceptCol) { acceptCol.innerHTML = ''; accepts.forEach(r => acceptCol.appendChild(buildImageCard(r))); }
+      if (rejectCol) { rejectCol.innerHTML = ''; rejects.forEach(r => rejectCol.appendChild(buildImageCard(r))); }
+    }
+
+    // ---- Render all scenes ----
+    function renderAllScenes() {
+      const container = el('#cullingScroll');
+      container.innerHTML = '';
+
+      for (const scene of scenes) {
+        const row = document.createElement('div');
+        row.className = 'scene-row';
+        row.id = `scene-row-${scene.id}`;
+        if (scene.allUnrated) row.classList.add('unrated');
+
+        // Scene label
+        const label = document.createElement('div');
+        label.className = 'scene-label';
+        const speciesText = scene.species.length ? scene.species.join(', ') : 'Unknown';
+        label.innerHTML = `<b>Scene #${escapeHtml(scene.id)}</b>` +
+          (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
+          ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
+          (scene.allUnrated ? ' <span class="unrated-badge">⚠ Unrated</span>' : '');
+        row.appendChild(label);
+
+        // Columns
+        const cols = document.createElement('div');
+        cols.className = 'scene-columns';
+
+        const acceptCol = document.createElement('div');
+        acceptCol.className = 'scene-col accept-col';
+
+        const divider = document.createElement('div');
+        divider.className = 'scene-col-divider';
+
+        const rejectCol = document.createElement('div');
+        rejectCol.className = 'scene-col reject-col';
+
+        const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
+        const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
+
+        accepts.forEach(r => acceptCol.appendChild(buildImageCard(r)));
+        rejects.forEach(r => rejectCol.appendChild(buildImageCard(r)));
+
+        cols.appendChild(acceptCol);
+        cols.appendChild(divider);
+        cols.appendChild(rejectCol);
+        row.appendChild(cols);
+        container.appendChild(row);
+      }
+    }
+
+    // ---- Update preview pane ----
+    async function updatePreview(row) {
+      // Export image
+      const exportBox = el('#previewExport');
+      exportBox.innerHTML = '<span class="muted">Loading…</span>';
+      const exportUrl = await getBlobUrl(row.export_path, rootPath);
+      if (exportUrl) {
+        exportBox.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = exportUrl;
+        exportBox.appendChild(img);
+      } else {
+        exportBox.innerHTML = '<span class="muted">No export image</span>';
+      }
+
+      // Crop image
+      const cropBox = el('#previewCrop');
+      cropBox.innerHTML = '<span class="muted">Loading…</span>';
+      const cropUrl = await getBlobUrl(row.crop_path, rootPath);
+      if (cropUrl) {
+        cropBox.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = cropUrl;
+        cropBox.appendChild(img);
+      } else {
+        cropBox.innerHTML = '<span class="muted">No crop image</span>';
+      }
+
+      // Metadata
+      const rating = getRating(row);
+      const origin = getOrigin(row);
+      const side = cullingState.get(row.filename) || '—';
+      const meta = el('#previewMeta');
+      meta.innerHTML = `
+        <div class="row"><span class="label">Filename</span><span class="value" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
+        <div class="row"><span class="label">Species</span><span class="value">${escapeHtml(row.species || 'Unknown')} (${fmt3(row.species_confidence)})</span></div>
+        <div class="row"><span class="label">Quality</span><span class="value">${fmt3(row.quality)}</span></div>
+        <div class="row"><span class="label">Rating</span><span class="value">${'★'.repeat(rating)}${'☆'.repeat(5-rating)} ${origin ? `(${origin})` : ''}</span></div>
+        <div class="row"><span class="label">Status</span><span class="value" style="color:${side==='accept' ? 'var(--ok)' : 'var(--bad)'}">${side === 'accept' ? '✓ Accept' : '✗ Reject'}</span></div>
+        <div class="row"><span class="label">Scene</span><span class="value">#${escapeHtml(String(row.scene_count || ''))}</span></div>
+      `;
+    }
+
+    // ---- Stats ----
+    function updateStats() {
+      let acceptCount = 0, rejectCount = 0;
+      for (const [, side] of cullingState) {
+        if (side === 'accept') acceptCount++;
+        else rejectCount++;
+      }
+      el('#statsLabel').textContent = `${acceptCount} accept · ${rejectCount} reject · ${rows.length} total`;
+      el('#statusLabel').textContent = `${acceptCount} images accepted, ${rejectCount} to reject`;
+
+      const doneBtn = el('#doneCullingBtn');
+      if (doneBtn) doneBtn.disabled = moveCompleted;
+    }
+
+    // ---- Auto-save (debounced) ----
+    let saveTimer = null;
+    function debouncedSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveCullingState(), 1500);
+    }
+
+    async function saveCullingState() {
+      try {
+        // Filter out internal __ keys
+        const exportCols = header.filter(c => !c.startsWith('__'));
+        const content = rowsToCsvString(exportCols, rows);
+        await window.pywebview.api.write_kestrel_csv(rootPath, content);
+      } catch (e) {
+        console.warn('Auto-save failed', e);
+      }
+    }
+
+    // ---- Done Culling flow ----
+    function onDoneCulling() {
+      let acceptCount = 0, rejectCount = 0;
+      const rejectNames = [];
+      for (const r of rows) {
+        if (cullingState.get(r.filename) === 'reject') { rejectCount++; rejectNames.push(r.filename); }
+        else acceptCount++;
+      }
+
+      const body = el('#confirmBody');
+      body.innerHTML = `
+        <p><b>${acceptCount}</b> image${acceptCount===1?'':'s'} will be <span style="color:var(--ok)">kept</span> in the folder.</p>
+        <p><b>${rejectCount}</b> image${rejectCount===1?'':'s'} will be <span style="color:var(--bad)">moved</span> to <code>_KESTREL_Rejects</code> folder.</p>
+        <p style="color:var(--muted);font-size:12px">A backup of kestrel_database.csv will be saved as kestrel_database_old.csv before any changes.</p>
+      `;
+
+      el('#confirmDlg').showModal();
+    }
+
+    async function executeMove() {
+      el('#confirmDlg').close();
+      el('#statusLabel').textContent = 'Processing…';
+      el('#doneCullingBtn').disabled = true;
+
+      try {
+        // 1. Save current ratings
+        await saveCullingState();
+
+        // 2. Backup CSV
+        const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
+        if (!backupRes.success) {
+          showToast('Failed to backup CSV: ' + (backupRes.error || ''), 5000);
+          el('#doneCullingBtn').disabled = false;
+          return;
+        }
+
+        // 3. Collect reject filenames
+        rejectFilenames = [];
+        for (const r of rows) {
+          if (cullingState.get(r.filename) === 'reject') {
+            rejectFilenames.push(r.filename);
+          }
+        }
+
+        // 4. Move original files to _KESTREL_Rejects
+        const moveRes = await window.pywebview.api.move_rejects_to_folder(rootPath, rejectFilenames);
+        if (!moveRes.success) {
+          showToast('Failed to move rejects: ' + (moveRes.error || ''), 5000);
+          el('#doneCullingBtn').disabled = false;
+          return;
+        }
+
+        // 5. Remove rejected rows from data and save cleaned CSV
+        const rejectSet = new Set(rejectFilenames);
+        rows = rows.filter(r => !rejectSet.has(r.filename));
+        for (const fn of rejectSet) cullingState.delete(fn);
+        await saveCullingState();
+
+        // 6. Open reject folder
+        try { await window.pywebview.api.open_reject_folder(rootPath); } catch(_) {}
+
+        // 7. Notify main window
+        try { await window.pywebview.api.notify_main_window_refresh(); } catch(_) {}
+
+        // 8. Show undo button
+        moveCompleted = true;
+        const undoBtn = el('#undoBtn');
+        undoBtn.style.display = '';
+        undoBtn.disabled = false;
+
+        // Re-aggregate and re-render with remaining images
+        scenes = aggregateScenes();
+        renderAllScenes();
+        updateStats();
+
+        showToast(`Moved ${moveRes.moved} image${moveRes.moved===1?'':'s'} to _KESTREL_Rejects`, 5000);
+        if (moveRes.errors && moveRes.errors.length > 0) {
+          console.warn('Move errors:', moveRes.errors);
+          showToast(`${moveRes.errors.length} file(s) had errors — check console`, 5000);
+        }
+
+        el('#statusLabel').textContent = `Done! ${moveRes.moved} rejects moved. Click "Undo Move" to revert.`;
+      } catch (e) {
+        console.error('executeMove error', e);
+        showToast('Error during move: ' + e.message, 5000);
+        el('#doneCullingBtn').disabled = false;
+      }
+    }
+
+    async function undoMove() {
+      el('#statusLabel').textContent = 'Undoing move…';
+      el('#undoBtn').disabled = true;
+      try {
+        // 1. Move files back
+        const undoRes = await window.pywebview.api.undo_reject_move(rootPath, rejectFilenames);
+        if (!undoRes.success) {
+          showToast('Undo failed: ' + (undoRes.error || ''), 5000);
+          el('#undoBtn').disabled = false;
+          return;
+        }
+
+        // 2. Restore backup CSV
+        const restoreRes = await window.pywebview.api.restore_kestrel_csv_backup(rootPath);
+        if (!restoreRes.success) {
+          showToast('CSV restore failed: ' + (restoreRes.error || ''), 5000);
+        }
+
+        // 3. Reload data from restored CSV
+        await loadData();
+
+        // 4. Notify main window
+        try { await window.pywebview.api.notify_main_window_refresh(); } catch(_) {}
+
+        moveCompleted = false;
+        el('#undoBtn').style.display = 'none';
+        el('#doneCullingBtn').disabled = false;
+
+        showToast(`Restored ${undoRes.restored} file${undoRes.restored===1?'':'s'}.`, 4000);
+        el('#statusLabel').textContent = 'Move undone. Continue culling or click Done Culling when ready.';
+      } catch (e) {
+        console.error('undoMove error', e);
+        showToast('Undo error: ' + e.message, 5000);
+        el('#undoBtn').disabled = false;
+      }
+    }
+
+    // ---- Load data ----
+    async function loadData() {
+      const res = await window.pywebview.api.read_kestrel_csv(rootPath);
+      if (!res.success) throw new Error(res.error || 'Failed to read CSV');
+
+      const parsed = Papa.parse(res.data, { header: true, skipEmptyLines: true });
+      header = parsed.meta.fields || [];
+      rows = parsed.data || [];
+      // Stamp rootPath (no __folderSlot needed — single folder)
+      for (const r of rows) r.__rootPath = rootPath;
+      ensureColumns();
+
+      scenes = aggregateScenes();
+      initCullingState();
+      renderAllScenes();
+      updateStats();
+    }
+
+    // ---- Init ----
+    async function init() {
+      rootPath = decodeURIComponent(getUrlParam('root'));
+      if (!rootPath) {
+        el('#statusLabel').textContent = 'Error: no folder specified';
+        return;
+      }
+
+      const folderName = rootPath.replace(/.*[/\\]/, '') || rootPath;
+      el('#folderName').textContent = folderName;
+
+      const ready = await waitForPywebview();
+      if (!ready) {
+        el('#statusLabel').textContent = 'Error: pywebview API not available';
+        return;
+      }
+
+      try {
+        await loadData();
+        el('#doneCullingBtn').disabled = false;
+        el('#statusLabel').textContent = 'Ready — Shift+Click images to move between Accept and Reject';
+      } catch (e) {
+        console.error('init error', e);
+        el('#statusLabel').textContent = 'Error loading data: ' + e.message;
+      }
+    }
+
+    // ---- Wire up buttons ----
+    el('#doneCullingBtn').addEventListener('click', onDoneCulling);
+    el('#confirmOk').addEventListener('click', executeMove);
+    el('#confirmCancel').addEventListener('click', () => el('#confirmDlg').close());
+    el('#undoBtn').addEventListener('click', undoMove);
+
+    // ---- Start ----
+    init();
+  </script>
+</body>
+</html>

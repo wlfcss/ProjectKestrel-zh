@@ -592,6 +592,24 @@
       font-size: 12px;
     }
 
+    .culling-btn {
+      margin-left: auto;
+      padding: 3px 12px;
+      font-size: 12px;
+      background: #1a2540;
+      color: #7eb8e0;
+      border: 1px solid #2a3b5a;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s;
+    }
+    .culling-btn:hover {
+      background: #243456;
+      border-color: #3a84e6;
+      color: #b8daf0;
+    }
+
     .folder-group-grid.hidden {
       display: none;
     }
@@ -2971,7 +2989,7 @@
         if (!folderGroups.has(rp)) { folderGroups.set(rp, []); groupOrder.push(rp); }
         folderGroups.get(rp).push(s);
       }
-      const multiFolder = groupByFolder && folderGroups.size > 1;
+      const multiFolder = groupByFolder && folderGroups.size >= 1;
 
       function buildCard(s) {
         const card = document.createElement('article');
@@ -3071,6 +3089,13 @@
           const hdr = document.createElement('div');
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
           hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${groupScenes.length} scene${groupScenes.length === 1 ? '' : 's'}</span>`;
+
+          // Add Culling Assistant button
+          const cullingBtn = document.createElement('button');
+          cullingBtn.className = 'culling-btn';
+          cullingBtn.textContent = 'Open Culling Assistant';
+          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(rp); });
+          hdr.appendChild(cullingBtn);
 
           gridEl = document.createElement('div');
           gridEl.className = 'folder-group-grid grid' + (collapsed ? ' hidden' : '');
@@ -5611,6 +5636,37 @@
         } catch (_) { }
       });
     }
+
+    // ---- Culling Assistant launcher ----
+    async function openCullingAssistant(rootPath) {
+      if (!window.pywebview?.api) {
+        showToast('Culling Assistant requires desktop mode', 4000);
+        return;
+      }
+      try {
+        showToast('Opening Culling Assistant\u2026', 2000);
+        const res = await window.pywebview.api.open_culling_window(rootPath);
+        if (res && !res.success) {
+          showToast('Failed to open Culling Assistant: ' + (res.error || 'Unknown error'), 5000);
+        }
+      } catch (e) {
+        console.error('openCullingAssistant error', e);
+        showToast('Error opening Culling Assistant', 4000);
+      }
+    }
+
+    // Reload current folders (called from Python via evaluate_js after culling completes)
+    async function reloadCurrentFolders() {
+      const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
+      if (loadedPaths.length === 0) return;
+      if (loadedPaths.length === 1) {
+        await loadFolderFromPath(loadedPaths[0]);
+      } else {
+        await loadMultipleFolders(loadedPaths);
+      }
+    }
+    // Expose globally for evaluate_js calls from Python
+    window.reloadCurrentFolders = reloadCurrentFolders;
 
     // Periodically broadcast queue running state to window (for beforeunload guard)
     setInterval(async () => {
