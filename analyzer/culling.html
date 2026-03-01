@@ -25,7 +25,7 @@
       --unrated-bg: rgba(255, 200, 0, 0.08);
       --unrated-border: #f0c040;
       --card-width: 150px;
-      --preview-w: 350px;
+      --preview-w: calc(100vw / 3);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; overflow: hidden; }
@@ -468,15 +468,16 @@
     }
     #tutorialOverlay.active {
       display: block;
-      pointer-events: all;
+      /* pointer-events stays none so users can interact with UI underneath */
     }
     #tutorialOverlay.has-backdrop {
       background: rgba(0,0,0,0.58);
+      pointer-events: all;
     }
     #tutorialHighlight {
       position: fixed;
       border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.60);
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
       border: 2px solid var(--brand);
       transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
       pointer-events: none;
@@ -493,6 +494,7 @@
       max-width: calc(100vw - 32px);
       box-shadow: 0 8px 32px rgba(0,0,0,0.55);
       z-index: 10002;
+      pointer-events: all;
       transition: top .22s ease, left .22s ease;
     }
     #tutorialCard h3 {
@@ -1345,7 +1347,7 @@
       });
 
       divider.addEventListener('dblclick', () => {
-        document.documentElement.style.setProperty('--preview-w', '350px');
+        document.documentElement.style.setProperty('--preview-w', 'calc(100vw / 3)');
       });
     })();
 
@@ -1489,12 +1491,12 @@
     const TUTORIAL_STEPS = [
       {
         title: 'Welcome to Culling Assistant!',
-        body: "Let's take a quick tour of the key features. Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
+        body: "Let's take a quick tour of the key features. You can <b>interact with the UI</b> at any time — try hovering, clicking, and exploring while the tour is open!<br><br>Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
         target: null,
       },
       {
         title: 'Photos, Organized by Scene',
-        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.',
+        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.<br><br><span style="color:var(--muted)">Try scrolling through the list now!</span>',
         target: '#cullingScroll',
         position: 'right',
       },
@@ -1506,25 +1508,25 @@
       },
       {
         title: 'Hover to Preview',
-        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.',
+        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.<br><br><span style="color:var(--muted)">Go ahead \u2014 hover over a card now to see it in action!</span>',
         target: '.scene-columns',
         position: 'right',
       },
       {
         title: 'The Preview Pane',
-        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. Kestrel will automatically load the full-resolution <b>RAW file</b> after a few seconds for maximum detail.',
+        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. Kestrel will automatically load the full-resolution <b>RAW file</b> after a few seconds for maximum detail.<br><br><span style="color:var(--muted)">Try it now \u2014 click & drag on a thumbnail!</span>',
         target: '.preview-pane',
         position: 'left',
       },
       {
         title: 'Move Photos with Shift+Click',
-        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.',
+        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.<br><br><span style="color:var(--muted)">Try Shift+Clicking a photo now!</span>',
         target: '.scene-columns',
         position: 'right',
       },
       {
         title: 'Manual Star Ratings',
-        body: '<b>Click the ★ stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel’s AI rating; <span style="color:#f5c542">gold stars</span> mean you’ve overridden it manually. The metadata panel on the right also has interactive stars.',
+        body: '<b>Click the ★ stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel’s AI rating; <span style="color:#f5c542">gold stars</span> mean you’ve overridden it manually. The metadata panel on the right also has interactive stars.<br><br><span style="color:var(--muted)">Try clicking a star on one of the cards!</span>',
         target: '.cull-info',
         position: 'top',
       },

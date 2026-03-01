@@ -1189,6 +1189,51 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     # ------------------------------------------------------------------ #
+    #  Sample Sets API                                                     #
+    # ------------------------------------------------------------------ #
+
+    def get_sample_sets_paths(self):
+        """Return absolute paths to bundled sample bird-photo sets.
+
+        Works both during development (sample_sets/ next to the repo root)
+        and in PyInstaller frozen builds (bundled via _MEIPASS).
+        """
+        try:
+            candidates = []
+            # 1) Frozen build: look inside sys._MEIPASS or its _internal subfolder
+            if getattr(sys, 'frozen', False):
+                meipass = getattr(sys, '_MEIPASS', None) or os.path.dirname(sys.executable)
+                for base in [os.path.join(meipass, '_internal'), meipass]:
+                    d = os.path.join(base, 'sample_sets')
+                    if os.path.isdir(d):
+                        candidates.append(d)
+                        break
+            # 2) Development: relative to CWD (repo root)
+            cwd_candidate = os.path.join(os.getcwd(), 'sample_sets')
+            if os.path.isdir(cwd_candidate) and cwd_candidate not in candidates:
+                candidates.append(cwd_candidate)
+            # 3) Development: relative to this file
+            file_candidate = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'sample_sets')
+            file_candidate = os.path.normpath(file_candidate)
+            if os.path.isdir(file_candidate) and file_candidate not in candidates:
+                candidates.append(file_candidate)
+
+            if not candidates:
+                return {'success': False, 'error': 'sample_sets folder not found', 'paths': []}
+
+            sample_root = candidates[0]
+            paths = []
+            for name in sorted(os.listdir(sample_root)):
+                full = os.path.join(sample_root, name)
+                if os.path.isdir(full) and os.path.isdir(os.path.join(full, '.kestrel')):
+                    paths.append(full)
+            print(f'[API] get_sample_sets_paths() -> {len(paths)} sets from {sample_root}', flush=True)
+            return {'success': True, 'paths': paths}
+        except Exception as e:
+            print(f'[API] get_sample_sets_paths() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e), 'paths': []}
+
+    # ------------------------------------------------------------------ #
     #  Analysis Queue API (called from JavaScript in pywebview mode)       #
     # ------------------------------------------------------------------ #
 
