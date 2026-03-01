@@ -460,17 +460,13 @@ class QueueManager:
                 item.path, files_this_session, item.total
             )
 
-            _telemetry.send_folder_analytics(
-                folder_path=item.path,
-                files_analyzed=files_this_session,
-                total_files=item.total,
-                active_compute_time_s=elapsed,
-                file_sizes_kb=stats.get('file_sizes_kb', []),
-                file_formats=stats.get('file_formats', {}),
-                was_cancelled=(item.status == 'cancelled'),
-                machine_id=machine_id,
-                version=version,
-            )
+            # --- Non-optional analysis completion telemetry ---
+            if _telemetry:
+                _telemetry.send_analysis_completion_telemetry(
+                    files_analyzed=files_this_session,
+                    machine_id=machine_id,
+                    version=version
+                )
         except Exception:
             pass  # failsafe — never disrupt queue operation
 
@@ -715,6 +711,30 @@ def launch(path: str, editor: str):
     subprocess.Popen(['xdg-open', path])
 class Api:
     """JavaScript API exposed to webview for native file/folder operations."""
+
+    def get_legal_status(self) -> dict:
+        """Check if the user has agreed to the terms and if install telemetry was sent."""
+        settings = load_persisted_settings()
+        return {
+            'agreed': settings.get('legal_agreed_version', '') != '',
+            'install_sent': settings.get('installed_telemetry_sent', False)
+        }
+
+    def agree_to_legal(self):
+        """Mark legal agreement as accepted and trigger installation telemetry if needed."""
+        settings = load_persisted_settings()
+        version = _telemetry._read_version() if _telemetry else 'unknown'
+        settings['legal_agreed_version'] = version
+        
+        # Trigger installation telemetry on first agreement
+        if not settings.get('installed_telemetry_sent', False):
+            if _telemetry:
+                mid = _telemetry.get_machine_id(settings)
+                _telemetry.send_installation_telemetry(mid, version=version)
+                settings['installed_telemetry_sent'] = True
+        
+        save_persisted_settings(settings)
+        return {'success': True}
     
     def choose_directory(self):
         """Open native folder picker dialog.
