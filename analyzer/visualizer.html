@@ -5219,7 +5219,11 @@
     }
 
     async function loadMultipleFolders(paths) {
-      if (!paths || paths.length === 0) return;
+      if (!paths || paths.length === 0) {
+        console.warn('[multi] No paths provided');
+        return;
+      }
+      console.log('[multi] Starting loadMultipleFolders with', paths.length, 'paths:', paths);
       blobUrlCache.clear();
       rows = [];
       header = [];
@@ -5230,24 +5234,39 @@
       for (let i = 0; i < paths.length; i++) {
         const p = paths[i];
         const folderName = p.replace(/.*[/\\]/, '');
+        console.log(`[multi] Loading [${i+1}/${total}] ${p}`);
         showProgress(`Loading ${i + 1} / ${total}: ${folderName}`, (i / total) * 90);
         try {
+          console.log(`[multi] Calling read_kestrel_csv(${p})...`);
           const result = await window.pywebview.api.read_kestrel_csv(p);
-          if (!result.success) { console.warn('[multi] Skipping', p, result.error); continue; }
+          console.log(`[multi] read_kestrel_csv result:`, result);
+          if (!result.success) { 
+            console.warn('[multi] Skipping', p, 'error:', result.error);
+            continue;
+          }
+          console.log(`[multi] Parsing CSV data (${result.data.length} bytes)...`);
           const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
           const newRows = parsed.data || [];
           const newFields = parsed.meta.fields || [];
+          console.log(`[multi] Parsed ${newRows.length} rows with ${newFields.length} fields`);
           for (const f of newFields) if (!header.includes(f)) header.push(f);
           const root = result.root || p;
           const currentSlot = slot++;
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = currentSlot; }
           rows = rows.concat(newRows);
           loadedCount++;
+          console.log(`[multi] Successfully loaded folder ${folderName}, now have ${rows.length} total rows`);
         } catch (e) {
-          console.warn('[multi] Failed to load', p, e);
+          console.warn('[multi] Failed to load', p, 'error:', e);
         }
       }
-      if (loadedCount === 0) { hideProgress(); setStatus('No folders could be loaded'); return; }
+      if (loadedCount === 0) { 
+        console.error('[multi] No folders could be loaded! loadedCount=0');
+        hideProgress(); 
+        setStatus('No folders could be loaded'); 
+        return; 
+      }
+      console.log(`[multi] Successfully loaded ${loadedCount} folders with ${rows.length} total rows`);
       showProgress(`Building scenes from ${loadedCount} folder${loadedCount === 1 ? '' : 's'}…`, 95);
       // For single-folder image-loading compat: set rootPath to first loaded root.
       // Per-row __rootPath handles multi-folder image loading in getBlobUrlForPath.
@@ -6203,21 +6222,41 @@
     async function _autoLoadSamplesAndStartPart2() {
       if (!hasPywebviewApi) { startMainTutorial(2, 0); return; }
       try {
+        console.log('[tutorial] Calling get_sample_sets_paths()...');
         var res = await window.pywebview.api.get_sample_sets_paths();
+        console.log('[tutorial] get_sample_sets_paths() response:', res);
+        
         if (res && res.success && res.paths && res.paths.length > 0) {
+          console.log('[tutorial] Found', res.paths.length, 'sample sets:', res.paths);
           _tutSampleLoaded = true;
           // Scan the parent folder so the folder tree sidebar shows backyard_birds + forest_trail
           var sampleParent = res.paths[0].replace(/[/\\][^/\\]+$/, '');
-          try { await scanFolderTree(sampleParent); } catch(e) {}
-          await loadMultipleFolders(res.paths);
+          console.log('[tutorial] Sample parent folder:', sampleParent);
+          try { 
+            await scanFolderTree(sampleParent);
+            console.log('[tutorial] Folder tree scanned successfully');
+          } catch(e) {
+            console.warn('[tutorial] Folder tree scan error:', e);
+          }
+          try {
+            console.log('[tutorial] Loading', res.paths.length, 'folders via loadMultipleFolders...');
+            await loadMultipleFolders(res.paths);
+            console.log('[tutorial] Folders loaded successfully');
+          } catch(e) {
+            console.warn('[tutorial] loadMultipleFolders error:', e);
+            throw e;
+          }
           // Small delay for render, then start Part 2
+          console.log('[tutorial] Starting Part 2 of tutorial');
           setTimeout(function() { startMainTutorial(2, 0); }, 600);
         } else {
           // No sample sets found -- just start Part 2 anyway
+          console.warn('[tutorial] No sample sets found. res.success=', res?.success, 'res.paths=', res?.paths);
           startMainTutorial(2, 0);
         }
       } catch (e) {
-        console.warn('_autoLoadSamplesAndStartPart2 error:', e);
+        console.warn('[tutorial] _autoLoadSamplesAndStartPart2 error:', e);
+        console.error(e);
         startMainTutorial(2, 0);
       }
     }

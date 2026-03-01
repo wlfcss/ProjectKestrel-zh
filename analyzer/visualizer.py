@@ -317,6 +317,14 @@ class QueueManager:
                 item.initial_processed = 0  # will be set by first progress callback
 
             try:
+                current_settings = load_persisted_settings()
+                if current_settings.get('active_analysis_path') != item.path:
+                    current_settings['active_analysis_path'] = item.path
+                    save_persisted_settings(current_settings)
+            except Exception:
+                pass
+
+            try:
                 def _on_progress(processed, total, _it=item):
                     with self._lock:
                         # Capture the initial processed count on the very first
@@ -435,39 +443,55 @@ class QueueManager:
         log('[queue] Run thread finished.')
 
     def _send_folder_analytics(self, item):
-        """Send per-folder analytics if the user has opted in (failsafe)."""
+        """Send per-folder analytics (if opted-in) and completion telemetry (non-optional)."""
         try:
             if _telemetry is None:
                 return
             settings = load_persisted_settings()
-            if not settings.get('analytics_opted_in', False):
-                return
-
             machine_id = _telemetry.get_machine_id(settings)
             version = _telemetry._read_version()
 
+            # 1. Non-optional basic completion telemetry (total photos analyzed)
+            files_this_session = max(0, item.processed - item.initial_processed)
+            _telemetry.send_analysis_completion_telemetry(
+                files_analyzed=files_this_session,
+                machine_id=machine_id,
+                version=version
+            )
+
+            # 2. Optional detailed analytics
             # Compute active time excluding pauses
             elapsed = 0.0
             if item.start_time is not None:
                 end = item.end_time if item.end_time is not None else _time_mod.time()
                 elapsed = max(0.0, (end - item.start_time) - item.paused_duration)
 
-            # Only count files analyzed in THIS session
-            files_this_session = max(0, item.processed - item.initial_processed)
-            print("[analytics] Sending folder analytics for", item.path, "files_analyzed:", files_this_session, "elapsed_s:", round(elapsed, 1))
+            was_cancelled = (item.status == 'cancelled')
             
             # Gather file stats from disk
             stats = _telemetry.collect_folder_stats(
                 item.path, files_this_session, item.total
             )
 
-            # --- Non-optional analysis completion telemetry ---
-            if _telemetry:
-                _telemetry.send_analysis_completion_telemetry(
-                    files_analyzed=files_this_session,
-                    machine_id=machine_id,
-                    version=version
-                )
+            analytics_payload = {
+                'folder_path': item.path,
+                'files_analyzed': files_this_session,
+                'total_files': item.total,
+                'active_compute_time_s': elapsed,
+                'file_sizes_kb': stats.get('file_sizes_kb', []),
+                'file_formats': stats.get('file_formats', {}),
+                'was_cancelled': was_cancelled,
+                'machine_id': machine_id,
+                'version': version
+            }
+
+            if not settings.get('analytics_consent_shown', False):
+                settings['pending_analytics'] = analytics_payload
+                save_persisted_settings(settings)
+                print("[analytics] Consent not yet shown; cached analytics payload.", flush=True)
+            elif settings.get('analytics_opted_in', False):
+                print("[analytics] Sending folder analytics for", item.path, "files_analyzed:", files_this_session, "elapsed_s:", round(elapsed, 1), flush=True)
+                _telemetry.send_folder_analytics(**analytics_payload)
         except Exception:
             pass  # failsafe — never disrupt queue operation
 
@@ -554,6 +578,18 @@ def load_persisted_settings() -> dict:
 def save_persisted_settings(data: dict) -> None:
     if not isinstance(data, dict):
         raise ValueError('Settings payload must be an object')
+        
+    # --- Flush pending analytics on consent ---
+    if data.get('analytics_consent_shown', False) and 'pending_analytics' in data:
+        pending = data.pop('pending_analytics')
+        if data.get('analytics_opted_in', False) and _telemetry is not None:
+            try:
+                _telemetry.send_folder_analytics(**pending)
+                log('[analytics] Flushed pending detailed analytics after opt-in.')
+            except Exception as e:
+                log(f'[analytics] Failed to flush pending analytics: {e}')
+    # ------------------------------------------
+
     path = _get_settings_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'
@@ -716,9 +752,12 @@ class Api:
     def get_legal_status(self) -> dict:
         """Check if the user has agreed to the terms and if install telemetry was sent."""
         settings = load_persisted_settings()
+        agreed = settings.get('legal_agreed_version', '') != ''
+        install_sent = settings.get('installed_telemetry_sent', False)
+        log(f'[legal] get_legal_status: agreed={agreed}, install_sent={install_sent}')
         return {
-            'agreed': settings.get('legal_agreed_version', '') != '',
-            'install_sent': settings.get('installed_telemetry_sent', False)
+            'agreed': agreed,
+            'install_sent': install_sent
         }
 
     def agree_to_legal(self):
@@ -726,6 +765,7 @@ class Api:
         settings = load_persisted_settings()
         version = _telemetry._read_version() if _telemetry else 'unknown'
         settings['legal_agreed_version'] = version
+        log(f'[legal] User agreed to terms (version {version})')
         
         # Trigger installation telemetry on first agreement
         if not settings.get('installed_telemetry_sent', False):
@@ -733,6 +773,7 @@ class Api:
                 mid = _telemetry.get_machine_id(settings)
                 _telemetry.send_installation_telemetry(mid, version=version)
                 settings['installed_telemetry_sent'] = True
+                log('[legal] Initial installation telemetry triggered.')
         
         save_persisted_settings(settings)
         return {'success': True}
@@ -1200,66 +1241,184 @@ class Api:
         """
         try:
             candidates = []
+            debug_info = []
+            
             # 1) Frozen build: look inside several likely locations.
             #    PyInstaller may set sys._MEIPASS (a temp extraction dir) which
             #    doesn't contain the installer-installed _internal folder. When
             #    installed under Program Files we bundle sample_sets under
             #    <exe_dir>/_internal/sample_sets — so check both the _MEIPASS
             #    path and the real executable directory and its _internal subdir.
-            if getattr(sys, 'frozen', False):
+            is_frozen = getattr(sys, 'frozen', False)
+            debug_info.append(f'[init] sys.frozen={is_frozen}')
+            
+            if is_frozen:
+                debug_info.append('[frozen] Checking frozen build paths...')
                 meipass = getattr(sys, '_MEIPASS', None)
                 exe_dir = os.path.dirname(sys.executable) if hasattr(sys, 'executable') else None
+                debug_info.append(f'[frozen] sys._MEIPASS={meipass}')
+                debug_info.append(f'[frozen] sys.executable={sys.executable}')
+                debug_info.append(f'[frozen] exe_dir={exe_dir}')
+                
                 candidates_checked = []
                 bases = []
-                # Prefer _MEIPASS first (when present), but also check exe dir and exe_dir/_internal
+                
+                # Build list of bases to check
                 if meipass:
                     bases.append(meipass)
                     bases.append(os.path.join(meipass, '_internal'))
                 if exe_dir:
                     bases.append(exe_dir)
                     bases.append(os.path.join(exe_dir, '_internal'))
-                # Also consider a folder relative to this source file (fallback)
+                    # Also check parent of exe_dir (in case exe is in a subdir)
+                    parent_exe = os.path.dirname(exe_dir)
+                    if parent_exe and parent_exe != exe_dir:
+                        bases.append(parent_exe)
+                        bases.append(os.path.join(parent_exe, '_internal'))
+                
+                # Also consider analyzer/ subfolder as a fallback
                 sources_internal = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '_internal'))
                 bases.append(sources_internal)
+                
+                debug_info.append(f'[frozen] Will check {len(bases)} base paths')
                 for base in bases:
                     if not base or base in candidates_checked:
                         continue
                     candidates_checked.append(base)
                     d = os.path.join(base, 'sample_sets')
-                    if os.path.isdir(d):
+                    exists = os.path.isdir(d)
+                    debug_info.append(f'[frozen] Checking {d}: exists={exists}')
+                    if exists:
+                        debug_info.append(f'[frozen] Found sample_sets at: {d}')
                         candidates.append(d)
                         break
+                
+                # If still not found, do an exhaustive search from exe_dir
+                if not candidates and exe_dir:
+                    debug_info.append(f'[frozen-fallback] Exhaustive search starting from {exe_dir}')
+                    try:
+                        for root, dirs, files in os.walk(exe_dir):
+                            # Limit depth to avoid searching too deep
+                            depth = root[len(exe_dir):].count(os.sep)
+                            if depth > 3:
+                                del dirs[:]  # Don't recurse deeper
+                                continue
+                            if 'sample_sets' in dirs:
+                                found = os.path.join(root, 'sample_sets')
+                                debug_info.append(f'[frozen-fallback] Found sample_sets at: {found}')
+                                candidates.append(found)
+                                break
+                    except Exception as e:
+                        debug_info.append(f'[frozen-fallback] Exhaustive search failed: {e}')
+            else:
+                debug_info.append('[dev] Not a frozen build')
+            
             # 2) Development: relative to CWD (repo root)
             cwd_candidate = os.path.join(os.getcwd(), 'sample_sets')
-            if os.path.isdir(cwd_candidate) and cwd_candidate not in candidates:
+            cwd_exists = os.path.isdir(cwd_candidate)
+            debug_info.append(f'[dev-cwd] {cwd_candidate}: exists={cwd_exists}')
+            if cwd_exists and cwd_candidate not in candidates:
                 candidates.append(cwd_candidate)
+            
             # 3) Development: relative to this file
             file_candidate = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'sample_sets')
             file_candidate = os.path.normpath(file_candidate)
-            if os.path.isdir(file_candidate) and file_candidate not in candidates:
+            file_exists = os.path.isdir(file_candidate)
+            debug_info.append(f'[dev-file] {file_candidate}: exists={file_exists}')
+            if file_exists and file_candidate not in candidates:
                 candidates.append(file_candidate)
+            
+            # 4) If still nothing, do a last-resort search in common Windows Program Files locations
+            if not candidates and sys.platform.startswith('win'):
+                debug_info.append('[fallback] Starting Program Files search...')
+                import os.path
+                pf_paths = [
+                    os.environ.get('ProgramFiles'),
+                    os.environ.get('ProgramFiles(x86)'),
+                    'C:\\Program Files',
+                    'C:\\Program Files (x86)',
+                ]
+                for pf_base in pf_paths:
+                    if not pf_base or not os.path.isdir(pf_base):
+                        continue
+                    # Look for Project Kestrel installations
+                    for dirname in os.listdir(pf_base):
+                        if 'kestrel' in dirname.lower():
+                            kestrel_dir = os.path.join(pf_base, dirname)
+                            # Check for sample_sets directly
+                            direct = os.path.join(kestrel_dir, 'sample_sets')
+                            if os.path.isdir(direct):
+                                debug_info.append(f'[fallback] Found sample_sets at: {direct}')
+                                candidates.append(direct)
+                                break
+                            # Check for _internal/sample_sets
+                            internal = os.path.join(kestrel_dir, '_internal', 'sample_sets')
+                            if os.path.isdir(internal):
+                                debug_info.append(f'[fallback] Found sample_sets at: {internal}')
+                                candidates.append(internal)
+                                break
+                    if candidates:
+                        break
+
+            debug_info.append(f'[collect] Found {len(candidates)} candidate roots')
+            for idx, cand in enumerate(candidates):
+                debug_info.append(f'[collect]   [{idx}] {cand}')
 
             if not candidates:
-                return {'success': False, 'error': 'sample_sets folder not found', 'paths': []}
+                error_msg = 'sample_sets folder not found'
+                for line in debug_info:
+                    print(line, flush=True)
+                print(f'[API] get_sample_sets_paths() -> Error: {error_msg}', flush=True)
+                return {'success': False, 'error': error_msg, 'paths': []}
 
             sample_root = candidates[0]
+            debug_info.append(f'[api] Using root: {sample_root}')
+            
+            # List all items in sample_root
+            try:
+                items = os.listdir(sample_root)
+                debug_info.append(f'[api] Root contains {len(items)} items: {items}')
+            except Exception as e:
+                debug_info.append(f'[api] Failed to list {sample_root}: {e}')
+                items = []
+            
             paths = []
-            for name in sorted(os.listdir(sample_root)):
+            for name in sorted(items):
                 full = os.path.join(sample_root, name)
+                is_dir = os.path.isdir(full)
                 kestrel_dir = os.path.join(full, '.kestrel')
-                if os.path.isdir(full) and os.path.isdir(kestrel_dir):
+                kestrel_exists = os.path.isdir(kestrel_dir)
+                debug_info.append(f'[api]   Item "{name}": is_dir={is_dir}, has .kestrel={kestrel_exists}')
+                
+                if is_dir and kestrel_exists:
                     # Restore the read-only snapshot so tutorial changes don't persist
                     readonly_src = os.path.join(kestrel_dir, 'kestrel_database_readonly.csv')
                     db_dst       = os.path.join(kestrel_dir, 'kestrel_database.csv')
-                    if os.path.isfile(readonly_src):
-                        import shutil
-                        shutil.copy2(readonly_src, db_dst)
-                        print(f'[API] Restored sample DB: {db_dst}', flush=True)
+                    readonly_exists = os.path.isfile(readonly_src)
+                    debug_info.append(f'[api]     readonly_src: {readonly_src} exists={readonly_exists}')
+                    
+                    if readonly_exists:
+                        try:
+                            import shutil
+                            shutil.copy2(readonly_src, db_dst)
+                            debug_info.append(f'[api]     Restored sample DB: {db_dst}')
+                        except Exception as e:
+                            debug_info.append(f'[api]     Failed to restore DB: {e}')
+                    else:
+                        debug_info.append(f'[api]     No readonly DB found at {readonly_src}')
+                    
                     paths.append(full)
+                    debug_info.append(f'[api]     Added path: {full}')
+            
+            # Print all debug info
+            for line in debug_info:
+                print(line, flush=True)
             print(f'[API] get_sample_sets_paths() -> {len(paths)} sets from {sample_root}', flush=True)
             return {'success': True, 'paths': paths}
         except Exception as e:
+            import traceback
             print(f'[API] get_sample_sets_paths() -> Error: {e}', flush=True)
+            print(f'[API] Traceback: {traceback.format_exc()}', flush=True)
             return {'success': False, 'error': str(e), 'paths': []}
 
     # ------------------------------------------------------------------ #
@@ -2022,10 +2181,18 @@ if __name__ == '__main__':
             if _telemetry is not None:
                 _crash_settings = load_persisted_settings()
                 _crash_mid = _telemetry.get_machine_id(_crash_settings)
+                
+                # Fetch recent log tail, passing the active folder's log if available
+                _folder_path = _crash_settings.get('active_analysis_path', '')
+                if _folder_path:
+                    _log_tail = _telemetry.get_recent_log_tail(folder_path=_folder_path)
+                else:
+                    _log_tail = _telemetry.get_recent_log_tail()
+                
                 _telemetry.send_crash_report(
                     exc=_main_exc,
                     tb_str=_tb.format_exc(),
-                    log_tail=_telemetry.get_recent_log_tail(),
+                    log_tail=_log_tail,
                     machine_id=_crash_mid,
                     version=_telemetry._read_version(),
                 )
