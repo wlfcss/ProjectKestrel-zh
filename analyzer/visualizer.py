@@ -1247,18 +1247,27 @@ class Api:
             port = self._server_port or 8765
             from urllib.parse import quote
             culling_url = f'http://{HOST}:{port}/analyzer/culling.html?root={quote(root_path, safe="")}'
-            log(f'Opening Culling Assistant for {root_path!r} at {culling_url}')
+            
+            # Debug: log available methods
+            methods = [m for m in dir(self) if not m.startswith('_') and callable(getattr(self, m))]
+            log(f'[culling] Creating window with Api instance')
+            log(f'[culling] Available public methods (first 10): {methods[:10]}')
+            log(f'[culling] read_kestrel_csv available: {"read_kestrel_csv" in methods}')
+            
             win = _wv.create_window(
-                f'Culling Assistant \u2014 {folder_name}',
+                f'Culling Assistant — {folder_name}',
                 culling_url,
                 js_api=self,
                 width=1400,
                 height=900,
             )
             self._culling_window = win
+            log(f'[culling] Culling window created successfully')
             return {'success': True}
         except Exception as e:
             log(f'open_culling_window error: {e}')
+            import traceback
+            log(f'[culling] Traceback: {traceback.format_exc()}')
             return {'success': False, 'error': str(e)}
 
     def move_rejects_to_folder(self, root_path: str, filenames):

@@ -461,14 +461,28 @@
     }
 
     // ---- Wait for pywebview ----
-    function waitForPywebview(timeout = 3000) {
+    function waitForPywebview(timeout = 5000) {
       return new Promise((resolve) => {
-        if (window.pywebview?.api) { resolve(true); return; }
+        const checkApi = () => {
+          // Check for both the api object AND a known method
+          if (window.pywebview?.api && typeof window.pywebview.api.read_kestrel_csv === 'function') {
+            resolve(true);
+            return true;
+          }
+          return false;
+        };
+        
+        if (checkApi()) return;
+        
         const start = Date.now();
         const iv = setInterval(() => {
-          if (window.pywebview?.api) { clearInterval(iv); resolve(true); }
-          else if (Date.now() - start > timeout) { clearInterval(iv); resolve(false); }
-        }, 50);
+          if (checkApi()) { clearInterval(iv); resolve(true); }
+          else if (Date.now() - start > timeout) { 
+            clearInterval(iv); 
+            console.error('Timeout waiting for pywebview API. window.pywebview:', window.pywebview, 'api:', window.pywebview?.api);
+            resolve(false); 
+          }
+        }, 100);
       });
     }
 
@@ -942,6 +956,16 @@
 
     // ---- Load data ----
     async function loadData() {
+      console.log('[culling] loadData() starting...');
+      console.log('[culling] window.pywebview:', window.pywebview);
+      console.log('[culling] window.pywebview.api:', window.pywebview?.api);
+      console.log('[culling] typeof read_kestrel_csv:', typeof window.pywebview?.api?.read_kestrel_csv);
+      
+      if (typeof window.pywebview?.api?.read_kestrel_csv !== 'function') {
+        console.error('[culling] read_kestrel_csv is not available! Available properties:', Object.keys(window.pywebview?.api || {}));
+        throw new Error('read_kestrel_csv is not available on the API');
+      }
+      
       const res = await window.pywebview.api.read_kestrel_csv(rootPath);
       if (!res.success) throw new Error(res.error || 'Failed to read CSV');
 
