@@ -2550,11 +2550,17 @@
     }
 
     // Start checking for pywebview immediately and update UI when ready
-    if (!hasPywebviewApi) {
-      waitForPywebview();
-    }
-
-    if (!supportsFS && !hasPywebviewApi) el('#compat').classList.remove('hidden');
+    (async function() {
+      const apiReady = !hasPywebviewApi ? await waitForPywebview() : true;
+      // After API is ready, check legal agreement
+      checkLegalAgreement();
+      // Show/hide compatibility warning
+      if (!supportsFS && !apiReady) {
+        el('#compat').classList.remove('hidden');
+      } else if (apiReady) {
+        el('#compat').classList.add('hidden');
+      }
+    })();
 
     // Utilities
     function setStatus(msg) { statusEl.textContent = msg; }
@@ -2699,7 +2705,7 @@
           const resp = await fetch('https://api.projectkestrel.org/version', { cache: 'no-store' });
           if (!resp.ok) return;
           const remote = (await resp.text()).trim();
-          if (remote && remote !== 'Junco') {
+          if (remote && remote !== 'Goldfinch') {
             showToast('There is a new update available! Please download the latest version from www.projectkestrel.org', 15000);
           }
         } catch (e) {
