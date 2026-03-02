@@ -2122,8 +2122,10 @@
 
       <!-- Welcome / Quick-Start panel — visible only when no folder is loaded -->
       <div id="welcomePanel">
-        <h2>Welcome to Kestrel &#x1F985;</h2>
+        <img src="logo.png" alt="Kestrel Logo" style="height:60px; margin-bottom:16px; opacity:0.9;">
+        <h2>Welcome to Kestrel</h2>
         <p class="welcome-subtitle">What would you like to do?</p>
+        <button class="welcome-action-btn" style="display:block; margin:12px auto 20px; width:100%; max-width:300px; font-size:14px; padding:10px 16px;" onclick="startMainTutorial(1, 0)">📖 Start Tutorial</button>
 
         <div class="welcome-cards">
           <div class="welcome-card">
@@ -2167,8 +2169,8 @@
         </div>
 
         <div class="welcome-footer">
-          Stuck? Visit <a id="welcomeTutorialLink" href="https://projectkestrel.org/#tutorial" target="_blank"
-            rel="noopener noreferrer">projectkestrel.org/#tutorial</a> for a video walkthrough.
+          Need help? Visit <a id="welcomeTutorialLink" href="https://projectkestrel.org/tutorial" target="_blank"
+            rel="noopener noreferrer">projectkestrel.org/tutorial</a> for a video walk-through or look for the in-app <b>Tutorial</b> buttons.
           <div style="margin-top:12px; font-size:11px; opacity:0.8;">
             By using Project Kestrel, you agree to the <a href="https://projectkestrel.org/terms-of-use"
               target="_blank">Terms of Use</a> and <a href="https://projectkestrel.org/privacy-policy"
