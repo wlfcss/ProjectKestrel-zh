@@ -87,7 +87,7 @@ fi
 
 # Also copy to onedir bundle if it exists (for completeness)
 if [[ -d "${DIST_DIR}" ]]; then
-  cp -R "sample_sets" "${DIST_DIR}/sample_sets"
+  cp -R "analyzer/sample_sets" "${DIST_DIR}/sample_sets"
   echo "[OK] Copied sample_sets to ${DIST_DIR}/sample_sets/"
 fi
 
