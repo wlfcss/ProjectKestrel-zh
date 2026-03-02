@@ -970,8 +970,10 @@ class Api:
             import base64
             import mimetypes
             
-            # Normalize paths
+            # Normalize paths - convert backslashes to forward slashes for consistent path handling
             root_path = root_path.rstrip('/\\')
+            # Normalize relative_path separators to forward slashes (handles cross-platform paths)
+            relative_path = relative_path.replace('\\', '/')
             
             # Check if relative_path is actually an absolute path (backward compatibility)
             if os.path.isabs(relative_path):

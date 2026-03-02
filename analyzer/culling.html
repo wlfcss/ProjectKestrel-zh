@@ -772,6 +772,8 @@
     // ---- Image loading ----
     async function getBlobUrl(relPath, root) {
       if (!relPath) return '';
+      // Normalize path separators (convert backslashes to forward slashes on macOS)
+      relPath = relPath.replace(/\\/g, '/');
       const key = `${root}:${relPath}`;
       if (blobUrlCache.has(key)) return blobUrlCache.get(key);
       try {

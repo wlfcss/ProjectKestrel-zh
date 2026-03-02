@@ -1,8 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_all
+from PyInstaller.building.datastruct import Tree
 
-datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.'), ('sample_sets', 'sample_sets')]
+# Build datas list with proper sample_sets bundling using Tree()
+datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
+
+# Add sample_sets using Tree() - convert 3-element tuples to 2-element format for datas
+sample_sets_tree = Tree('sample_sets', prefix='sample_sets')
+datas += [(item[0], item[1]) for item in sample_sets_tree]  # Only use first 2 elements of each tuple
 binaries = []
 hiddenimports = ['pywebview', 'certifi']
 binaries += collect_dynamic_libs('torch')
