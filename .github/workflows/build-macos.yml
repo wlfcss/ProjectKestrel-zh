@@ -91,6 +91,16 @@ jobs:
           echo "Found .app: $APP_PATH"
           # Copy the .app directory into artifact/ so the artifact root is the .app
           cp -a "$APP_PATH" artifact/
+          
+      - name: Package .app with ditto
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent "analyzer/dist/Project Kestrel.app" "artifact/ProjectKestrel.zip"
+
+      - name: Upload macOS .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-ditto
+          path: artifact/ProjectKestrel.zip
 
       - name: Upload macOS .app
         uses: actions/upload-artifact@v4
