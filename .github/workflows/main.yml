@@ -120,12 +120,10 @@ jobs:
         shell: cmd
         run: packaging\build_installer_headless.bat
 
-        
       - name: Create MSIX package
         shell: powershell
         run: |
           Write-Host 'Preparing MSIX staging folder...'
-          # Use -ErrorAction Ignore to be cleaner than SilentlyContinue
           Remove-Item -Recurse -Force "analyzer\msix" -ErrorAction Ignore
           New-Item -ItemType Directory -Force -Path "analyzer\msix" | Out-Null
           New-Item -ItemType Directory -Force -Path "analyzer\msix\Assets\Squares" | Out-Null
@@ -139,34 +137,46 @@ jobs:
           Copy-Item "assets\squares\Square44x44Logo.png"   "analyzer\msix\Assets\Squares\Square44x44Logo.png"
           Copy-Item "assets\squares\Square150x150Logo.png" "analyzer\msix\Assets\Squares\Square150x150Logo.png"
 
-          # Ensure the variable is captured as a string
           $makeappx = "${{ steps.find_makeappx.outputs.makeappx }}"
 
           if ($makeappx -and (Test-Path "$makeappx")) {
               Write-Host "Using makeappx from: $makeappx"
-              Write-Host 'Creating MSIX package...'
-              
-              # Ensure the output directory exists
+
               if (!(Test-Path "dist\installer")) {
                   New-Item -ItemType Directory -Force -Path "dist\installer" | Out-Null
               }
 
-              # Use double quotes around variables in case of spaces in the path
+              # Step 1 - Create the .msix as before
+              Write-Host 'Creating MSIX package...'
               & "$makeappx" pack /d "analyzer\msix" /p "dist\installer\ProjectKestrel.msix" /o
-              
-              Write-Host 'MSIX package created successfully at dist\installer\ProjectKestrel.msix'
+              Write-Host 'MSIX created at dist\installer\ProjectKestrel.msix'
+
+              # Step 2 - Create a bundle staging folder containing just the .msix
+              New-Item -ItemType Directory -Force -Path "dist\installer\bundle_staging" | Out-Null
+              Copy-Item "dist\installer\ProjectKestrel.msix" "dist\installer\bundle_staging\ProjectKestrel.msix"
+
+              # Step 3 - Wrap into a .msixbundle
+              Write-Host 'Creating MSIX bundle...'
+              & "$makeappx" bundle /d "dist\installer\bundle_staging" /p "dist\installer\ProjectKestrel.msixbundle" /o
+              Write-Host 'MSIX bundle created at dist\installer\ProjectKestrel.msixbundle'
+
           } else {
               Write-Host 'ERROR: makeappx.exe not found. MSIX packaging skipped.'
               Write-Host "Path attempted: $makeappx"
-              Write-Host "Effective PATH: $env:PATH"
-              exit 1 # Failing the step is usually better than a silent warning in CI/CD
+              exit 1
           }
-              
+
       - name: Upload MSIX package
         uses: actions/upload-artifact@v4
         with:
           name: windows-msix
-          path: dist/installer/*.msix
+          path: dist/installer/ProjectKestrel.msix
+
+      - name: Upload MSIX bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msixbundle
+          path: dist/installer/ProjectKestrel.msixbundle
 
       - name: Install Inno Setup 6
         shell: powershell
