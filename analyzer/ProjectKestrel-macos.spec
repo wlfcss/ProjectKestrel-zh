@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_all
-from PyInstaller.building.datastruct import Tree
+# tree is already imported by pyinstaller runtime environment.
 
 # Build datas list with proper sample_sets bundling using Tree()
 datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
