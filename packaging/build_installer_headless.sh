@@ -73,22 +73,35 @@ APP_BUNDLE="analyzer/dist/Project Kestrel.app"
 if [[ -d "${APP_BUNDLE}" ]]; then
   RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
   mkdir -p "${RESOURCES_DIR}"
-  cp -R "analyzer/sample_sets" "${RESOURCES_DIR}"
-  echo "[OK] Copied sample_sets to ${RESOURCES_DIR}"
-  
+  # Remove any existing copy to avoid nested or stale files, then copy recursively
+  if [[ -d "${RESOURCES_DIR}/sample_sets" ]]; then
+    echo "[INFO] Removing existing ${RESOURCES_DIR}/sample_sets to ensure clean copy"
+    rm -rf "${RESOURCES_DIR}/sample_sets"
+  fi
+  cp -R "analyzer/sample_sets" "${RESOURCES_DIR}/"
+  echo "[OK] Copied sample_sets to ${RESOURCES_DIR}/sample_sets/"
+
   # Also copy to _internal subdirectory as fallback path
   INTERNAL_DIR="${RESOURCES_DIR}/_internal"
   mkdir -p "${INTERNAL_DIR}"
-  cp -R "analyzer/sample_sets" "${INTERNAL_DIR}"
-  echo "[OK] Copied sample_sets to ${INTERNAL_DIR}"
+  if [[ -d "${INTERNAL_DIR}/sample_sets" ]]; then
+    echo "[INFO] Removing existing ${INTERNAL_DIR}/sample_sets to ensure clean copy"
+    rm -rf "${INTERNAL_DIR}/sample_sets"
+  fi
+  cp -R "analyzer/sample_sets" "${INTERNAL_DIR}/"
+  echo "[OK] Copied sample_sets to ${INTERNAL_DIR}/sample_sets/"
 else
   echo "[WARNING] .app bundle not found at ${APP_BUNDLE}"
 fi
 
 # Also copy to onedir bundle if it exists (for completeness)
 if [[ -d "${DIST_DIR}" ]]; then
-  cp -R "analyzer/sample_sets" "${DIST_DIR}"
-  echo "[OK] Copied sample_sets to ${DIST_DIR}"
+  if [[ -d "${DIST_DIR}/sample_sets" ]]; then
+    echo "[INFO] Removing existing ${DIST_DIR}/sample_sets to ensure clean copy"
+    rm -rf "${DIST_DIR}/sample_sets"
+  fi
+  cp -R "analyzer/sample_sets" "${DIST_DIR}/"
+  echo "[OK] Copied sample_sets to ${DIST_DIR}/sample_sets/"
 fi
 
 echo
