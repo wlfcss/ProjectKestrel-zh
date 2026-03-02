@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="ProjectKestrel"
+    Publisher="CN=3068A254-E666-49EB-8E3B-BB19CAE3D346"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>Project Kestrel</DisplayName>
+    <PublisherDisplayName>Project Kestrel</PublisherDisplayName>
+    <Description>Project Kestrel - AI Bird Photo Culling and Organization</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="ProjectKestrel"
+      Executable="ProjectKestrel\ProjectKestrel.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Project Kestrel"
+        Square150x150Logo="Assets\Squares\Square150x150Logo.png"
+        Square44x44Logo="Assets\Squares\Square44x44Logo.png"
+        Description="Project Kestrel"
+        BackgroundColor="#FFFFFF">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="broadFileSystemAccess" />
+    <Capability Name="internetClient" />
+  </Capabilities>
+
+</Package>
