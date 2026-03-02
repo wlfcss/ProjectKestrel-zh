@@ -1,8 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+
 from PyInstaller.utils.hooks import collect_dynamic_libs
 from PyInstaller.utils.hooks import collect_all
 # tree is already imported by pyinstaller runtime environment.
 
+
+# See if sample_sets exists
+print(os.listdir("sample_sets"))
 # Build datas list with proper sample_sets bundling using Tree()
 datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
 
@@ -16,6 +21,15 @@ binaries += collect_dynamic_libs('onnxruntime')
 binaries += collect_dynamic_libs('tensorflow')
 tmp_ret = collect_all('msvc-runtime')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
+# After your datas definition, add:
+print("=== Verifying source files exist ===")
+for src, dst in datas:
+    exists = os.path.exists(src)
+    print(f"  {src} -> {dst} | exists: {exists}")
+    if os.path.isdir(src):
+        contents = os.listdir(src)
+        print(f"    contents: {contents}")
 
 
 a = Analysis(
@@ -42,7 +56,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=True,
     icon='../assets/logo.ico',
     disable_windowed_traceback=False,
@@ -57,7 +71,7 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='ProjectKestrel',
     icon='../assets/logo.ico',

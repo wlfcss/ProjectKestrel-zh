@@ -1299,10 +1299,13 @@ class Api:
                 if not candidates and exe_dir:
                     debug_info.append(f'[frozen-fallback] Exhaustive search starting from {exe_dir}')
                     try:
-                        for root, dirs, files in os.walk(exe_dir):
+                        start_dir = os.path.abspath(os.path.join(exe_dir, '..', '..'))
+                        if not os.path.isdir(start_dir):
+                            start_dir = exe_dir
+                        for root, dirs, files in os.walk(start_dir):
                             # Limit depth to avoid searching too deep
                             depth = root[len(exe_dir):].count(os.sep)
-                            if depth > 3:
+                            if depth > 5:
                                 del dirs[:]  # Don't recurse deeper
                                 continue
                             if 'sample_sets' in dirs:
