@@ -229,6 +229,7 @@ This project is licensed under the GPL v3 License - see the LICENSE file for det
 ## 🙏 Acknowledgments
 
 - **rawpy** library for robust RAW image file format handling
+- **pyinstaller project** for robust python packaging and distribution solutions.
 
 ---
 
