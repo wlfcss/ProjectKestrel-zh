@@ -2920,7 +2920,7 @@
     // ── Lazy image loader ───────────────────────────────────────────────────────
     // Limits concurrent in-flight image-load API calls to avoid flooding pywebview.
     let _imgLoadActive = 0;
-    const _IMG_LOAD_MAX = 50;
+    const _IMG_LOAD_MAX = 6;
     const _imgLoadQueue = [];
     function _scheduleImgLoad(fn) {
       return new Promise((resolve, reject) => {
@@ -3140,32 +3140,19 @@
     const blobUrlCache = new Map();
 
     async function getBlobUrlForPath(relOrAbsPath, rootOverride) {
+      if (!relOrAbsPath) return null;
       const effectiveRoot = rootOverride || rootPath;
 
+      // Normalize separators immediately (cheap, matches culling.html behaviour)
+      const rel = String(relOrAbsPath).replace(/\\/g, '/');
+
+      // Cache check first — avoids ALL further work on already-loaded images
+      // (this is the hot path during scroll-back through cached thumbnails)
+      const cacheKey = `${effectiveRoot}:${rel}`;
+      if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
+
       // PRIORITY 1: Python API (desktop app - all platforms)
-      // Use this when available for consistent behavior across Windows/macOS/Linux
       if (hasPywebviewApi && window.pywebview?.api?.read_image_file && effectiveRoot) {
-        let rel = null;
-        const sanitized = sanitizePath(relOrAbsPath);
-
-        // Check if path is already relative (new CSV format)
-        // Relative paths start with .kestrel/ and don't have drive letters or leading /
-        if (sanitized && (sanitized.startsWith('.kestrel/') || sanitized.startsWith('kestrel/'))) {
-          rel = sanitized;
-        } else if (sanitized && !sanitized.match(/^[A-Za-z]:/) && !sanitized.startsWith('/')) {
-          rel = sanitized;
-        } else {
-          // Absolute path (old CSV format) - extract relative part
-          rel = toRootRelative(relOrAbsPath);
-          if (!rel) rel = sanitized;
-        }
-
-        if (!rel) return null;
-
-        // Check cache first (key includes root so multi-folder caches stay separate)
-        const cacheKey = `pyapi:${effectiveRoot}:${rel}`;
-        if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
-
         try {
           const result = await window.pywebview.api.read_image_file(rel, effectiveRoot);
           if (result && result.success && result.data) {
@@ -3175,25 +3162,12 @@
           }
         } catch (e) {
           console.error('Python API image read failed:', e);
-          // Don't fall through to File System Access API in desktop app
-          // If Python API fails, something is wrong
           return null;
         }
       }
 
       // PRIORITY 2: File System Access API (browser mode only)
-      // This only runs when NOT using Python API (browser context) 
       if (!rootPath && rootDirHandle) {
-        let rel = toRootRelative(relOrAbsPath);
-        if (!rel) {
-          // maybe the file is at the top-level (original filename)
-          rel = sanitizePath(relOrAbsPath);
-        }
-        if (!rel) return null;
-
-        const cacheKey = `fsapi:${rel}`;
-        if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
-
         try {
           const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
           const file = await fileHandle.getFile();
@@ -3470,7 +3444,6 @@
         th.className = 'thumb';
         const img = document.createElement('img');
         img.alt = s.representative?.filename || '';
-        img.loading = 'lazy';
         lazyLoadImg(img, () => getBlobUrlForPath(
           s.representative?.export_path || s.representative?.crop_path,
           s.representative?.__rootPath
