@@ -290,6 +290,36 @@ class QueueManager:
             self._items = [it for it in self._items if it.status not in ('done', 'error', 'cancelled')]
         return {'success': True}
 
+    def remove_pending_item(self, path: str) -> dict:
+        """Remove a single pending item from the queue by path."""
+        with self._lock:
+            idx = next((i for i, it in enumerate(self._items)
+                        if it.path == path and it.status == 'pending'), None)
+            if idx is None:
+                return {'success': False, 'error': 'Item not found or not pending'}
+            self._items.pop(idx)
+        return {'success': True}
+
+    def reorder_pending(self, ordered_paths: list) -> dict:
+        """Reorder pending items to match the given path order.
+        Non-pending items keep their positions; pending items are
+        rearranged in the order specified by *ordered_paths*."""
+        with self._lock:
+            pending = [it for it in self._items if it.status == 'pending']
+            non_pending = [it for it in self._items if it.status != 'pending']
+            path_to_item = {it.path: it for it in pending}
+            reordered = []
+            for p in ordered_paths:
+                if p in path_to_item:
+                    reordered.append(path_to_item.pop(p))
+            # Append any pending items not in ordered_paths at the end
+            for it in pending:
+                if it.path in path_to_item:
+                    reordered.append(it)
+            # Rebuild: non-pending first (running, done, etc.), then reordered pending
+            self._items = non_pending + reordered
+        return {'success': True}
+
     # ---- internal ----
 
     def _run(self):
@@ -1472,6 +1502,24 @@ class Api:
     def clear_queue_done(self):
         """Remove finished/errored/cancelled items from the queue list."""
         return _queue_manager.clear_done()
+
+    def remove_queue_item(self, path: str):
+        """Remove a single pending item from the queue by path."""
+        try:
+            return _queue_manager.remove_pending_item(str(path))
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def reorder_queue(self, ordered_paths):
+        """Reorder pending queue items. ordered_paths is a JSON string or list of paths."""
+        try:
+            if isinstance(ordered_paths, str):
+                ordered_paths = json.loads(ordered_paths)
+            if not isinstance(ordered_paths, list):
+                return {'success': False, 'error': 'ordered_paths must be a list'}
+            return _queue_manager.reorder_pending(ordered_paths)
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
 
     def is_analysis_running(self):
         """Return True if the analysis queue is actively running."""

@@ -39,8 +39,15 @@
       color: var(--text);
       font: 14px/1.35 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
       display: flex;
-      min-height: 100vh;
+      flex-direction: column;
+      height: 100vh;
       overflow: hidden;
+    }
+
+    .app-body {
+      display: flex;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     header {
@@ -48,7 +55,7 @@
       z-index: 5;
       width: 400px;
       flex: 0 0 400px;
-      height: 100vh;
+      height: 100%;
       background: linear-gradient(180deg, rgba(17, 19, 24, .95), rgba(17, 19, 24, .85));
       backdrop-filter: blur(8px);
       border-right: 1px solid #1d2230;
@@ -283,6 +290,54 @@
       background: #3a84e6;
       border-radius: 999px;
       transition: width .18s ease;
+    }
+
+    /* ── Bottom status bar ── */
+    .app-status-bar {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 3px 14px;
+      background: #111318;
+      border-top: 1px solid #1d2230;
+      font-size: 12px;
+      color: var(--muted);
+      z-index: 10;
+      min-height: 26px;
+    }
+
+    .app-status-bar .status {
+      padding: 0;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .app-status-bar .load-progress {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      flex-direction: row;
+    }
+
+    .app-status-bar .load-progress-label {
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .app-status-bar .load-progress-track {
+      width: 120px;
+      height: 3px;
+    }
+
+    .app-status-bar .version-badge {
+      padding: 0;
+      font-size: 11px;
+      margin-left: auto;
+      white-space: nowrap;
     }
 
     .sidebar-footer {
@@ -663,7 +718,7 @@
       max-width: none;
       flex: 1 1 auto;
       min-width: 0;
-      height: 100vh;
+      height: 100%;
       overflow: auto;
     }
 
@@ -1007,13 +1062,13 @@
       flex-shrink: 0;
     }
 
-    .tree-node-row.has-kestrel .tree-label {
+    .tree-node-row.has-kestrel:not(.analyzed-full):not(.analyzed-partial):not(.analyzed-none) .tree-label {
       color: var(--ok);
       cursor: pointer;
       font-weight: 600;
     }
 
-    .tree-node-row.has-kestrel:hover .tree-label {
+    .tree-node-row.has-kestrel:not(.analyzed-full):not(.analyzed-partial):not(.analyzed-none):hover .tree-label {
       color: #c8dcf5;
     }
 
@@ -1053,13 +1108,13 @@
     }
 
     /* Mirror has-kestrel styling for analyze dialog rows */
-    .adlg-node-row.has-kestrel .tree-label {
+    .adlg-node-row.has-kestrel:not(.analyzed-full):not(.analyzed-partial):not(.analyzed-none) .tree-label {
       color: var(--ok);
       cursor: pointer;
       font-weight: 600;
     }
 
-    .adlg-node-row.has-kestrel:hover .tree-label {
+    .adlg-node-row.has-kestrel:not(.analyzed-full):not(.analyzed-partial):not(.analyzed-none):hover .tree-label {
       color: #c8dcf5;
     }
 
@@ -1105,6 +1160,7 @@
       gap: 10px;
       padding: 16px;
       width: min(920px, 96vw);
+      height: 80vh;
       max-height: 88vh;
       box-sizing: border-box;
     }
@@ -1121,7 +1177,7 @@
       gap: 12px;
       flex: 1 1 auto;
       min-height: 0;
-      max-height: 56vh;
+      overflow: hidden;
     }
     /* Stack on narrow screens */
     @media (max-width: 640px) {
@@ -1130,13 +1186,12 @@
     }
 
     .analyze-dlg-tree-wrap {
-      flex: 1 1 auto;
       overflow: auto;
       background: #0a0d12;
       border: 1px solid #1d2230;
       border-radius: 8px;
       padding: 4px 2px;
-      min-height: 120px;
+      min-height: 0;
     }
 
     /* Right panel: queue preview */
@@ -1149,7 +1204,7 @@
       border: 1px solid #1d2230;
       border-radius: 8px;
       padding: 8px;
-      min-height: 120px;
+      min-height: 0;
     }
 
     .analyze-dlg-queue-wrap h4 {
@@ -1204,6 +1259,20 @@
       opacity: 0.6;
     }
     .adlg-queue-item .adlg-qi-remove:hover { opacity: 1; background: rgba(231,76,60,.12); }
+
+    /* Drag-and-drop for pending queue items */
+    .adlg-queue-item[draggable="true"] { cursor: grab; }
+    .adlg-queue-item[draggable="true"]:active { cursor: grabbing; }
+    .adlg-queue-item.drag-over { border-top: 2px solid var(--brand); margin-top: -2px; }
+    .adlg-queue-item.dragging { opacity: 0.35; }
+    .adlg-qi-grip {
+      flex-shrink: 0;
+      color: #555;
+      font-size: 11px;
+      cursor: grab;
+      user-select: none;
+      padding: 0 2px;
+    }
 
     .adlg-queue-empty {
       color: var(--muted);
@@ -2188,6 +2257,7 @@
         Policy</a>.</span>
     <button id="legalAgreeBtn" class="legal-notice-btn">Agree & Dismiss</button>
   </div>
+  <div class="app-body">
   <header>
     <div class="wrap">
       <h1>
@@ -2257,20 +2327,6 @@
               <option value="imageCount">Image Count</option>
             </select>
           </div>
-        </div>
-        <div class="toolbar-row status">
-          <div id="status" class="status">Idle</div>
-        </div>
-        <div class="toolbar-row status hidden" id="loadProgressRow">
-          <div class="load-progress" style="width:100%">
-            <div id="loadProgressLabel" class="load-progress-label">Loading…</div>
-            <div class="load-progress-track">
-              <div id="loadProgressFill" class="load-progress-fill"></div>
-            </div>
-          </div>
-        </div>
-        <div class="toolbar-row status">
-          <div id="versionBadge" class="version-badge">Version: —</div>
         </div>
       </div>
       <div class="spacer"></div>
@@ -2384,6 +2440,20 @@
       </div>
     </div>
   </main>
+  </div><!-- /.app-body -->
+
+  <footer class="app-status-bar">
+    <div id="status" class="status">Idle</div>
+    <div class="hidden" id="loadProgressRow">
+      <div class="load-progress">
+        <div id="loadProgressLabel" class="load-progress-label">Loading…</div>
+        <div class="load-progress-track">
+          <div id="loadProgressFill" class="load-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+    <div id="versionBadge" class="version-badge">Version: —</div>
+  </footer>
 
   <dialog id="sceneDlg">
     <div class="modal">
@@ -2546,7 +2616,6 @@
     <div class="analyze-dlg">
       <div style="display:flex;align-items:center;gap:8px;">
         <h3 style="margin:0;flex:1;">🔬 Analyze Folders</h3>
-        <button id="analyzeDlgChangeRoot" style="font-size:11px;padding:3px 9px;flex-shrink:0;" title="Choose a different parent folder to scan">📁 Change Folder…</button>
       </div>
       <p style="margin:0;font-size:12px;color:var(--muted)">Check folders to add to the analysis queue.
         <span style="color:var(--ok);">●</span>&thinsp;finished
@@ -2555,12 +2624,18 @@
         &nbsp;<span style="color:#555;font-size:11px;">● faded = no photos</span></p>
       <div class="analyze-dlg-split">
         <!-- Left panel: folder tree -->
-        <div class="analyze-dlg-tree-wrap">
-          <div id="analyzeDlgTree"></div>
-          <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
-            <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
-            <div class="load-progress-track">
-              <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;min-height:0;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--muted);font-weight:600;flex:1;">📂 Browse Folders</span>
+            <button id="analyzeDlgChangeRoot" style="font-size:11px;padding:3px 9px;flex-shrink:0;" title="Choose a different parent folder to scan">📁 Change Folder…</button>
+          </div>
+          <div class="analyze-dlg-tree-wrap">
+            <div id="analyzeDlgTree"></div>
+            <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
+              <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
+              <div class="load-progress-track">
+                <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -4711,7 +4786,8 @@
       return wrap;
     }
 
-    /** Render the right-side queue preview panel in the Analyze dialog. */
+    /** Render the right-side queue preview panel in the Analyze dialog.
+     *  Shows: running items, pending items (draggable + removable), and "will be added" selection. */
     function _refreshAnalyzeDlgQueuePreview() {
       const runningEl = document.getElementById('adlgQueueRunning');
       const willAddEl = document.getElementById('adlgQueueWillAdd');
@@ -4721,20 +4797,22 @@
       runningEl.innerHTML = '';
       willAddEl.innerHTML = '';
 
-      // ── Currently running / pending queue items ──
-      let hasRunning = false;
+      let hasActiveQueue = false;
+
       try {
-        // _lastQueueStatus is set by renderQueuePanel
         const status = window._lastQueueStatus;
         if (status && status.items && status.items.length > 0) {
-          const activeItems = status.items.filter(i => i.status === 'running' || i.status === 'pending');
-          if (activeItems.length > 0) {
-            hasRunning = true;
+          const runningItems = status.items.filter(i => i.status === 'running');
+          const pendingItems = status.items.filter(i => i.status === 'pending');
+
+          // ── Running items ──
+          if (runningItems.length > 0) {
+            hasActiveQueue = true;
             const title = document.createElement('div');
             title.className = 'adlg-queue-section-title';
-            title.textContent = '⚙ Currently in Queue';
+            title.textContent = '⚙ Analyzing';
             runningEl.appendChild(title);
-            for (const item of activeItems) {
+            for (const item of runningItems) {
               const row = document.createElement('div');
               row.className = 'adlg-queue-item';
               const nameEl = document.createElement('span');
@@ -4743,23 +4821,116 @@
               nameEl.title = item.path;
               const statusEl = document.createElement('span');
               statusEl.className = 'adlg-qi-status';
-              statusEl.textContent = item.status === 'running'
-                ? (item.total > 0 ? `${item.processed}/${item.total}` : 'analyzing…')
-                : 'pending';
+              statusEl.textContent = item.total > 0 ? `${item.processed}/${item.total}` : 'starting…';
               row.appendChild(nameEl);
               row.appendChild(statusEl);
               runningEl.appendChild(row);
             }
           }
+
+          // ── Pending items (drag-to-reorder + cancel) ──
+          if (pendingItems.length > 0) {
+            hasActiveQueue = true;
+            const pendTitle = document.createElement('div');
+            pendTitle.className = 'adlg-queue-section-title';
+            pendTitle.textContent = `⏳ In Queue (${pendingItems.length})`;
+            runningEl.appendChild(pendTitle);
+
+            let _dragSrcPath = null;
+            const pendContainer = document.createElement('div');
+            pendContainer.dataset.role = 'pending-list';
+
+            for (const item of pendingItems) {
+              const row = document.createElement('div');
+              row.className = 'adlg-queue-item';
+              row.draggable = true;
+              row.dataset.queuePath = item.path;
+
+              const grip = document.createElement('span');
+              grip.className = 'adlg-qi-grip';
+              grip.textContent = '⠿';
+              grip.title = 'Drag to reorder';
+
+              const nameEl = document.createElement('span');
+              nameEl.className = 'adlg-qi-name';
+              nameEl.textContent = item.name;
+              nameEl.title = item.path;
+
+              const statusEl = document.createElement('span');
+              statusEl.className = 'adlg-qi-status';
+              statusEl.textContent = 'pending';
+
+              const removeBtn = document.createElement('button');
+              removeBtn.className = 'adlg-qi-remove';
+              removeBtn.textContent = '✕';
+              removeBtn.title = 'Remove from queue';
+              removeBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (hasPywebviewApi && window.pywebview?.api?.remove_queue_item) {
+                  await window.pywebview.api.remove_queue_item(item.path);
+                  const s = await apiGetQueueStatus();
+                  renderQueuePanel(s);
+                  _refreshAnalyzeDlgQueuePreview();
+                }
+              });
+
+              // Drag events
+              row.addEventListener('dragstart', (e) => {
+                _dragSrcPath = item.path;
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', item.path);
+              });
+              row.addEventListener('dragend', () => {
+                _dragSrcPath = null;
+                row.classList.remove('dragging');
+                pendContainer.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+              });
+              row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (row.dataset.queuePath !== _dragSrcPath) {
+                  row.classList.add('drag-over');
+                }
+              });
+              row.addEventListener('dragleave', () => {
+                row.classList.remove('drag-over');
+              });
+              row.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+                const srcPath = e.dataTransfer.getData('text/plain');
+                if (!srcPath || srcPath === item.path) return;
+                const currentOrder = Array.from(pendContainer.querySelectorAll('[data-queue-path]'))
+                  .map(el => el.dataset.queuePath);
+                const filtered = currentOrder.filter(p => p !== srcPath);
+                const targetIdx = filtered.indexOf(item.path);
+                filtered.splice(targetIdx, 0, srcPath);
+                if (hasPywebviewApi && window.pywebview?.api?.reorder_queue) {
+                  await window.pywebview.api.reorder_queue(JSON.stringify(filtered));
+                  const s = await apiGetQueueStatus();
+                  renderQueuePanel(s);
+                  _refreshAnalyzeDlgQueuePreview();
+                }
+              });
+
+              row.appendChild(grip);
+              row.appendChild(nameEl);
+              row.appendChild(statusEl);
+              row.appendChild(removeBtn);
+              pendContainer.appendChild(row);
+            }
+            runningEl.appendChild(pendContainer);
+          }
         }
       } catch (_) { }
 
-      // ── Will be added (selected folders) ──
+      // ── Will be added (selected but not yet queued) ──
       const selected = Array.from(_dlgSelected);
       if (selected.length > 0) {
         const title = document.createElement('div');
         title.className = 'adlg-queue-section-title';
-        title.textContent = '➕ Will Be Added';
+        title.textContent = `➕ Will Be Added (${selected.length})`;
         willAddEl.appendChild(title);
         for (const path of selected) {
           const name = path.replace(/\\/g, '/').split('/').pop() || path;
@@ -4775,16 +4946,14 @@
           removeBtn.title = 'Remove from selection';
           removeBtn.addEventListener('click', () => {
             _dlgSelected.delete(path);
-            // Uncheck corresponding checkbox in the tree
-            const rows = document.querySelectorAll('#analyzeDlgTree .adlg-node-row');
-            for (const r of rows) {
+            const treeRows = document.querySelectorAll('#analyzeDlgTree .adlg-node-row');
+            for (const r of treeRows) {
               if (r.dataset.path === path) {
                 const cb = r.querySelector('.adlg-cb');
                 if (cb) cb.checked = false;
                 r.classList.remove('queue-sel');
               }
             }
-            // Refresh count + preview
             const countEl = document.getElementById('analyzeDlgCount');
             const addBtn = document.getElementById('analyzeDlgAdd');
             if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
@@ -4797,7 +4966,7 @@
         }
       }
 
-      emptyEl.classList.toggle('hidden', hasRunning || selected.length > 0);
+      emptyEl.classList.toggle('hidden', hasActiveQueue || selected.length > 0);
     }
 
     /** Open the 'Analyze Folders…' dialog. */
