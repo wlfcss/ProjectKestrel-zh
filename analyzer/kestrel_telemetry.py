@@ -269,6 +269,7 @@ def send_analysis_completion_telemetry(
     files_analyzed: int,
     machine_id: str = '',
     version: str = '',
+    avg_time_per_file_s: float = 0.0,
 ) -> None:
     """Send total photos analyzed upon completion (non-optional, failsafe)."""
     try:
@@ -277,6 +278,7 @@ def send_analysis_completion_telemetry(
             'version': version or _read_version(),
             'os': _get_os_info(),
             'files_analyzed': files_analyzed,
+            'avg_time_per_file_s': round(avg_time_per_file_s, 3),
         }
         _post_json_async('/api/completion', payload)
     except Exception:

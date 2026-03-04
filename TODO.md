@@ -2,6 +2,8 @@
 
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
+- Add "Threshold"/basic customization support (star ratings or Q score) to culling assistant
+- UI fixes on analysis window
 * Issue with multi-subject mode detecting false birds and ranking those subjects with higher quality over the true bird. This may be confusing and unoptimal behavior. Potentially add a multi-subject-mode toggle or allow the user to scroll between multiple bird thumbnails/store all (up to 5) subject thumbnails.
     - Potential improvement: Exclude lower-confidence detections that **overlap** with higher-confidence detections
     - Potential improvement: raise detection threshold to avoid falsely flagging leaves

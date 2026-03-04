@@ -287,9 +287,10 @@
 
     .sidebar-footer {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
       justify-content: flex-start;
+      flex-wrap: wrap;
     }
 
     /* Grid */
@@ -950,6 +951,46 @@
       overflow: hidden;
     }
 
+    /* ── Tree node layout: consistent flex rows ──────────────────── */
+    .tree-node-row, .adlg-node-row {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      cursor: default;
+      min-height: 20px;
+    }
+    .tree-node-row:hover { background: rgba(255,255,255,.04); }
+    .adlg-node-row:hover { background: rgba(255,255,255,.04); }
+    /* Expand arrow: fixed 12px slot, always present; leaf = invisible */
+    .tree-arrow {
+      flex: 0 0 12px;
+      width: 12px;
+      font-size: 9px;
+      text-align: center;
+      line-height: 1;
+      cursor: pointer;
+      color: #6a7585;
+      user-select: none;
+      transition: transform .12s;
+    }
+    .tree-arrow.open { transform: rotate(90deg); }
+    .tree-arrow.leaf { visibility: hidden; cursor: default; }
+    /* Folder icon: alignment anchor */
+    .tree-icon { flex: 0 0 18px; font-size: 14px; text-align: center; }
+    /* Invisible spacer matching tree-cb width (sidebar rows without a checkbox) */
+    .tree-cb-spacer { flex: 0 0 13px; width: 13px; height: 1px; display: inline-block; }
+    /* Greyed-out folder: Kestrel found no supported photos */
+    /* Deep: folder AND every descendant have 0 images — fade whole row */
+    .adlg-node-row.no-photos-deep { opacity: 0.38; }
+    .adlg-node-row.no-photos-deep .adlg-cb { cursor: not-allowed; pointer-events: none; }
+    /* Shallow: folder itself has 0 images but a descendant has some — fade checkbox only */
+    .adlg-node-row.no-photos-shallow .adlg-cb { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
+    /* Legacy class kept for backwards compat */
+    .adlg-node-row.no-photos { opacity: 0.38; }
+    .adlg-node-row.no-photos .adlg-cb { cursor: not-allowed; pointer-events: none; }
+
     .tree-label {
       flex: 1 1 auto;
       min-width: 0;
@@ -984,13 +1025,13 @@
     }
 
     .tree-node-row.analyzed-partial .tree-label {
-      color: var(--brand);
+      color: #b36bff;
       cursor: pointer;
       font-weight: 700;
     }
 
     .tree-node-row.analyzed-none .tree-label {
-      color: #b36bff;
+      color: var(--brand);
       cursor: pointer;
       font-weight: 700;
     }
@@ -1002,12 +1043,12 @@
     }
 
     .adlg-node-row.analyzed-partial .tree-label {
-      color: var(--brand);
+      color: #b36bff;
       font-weight: 700;
     }
 
     .adlg-node-row.analyzed-none .tree-label {
-      color: #b36bff;
+      color: var(--brand);
       font-weight: 700;
     }
 
@@ -1041,8 +1082,11 @@
       background: #10293d;
     }
 
+    /* Visual connector lines from parent to children */
     .tree-children {
-      padding-left: 14px;
+      padding-left: 12px;
+      border-left: 1px solid #1e2840;
+      margin-left: 8px;
     }
 
     .tree-cb {
@@ -1060,7 +1104,7 @@
       flex-direction: column;
       gap: 10px;
       padding: 16px;
-      width: min(520px, 96vw);
+      width: min(920px, 96vw);
       max-height: 88vh;
       box-sizing: border-box;
     }
@@ -1070,6 +1114,21 @@
       font-size: 16px;
     }
 
+    /* Split layout: folder tree (left) + queue preview (right) */
+    .analyze-dlg-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-height: 56vh;
+    }
+    /* Stack on narrow screens */
+    @media (max-width: 640px) {
+      .analyze-dlg-split { grid-template-columns: 1fr; }
+      .analyze-dlg { width: min(520px, 96vw); }
+    }
+
     .analyze-dlg-tree-wrap {
       flex: 1 1 auto;
       overflow: auto;
@@ -1077,8 +1136,81 @@
       border: 1px solid #1d2230;
       border-radius: 8px;
       padding: 4px 2px;
-      max-height: 44vh;
       min-height: 120px;
+    }
+
+    /* Right panel: queue preview */
+    .analyze-dlg-queue-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: auto;
+      background: #0a0d12;
+      border: 1px solid #1d2230;
+      border-radius: 8px;
+      padding: 8px;
+      min-height: 120px;
+    }
+
+    .analyze-dlg-queue-wrap h4 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .adlg-queue-section { margin-bottom: 6px; }
+    .adlg-queue-section-title {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .adlg-queue-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .adlg-queue-item:hover { background: rgba(255,255,255,.04); }
+
+    .adlg-queue-item .adlg-qi-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .adlg-queue-item .adlg-qi-status {
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .adlg-queue-item .adlg-qi-remove {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: #e74c3c;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      opacity: 0.6;
+    }
+    .adlg-queue-item .adlg-qi-remove:hover { opacity: 1; background: rgba(231,76,60,.12); }
+
+    .adlg-queue-empty {
+      color: var(--muted);
+      font-size: 12px;
+      font-style: italic;
+      padding: 12px 6px;
+      text-align: center;
     }
 
     .analyze-dlg-options {
@@ -1998,6 +2130,52 @@
       border-color: var(--brand); 
       color: var(--brand); 
     }
+    /* ── Donate button ────────────────────────────────────────────── */
+    .donate-btn {
+      padding: 5px 10px;
+      height: auto;
+      border-radius: 6px;
+      background: rgba(111, 78, 39, 0.22);
+      border: 1px solid #7a5530;
+      color: #e8c87a;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .15s, border-color .15s;
+    }
+    .donate-btn:hover {
+      background: rgba(111, 78, 39, 0.45);
+      border-color: #c49050;
+      color: #f5d98b;
+    }
+    /* ── Donation prompt dialog ──────────────────────────────────── */
+    .donate-dlg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 26px 22px 20px;
+      width: min(400px, 94vw);
+      text-align: center;
+    }
+    .donate-dlg-icon { font-size: 46px; line-height: 1; margin-bottom: 2px; }
+    .donate-dlg h3 { margin: 0; font-size: 18px; }
+    .donate-dlg p { margin: 0; font-size: 13px; color: var(--muted); max-width: 350px; line-height: 1.55; }
+    .donate-main-btn {
+      background: linear-gradient(135deg, #7a5428 0%, #955f2a 100%);
+      color: #f5d98b;
+      border: 1px solid #b07838;
+      border-radius: 8px;
+      padding: 11px 30px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter .15s;
+      margin-top: 4px;
+    }
+    .donate-main-btn:hover { filter: brightness(1.15); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -2096,12 +2274,15 @@
         </div>
       </div>
       <div class="spacer"></div>
-      <div class="sidebar-footer" aria-label="Zoom controls">
-        <button id="zoomOut" title="Zoom out">Zoom −</button>
-        <button id="zoomIn" title="Zoom in">Zoom +</button>
+      <div class="sidebar-footer" aria-label="Controls">
+        <div style="display:flex;gap:2px;align-items:center;flex-shrink:0;">
+          <button id="zoomOut" title="Zoom out" style="padding:3px 8px;">&#x2212;</button>
+          <span style="font-size:11px;color:var(--muted);padding:0 2px;">Zoom</span>
+          <button id="zoomIn" title="Zoom in" style="padding:3px 8px;">+</button>
+        </div>
+        <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion" style="font-size:11px;padding:4px 8px;">Feedback</button>
         <button id="helpBtnMain" title="Start guided tutorial">📖 Tutorial</button>
-        <button id="openFeedback" title="Send feedback, report a bug, or share a suggestion"
-          style="margin-left:auto;font-size:11px;padding:3px 8px;">Feedback</button>
+        <button id="donateBtnMain" class="donate-btn" title="Support Project Kestrel — Donate via PayPal">💛 Donate</button>
       </div>
     </div>
   </header>
@@ -2363,16 +2544,32 @@
   <!-- Analyze Folders dialog -->
   <dialog id="analyzeQueueDlg" class="dlg-compact">
     <div class="analyze-dlg">
-      <h3>🔬 Analyze Folders</h3>
-      <p style="margin:0;font-size:13px;color:var(--muted)">Check folders to add to the analysis queue. 📁 = not yet
-        analyzed &nbsp; 📂 = already analyzed (can re-run).</p>
-      <div class="analyze-dlg-tree-wrap">
-        <div id="analyzeDlgTree"></div>
-        <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
-          <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
-          <div class="load-progress-track">
-            <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3 style="margin:0;flex:1;">🔬 Analyze Folders</h3>
+        <button id="analyzeDlgChangeRoot" style="font-size:11px;padding:3px 9px;flex-shrink:0;" title="Choose a different parent folder to scan">📁 Change Folder…</button>
+      </div>
+      <p style="margin:0;font-size:12px;color:var(--muted)">Check folders to add to the analysis queue.
+        <span style="color:var(--ok);">●</span>&thinsp;finished
+        &nbsp;<span style="color:#b36bff;">●</span>&thinsp;in progress
+        &nbsp;<span style="color:var(--brand);">●</span>&thinsp;not started
+        &nbsp;<span style="color:#555;font-size:11px;">● faded = no photos</span></p>
+      <div class="analyze-dlg-split">
+        <!-- Left panel: folder tree -->
+        <div class="analyze-dlg-tree-wrap">
+          <div id="analyzeDlgTree"></div>
+          <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
+            <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
+            <div class="load-progress-track">
+              <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
+            </div>
           </div>
+        </div>
+        <!-- Right panel: queue preview -->
+        <div class="analyze-dlg-queue-wrap">
+          <h4>📋 Queue Preview</h4>
+          <div class="adlg-queue-section" id="adlgQueueRunning"></div>
+          <div class="adlg-queue-section" id="adlgQueueWillAdd"></div>
+          <div class="adlg-queue-empty" id="adlgQueueEmpty">Check folders on the left to queue them for analysis.</div>
         </div>
       </div>
       <div class="analyze-dlg-options">
@@ -3907,6 +4104,77 @@
     document.getElementById('analyticsAccept').addEventListener('click', () => handleAnalyticsConsent(true));
     document.getElementById('analyticsDecline').addEventListener('click', () => handleAnalyticsConsent(false));
 
+    // ─── Donation / Support ──────────────────────────────────────────────────────
+    const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A';
+    const DONATE_THRESHOLD_KEY = 'kestrel-donate-thresholds-shown-v1';
+
+    function openDonateLink() {
+      if (hasPywebviewApi && window.pywebview?.api?.open_url) {
+        window.pywebview.api.open_url(DONATE_URL);
+      } else {
+        try { window.open(DONATE_URL, '_blank', 'noopener,noreferrer'); } catch (_) { }
+      }
+    }
+
+    function _loadDonateThresholdsShown() {
+      try { return JSON.parse(localStorage.getItem(DONATE_THRESHOLD_KEY) || '[]'); } catch { return []; }
+    }
+    function _saveDonateThresholdsShown(arr) {
+      try { localStorage.setItem(DONATE_THRESHOLD_KEY, JSON.stringify(arr)); } catch { }
+    }
+
+    function showDonatePrompt(totalFiles) {
+      const countEl = document.getElementById('donateCountDisplay');
+      // Round down to nearest threshold for "over N photos" phrasing
+      const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
+      let milestone = totalFiles || 0;
+      for (let i = thresholds.length - 1; i >= 0; i--) {
+        if (milestone >= thresholds[i]) { milestone = thresholds[i]; break; }
+      }
+      if (countEl) countEl.textContent = milestone.toLocaleString();
+      const dlg = document.getElementById('donateDlg');
+      // Only show if no other dialog is already open
+      if (dlg && !document.querySelector('dialog[open]')) dlg.showModal();
+    }
+
+    /** Check if the cumulative total crosses a donation milestone. Call after a folder finishes. */
+    async function checkDonationThresholdAsync() {
+      try {
+        let total = 0;
+        if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
+          const s = await window.pywebview.api.get_settings();
+          total = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
+        }
+        if (total <= 0) return;
+        const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
+        const shown = _loadDonateThresholdsShown();
+        for (const t of thresholds) {
+          if (total >= t && !shown.includes(t)) {
+            shown.push(t);
+            _saveDonateThresholdsShown(shown);
+            // Small delay so queue panel settles first
+            setTimeout(() => showDonatePrompt(total), 2000);
+            break;
+          }
+        }
+      } catch (_) { /* failsafe */ }
+    }
+
+    document.getElementById('donateBtnMain')?.addEventListener('click', openDonateLink);
+    document.getElementById('donateDlgGoBtn')?.addEventListener('click', () => {
+      document.getElementById('donateDlg').close();
+      openDonateLink();
+    });
+    document.getElementById('donateDlgFeedbackBtn')?.addEventListener('click', () => {
+      try { document.getElementById('donateDlg').close(); } catch (_) { }
+      // Small delay so dialog closes first
+      setTimeout(() => { try { document.getElementById('feedbackDlg').showModal(); } catch (_) { } }, 200);
+    });
+    document.getElementById('donateDlgClose')?.addEventListener('click', () => {
+      try { document.getElementById('donateDlg').close(); } catch (_) { }
+    });
+    // ─── End Donation ─────────────────────────────────────────────────────
+
     // Info dialog: load kestrel_metadata.json from opened photo folder (.kestrel)
     async function getMetadataHandle() {
       if (!rootDirHandle) return null;
@@ -4170,7 +4438,14 @@
       countSpan.textContent = '';
 
       row.appendChild(arrow);
-      if (loadCheckbox) row.appendChild(loadCheckbox);
+      if (loadCheckbox) {
+        row.appendChild(loadCheckbox);
+      } else {
+        // Always keep a fixed-width spacer so folder icons at every level align
+        const spacer = document.createElement('span');
+        spacer.className = 'tree-cb-spacer';
+        row.appendChild(spacer);
+      }
       row.appendChild(icon);
       row.appendChild(label);
       row.appendChild(countSpan);
@@ -4218,125 +4493,74 @@
     }
 
     // Populate folder counts ONLY for the Analyze Folders dialog tree.
-    // This function applies colors (blue/purple/green) based on analysis state,
-    // shows counts, and displays a progress bar.
+    // Two-pass approach: (1) inspect all folders, (2) apply subtree-aware fading & colors.
+    // Colors: green=finished, purple=started-not-finished, blue=not-started-but-has-images.
+    // Fading: no-photos-deep = folder+all descendants have 0 images (full row faded).
+    //         no-photos-shallow = folder has 0 images but some descendant has images (checkbox faded only).
     async function populateAnalyzeFolderCounts() {
       if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folder) return;
       try {
         // Query ONLY the Analyze dialog tree nodes
         const rows = Array.from(document.querySelectorAll('#analyzeDlgTree .adlg-node-row'));
         const norm = p => (p || '').replace(/\\/g, '/');
-        const pathToRows = new Map(); // normalized path → [row, row, ...]
-        const normToOriginal = new Map(); // normalized path → original path
-        const paths = []; // normalized paths only
+        const pathToRows = new Map(); // normalized path → [row, ...]
+        const normToOriginal = new Map();
+        const paths = [];
 
-        // Collect rows and normalize paths immediately
         for (const row of rows) {
           const origPath = row.dataset.path;
           if (!origPath) continue;
-          const normalizedPath = norm(origPath);
-          if (!pathToRows.has(normalizedPath)) {
-            pathToRows.set(normalizedPath, []);
-            normToOriginal.set(normalizedPath, origPath);
-            paths.push(normalizedPath);
+          const np = norm(origPath);
+          if (!pathToRows.has(np)) {
+            pathToRows.set(np, []);
+            normToOriginal.set(np, origPath);
+            paths.push(np);
           }
-          pathToRows.get(normalizedPath).push(row);
-          // Clear count placeholder initially
+          pathToRows.get(np).push(row);
           const span = row.querySelector('.tree-count');
           if (span) span.textContent = '';
         }
         if (paths.length === 0) return;
 
-        // Deduplicate and sort by depth (shallow first)
         const uniq = Array.from(new Set(paths));
         uniq.sort((a, b) => {
-          const da = a.split('/').length;
-          const db = b.split('/').length;
-          if (da !== db) return da - db;
-          return a.length - b.length;
+          const da = a.split('/').length, db = b.split('/').length;
+          return da !== db ? da - db : a.length - b.length;
         });
 
         const total = uniq.length;
         let completed = 0;
+        // Store inspection results for the second pass
+        const inspectionMap = new Map(); // normalized path → { total, processed } | null
 
-        // Progress UI elements (dialog only)
         const dlgProgWrap = document.getElementById('analyzeScanProgress');
         const dlgProgFill = document.getElementById('analyzeScanFill');
         const dlgProgLabel = document.getElementById('analyzeScanLabel');
         if (dlgProgWrap) dlgProgWrap.classList.remove('hidden');
 
-        // Concurrency-limited worker pool
+        // ── Pass 1: Inspect all folders concurrently ──
         const concurrency = Math.min(8, Math.max(2, Math.ceil(total / 8)));
         let idx = 0;
 
         async function worker() {
           while (true) {
-            const i = idx;
-            idx += 1;
+            const i = idx++;
             if (i >= total) break;
-            const normalizedPath = uniq[i];
-            const originalPath = normToOriginal.get(normalizedPath) || normalizedPath;
-
+            const np = uniq[i];
+            const origPath = normToOriginal.get(np) || np;
             try {
-              // Mark placeholder
-              const placeholders = pathToRows.get(normalizedPath) || [];
-              for (const r of placeholders) {
+              for (const r of (pathToRows.get(np) || [])) {
                 const s = r.querySelector('.tree-count');
                 if (s) s.textContent = ' …';
               }
-
-              // Call inspect_folder with original path format
-              const res = await window.pywebview.api.inspect_folder(originalPath);
+              const res = await window.pywebview.api.inspect_folder(origPath);
               const info = res && res.success ? res.info : null;
-
-              // Update all rows that correspond to this path
-              const related = pathToRows.get(normalizedPath) || [];
-              for (const row of related) {
-                const span = row.querySelector('.tree-count');
-                if (!span) continue;
-
-                if (info) {
-                  // Show processed/total when there are images
-                  if ((info.total || 0) > 0) {
-                    span.textContent = ` ${info.processed}/${info.total}`;
-                  } else {
-                    span.textContent = '';
-                  }
-
-                  // Clear previous analysis-state classes
-                  row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
-
-                  // Determine analysis state based on processed/total counts
-                  const totalImgs = info.total || 0;
-                  const processedImgs = info.processed || 0;
-                  if (totalImgs > 0) {
-                    if (processedImgs === 0) {
-                      // Purple: not analyzed at all
-                      row.classList.add('analyzed-none');
-                    } else if (processedImgs >= totalImgs) {
-                      // Green: fully analyzed
-                      row.classList.add('analyzed-full');
-                    } else {
-                      // Blue: partially analyzed
-                      row.classList.add('analyzed-partial');
-                    }
-                  }
-                } else {
-                  span.textContent = '';
-                  row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
-                }
-              }
+              inspectionMap.set(np, info ? { total: info.total || 0, processed: info.processed || 0 } : null);
             } catch (e) {
-              console.warn('[populateAnalyzeFolderCounts] error for', originalPath, e);
-              const related = pathToRows.get(normalizedPath) || [];
-              for (const row of related) {
-                const span = row.querySelector('.tree-count');
-                if (span) span.textContent = '';
-                row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
-              }
+              console.warn('[populateAnalyzeFolderCounts] error for', origPath, e);
+              inspectionMap.set(np, null);
             }
-
-            completed += 1;
+            completed++;
             const pct = Math.round((completed / total) * 100);
             if (dlgProgFill) dlgProgFill.style.width = pct + '%';
             if (dlgProgLabel) dlgProgLabel.textContent = `Scanning folders… (${completed}/${total})`;
@@ -4346,6 +4570,61 @@
         const workers = [];
         for (let w = 0; w < concurrency; w++) workers.push(worker());
         await Promise.all(workers);
+
+        // ── Pass 2: Apply colors and subtree-aware fading ──
+        // Helper: does any descendant of `prefix` have images?
+        function subtreeHasImages(prefix) {
+          const pfx = prefix.endsWith('/') ? prefix : prefix + '/';
+          for (const [p, info] of inspectionMap) {
+            if (p !== prefix && p.startsWith(pfx) && info && info.total > 0) return true;
+          }
+          return false;
+        }
+
+        for (const np of uniq) {
+          const info = inspectionMap.get(np);
+          const related = pathToRows.get(np) || [];
+          for (const row of related) {
+            const span = row.querySelector('.tree-count');
+            row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none',
+                                 'no-photos', 'no-photos-deep', 'no-photos-shallow');
+            row.title = '';
+            if (span) { span.title = ''; span.textContent = ''; }
+
+            if (!info) continue;
+
+            const totalImgs = info.total;
+            const processedImgs = info.processed;
+
+            if (totalImgs > 0) {
+              if (span) span.textContent = ` ${processedImgs}/${totalImgs}`;
+              if (processedImgs >= totalImgs) {
+                row.classList.add('analyzed-full');          // green: finished
+              } else if (processedImgs > 0) {
+                row.classList.add('analyzed-partial');       // purple: started not finished
+              } else {
+                row.classList.add('analyzed-none');          // blue: has images, not started
+              }
+            } else {
+              // This folder has 0 images — determine deep vs shallow fading
+              const hasDescendantImages = subtreeHasImages(np);
+              if (hasDescendantImages) {
+                // Shallow: only fade the checkbox, not the name/arrow (descendant has images)
+                row.classList.add('no-photos-shallow');
+              } else {
+                // Deep: entire row faded (no images anywhere in subtree)
+                row.classList.add('no-photos-deep');
+              }
+              const cb = row.querySelector('.adlg-cb');
+              if (cb) { cb.disabled = true; cb.checked = false; }
+              const tip = hasDescendantImages
+                ? 'No photos in this folder, but subfolders contain images.'
+                : 'No supported photos found in this folder or any subfolder.';
+              if (span) span.title = tip;
+              row.title = tip;
+            }
+          }
+        }
 
         // Hide progress after brief delay
         setTimeout(() => {
@@ -4432,6 +4711,95 @@
       return wrap;
     }
 
+    /** Render the right-side queue preview panel in the Analyze dialog. */
+    function _refreshAnalyzeDlgQueuePreview() {
+      const runningEl = document.getElementById('adlgQueueRunning');
+      const willAddEl = document.getElementById('adlgQueueWillAdd');
+      const emptyEl = document.getElementById('adlgQueueEmpty');
+      if (!runningEl || !willAddEl || !emptyEl) return;
+
+      runningEl.innerHTML = '';
+      willAddEl.innerHTML = '';
+
+      // ── Currently running / pending queue items ──
+      let hasRunning = false;
+      try {
+        // _lastQueueStatus is set by renderQueuePanel
+        const status = window._lastQueueStatus;
+        if (status && status.items && status.items.length > 0) {
+          const activeItems = status.items.filter(i => i.status === 'running' || i.status === 'pending');
+          if (activeItems.length > 0) {
+            hasRunning = true;
+            const title = document.createElement('div');
+            title.className = 'adlg-queue-section-title';
+            title.textContent = '⚙ Currently in Queue';
+            runningEl.appendChild(title);
+            for (const item of activeItems) {
+              const row = document.createElement('div');
+              row.className = 'adlg-queue-item';
+              const nameEl = document.createElement('span');
+              nameEl.className = 'adlg-qi-name';
+              nameEl.textContent = item.name;
+              nameEl.title = item.path;
+              const statusEl = document.createElement('span');
+              statusEl.className = 'adlg-qi-status';
+              statusEl.textContent = item.status === 'running'
+                ? (item.total > 0 ? `${item.processed}/${item.total}` : 'analyzing…')
+                : 'pending';
+              row.appendChild(nameEl);
+              row.appendChild(statusEl);
+              runningEl.appendChild(row);
+            }
+          }
+        }
+      } catch (_) { }
+
+      // ── Will be added (selected folders) ──
+      const selected = Array.from(_dlgSelected);
+      if (selected.length > 0) {
+        const title = document.createElement('div');
+        title.className = 'adlg-queue-section-title';
+        title.textContent = '➕ Will Be Added';
+        willAddEl.appendChild(title);
+        for (const path of selected) {
+          const name = path.replace(/\\/g, '/').split('/').pop() || path;
+          const row = document.createElement('div');
+          row.className = 'adlg-queue-item';
+          const nameEl = document.createElement('span');
+          nameEl.className = 'adlg-qi-name';
+          nameEl.textContent = name;
+          nameEl.title = path;
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'adlg-qi-remove';
+          removeBtn.textContent = '✕';
+          removeBtn.title = 'Remove from selection';
+          removeBtn.addEventListener('click', () => {
+            _dlgSelected.delete(path);
+            // Uncheck corresponding checkbox in the tree
+            const rows = document.querySelectorAll('#analyzeDlgTree .adlg-node-row');
+            for (const r of rows) {
+              if (r.dataset.path === path) {
+                const cb = r.querySelector('.adlg-cb');
+                if (cb) cb.checked = false;
+                r.classList.remove('queue-sel');
+              }
+            }
+            // Refresh count + preview
+            const countEl = document.getElementById('analyzeDlgCount');
+            const addBtn = document.getElementById('analyzeDlgAdd');
+            if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
+            if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
+            _refreshAnalyzeDlgQueuePreview();
+          });
+          row.appendChild(nameEl);
+          row.appendChild(removeBtn);
+          willAddEl.appendChild(row);
+        }
+      }
+
+      emptyEl.classList.toggle('hidden', hasRunning || selected.length > 0);
+    }
+
     /** Open the 'Analyze Folders…' dialog. */
     async function openAnalyzeDialog() {
       if (!hasPywebviewApi) {
@@ -4454,6 +4822,7 @@
         const addBtn = document.getElementById('analyzeDlgAdd');
         if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
         if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
+        _refreshAnalyzeDlgQueuePreview();
       }
 
       const treeEl = document.getElementById('analyzeDlgTree');
@@ -4531,6 +4900,7 @@
 
     /** Render the queue panel from a status object. */
     function renderQueuePanel(status) {
+      window._lastQueueStatus = status; // store for analyze dialog queue preview
       const panel = document.getElementById('queuePanel');
       const badge = document.getElementById('queuePanelBadge');
       const body = document.getElementById('queuePanelBody');
@@ -4760,6 +5130,8 @@
           scheduleAutoRefresh(p);
           // First-time folder completion → offer analytics consent if not yet asked
           if (!getSetting('analytics_consent_shown', false)) showAnalyticsConsentDialog();
+          // Check donation thresholds (async, non-blocking)
+          checkDonationThresholdAsync();
         }
       }
       if (treeRescanNeeded) {
@@ -5741,6 +6113,29 @@
       });
     }
 
+    // Analyze dialog: Change Folder button
+    document.getElementById('analyzeDlgChangeRoot')?.addEventListener('click', async () => {
+      if (!hasPywebviewApi) { alert('Directory browsing is only available in the desktop app.'); return; }
+      const fp = await window.pywebview.api.choose_directory();
+      if (!fp) return;
+      await scanFolderTree(fp);
+      if (!folderTreeRootNode) return;
+      _dlgExpandedPaths = new Set([folderTreeRootNode.path]);
+      _dlgSelected.clear();
+      function refreshDlg2() {
+        const countEl = document.getElementById('analyzeDlgCount');
+        const addBtn = document.getElementById('analyzeDlgAdd');
+        if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
+        if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
+        _refreshAnalyzeDlgQueuePreview();
+      }
+      const treeEl = document.getElementById('analyzeDlgTree');
+      treeEl.innerHTML = '';
+      treeEl.appendChild(buildAnalyzeDlgNode(folderTreeRootNode, _dlgSelected, refreshDlg2));
+      populateAnalyzeFolderCounts();
+      refreshDlg2();
+    });
+
     // ── Welcome Panel action wiring ──────────────────────────────────────────────
 
     // ── Legal Agreement Logic ──────────────────────────────────────────────
@@ -6325,6 +6720,22 @@
     })();
 
   </script>
+
+  <!-- Donation / Support dialog -->
+  <dialog id="donateDlg" class="dlg-compact">
+    <div class="donate-dlg">
+      <div class="donate-dlg-icon">🦅</div>
+      <h3>Kestrel has analyzed over <span id="donateCountDisplay">many</span> photos!</h3>
+      <p>If Kestrel has been useful, please consider supporting its development — or share your thoughts.</p>
+      <p style="font-size:11px;">Project Kestrel is free &amp; open-source. Every contribution helps keep it growing.</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button class="donate-main-btn" id="donateDlgGoBtn">💛 Donate via PayPal</button>
+        <button class="primary" id="donateDlgFeedbackBtn" style="font-size:13px;padding:8px 18px;">💬 Send Feedback</button>
+      </div>
+      <button id="donateDlgClose" style="font-size:12px;background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px 8px;margin-top:4px;">Close</button>
+    </div>
+  </dialog>
+
 </body>
 
 </html>

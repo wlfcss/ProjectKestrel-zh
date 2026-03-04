@@ -453,21 +453,32 @@ class QueueManager:
 
             # 1. Non-optional basic completion telemetry (total photos analyzed)
             files_this_session = max(0, item.processed - item.initial_processed)
-            _telemetry.send_analysis_completion_telemetry(
-                files_analyzed=files_this_session,
-                machine_id=machine_id,
-                version=version
-            )
 
-            # 2. Optional detailed analytics
-            # Compute active time excluding pauses
+            # Compute active time excluding pauses (used in both telemetry and analytics)
             elapsed = 0.0
             if item.start_time is not None:
                 end = item.end_time if item.end_time is not None else _time_mod.time()
                 elapsed = max(0.0, (end - item.start_time) - item.paused_duration)
 
+            avg_time_per_file_s = elapsed / files_this_session if files_this_session > 0 else 0.0
+            _telemetry.send_analysis_completion_telemetry(
+                files_analyzed=files_this_session,
+                machine_id=machine_id,
+                version=version,
+                avg_time_per_file_s=avg_time_per_file_s,
+            )
+
+            # Update Kestrel Impact cumulative stats in persisted settings
+            settings['kestrel_impact_total_files'] = settings.get('kestrel_impact_total_files', 0) + files_this_session
+            settings['kestrel_impact_total_seconds'] = round(
+                settings.get('kestrel_impact_total_seconds', 0.0) + elapsed, 1
+            )
+            save_persisted_settings(settings)
+            print(f"[impact] total_files={settings['kestrel_impact_total_files']} total_hours={round(settings['kestrel_impact_total_seconds']/3600,2)}", flush=True)
+
+            # 2. Optional detailed analytics
             was_cancelled = (item.status == 'cancelled')
-            
+
             # Gather file stats from disk
             stats = _telemetry.collect_folder_stats(
                 item.path, files_this_session, item.total
