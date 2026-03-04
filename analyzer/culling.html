@@ -336,25 +336,152 @@
     .btn.danger:hover { background: #4a2020; }
     .btn:disabled { opacity: 0.4; cursor: default; }
 
-    /* ---- Dialogs ---- */
+    /* ---- Dialogs (base) ---- */
     dialog {
       background: var(--panel);
       color: var(--text);
       border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 520px;
-      width: 90%;
+      border-radius: 14px;
+      padding: 0;
+      max-width: 560px;
+      width: 94%;
+      overflow: hidden;
     }
-    dialog::backdrop { background: rgba(0,0,0,0.6); }
-    dialog h2 { margin: 0 0 12px 0; font-size: 16px; }
-    dialog p { margin: 6px 0; font-size: 13px; color: var(--text); line-height: 1.5; }
+    dialog::backdrop { background: rgba(0,0,0,0.65); }
+    dialog h2 { margin: 0 0 3px 0; font-size: 17px; font-weight: 700; }
+    dialog p { margin: 4px 0; font-size: 13px; color: var(--text); line-height: 1.5; }
     dialog .actions {
       display: flex;
       gap: 10px;
-      margin-top: 18px;
+      padding: 14px 20px 20px;
+      margin-top: 0;
       justify-content: flex-end;
     }
+
+    /* ---- Finish Culling dialog ---- */
+    .dlg-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 22px 22px 0;
+    }
+    .dlg-icon { font-size: 28px; line-height: 1; flex-shrink: 0; margin-top: 3px; }
+    .dlg-subtitle { margin: 0; font-size: 12px; color: var(--muted); }
+    .dlg-divider {
+      height: 1px;
+      background: var(--card-border);
+      margin: 14px 0 0;
+    }
+    .dlg-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      padding: 12px 22px 6px;
+      margin: 0;
+    }
+    .dlg-option-card {
+      margin: 0 14px 10px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: var(--card);
+      transition: border-color .15s, background .15s;
+      cursor: pointer;
+    }
+    .dlg-option-card:has(input:checked) {
+      border-color: var(--brand);
+      background: rgba(74,163,255,0.05);
+    }
+    .dlg-option-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 13px 14px;
+      cursor: pointer;
+      width: 100%;
+    }
+    .dlg-option-label input[type="checkbox"] {
+      margin-top: 2px;
+      accent-color: var(--brand);
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .dlg-option-icon { font-size: 20px; flex-shrink: 0; line-height: 1.2; }
+    .dlg-option-body { display: flex; flex-direction: column; gap: 3px; }
+    .dlg-option-body b { font-size: 13px; font-weight: 700; }
+    .dlg-option-body span { font-size: 12px; color: var(--muted); line-height: 1.55; }
+    .dlg-option-body code {
+      background: rgba(74,163,255,0.10);
+      color: var(--brand);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    .dlg-xmp-note {
+      margin: 0 14px 10px;
+      padding: 8px 12px;
+      background: rgba(243,156,18,0.08);
+      border: 1px solid rgba(243,156,18,0.25);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #c8952a;
+      line-height: 1.5;
+      display: none;
+    }
+    .dlg-xmp-note.visible { display: block; }
+
+    /* ---- Progress steps ---- */
+    .dlg-steps {
+      list-style: none;
+      margin: 14px 22px 6px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dlg-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .dlg-step-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+      border: 1px solid var(--card-border);
+      background: var(--card);
+      color: var(--muted);
+    }
+    .dlg-step.running .dlg-step-icon {
+      border-color: var(--brand);
+      color: var(--brand);
+      animation: spin 1s linear infinite;
+    }
+    .dlg-step.done .dlg-step-icon {
+      border-color: var(--ok);
+      background: rgba(46,204,113,0.1);
+      color: var(--ok);
+    }
+    .dlg-step.failed .dlg-step-icon {
+      border-color: var(--bad);
+      background: rgba(231,76,60,0.1);
+      color: var(--bad);
+    }
+    .dlg-step.skipped .dlg-step-icon { opacity: 0.35; }
+    .dlg-step-label { flex: 1; }
+    .dlg-step.done .dlg-step-label { color: var(--muted); }
+    .dlg-step.skipped .dlg-step-label { color: var(--muted); text-decoration: line-through; }
+    .dlg-step-detail { font-size: 11px; color: var(--muted); }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
 
@@ -784,14 +911,73 @@
     <button class="btn primary" id="doneCullingBtn" disabled>Done Culling, Proceed to Review</button>
   </div>
 
-  <!-- Confirmation dialog -->
+  <!-- Finish Culling dialog -->
   <dialog id="confirmDlg">
-    <h2>Finish Culling</h2>
-    <div id="confirmBody"></div>
-    <div class="actions">
-      <button class="btn" id="confirmCancel">Cancel</button>
-      <button class="btn primary" id="confirmOk">Move Rejects &amp; Finish</button>
+
+    <!-- ── View 1: Options ── -->
+    <div id="dlgOptions">
+      <div class="dlg-header">
+        <span class="dlg-icon">&#x1F3C1;</span>
+        <div>
+          <h2>Finish Culling</h2>
+          <p class="dlg-subtitle" id="dlgSubtitle">—</p>
+        </div>
+      </div>
+      <div class="dlg-divider"></div>
+
+      <p class="dlg-section-label">Choose export actions</p>
+
+      <!-- XMP option -->
+      <div class="dlg-option-card" id="xmpOptionCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doXmpCheck" />
+          <span class="dlg-option-icon">&#x1F4DD;</span>
+          <div class="dlg-option-body">
+            <b>Write XMP Metadata Files</b>
+            <span>Writes a <code>.xmp</code> sidecar file next to each original. Embeds your star rating and Accept / Reject label so you can import directly into Lightroom, Capture One, or any XMP-aware application.</span>
+          </div>
+        </label>
+      </div>
+      <!-- XMP early-access note (shown when checked) -->
+      <div class="dlg-xmp-note" id="xmpNote">
+        &#x26A0; XMP export is an early-access feature. Sidecar files will be written alongside originals.
+        Verify in your target application before deleting anything.
+      </div>
+
+      <!-- Move option -->
+      <div class="dlg-option-card" id="moveOptionCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doMoveCheck" checked />
+          <span class="dlg-option-icon">&#x1F4C1;</span>
+          <div class="dlg-option-body">
+            <b>Move Rejects to Folder</b>
+            <span id="moveCardDesc">Moves rejected files into <code>_KESTREL_Rejects/</code>. A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.</span>
+          </div>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="confirmCancel">Cancel</button>
+        <button class="btn primary" id="confirmOk">Execute &#x2713;</button>
+      </div>
     </div>
+
+    <!-- ── View 2: Progress ── -->
+    <div id="dlgProgress" class="hidden">
+      <div class="dlg-header">
+        <span class="dlg-icon" id="dlgProgressIcon">&#x23F3;</span>
+        <div>
+          <h2 id="dlgProgressTitle">Working&hellip;</h2>
+          <p class="dlg-subtitle" id="dlgProgressSubtitle">Please wait.</p>
+        </div>
+      </div>
+      <div class="dlg-divider"></div>
+      <ul class="dlg-steps" id="dlgStepsList"></ul>
+      <div class="actions" id="dlgProgressActions" style="display:none">
+        <button class="btn primary" id="dlgDoneBtn">Close</button>
+      </div>
+    </div>
+
   </dialog>
 
   <!-- Tutorial overlay -->
@@ -1334,89 +1520,172 @@
     // ---- Done Culling flow ----
     function onDoneCulling() {
       let acceptCount = 0, rejectCount = 0;
-      const rejectNames = [];
       for (const r of rows) {
-        if (cullingState.get(r.filename) === 'reject') { rejectCount++; rejectNames.push(r.filename); }
+        if (cullingState.get(r.filename) === 'reject') rejectCount++;
         else acceptCount++;
       }
 
-      const body = el('#confirmBody');
-      body.innerHTML = `
-        <p><b>${acceptCount}</b> image${acceptCount===1?'':'s'} will be <span style="color:var(--ok)">kept</span> in the folder.</p>
-        <p><b>${rejectCount}</b> image${rejectCount===1?'':'s'} will be <span style="color:var(--bad)">moved</span> to <code>_KESTREL_Rejects</code> folder.</p>
-        <p style="color:var(--muted);font-size:12px">A backup of kestrel_database.csv will be saved as kestrel_database_old.csv before any changes.</p>
-      `;
+      // Populate summary
+      el('#dlgSubtitle').textContent = `${acceptCount} accepted \u00b7 ${rejectCount} to reject`;
+      el('#moveCardDesc').innerHTML =
+        `Moves <b>${rejectCount}</b> rejected file${rejectCount === 1 ? '' : 's'} into <code>_KESTREL_Rejects/</code>. ` +
+        `A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.`;
 
+      // Reset to options view
+      el('#dlgOptions').classList.remove('hidden');
+      el('#dlgProgress').classList.add('hidden');
+      el('#dlgProgressActions').style.display = 'none';
+
+      _updateExecuteBtn();
       el('#confirmDlg').showModal();
     }
 
-    async function executeMove() {
-      el('#confirmDlg').close();
-      el('#statusLabel').textContent = 'Processing…';
+    function _updateExecuteBtn() {
+      const any = el('#doXmpCheck')?.checked || el('#doMoveCheck')?.checked;
+      const btn = el('#confirmOk');
+      if (btn) btn.disabled = !any;
+    }
+
+    // ---- Execute selected actions ----
+    async function executeActions() {
+      const doXmp  = el('#doXmpCheck')?.checked  || false;
+      const doMove = el('#doMoveCheck')?.checked || false;
+      if (!doXmp && !doMove) return;
+
+      // Switch to progress view
+      el('#dlgOptions').classList.add('hidden');
+      el('#dlgProgress').classList.remove('hidden');
+      el('#dlgProgressIcon').textContent = '\u23F3';
+      el('#dlgProgressTitle').textContent = 'Working\u2026';
+      el('#dlgProgressSubtitle').textContent = 'Please wait.';
+
+      // Build ordered step list
+      const stepDefs = [
+        { id: 'save',   label: 'Saving database',                    always: true },
+        { id: 'backup', label: 'Backing up kestrel_database.csv',    cond: doMove },
+        { id: 'xmp',    label: 'Writing XMP sidecar files',          cond: doXmp  },
+        { id: 'move',   label: 'Moving rejects to _KESTREL_Rejects', cond: doMove },
+      ];
+      const stepsEl = el('#dlgStepsList');
+      stepsEl.innerHTML = '';
+      for (const s of stepDefs) {
+        const li = document.createElement('li');
+        li.className = 'dlg-step ' + ((s.always || s.cond) ? 'pending' : 'skipped');
+        li.id = 'dlg-step-' + s.id;
+        li.innerHTML =
+          `<span class="dlg-step-icon">${(s.always || s.cond) ? '\u25CB' : '\u2013'}</span>` +
+          `<span class="dlg-step-label">${s.label}</span>` +
+          `<span class="dlg-step-detail" id="dlg-step-detail-${s.id}"></span>`;
+        stepsEl.appendChild(li);
+      }
+
+      function setStep(id, state, detail = '') {
+        const li = document.getElementById('dlg-step-' + id);
+        if (!li) return;
+        li.className = 'dlg-step ' + state;
+        const icons = { pending: '\u25CB', running: '\u27F3', done: '\u2713', failed: '\u2717', skipped: '\u2013' };
+        li.querySelector('.dlg-step-icon').textContent = icons[state] || '\u25CB';
+        if (detail) li.querySelector('#dlg-step-detail-' + id).textContent = detail;
+      }
+
       el('#doneCullingBtn').disabled = true;
+      el('#statusLabel').textContent = 'Processing\u2026';
 
+      let anyFailed = false;
       try {
-        // 1. Save current ratings
+        // 1. Save
+        setStep('save', 'running');
         await saveCullingState();
+        setStep('save', 'done');
 
-        // 2. Backup CSV
-        const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
-        if (!backupRes.success) {
-          showToast('Failed to backup CSV: ' + (backupRes.error || ''), 5000);
-          el('#doneCullingBtn').disabled = false;
-          return;
+        // 2. Backup (only if moving)
+        if (doMove) {
+          setStep('backup', 'running');
+          const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
+          if (!backupRes.success) {
+            setStep('backup', 'failed', backupRes.error || '');
+            throw new Error('Backup failed: ' + (backupRes.error || ''));
+          }
+          setStep('backup', 'done');
         }
 
-        // 3. Collect reject filenames
-        rejectFilenames = [];
-        for (const r of rows) {
-          if (cullingState.get(r.filename) === 'reject') {
-            rejectFilenames.push(r.filename);
+        // 3. XMP
+        if (doXmp) {
+          setStep('xmp', 'running');
+          const xmpPayload = rows.map(r => ({
+            filename: r.filename,
+            rating: getRating(r),
+            culled: cullingState.get(r.filename) || 'accept',
+          }));
+          const xmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload);
+          if (!xmpRes.success) {
+            setStep('xmp', 'failed', xmpRes.error || '');
+            anyFailed = true;
+          } else {
+            setStep('xmp', 'done', `${xmpRes.written} file${xmpRes.written === 1 ? '' : 's'} written`);
           }
         }
 
-        // 4. Move original files to _KESTREL_Rejects
-        const moveRes = await window.pywebview.api.move_rejects_to_folder(rootPath, rejectFilenames);
-        if (!moveRes.success) {
-          showToast('Failed to move rejects: ' + (moveRes.error || ''), 5000);
-          el('#doneCullingBtn').disabled = false;
-          return;
+        // 4. Move
+        let moveRes = null;
+        if (doMove) {
+          setStep('move', 'running');
+          rejectFilenames = rows
+            .filter(r => cullingState.get(r.filename) === 'reject')
+            .map(r => r.filename);
+          moveRes = await window.pywebview.api.move_rejects_to_folder(rootPath, rejectFilenames);
+          if (!moveRes.success) {
+            setStep('move', 'failed', moveRes.error || '');
+            throw new Error('Move failed: ' + (moveRes.error || ''));
+          }
+          setStep('move', 'done', `${moveRes.moved} file${moveRes.moved === 1 ? '' : 's'} moved`);
+
+          // Post-move: strip rejects from working data
+          const rejectSet = new Set(rejectFilenames);
+          rows = rows.filter(r => !rejectSet.has(r.filename));
+          for (const fn of rejectSet) cullingState.delete(fn);
+          await saveCullingState();
+
+          try { await window.pywebview.api.open_reject_folder(rootPath); } catch (_) {}
+          try { await window.pywebview.api.notify_main_window_refresh(); } catch (_) {}
+
+          moveCompleted = true;
+          const undoBtn = el('#undoBtn');
+          undoBtn.style.display = '';
+          undoBtn.disabled = false;
+          scenes = aggregateScenes();
+          renderAllScenes();
+          updateStats();
+          el('#statusLabel').textContent =
+            `Done! ${moveRes.moved} reject${moveRes.moved === 1 ? '' : 's'} moved. Click \u201cUndo Move\u201d to revert.`;
+        } else {
+          try { await window.pywebview.api.notify_main_window_refresh(); } catch (_) {}
+          el('#statusLabel').textContent = 'Done!';
         }
 
-        // 5. Remove rejected rows from data and save cleaned CSV
-        const rejectSet = new Set(rejectFilenames);
-        rows = rows.filter(r => !rejectSet.has(r.filename));
-        for (const fn of rejectSet) cullingState.delete(fn);
-        await saveCullingState();
+        // Finish UI
+        el('#dlgProgressIcon').textContent = anyFailed ? '\u26A0\uFE0F' : '\u2705';
+        el('#dlgProgressTitle').textContent = anyFailed ? 'Completed with warnings' : 'Complete!';
+        const parts = [];
+        if (doXmp && !anyFailed)  parts.push('XMP files written');
+        if (doXmp &&  anyFailed)  parts.push('XMP had errors \u2014 check above');
+        if (doMove) parts.push('Undo available via the bottom bar');
+        el('#dlgProgressSubtitle').textContent = parts.join(' \u00b7 ');
+        el('#dlgProgressActions').style.display = 'flex';
 
-        // 6. Open reject folder
-        try { await window.pywebview.api.open_reject_folder(rootPath); } catch(_) {}
-
-        // 7. Notify main window
-        try { await window.pywebview.api.notify_main_window_refresh(); } catch(_) {}
-
-        // 8. Show undo button
-        moveCompleted = true;
-        const undoBtn = el('#undoBtn');
-        undoBtn.style.display = '';
-        undoBtn.disabled = false;
-
-        // Re-aggregate and re-render with remaining images
-        scenes = aggregateScenes();
-        renderAllScenes();
-        updateStats();
-
-        showToast(`Moved ${moveRes.moved} image${moveRes.moved===1?'':'s'} to _KESTREL_Rejects`, 5000);
-        if (moveRes.errors && moveRes.errors.length > 0) {
+        if (moveRes && moveRes.errors && moveRes.errors.length > 0) {
           console.warn('Move errors:', moveRes.errors);
-          showToast(`${moveRes.errors.length} file(s) had errors — check console`, 5000);
+          showToast(`${moveRes.errors.length} file(s) had move errors \u2014 check console`, 5000);
         }
 
-        el('#statusLabel').textContent = `Done! ${moveRes.moved} rejects moved. Click "Undo Move" to revert.`;
       } catch (e) {
-        console.error('executeMove error', e);
-        showToast('Error during move: ' + e.message, 5000);
+        console.error('executeActions error', e);
+        el('#dlgProgressIcon').textContent = '\u274C';
+        el('#dlgProgressTitle').textContent = 'Error';
+        el('#dlgProgressSubtitle').textContent = e.message;
+        el('#dlgProgressActions').style.display = 'flex';
         el('#doneCullingBtn').disabled = false;
+        showToast('Error: ' + e.message, 6000);
       }
     }
 
@@ -2000,10 +2269,18 @@
 
     // ---- Wire up buttons ----
     el('#doneCullingBtn').addEventListener('click', onDoneCulling);
-    el('#confirmOk').addEventListener('click', executeMove);
+    el('#confirmOk').addEventListener('click', executeActions);
     el('#confirmCancel').addEventListener('click', () => el('#confirmDlg').close());
     el('#undoBtn').addEventListener('click', undoMove);
     el('#helpBtn').addEventListener('click', () => startTutorial(0));
+    el('#dlgDoneBtn').addEventListener('click', () => el('#confirmDlg').close());
+
+    // XMP checkbox shows/hides early-access note; both checkboxes update execute button state
+    el('#doXmpCheck').addEventListener('change', () => {
+      el('#xmpNote').classList.toggle('visible', el('#doXmpCheck').checked);
+      _updateExecuteBtn();
+    });
+    el('#doMoveCheck').addEventListener('change', _updateExecuteBtn);
 
     // Auto-categorize panel controls
     el('#autoCatToggle').addEventListener('click', () => {

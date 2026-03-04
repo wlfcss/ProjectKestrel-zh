@@ -1568,6 +1568,90 @@ class Api:
             log(f'move_rejects_to_folder error: {e}')
             return {'success': False, 'error': str(e)}
 
+    def write_xmp_metadata(self, root_path: str, image_data):
+        """Write XMP sidecar files for each image, embedding star rating and culling label.
+
+        Each entry in ``image_data`` is expected to be a dict with:
+            filename  – bare filename (e.g. "IMG_0001.jpg")
+            rating    – integer 0-5
+            culled    – "accept" or "reject"
+
+        XMP sidecar files are written as ``<basename>.xmp`` alongside the
+        original in ``root_path``.  The culling label is mapped to an
+        Adobe-compatible ``Label`` value ("Green" for accept, "Red" for
+        reject) as well as a ``xmp:Rating`` and a custom
+        ``kestrel:CullStatus`` property so any XMP-aware importer can use
+        whichever field it prefers.
+
+        TODO: This is a placeholder implementation.  The XMP schema and
+        sidecar-writing logic will be finalised once the XMP research phase
+        is complete.  Currently the function validates inputs, builds a
+        minimal XMP template per image, and writes the file – but the
+        template may need adjustment for full Lightroom / Capture One
+        compatibility.
+        """
+        try:
+            if not root_path or not os.path.isdir(root_path):
+                return {'success': False, 'error': 'Invalid root path'}
+
+            written = 0
+            errors  = []
+
+            for entry in (image_data or []):
+                try:
+                    filename = str(entry.get('filename', '')).strip()
+                    if not filename:
+                        errors.append('(blank filename): skipped')
+                        continue
+
+                    rating = int(entry.get('rating', 0) or 0)
+                    rating = max(0, min(5, rating))
+
+                    cull_status = str(entry.get('culled', 'accept')).lower()
+                    adobe_label = 'Green' if cull_status == 'accept' else 'Red'
+
+                    # Derive sidecar path: same directory, extension replaced with .xmp
+                    base, _ext = os.path.splitext(filename)
+                    xmp_filename = base + '.xmp'
+                    xmp_path = os.path.join(root_path, xmp_filename)
+
+                    # Minimal XMP sidecar template
+                    # TODO: extend with full dc:, exif:, and Lightroom lr: namespaces
+                    #       once the exact schema is confirmed.
+                    xmp_content = (
+                        '<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
+                        '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
+                        '  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n'
+                        '    <rdf:Description rdf:about=""\n'
+                        '        xmlns:xmp="http://ns.adobe.com/xap/1.0/"\n'
+                        '        xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"\n'
+                        '        xmlns:kestrel="http://ns.projectkestrel.app/xmp/1.0/">\n'
+                        f'      <xmp:Rating>{rating}</xmp:Rating>\n'
+                        f'      <xmp:Label>{adobe_label}</xmp:Label>\n'
+                        f'      <kestrel:CullStatus>{cull_status}</kestrel:CullStatus>\n'
+                        f'      <kestrel:SourceFile>{filename}</kestrel:SourceFile>\n'
+                        '    </rdf:Description>\n'
+                        '  </rdf:RDF>\n'
+                        '</x:xmpmeta>\n'
+                        '<?xpacket end="w"?>\n'
+                    )
+
+                    with open(xmp_path, 'w', encoding='utf-8') as f:
+                        f.write(xmp_content)
+
+                    written += 1
+                    log(f'write_xmp: wrote {xmp_path}')
+
+                except Exception as entry_err:
+                    errors.append(f'{entry.get("filename", "?")}: {entry_err}')
+
+            log(f'write_xmp_metadata: written={written}, errors={len(errors)}')
+            return {'success': True, 'written': written, 'errors': errors}
+
+        except Exception as e:
+            log(f'write_xmp_metadata error: {e}')
+            return {'success': False, 'error': str(e)}
+
     def undo_reject_move(self, root_path: str, filenames):
         """Move files back from _KESTREL_Rejects to the root folder."""
         try:
