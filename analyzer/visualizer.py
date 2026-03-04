@@ -1568,7 +1568,7 @@ class Api:
             log(f'move_rejects_to_folder error: {e}')
             return {'success': False, 'error': str(e)}
 
-    def write_xmp_metadata(self, root_path: str, image_data):
+    def write_xmp_metadata(self, root_path: str, image_data, overwrite_external: bool = False):
         """Write XMP sidecar files for each image, embedding star rating and culling label.
 
         Each entry in ``image_data`` is expected to be a dict with:
@@ -1577,25 +1577,44 @@ class Api:
             culled    – "accept" or "reject"
 
         XMP sidecar files are written as ``<basename>.xmp`` alongside the
-        original in ``root_path``.  The culling label is mapped to an
-        Adobe-compatible ``Label`` value ("Green" for accept, "Red" for
-        reject) as well as a ``xmp:Rating`` and a custom
-        ``kestrel:CullStatus`` property so any XMP-aware importer can use
-        whichever field it prefers.
+        original in ``root_path``.
 
-        TODO: This is a placeholder implementation.  The XMP schema and
-        sidecar-writing logic will be finalised once the XMP research phase
-        is complete.  Currently the function validates inputs, builds a
-        minimal XMP template per image, and writes the file – but the
-        template may need adjustment for full Lightroom / Capture One
-        compatibility.
+        Safety rules:
+          - If a ``.xmp`` file already exists and was written by Kestrel
+            (detected by the presence of the ``kestrel:`` namespace URI), it is
+            safe to overwrite and will always be updated.
+          - If a ``.xmp`` file already exists but was written by external
+            software (Lightroom, darktable, Capture One, etc.) AND
+            ``overwrite_external`` is False, the file is skipped and its
+            filename is added to ``skipped_conflicts`` in the response so the
+            caller can ask the user for confirmation.
+          - If ``overwrite_external`` is True, external XMP files are also
+            overwritten.
+
+        Returns:
+            { success, written, skipped_conflicts: [filenames], errors }
+
+        TODO: Finalise the XMP schema / sidecar format once the research phase
+        is complete.  The current template is minimal but valid.
         """
+        _KESTREL_NS = 'http://ns.projectkestrel.app/xmp/1.0/'
+
+        def _is_kestrel_xmp(path: str) -> bool:
+            """Return True if the file appears to have been written by Kestrel."""
+            try:
+                with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read(4096)  # Only need the header/namespace section
+                return _KESTREL_NS in content
+            except Exception:
+                return False
+
         try:
             if not root_path or not os.path.isdir(root_path):
                 return {'success': False, 'error': 'Invalid root path'}
 
             written = 0
-            errors  = []
+            skipped_conflicts = []
+            errors = []
 
             for entry in (image_data or []):
                 try:
@@ -1615,6 +1634,16 @@ class Api:
                     xmp_filename = base + '.xmp'
                     xmp_path = os.path.join(root_path, xmp_filename)
 
+                    # Safety check: if XMP already exists, verify origin
+                    if os.path.exists(xmp_path):
+                        if not _is_kestrel_xmp(xmp_path):
+                            if not overwrite_external:
+                                skipped_conflicts.append(xmp_filename)
+                                log(f'write_xmp: skipping external XMP {xmp_path}')
+                                continue
+                            else:
+                                log(f'write_xmp: overwriting external XMP {xmp_path} (user confirmed)')
+
                     # Minimal XMP sidecar template
                     # TODO: extend with full dc:, exif:, and Lightroom lr: namespaces
                     #       once the exact schema is confirmed.
@@ -1625,7 +1654,7 @@ class Api:
                         '    <rdf:Description rdf:about=""\n'
                         '        xmlns:xmp="http://ns.adobe.com/xap/1.0/"\n'
                         '        xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/"\n'
-                        '        xmlns:kestrel="http://ns.projectkestrel.app/xmp/1.0/">\n'
+                        f'        xmlns:kestrel="{_KESTREL_NS}">\n'
                         f'      <xmp:Rating>{rating}</xmp:Rating>\n'
                         f'      <xmp:Label>{adobe_label}</xmp:Label>\n'
                         f'      <kestrel:CullStatus>{cull_status}</kestrel:CullStatus>\n'
@@ -1645,8 +1674,13 @@ class Api:
                 except Exception as entry_err:
                     errors.append(f'{entry.get("filename", "?")}: {entry_err}')
 
-            log(f'write_xmp_metadata: written={written}, errors={len(errors)}')
-            return {'success': True, 'written': written, 'errors': errors}
+            log(f'write_xmp_metadata: written={written}, conflicts={len(skipped_conflicts)}, errors={len(errors)}')
+            return {
+                'success': True,
+                'written': written,
+                'skipped_conflicts': skipped_conflicts,
+                'errors': errors,
+            }
 
         except Exception as e:
             log(f'write_xmp_metadata error: {e}')
