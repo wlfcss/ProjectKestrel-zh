@@ -360,24 +360,27 @@
       background: var(--card);
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      overflow: hidden;
+      /* overflow:clip clips border-radius without creating a stacking context */
+      overflow: clip;
       display: flex;
       flex-direction: column;
-      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+      /* contain:layout style isolates style invalidation to this card only —
+         hover state changes on one card no longer force the browser to re-evaluate
+         descendant selectors across all other cards in the grid */
+      contain: layout style;
     }
 
     .card:hover {
-      transform: translateY(-2px);
-      border-color: #2a3040;
-      background: #191d28;
+      /* Simple border tint — no transform (avoids GPU layer promotion/demotion
+         on every card the mouse crosses) and no background repaint */
+      border-color: #3a4a6a;
     }
 
     .thumb {
       aspect-ratio: 16/10;
       background: #0e1117;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      /* overflow:hidden is fine here — .thumb is a leaf container with no stacking
+         context concerns, and it correctly clips the image to the card's top corners */
       overflow: hidden;
       position: relative;
     }
@@ -896,7 +899,8 @@
       line-height: 1;
       cursor: pointer;
       color: #2a3040;
-      transition: color .12s ease;
+      /* No color transition — firing a transition on 5 stars × N cards during
+         mouse movement adds up quickly */
     }
 
     .star.filled.auto {
@@ -2918,29 +2922,8 @@
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     // ── Lazy image loader ───────────────────────────────────────────────────────
-    // Limits concurrent in-flight image-load API calls to avoid flooding pywebview.
-    let _imgLoadActive = 0;
-    const _IMG_LOAD_MAX = 6;
-    const _imgLoadQueue = [];
-    function _scheduleImgLoad(fn) {
-      return new Promise((resolve, reject) => {
-        _imgLoadQueue.push({ fn, resolve, reject });
-        _drainImgQueue();
-      });
-    }
-    function _drainImgQueue() {
-      while (_imgLoadActive < _IMG_LOAD_MAX && _imgLoadQueue.length > 0) {
-        const { fn, resolve, reject } = _imgLoadQueue.shift();
-        _imgLoadActive++;
-        fn().then(resolve, reject).finally(() => { _imgLoadActive--; _drainImgQueue(); });
-      }
-    }
-
-    // Defers the async getBlobUrlForPath call until the <img> element is within
-    // the viewport (+ a 200 px root-margin buffer).  Just call:
-    //   lazyLoadImg(img, pathResolver)
-    // where pathResolver is an async () => string | null that resolves the URL.
-    // The observer detaches automatically once the image is loaded.
+    // Defers getBlobUrlForPath until the <img> is near the viewport.
+    // No concurrency cap — the Python bridge handles parallelism itself.
     const _lazyObserver = new IntersectionObserver((entries, obs) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
@@ -2949,9 +2932,9 @@
         const resolve = img._lazyResolve;
         if (!resolve) continue;
         delete img._lazyResolve;
-        _scheduleImgLoad(resolve).then(url => { if (url) img.src = url; }).catch(() => { });
+        resolve().then(url => { if (url) img.src = url; }).catch(() => { });
       }
-    }, { rootMargin: '200px' });
+    }, { rootMargin: '300px' });
 
     function lazyLoadImg(img, resolverFn) {
       img._lazyResolve = resolverFn;
@@ -3381,11 +3364,21 @@
         s.className = 'star';
         s.textContent = '★';
         s.title = 'Click to set rating';
-        s.addEventListener('mouseenter', () => render(i));
-        s.addEventListener('mouseleave', () => render());
+        // Click only — hover preview is handled by delegated listeners below
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
         wrap.appendChild(s);
       }
+
+      // 2 delegated listeners per bar instead of 10 per-star mouseenter/mouseleave
+      wrap.addEventListener('mousemove', (ev) => {
+        const t = ev.target;
+        if (t.classList.contains('star')) {
+          const idx = Array.prototype.indexOf.call(wrap.children, t);
+          if (idx >= 0) render(idx + 1);
+        }
+      });
+      wrap.addEventListener('mouseleave', () => render());
+
       render();
       return wrap;
     }
