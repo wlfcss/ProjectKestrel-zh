@@ -2559,6 +2559,14 @@
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div class="row">
+        <label style="flex:1">Kestrel's Impact</label>
+        <span class="muted" id="settingsTotalImpact">—</span>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Total number of photos analyzed by Kestrel
+        on this computer. Every photo analyzed helps advance conservation efforts.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
         <label for="settingsAnalyticsOptIn" style="flex:1">Share anonymous usage analytics</label>
         <label class="inline" style="gap:6px">
           <input type="checkbox" id="settingsAnalyticsOptIn" />
@@ -4034,6 +4042,25 @@
       lbl.textContent = consentShown
         ? (optedIn === true ? 'Opted in' : 'Not sharing')
         : 'Not yet decided';
+      
+      // Display total impact (photos analyzed)
+      (async function() {
+        try {
+          let totalPhotos = 0;
+          if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
+            const s = await window.pywebview.api.get_settings();
+            totalPhotos = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
+          }
+          const impactEl = document.getElementById('settingsTotalImpact');
+          if (impactEl) {
+            impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
+          }
+        } catch (_) {
+          const impactEl = document.getElementById('settingsTotalImpact');
+          if (impactEl) impactEl.textContent = '0 photos';
+        }
+      })();
+      
       dlg.showModal();
     }
     async function applySettings() {
@@ -4233,6 +4260,29 @@
             _saveDonateThresholdsShown(shown);
             // Small delay so queue panel settles first
             setTimeout(() => showDonatePrompt(total), 2000);
+            break;
+          }
+        }
+      } catch (_) { /* failsafe */ }
+    }
+
+    /** Check donation threshold on app startup (only once). */
+    async function checkDonationThresholdOnStartup() {
+      try {
+        let total = 0;
+        if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
+          const s = await window.pywebview.api.get_settings();
+          total = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
+        }
+        if (total < 1000) return;
+        const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
+        const shown = _loadDonateThresholdsShown();
+        for (const t of thresholds) {
+          if (total >= t && !shown.includes(t)) {
+            shown.push(t);
+            _saveDonateThresholdsShown(shown);
+            // Show dialog after a brief delay to let UI settle
+            setTimeout(() => showDonatePrompt(total), 1000);
             break;
           }
         }
@@ -5303,8 +5353,6 @@
           scheduleAutoRefresh(p);
           // First-time folder completion → offer analytics consent if not yet asked
           if (!getSetting('analytics_consent_shown', false)) showAnalyticsConsentDialog();
-          // Check donation thresholds (async, non-blocking)
-          checkDonationThresholdAsync();
         }
       }
       if (treeRescanNeeded) {
@@ -6876,6 +6924,13 @@
       if (!seen) {
         startMainTutorial(1, 0);
       }
+    })();
+
+    // Check donation threshold on startup (once per session)
+    (async function() {
+      // Wait a moment for the UI to settle and settings to load
+      await new Promise(function(r) { setTimeout(r, 1000); });
+      checkDonationThresholdOnStartup();
     })();
 
   </script>
