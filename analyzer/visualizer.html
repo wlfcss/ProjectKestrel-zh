@@ -2229,31 +2229,56 @@
       color: #f5d98b;
     }
     /* ── Donation prompt dialog ──────────────────────────────────── */
+    #donateDlg {
+      width: fit-content !important;
+      height: fit-content !important;
+      max-width: min(520px, 92vw);
+      max-height: 92vh;
+      min-width: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 0;
+    }
     .donate-dlg {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-      padding: 26px 22px 20px;
-      width: min(400px, 94vw);
+      gap: 14px;
+      padding: 28px 28px 20px;
+      width: min(480px, 90vw);
+      box-sizing: border-box;
       text-align: center;
     }
-    .donate-dlg-icon { font-size: 46px; line-height: 1; margin-bottom: 2px; }
-    .donate-dlg h3 { margin: 0; font-size: 18px; }
-    .donate-dlg p { margin: 0; font-size: 13px; color: var(--muted); max-width: 350px; line-height: 1.55; }
+    .donate-dlg-icon { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; }
+    .donate-dlg-icon img { width: 100%; height: 100%; object-fit: contain; }
+    .donate-dlg h3 { margin: 0; font-size: 17px; line-height: 1.4; }
+    .donate-dlg p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.65; }
+    .donate-dlg a { color: #4aa3ff; text-decoration: none; }
+    .donate-dlg a:hover { text-decoration: underline; }
+    .donate-dlg-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; width: 100%; }
     .donate-main-btn {
       background: linear-gradient(135deg, #7a5428 0%, #955f2a 100%);
       color: #f5d98b;
       border: 1px solid #b07838;
       border-radius: 8px;
-      padding: 11px 30px;
-      font-size: 15px;
+      padding: 12px 28px;
+      font-size: 14px;
       font-weight: 700;
       cursor: pointer;
       transition: filter .15s;
-      margin-top: 4px;
+      height: auto;
     }
     .donate-main-btn:hover { filter: brightness(1.15); }
+    .donate-dlg-close-btn {
+      font-size: 12px;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px 8px;
+      transition: color .15s;
+    }
+    .donate-dlg-close-btn:hover { color: var(--text); background: transparent; border: none; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="bridge_config.js"></script>
@@ -2851,6 +2876,12 @@
       } else if (apiReady) {
         el('#compat').classList.add('hidden');
       }
+      // After API is confirmed ready, wait for settings to be hydrated, then check donation threshold
+      await new Promise(function(r) { setTimeout(r, 500); });
+      // Hydrate settings from server to ensure localStorage has the latest data
+      await hydrateSettingsFromServer();
+      // Then check donation threshold (after settings are loaded into localStorage)
+      checkDonationThresholdOnStartup();
     })();
 
     // Utilities
@@ -4043,23 +4074,12 @@
         ? (optedIn === true ? 'Opted in' : 'Not sharing')
         : 'Not yet decided';
       
-      // Display total impact (photos analyzed)
-      (async function() {
-        try {
-          let totalPhotos = 0;
-          if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
-            const s = await window.pywebview.api.get_settings();
-            totalPhotos = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
-          }
-          const impactEl = document.getElementById('settingsTotalImpact');
-          if (impactEl) {
-            impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
-          }
-        } catch (_) {
-          const impactEl = document.getElementById('settingsTotalImpact');
-          if (impactEl) impactEl.textContent = '0 photos';
-        }
-      })();
+      // Display total impact (photos analyzed) - read from localStorage settings
+      const totalPhotos = getSetting('kestrel_impact_total_files', 0);
+      const impactEl = document.getElementById('settingsTotalImpact');
+      if (impactEl) {
+        impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
+      }
       
       dlg.showModal();
     }
@@ -4269,16 +4289,19 @@
     /** Check donation threshold on app startup (only once). */
     async function checkDonationThresholdOnStartup() {
       try {
-        let total = 0;
-        if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
-          const s = await window.pywebview.api.get_settings();
-          total = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
+        // Read from localStorage (same source as the settings dialog)
+        let total = getSetting('kestrel_impact_total_files', 0);
+        console.log('[donation] checkDonationThresholdOnStartup: total =', total);
+        if (total < 1000) {
+          console.log('[donation] Total < 1000, skipping');
+          return;
         }
-        if (total < 1000) return;
         const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
         const shown = _loadDonateThresholdsShown();
+        console.log('[donation] Thresholds already shown:', shown);
         for (const t of thresholds) {
           if (total >= t && !shown.includes(t)) {
+            console.log('[donation] Milestone crossed:', t, '- showing dialog');
             shown.push(t);
             _saveDonateThresholdsShown(shown);
             // Show dialog after a brief delay to let UI settle
@@ -4286,22 +4309,17 @@
             break;
           }
         }
-      } catch (_) { /* failsafe */ }
+        if (shown.includes(1000)) {
+          console.log('[donation] 1000 threshold already shown, no dialog needed');
+        }
+      } catch (e) {
+        console.error('[donation] checkDonationThresholdOnStartup error:', e);
+      }
     }
 
     document.getElementById('donateBtnMain')?.addEventListener('click', openDonateLink);
-    document.getElementById('donateDlgGoBtn')?.addEventListener('click', () => {
-      document.getElementById('donateDlg').close();
-      openDonateLink();
-    });
-    document.getElementById('donateDlgFeedbackBtn')?.addEventListener('click', () => {
-      try { document.getElementById('donateDlg').close(); } catch (_) { }
-      // Small delay so dialog closes first
-      setTimeout(() => { try { document.getElementById('feedbackDlg').showModal(); } catch (_) { } }, 200);
-    });
-    document.getElementById('donateDlgClose')?.addEventListener('click', () => {
-      try { document.getElementById('donateDlg').close(); } catch (_) { }
-    });
+    // Note: donateDlg button listeners are wired in the inline script after the dialog HTML,
+    // because that dialog is defined after this script block and wouldn't be in the DOM yet.
     // ─── End Donation ─────────────────────────────────────────────────────
 
     // Info dialog: load kestrel_metadata.json from opened photo folder (.kestrel)
@@ -6926,29 +6944,42 @@
       }
     })();
 
-    // Check donation threshold on startup (once per session)
-    (async function() {
-      // Wait a moment for the UI to settle and settings to load
-      await new Promise(function(r) { setTimeout(r, 1000); });
-      checkDonationThresholdOnStartup();
-    })();
-
   </script>
 
   <!-- Donation / Support dialog -->
-  <dialog id="donateDlg" class="dlg-compact">
+  <dialog id="donateDlg">
     <div class="donate-dlg">
-      <div class="donate-dlg-icon">🦅</div>
+      <div class="donate-dlg-icon"><img src="logo.png" alt="Kestrel Logo" /></div>
       <h3>Kestrel has analyzed over <span id="donateCountDisplay">many</span> photos!</h3>
-      <p>If Kestrel has been useful, please consider supporting its development — or share your thoughts.</p>
-      <p style="font-size:11px;">Project Kestrel is free &amp; open-source. Every contribution helps keep it growing.</p>
-      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <p>Thank you for using Project Kestrel! I’m a solo student developer and birder who built Kestrel because I love taking wildlife photos — but not sorting through them. If Kestrel has been useful to you, please consider supporting its development, or share your thoughts and feedback!</p>
+      <p style="font-size:12px;color:#607080;">Project Kestrel is free &amp; open-source. Every <a href="https://github.com/SanjaySoniLV/ProjectKestrel" target="_blank">contribution</a> helps keep it growing.</p>
+      <div class="donate-dlg-btns">
         <button class="donate-main-btn" id="donateDlgGoBtn">💛 Donate via PayPal</button>
-        <button class="primary" id="donateDlgFeedbackBtn" style="font-size:13px;padding:8px 18px;">💬 Send Feedback</button>
+        <button class="primary" id="donateDlgFeedbackBtn" style="font-size:13px;padding:12px 20px;">💬 Send Feedback</button>
       </div>
-      <button id="donateDlgClose" style="font-size:12px;background:transparent;border:none;color:var(--muted);cursor:pointer;padding:2px 8px;margin-top:4px;">Close</button>
+      <button id="donateDlgClose" class="donate-dlg-close-btn">Close</button>
     </div>
   </dialog>
+
+  <script>
+    // Wire donation dialog buttons — this script runs after the dialog HTML is in the DOM
+    (function() {
+      var dlg = document.getElementById('donateDlg');
+      document.getElementById('donateDlgGoBtn').addEventListener('click', function() {
+        dlg.close();
+        openDonateLink();
+      });
+      document.getElementById('donateDlgFeedbackBtn').addEventListener('click', function() {
+        dlg.close();
+        setTimeout(function() {
+          document.getElementById('feedbackDlg').showModal();
+        }, 150);
+      });
+      document.getElementById('donateDlgClose').addEventListener('click', function() {
+        dlg.close();
+      });
+    })();
+  </script>
 
 </body>
 
