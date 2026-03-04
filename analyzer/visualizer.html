@@ -2918,6 +2918,24 @@
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     // ── Lazy image loader ───────────────────────────────────────────────────────
+    // Limits concurrent in-flight image-load API calls to avoid flooding pywebview.
+    let _imgLoadActive = 0;
+    const _IMG_LOAD_MAX = 50;
+    const _imgLoadQueue = [];
+    function _scheduleImgLoad(fn) {
+      return new Promise((resolve, reject) => {
+        _imgLoadQueue.push({ fn, resolve, reject });
+        _drainImgQueue();
+      });
+    }
+    function _drainImgQueue() {
+      while (_imgLoadActive < _IMG_LOAD_MAX && _imgLoadQueue.length > 0) {
+        const { fn, resolve, reject } = _imgLoadQueue.shift();
+        _imgLoadActive++;
+        fn().then(resolve, reject).finally(() => { _imgLoadActive--; _drainImgQueue(); });
+      }
+    }
+
     // Defers the async getBlobUrlForPath call until the <img> element is within
     // the viewport (+ a 200 px root-margin buffer).  Just call:
     //   lazyLoadImg(img, pathResolver)
@@ -2931,7 +2949,7 @@
         const resolve = img._lazyResolve;
         if (!resolve) continue;
         delete img._lazyResolve;
-        resolve().then(url => { if (url) img.src = url; }).catch(() => { });
+        _scheduleImgLoad(resolve).then(url => { if (url) img.src = url; }).catch(() => { });
       }
     }, { rootMargin: '200px' });
 
@@ -2949,6 +2967,8 @@
 
     // Version counter so concurrent renderScenes calls can bail out early
     let _renderScenesVersion = 0;
+    // Version counter so loadMultipleFolders can be cancelled mid-flight
+    let _loadFoldersVersion = 0;
 
     function loadVersionBadge() {
       if (!versionBadge) return;
@@ -3121,56 +3141,37 @@
 
     async function getBlobUrlForPath(relOrAbsPath, rootOverride) {
       const effectiveRoot = rootOverride || rootPath;
-      console.log('[DEBUG] getBlobUrlForPath called with:', relOrAbsPath);
-      console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi, 'effectiveRoot:', effectiveRoot);
 
       // PRIORITY 1: Python API (desktop app - all platforms)
       // Use this when available for consistent behavior across Windows/macOS/Linux
       if (hasPywebviewApi && window.pywebview?.api?.read_image_file && effectiveRoot) {
-        console.log('[DEBUG] Using Python API for image loading');
-
         let rel = null;
         const sanitized = sanitizePath(relOrAbsPath);
 
         // Check if path is already relative (new CSV format)
         // Relative paths start with .kestrel/ and don't have drive letters or leading /
         if (sanitized && (sanitized.startsWith('.kestrel/') || sanitized.startsWith('kestrel/'))) {
-          // Already relative - use as-is
           rel = sanitized;
-          console.log('[DEBUG] Path appears to be relative (new format):', rel);
         } else if (sanitized && !sanitized.match(/^[A-Za-z]:/) && !sanitized.startsWith('/')) {
-          // Looks like a simple filename or relative path without .kestrel prefix
           rel = sanitized;
-          console.log('[DEBUG] Path appears to be simple relative:', rel);
         } else {
           // Absolute path (old CSV format) - extract relative part
           rel = toRootRelative(relOrAbsPath);
-          console.log('[DEBUG] Extracted relative path from absolute:', rel);
-          if (!rel) {
-            // Last resort: just use the sanitized path
-            rel = sanitized;
-          }
+          if (!rel) rel = sanitized;
         }
 
         if (!rel) return null;
 
         // Check cache first (key includes root so multi-folder caches stay separate)
         const cacheKey = `pyapi:${effectiveRoot}:${rel}`;
-        if (blobUrlCache.has(cacheKey)) {
-          console.log('[DEBUG] Using cached image:', rel);
-          return blobUrlCache.get(cacheKey);
-        }
+        if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
 
         try {
           const result = await window.pywebview.api.read_image_file(rel, effectiveRoot);
           if (result && result.success && result.data) {
-            console.log('[DEBUG] Successfully loaded image via Python API:', rel);
-            // Create data URL from base64
             const dataUrl = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
             blobUrlCache.set(cacheKey, dataUrl);
             return dataUrl;
-          } else {
-            console.warn('[DEBUG] Python API returned no data for:', rel, result);
           }
         } catch (e) {
           console.error('Python API image read failed:', e);
@@ -5723,6 +5724,7 @@
       if (checkedFolderPaths.size > 0) {
         await loadMultipleFolders(Array.from(checkedFolderPaths));
       } else {
+        ++_loadFoldersVersion; // cancel any in-progress load
         rows = []; header = []; scenes = [];
         sceneGrid.innerHTML = '';
         setStatus('No folders selected — check folders in the tree to load scenes');
@@ -5768,11 +5770,8 @@
     }
 
     async function loadMultipleFolders(paths) {
-      if (!paths || paths.length === 0) {
-        console.warn('[multi] No paths provided');
-        return;
-      }
-      console.log('[multi] Starting loadMultipleFolders with', paths.length, 'paths:', paths);
+      if (!paths || paths.length === 0) return;
+      const myVer = ++_loadFoldersVersion;
       blobUrlCache.clear();
       rows = [];
       header = [];
@@ -5781,41 +5780,29 @@
       const total = paths.length;
       showProgress(`Loading 0 / ${total} folders…`, 0);
       for (let i = 0; i < paths.length; i++) {
+        if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
         const p = paths[i];
         const folderName = p.replace(/.*[/\\]/, '');
-        console.log(`[multi] Loading [${i+1}/${total}] ${p}`);
         showProgress(`Loading ${i + 1} / ${total}: ${folderName}`, (i / total) * 90);
         try {
-          console.log(`[multi] Calling read_kestrel_csv(${p})...`);
           const result = await window.pywebview.api.read_kestrel_csv(p);
-          console.log(`[multi] read_kestrel_csv result:`, result);
-          if (!result.success) { 
-            console.warn('[multi] Skipping', p, 'error:', result.error);
-            continue;
-          }
-          console.log(`[multi] Parsing CSV data (${result.data.length} bytes)...`);
+          if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
+          if (!result.success) continue;
           const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
           const newRows = parsed.data || [];
           const newFields = parsed.meta.fields || [];
-          console.log(`[multi] Parsed ${newRows.length} rows with ${newFields.length} fields`);
           for (const f of newFields) if (!header.includes(f)) header.push(f);
           const root = result.root || p;
           const currentSlot = slot++;
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = currentSlot; }
           rows = rows.concat(newRows);
           loadedCount++;
-          console.log(`[multi] Successfully loaded folder ${folderName}, now have ${rows.length} total rows`);
         } catch (e) {
-          console.warn('[multi] Failed to load', p, 'error:', e);
+          console.warn('[multi] Failed to load', p, e);
         }
       }
-      if (loadedCount === 0) { 
-        console.error('[multi] No folders could be loaded! loadedCount=0');
-        hideProgress(); 
-        setStatus('No folders could be loaded'); 
-        return; 
-      }
-      console.log(`[multi] Successfully loaded ${loadedCount} folders with ${rows.length} total rows`);
+      if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
+      if (loadedCount === 0) { hideProgress(); setStatus('No folders could be loaded'); return; }
       showProgress(`Building scenes from ${loadedCount} folder${loadedCount === 1 ? '' : 's'}…`, 95);
       // For single-folder image-loading compat: set rootPath to first loaded root.
       // Per-row __rootPath handles multi-folder image loading in getBlobUrlForPath.
