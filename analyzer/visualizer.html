@@ -1159,9 +1159,9 @@
       flex-direction: column;
       gap: 10px;
       padding: 16px;
-      width: min(920px, 96vw);
-      height: 80vh;
-      max-height: 88vh;
+      width: min(96vw, calc(100vw - 80px));
+      height: min(88vh, calc(100vh - 80px));
+      max-height: none;
       box-sizing: border-box;
     }
 
@@ -2631,11 +2631,11 @@
           </div>
           <div class="analyze-dlg-tree-wrap">
             <div id="analyzeDlgTree"></div>
-            <div id="analyzeScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
-              <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
-              <div class="load-progress-track">
-                <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
-              </div>
+          </div>
+          <div id="analyzeScanProgress" class="load-progress hidden" style="margin:0 6px">
+            <div class="load-progress-label" id="analyzeScanLabel">Scanning folders…</div>
+            <div class="load-progress-track">
+              <div id="analyzeScanFill" class="load-progress-fill" style="width:0%"></div>
             </div>
           </div>
         </div>
