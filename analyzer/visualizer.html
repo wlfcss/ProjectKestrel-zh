@@ -364,10 +364,15 @@
       overflow: clip;
       display: flex;
       flex-direction: column;
-      /* contain:layout style isolates style invalidation to this card only —
-         hover state changes on one card no longer force the browser to re-evaluate
-         descendant selectors across all other cards in the grid */
-      contain: layout style;
+      /* content-visibility:auto lets the browser skip ALL rendering work (style,
+         layout, paint) for cards that are off-screen.  This is the single biggest
+         scroll-perf win when hundreds/thousands of scene cards are in the DOM:
+         each image-load paint invalidation stays scoped to the visible card
+         instead of triggering an O(n) walk across every card in the grid.
+         contain-intrinsic-size gives the grid a stable placeholder height so
+         scroll position and scrollbar size stay correct. */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 280px;
     }
 
     .card:hover {
@@ -2921,23 +2926,42 @@
 
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-    // ── Lazy image loader ───────────────────────────────────────────────────────
-    // Mirrors culling.html's pattern exactly to ensure unobstructed performance.
+    // ── Lazy image loader (throttled) ────────────────────────────────────────────
+    // Concurrency-limited to avoid flooding the Python IPC bridge with dozens of
+    // simultaneous read_image_file calls when a large section of the grid scrolls
+    // into view.  Excess loads are queued and drained as earlier ones finish.
+    const _imgLoadThrottle = { active: 0, max: 30, queue: [] };
+    function _scheduleLoad(fn) {
+      if (_imgLoadThrottle.active < _imgLoadThrottle.max) {
+        _imgLoadThrottle.active++;
+        fn().finally(() => {
+          _imgLoadThrottle.active--;
+          if (_imgLoadThrottle.queue.length) _scheduleLoad(_imgLoadThrottle.queue.shift());
+        });
+      } else {
+        _imgLoadThrottle.queue.push(fn);
+      }
+    }
+
     const _lazyObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const img = entry.target;
         const loader = img._lazyLoader;
-        if (loader) { loader(); delete img._lazyLoader; }
+        if (loader) { _scheduleLoad(loader); delete img._lazyLoader; }
         _lazyObserver.unobserve(img);
       }
     }, { rootMargin: '300px' });
 
     function lazyLoadImg(img, resolverFn) {
-      // Pre-wrap once at attach time — culling.html pattern
       img._lazyLoader = async () => {
         const url = await resolverFn();
-        if (url) img.src = url;
+        if (url) {
+          img.src = url;
+          // Let the browser decode the image off the main thread before the
+          // next paint, preventing jank from synchronous decode.
+          try { await img.decode(); } catch (_) { /* broken/aborted image */ }
+        }
       };
       _lazyObserver.observe(img);
     }
@@ -3123,6 +3147,16 @@
     // Blob URL cache per path
     const blobUrlCache = new Map();
 
+    /** Convert a base64 string to a Blob Object URL.  Unlike data: URIs, blob:
+     *  URLs are decoded asynchronously by the browser's image-decode thread,
+     *  keeping the main thread free during scroll. */
+    function _base64ToBlobUrl(b64, mime) {
+      const bin = atob(b64);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([buf], { type: mime || 'image/jpeg' }));
+    }
+
     async function getBlobUrlForPath(relOrAbsPath, rootOverride) {
       if (!relOrAbsPath) return null;
       const effectiveRoot = rootOverride || rootPath;
@@ -3140,9 +3174,12 @@
         try {
           const result = await window.pywebview.api.read_image_file(rel, effectiveRoot);
           if (result && result.success && result.data) {
-            const dataUrl = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
-            blobUrlCache.set(cacheKey, dataUrl);
-            return dataUrl;
+            // Use a blob: URL instead of a data: URL so the browser can decode
+            // the image asynchronously on its decode thread rather than blocking
+            // the main thread with synchronous base64 + JPEG/PNG parsing.
+            const blobUrl = _base64ToBlobUrl(result.data, result.mime);
+            blobUrlCache.set(cacheKey, blobUrl);
+            return blobUrl;
           }
         } catch (e) {
           console.error('Python API image read failed:', e);
@@ -5250,7 +5287,7 @@
           if (!isLive && _thumbCache.has(key)) { img.src = _thumbCache.get(key); return; }
           const result = await window.pywebview.api.read_image_file(rel, root);
           if (result && result.success && result.data) {
-            const url = `data:${result.mime || 'image/jpeg'};base64,${result.data}`;
+            const url = _base64ToBlobUrl(result.data, result.mime);
             if (!isLive) _thumbCache.set(key, url);
             img.src = url;
           }
@@ -5453,7 +5490,7 @@
       try {
         const r = await window.pywebview.api.read_image_file(relPath, rootPath);
         if (r && r.success && r.data) {
-          const url = `data:${r.mime || 'image/jpeg'};base64,${r.data}`;
+          const url = _base64ToBlobUrl(r.data, r.mime);
           if (!isLive) _thumbCache.set(key, url);
           imgEl.src = url;
         }
