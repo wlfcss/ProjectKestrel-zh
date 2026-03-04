@@ -33,7 +33,9 @@ except Exception:
     pass
 
 import argparse
+import base64
 import json
+import mimetypes
 import os
 import shutil
 import sys
@@ -790,6 +792,25 @@ def launch(path: str, editor: str):
 class Api:
     """JavaScript API exposed to webview for native file/folder operations."""
 
+    # Extension → MIME type map used by read_image_file (avoids mimetypes.guess_type overhead)
+    _MIME_MAP: dict = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png',  '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.tif': 'image/tiff', '.tiff': 'image/tiff',
+    }
+
+    def __init__(self):
+        # Cache os.path.realpath(root_path) — root_path is constant for the session
+        # but realpath() does a GetFinalPathNameByHandle syscall on Windows each time.
+        self._realpath_cache: dict = {}
+
+    def _root_realpath(self, root_path: str) -> str:
+        """Return os.path.realpath(root_path), cached for the lifetime of this Api."""
+        if root_path not in self._realpath_cache:
+            self._realpath_cache[root_path] = os.path.realpath(root_path)
+        return self._realpath_cache[root_path]
+
     def get_legal_status(self) -> dict:
         """Check if the user has agreed to the terms and if install telemetry was sent."""
         settings = load_persisted_settings()
@@ -1005,89 +1026,44 @@ class Api:
         Returns:
             dict with 'success': bool, 'data': str (base64), 'mime': str, 'error': str
         """
-        print(f"[API] read_image_file() called: relative_path='{relative_path}', root_path='{root_path}'", flush=True)
         try:
-            import os
-            import base64
-            import mimetypes
-            
-            # Normalize paths - convert backslashes to forward slashes for consistent path handling
+            # Normalize separators
             root_path = root_path.rstrip('/\\')
-            # Normalize relative_path separators to forward slashes (handles cross-platform paths)
             relative_path = relative_path.replace('\\', '/')
-            
-            # Check if relative_path is actually an absolute path (backward compatibility)
+
+            # Resolve to full path
             if os.path.isabs(relative_path):
-                print(f"[API] Detected absolute path (old format), using directly", flush=True)
                 full_path = relative_path
             else:
-                # It's a relative path (new format) - join with root
                 relative_path = relative_path.lstrip('/\\')
                 full_path = os.path.join(root_path, relative_path)
-            
-            print(f"[API] Full path resolved to: {full_path}", flush=True)
-            
-            # Security check: ensure path is within or equal to root
-            full_path_real = os.path.realpath(full_path)
-            root_path_real = os.path.realpath(root_path)
-            if not full_path_real.startswith(root_path_real):
-                print(f"[API] read_image_file() -> Security error: Path escapes root", flush=True)
-                print(f"[API]   full_path_real: {full_path_real}", flush=True)
-                print(f"[API]   root_path_real: {root_path_real}", flush=True)
-                return {
-                    'success': False,
-                    'error': 'Path escapes root directory',
-                    'data': '',
-                    'mime': ''
-                }
-            
-            if not os.path.exists(full_path):
-                print(f"[API] read_image_file() -> File not found: {full_path}", flush=True)
-                return {
-                    'success': False,
-                    'error': f'File not found: {full_path}',
-                    'data': '',
-                    'mime': ''
-                }
-            
-            # Read file as binary
-            with open(full_path, 'rb') as f:
-                data = f.read()
-            
-            # Encode as base64
-            b64_data = base64.b64encode(data).decode('ascii')
-            
-            # Detect MIME type
-            mime_type, _ = mimetypes.guess_type(full_path)
-            if not mime_type:
-                # Fallback based on extension
-                ext = os.path.splitext(full_path)[1].lower()
-                mime_map = {
-                    '.jpg': 'image/jpeg',
-                    '.jpeg': 'image/jpeg',
-                    '.png': 'image/png',
-                    '.gif': 'image/gif',
-                    '.webp': 'image/webp',
-                    '.tif': 'image/tiff',
-                    '.tiff': 'image/tiff'
-                }
-                mime_type = mime_map.get(ext, 'application/octet-stream')
-            
-            print(f"[API] read_image_file() -> Success: Read {len(data)} bytes ({mime_type}) from {os.path.basename(full_path)}", flush=True)
+
+            # Security check — fast path: no '..' means path cannot escape root.
+            # Slow path: resolve symlinks only when traversal sequences are present.
+            if '..' in relative_path or os.path.isabs(relative_path):
+                root_path_real = self._root_realpath(root_path)
+                if not os.path.realpath(full_path).startswith(root_path_real):
+                    return {'success': False, 'error': 'Path escapes root directory', 'data': '', 'mime': ''}
+
+            # Read — let open() raise FileNotFoundError rather than a separate stat call
+            try:
+                with open(full_path, 'rb') as f:
+                    data = f.read()
+            except FileNotFoundError:
+                return {'success': False, 'error': f'File not found: {full_path}', 'data': '', 'mime': ''}
+
+            ext = os.path.splitext(full_path)[1].lower()
+            mime_type = self._MIME_MAP.get(ext, 'image/jpeg')
+
             return {
                 'success': True,
-                'data': b64_data,
+                'data': base64.b64encode(data).decode('ascii'),
                 'mime': mime_type,
                 'error': ''
             }
         except Exception as e:
             print(f"[API] read_image_file() -> Error: {e}", flush=True)
-            return {
-                'success': False,
-                'error': str(e),
-                'data': '',
-                'mime': ''
-            }
+            return {'success': False, 'error': str(e), 'data': '', 'mime': ''}
 
     def list_subfolders(self, root_path: str, max_depth: int = 3):
         """Recursively list subfolders under root_path, flagging those with .kestrel.

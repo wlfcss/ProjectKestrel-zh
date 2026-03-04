@@ -3556,7 +3556,9 @@
           const frag = document.createDocumentFragment();
           for (const s of slice) frag.appendChild(buildCard(s));
           gridEl.appendChild(frag);
-          await sleep(16);
+          // Gate each batch to the real vsync boundary so image-load callbacks
+          // can't interleave with DOM construction mid-frame
+          await new Promise(r => requestAnimationFrame(r));
         }
       }
     }
