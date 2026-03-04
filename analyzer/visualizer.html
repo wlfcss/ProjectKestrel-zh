@@ -2922,22 +2922,23 @@
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     // ── Lazy image loader ───────────────────────────────────────────────────────
-    // Defers getBlobUrlForPath until the <img> is near the viewport.
-    // No concurrency cap — the Python bridge handles parallelism itself.
-    const _lazyObserver = new IntersectionObserver((entries, obs) => {
+    // Mirrors culling.html's pattern exactly to ensure unobstructed performance.
+    const _lazyObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         const img = entry.target;
-        obs.unobserve(img);
-        const resolve = img._lazyResolve;
-        if (!resolve) continue;
-        delete img._lazyResolve;
-        resolve().then(url => { if (url) img.src = url; }).catch(() => { });
+        const loader = img._lazyLoader;
+        if (loader) { loader(); delete img._lazyLoader; }
+        _lazyObserver.unobserve(img);
       }
     }, { rootMargin: '300px' });
 
     function lazyLoadImg(img, resolverFn) {
-      img._lazyResolve = resolverFn;
+      // Pre-wrap once at attach time — culling.html pattern
+      img._lazyLoader = async () => {
+        const url = await resolverFn();
+        if (url) img.src = url;
+      };
       _lazyObserver.observe(img);
     }
     // ── End lazy image loader ────────────────────────────────────────────────────
@@ -3556,9 +3557,6 @@
           const frag = document.createDocumentFragment();
           for (const s of slice) frag.appendChild(buildCard(s));
           gridEl.appendChild(frag);
-          // Gate each batch to the real vsync boundary so image-load callbacks
-          // can't interleave with DOM construction mid-frame
-          await new Promise(r => requestAnimationFrame(r));
         }
       }
     }
