@@ -1,9 +1,7 @@
 # Project Kestrel To-Do and Changelog
 
 * Merge select changes from recent pull request #14 --> filtering detections, expanding XMP metadata support, TIFF file fix
-* Fix issue with analytics compute time data not being sent by default
 * Implement new logo/icon.
-* Potentially improve "new version available" methodology
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 
 # Priority Issues
