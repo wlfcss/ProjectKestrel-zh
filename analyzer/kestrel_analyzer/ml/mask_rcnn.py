@@ -57,7 +57,8 @@ class MaskRCNNWrapper:
                 masks = masks[: pred_t + 1]
                 pred_boxes = pred_boxes[: pred_t + 1]
                 pred_class = pred_class[: pred_t + 1]
-                return masks, pred_boxes, pred_class, pred_score[: pred_t + 1]
+                pred_score = pred_score[: pred_t + 1]
+                return self.filter_overlapping_detections(masks, pred_boxes, pred_class, pred_score)
             except Exception as e:
                 if attempt < 2:
                     print(f"Prediction attempt {attempt + 1} failed: {e}. Retrying...")
@@ -119,6 +120,40 @@ class MaskRCNNWrapper:
         y_min = int(center[1] - s_new / 2)
         y_max = int(center[1] + s_new / 2)
         return x_min, x_max, y_min, y_max
+
+    @staticmethod
+    def filter_overlapping_detections(masks, pred_boxes, pred_class, pred_score, iou_threshold=0.5):
+        """Remove lower-confidence detections that overlap significantly with higher-confidence ones."""
+        if masks is None or len(masks) == 0:
+            return masks, pred_boxes, pred_class, pred_score
+
+        n = len(pred_score)
+        keep = [True] * n
+        # Sort indices by score descending
+        sorted_indices = sorted(range(n), key=lambda i: pred_score[i], reverse=True)
+
+        for i_idx, i in enumerate(sorted_indices):
+            if not keep[i]:
+                continue
+            for j in sorted_indices[i_idx + 1:]:
+                if not keep[j]:
+                    continue
+                # Compute mask IoU
+                intersection = np.logical_and(masks[i], masks[j]).sum()
+                union = np.logical_or(masks[i], masks[j]).sum()
+                if union > 0 and intersection / union > iou_threshold:
+                    keep[j] = False
+
+        indices = [i for i in range(n) if keep[i]]
+        if not indices:
+            return masks, pred_boxes, pred_class, pred_score
+
+        return (
+            masks[indices],
+            [pred_boxes[i] for i in indices],
+            [pred_class[i] for i in indices],
+            [pred_score[i] for i in indices],
+        )
 
     def get_square_crop(self, mask, img, resize=True):
         x_min, x_max, y_min, y_max = self._get_bounding_box(mask)

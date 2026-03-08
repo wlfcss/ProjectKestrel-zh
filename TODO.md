@@ -1,6 +1,6 @@
 # Project Kestrel To-Do and Changelog
 
-* Merge select changes from recent pull request #14 --> filtering detections, expanding XMP metadata support, TIFF file fix
+* Merge select changes from recent pull request #14 --> expanding XMP metadata support
 * Implement new logo/icon.
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 
