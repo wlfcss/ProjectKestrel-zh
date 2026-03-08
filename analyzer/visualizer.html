@@ -673,6 +673,23 @@
       border-color: #3a84e6;
       color: #b8daf0;
     }
+    .write-metadata-btn {
+      margin-left: 6px;
+      padding: 3px 12px;
+      font-size: 12px;
+      background: #1a2a1e;
+      color: #7ed4a0;
+      border: 1px solid #2a5a3b;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s;
+    }
+    .write-metadata-btn:hover {
+      background: #243d2c;
+      border-color: #3ae67a;
+      color: #b0f0c8;
+    }
 
     .folder-group-grid.hidden {
       display: none;
@@ -3609,6 +3626,13 @@
           cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(rp); });
           hdr.appendChild(cullingBtn);
 
+          // Add Write Metadata button
+          const writeMetaBtn = document.createElement('button');
+          writeMetaBtn.className = 'write-metadata-btn';
+          writeMetaBtn.textContent = 'Write Metadata';
+          writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(rp); });
+          hdr.appendChild(writeMetaBtn);
+
           gridEl = document.createElement('div');
           gridEl.className = 'folder-group-grid grid' + (collapsed ? ' hidden' : '');
 
@@ -6498,6 +6522,57 @@
       }
     }
 
+    // ---- Write Metadata launcher ----
+    async function writeMetadataForFolder(rootPath) {
+      if (!window.pywebview?.api) {
+        showToast('Write Metadata requires desktop mode', 4000);
+        return;
+      }
+      try {
+        const folderRows = rows.filter(r => r.__rootPath === rootPath);
+        if (!folderRows.length) {
+          showToast('No images found for this folder', 3000);
+          return;
+        }
+        const payload = folderRows.map(r => ({
+          filename: r.filename,
+          rating: getRating(r),
+          culled: 'accept',
+          species: r.species || '',
+          family: r.family || '',
+          quality: r.quality != null ? r.quality : null,
+        }));
+
+        showToast('Writing XMP metadata\u2026', 2000);
+        const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false);
+        if (!res.success) {
+          showToast('Write Metadata failed: ' + (res.error || 'Unknown error'), 5000);
+          return;
+        }
+        if (res.skipped_conflicts && res.skipped_conflicts.length > 0) {
+          const n = res.skipped_conflicts.length;
+          const ok = confirm(
+            `${n} existing XMP file${n === 1 ? '' : 's'} in this folder were created by another application (e.g. Lightroom or darktable).\n\nOverwrite them with Kestrel metadata?`
+          );
+          if (ok) {
+            const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true);
+            if (!res2.success) {
+              showToast('Write Metadata failed: ' + (res2.error || 'Unknown error'), 5000);
+              return;
+            }
+            showToast(`Metadata written: ${res2.written} file${res2.written === 1 ? '' : 's'}`, 4000);
+          } else {
+            showToast(`Metadata written: ${res.written || 0} written, ${n} skipped`, 4000);
+          }
+        } else {
+          showToast(`Metadata written: ${res.written} file${res.written === 1 ? '' : 's'}`, 4000);
+        }
+      } catch (e) {
+        console.error('writeMetadataForFolder error', e);
+        showToast('Error writing metadata', 4000);
+      }
+    }
+
     // Reload current folders (called from Python via evaluate_js after culling completes)
     async function reloadCurrentFolders() {
       const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
@@ -6617,6 +6692,12 @@
         position: 'bottom',
       },
       {
+        title: 'Write XMP Metadata',
+        body: 'Click <b>Write Metadata</b> to write XMP sidecar files alongside your photos. These <code>.xmp</code> files carry Kestrel\u2019s star ratings, species ID, and quality scores in a format that <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors understand natively.<br><br>\u26a0\ufe0f <b>Write XMP files <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
+        target: '.write-metadata-btn',
+        position: 'bottom',
+      },
+      {
         title: 'Settings',
         body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Darktable, Lightroom, or system default). Double-clicking a photo will open it there.',
         target: '#openSettings',
@@ -6624,7 +6705,7 @@
       },
       {
         title: 'You\u2019re All Set!',
-        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br><br>Click the <b>?</b> button anytime to replay this tour. Happy birding!',
+        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br>\u2022 <b>Write Metadata</b> to export ratings &amp; species to Lightroom or darktable<br><br>Click the <b>?</b> button anytime to replay this tour. Happy birding!',
         target: null,
       },
     ];

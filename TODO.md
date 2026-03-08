@@ -1,8 +1,9 @@
 # Project Kestrel To-Do and Changelog
 
-* Merge select changes from recent pull request #14 --> metadata automatic writing
+* Merge select changes from recent pull request #14 --> test metadata writing.
 * Implement new logo/icon.
 * Investigate refinements to image quality thresholding from recent pull request #14. 
+* Investigate GPU support from recent pull request #14
 
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
