@@ -1,7 +1,5 @@
 # Project Kestrel To-Do and Changelog
 
-* Merge select changes from recent pull request #14 --> test metadata writing.
-* Implement new logo/icon.
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
 
