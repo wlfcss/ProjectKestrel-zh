@@ -1714,6 +1714,9 @@
             filename: r.filename,
             rating: getRating(r),
             culled: cullingState.get(r.filename) || 'accept',
+            species: r.species || '',
+            family: r.family || '',
+            quality: r.quality != null ? r.quality : null,
           }));
 
           // First pass: detect conflicts (existing non-Kestrel XMPs)

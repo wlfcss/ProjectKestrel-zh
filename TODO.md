@@ -1,6 +1,6 @@
 # Project Kestrel To-Do and Changelog
 
-* Merge select changes from recent pull request #14 --> expanding XMP metadata support
+* Merge select changes from recent pull request #14 --> metadata automatic writing
 * Implement new logo/icon.
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 
