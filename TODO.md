@@ -1,5 +1,11 @@
 # Project Kestrel To-Do and Changelog
 
+* Merge select changes from recent pull request #14 --> filtering detections, expanding XMP metadata support, TIFF file fix
+* Fix issue with analytics compute time data not being sent by default
+* Implement new logo/icon.
+* Potentially improve "new version available" methodology
+* Investigate refinements to image quality thresholding from recent pull request #14. 
+
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
 - Add "Threshold"/basic customization support (star ratings or Q score) to culling assistant
