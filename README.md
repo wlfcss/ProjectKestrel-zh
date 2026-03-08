@@ -213,6 +213,23 @@ your_photos/
 
 The `.kestrel` folder will require an additional 1MB of disk space for every ~100MB of RAW files. This folder may also include error or warning logs.
 
+### Building Logo Files (Development)
+
+If you update the logo (`assets/logo.svg`), you can regenerate all logo assets (PNG, ICO, and Microsoft Store formats) using the build script:
+
+```bash
+cd assets
+python build_logo_files.py
+```
+
+This script will:
+- Convert `logo.svg` to `.ico` file
+- Generate PNG files at various sizes (256×256, 44×44, 150×150, 310×310)
+- Create Microsoft Store app package logos (StoreLogo, Wide310x150Logo, SplashScreen)
+- Copy the generated `.ico` and `.svg` to the `analyzer/` directory
+
+The script automatically installs required dependencies (cairosvg, Pillow) on first run and maintains the original SVG's aspect ratio when creating square logo variants.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit pull requests, report bugs, or suggest features.
