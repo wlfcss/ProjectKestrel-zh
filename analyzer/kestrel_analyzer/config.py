@@ -15,7 +15,7 @@ WILDLIFE_CATEGORIES = [
 ]
 
 RAW_EXTENSIONS = [".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".raf", ".rw2", ".pef", ".sr2", ".x3f"]
-JPEG_EXTENSIONS = [".jpg", ".jpeg", ".png"]
+JPEG_EXTENSIONS = [".jpg", ".jpeg", ".png", '.tiff', '.tif']
 
 DATABASE_NAME = "kestrel_database.csv"
 METADATA_FILENAME = "kestrel_metadata.json"

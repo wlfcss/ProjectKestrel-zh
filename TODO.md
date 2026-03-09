@@ -1,5 +1,8 @@
 # Project Kestrel To-Do and Changelog
 
+* Investigate refinements to image quality thresholding from recent pull request #14. 
+* Investigate GPU support from recent pull request #14
+
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
 - Add "Threshold"/basic customization support (star ratings or Q score) to culling assistant

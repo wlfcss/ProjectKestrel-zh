@@ -9,7 +9,7 @@ from PyInstaller.utils.hooks import collect_all
 # See if sample_sets exists
 print(os.listdir("sample_sets"))
 # Build datas list with proper sample_sets bundling using Tree()
-datas = [('models', 'models'), ('gui_app.py', '.'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('gui_helpers.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
+datas = [('models', 'models'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.')]
 
 # Add sample_sets using Tree() - convert 3-element tuples to 2-element format for datas
 sample_sets_tree = Tree('sample_sets', prefix='sample_sets')

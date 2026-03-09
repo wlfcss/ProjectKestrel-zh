@@ -1,86 +1,73 @@
 # Project Kestrel 🦅
 
-Project Kestrel is a Machine Learning-powered bird photography analysis software that groups your burst photos together and ranks them by image quality. Let Kestrel move you from your RAW photo collection to a searchable, quality-sorted and interactive library, then take the last few steps to select your favorite photos to edit and share!
+Project Kestrel uses machine learning to organize your bird photo collection. By grouping similar photos together, ranking them by sharpness, and tagging them by bird species, Kestrel turns your photography into a searchable, quality-sorted, and interactive library.
 
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey.svg)
 
-[Donate](https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A) | [Visit Projectkestrel.org](https://projectkestrel.org)
+[Visit Projectkestrel.org](https://projectkestrel.org) | [Donate](https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A)
 
 ## At a Glance
 
-Are you a bird photographer? Do you take hundreds or thousands of bird photos, often in bursts? How much time do you spend comparing your images to find the sharpest ones to edit and share?
-
-Project Kestrel creates a searchable, quality-sorted, and easy-to-browse visualization of your bird photo collection. To do this, Kestrel first scans through your photos, grouping them together by scene/burst, and identifying birds in each photo. After that, it anazlyes the bird, identifying its family/species and estimating the **objective** image quality (sharpness, motion blur, and noise).
-
-After Kestrel is done scanning, run the visualizer tool to intelligently browse through your photos. Search by species or family, and double-click on an image you like to launch it in your favorite photo editor (darktable, lightroom, etc.) 
-
-✅ Kestrel is for:
-* Hobbyist/Professional bird photographers who take **hundreds or thousands of photos in bursts.**
-* Bird photographers who want to **retain control** and decision-making authority when selecting their favorite photos.
-* Bird photographers who spend too much time painstakingly scrutinizing their images to find minor differences in sharpness, motion blur, or noise.
-
-❌ Kestrel does NOT:
-* Attempt to evaluate your photos on **subjective** characteristics (ex. bird pose, framing, etc.)
-* Delete or modify any of your photos
-* Do any processing in the cloud (All processing is done locally on your computer!)
-* Collect or transmit any data about your photos.
-
+* ✅ **Sort by sharpness** to skip hours of tedious manual culling.
+* ✅ **Instantly search** all your photography work by bird species or family.
+* ✅ **Double-click** on any photo to open in your favorite editor.
+* ✅ **100% Local**: All processing is done locally on your device.
 
 ## Get Started
 
-Download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases) for your platform! Windows and macOS users can simply download and run the installer or application. Once installed, run Kestrel Analyzer to analyze your photos. Once it is finished, run Kestrel Visualizer to browse your photos!
+For the best experience, download the latest version for your platform from [ProjectKestrel.org](https://projectkestrel.org/download) or the [GitHub Releases page](https://github.com/SanjaySoniLV/ProjectKestrel/releases).
 
-Linux users or those who prefer to run from source code should see the Quick Start section below.
+Project Kestrel is now a single, unified application for analyzing and exploring your photos.
 
-## Gallery/Quick Tutorial
+## Tutorial: 5 Steps to Better Culling
 
-First, open Kestrel Analyzer. Kestrel will analyze all of your photos, spotting birds, checking their species, and estimating the objective image quality.
-![alt text](readme_imgs/image.png)
+### Step 1: Install & Open
+Download and install Kestrel, then launch the application to get started.
+![Install Kestrel](readme_imgs/kestrel-open.png)
 
-After Kestrel is done, it is time to launch the interactive visualizer. Search by bird species and click on a scene.
-![alt text](readme_imgs/image-1.png)
+### Step 2: Analyze Folders
+Select the folders containing your RAW or JPEG photos. Kestrel will scan them, detecting birds and estimating image quality.
+![Analyze Folders](readme_imgs/live-analysis.png)
 
-Simply double-click on a scene to view all your photos, sorted by quality! Find a pose you like? Double-click to open in darktable or whatever photo software you prefer.
-![alt text](readme_imgs/image-2.png)
+### Step 3: Explore Results
+Browse your collection! Photos are automatically grouped by "scene" (bursts) and organized from sharpest to blurriest.
+![Explore Results](readme_imgs/kestrel-overview.png)
 
-Kestrel has sorted your photos from sharp to blurry. No more time painstakingly reviewing each bird!
-![alt text](readme_imgs/image-3.png)
+### Step 4: Rapid Culling
+Use the Culling Assistant to quickly split photos into "Accept" and "Reject" groups.
+![Culling Assistant](readme_imgs/culling-assistant.png)
 
-You can even search by bird species! (Note: Species detection is experimental and may be incorrect.)
-![alt text](readme_imgs/image-6.png)
+### Step 5: Search & Discover
+Search through thousands of photos by species or family to instantly rediscover shots from any outing.
+![Search](readme_imgs/kestrel-search.png)
 
+---
 
 ## Features
 
-- **Automatic Bird Detection**: Kestrel will find exactly where the bird is in your photo
-- **Family Classification**: Kestrel will guess the bird family (ex. Waterfowl, Hummingbirds, Sparrows) and species, allowing you to search your photos quickly!
-- **Objective Quality Assessment**: Kestrel will analyze the quality of your photos based on sharpness, motion blur, and noise. It will NOT analyze your photos based on bird pose, framing, or other subjective characteristics.
-- **Intelligent Organization**: Kestrel groups your photos by scene/burst, allowing you to compare all images of a given subject.
-- **Responsive, Interactive Visualizer**: Browse Kestrel's results and double-click on photos to import into your preferred editing workflow.
-- **RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats using rawpy library
+- **Automatic Bird Detection**: Kestrel finds exactly where the bird is in your photo and focuses its analysis there.
+- **Family & Species Search**: Classifies birds so you can filter your library by species or family keywords.
+- **Objective Quality Ranking**: Only considers sharpness, motion blur, and noise, letting you keep full artistic control.
+- **Intelligent Scene Grouping**: Bursts are grouped automatically so you can compare similar frames side-by-side.
+- **RAW File Support**: Processes CR2, CR3, NEF, ARW, DNG, and other RAW formats using the `rawpy` library.
 
-## 🚀 Quick Start
+## 🚀 Running from Source
 
-For the easiest setup, download the [latest release](https://github.com/SanjaySoniLV/ProjectKestrel/releases) for your platform. Windows and macOS executables are available!
+If you are on Linux or prefer to run from source code, follow these steps:
 
-### Running from Source (Linux or Development)
-
-If you prefer to run Kestrel from source code or are on Linux, follow these steps:
-
-#### Prerequisites
+### Prerequisites
 - Python 3.12+
 - Git (for cloning)
 
-#### Installation
+### Installation
 
-1. Clone the repository with [Git](https://git-scm.com/):
+1. Clone the repository:
 ```bash
 git clone https://github.com/SanjaySoniLV/ProjectKestrel.git
 cd ProjectKestrel
 ```
-or simply download the Code as a .zip file and extract it.
 
 2. Install dependencies:
 ```bash
@@ -89,40 +76,11 @@ pip install -r requirements.txt
 
 ### Usage
 
-#### 1. Analyze a Photo Directory
-
-First open the analyzer.
-
-```bash
-python analyzer/main.py
-```
-
-Select a folder and hit start. The script will:
-- Process each image to detect birds, classify species, and assess quality
-- Generate a database of results in `{your_photo_folder}/.kestrel/kestrel_database.csv`
-- Create export JPEGs and cropped bird images
-
-![alt text](readme_imgs/image-4.png)
-
-> Note: The script will take some time to run. All progress is saved automatically. If you encounter any errors, try re-running the script, and Kestrel will continue where it left off.
-
-> Note: Kestrel comes with a set of test images. Simply open the `test_imgs` folder and hit Start. 
-
-If you want to use a command line to analyze your photos, run:
-```bash
-python analyzer/cli.py "C:\\path\\to\\photos" --no-gpu
-```
-
-#### 2. Visualize Results
-
-Launch the interactive visualizer to browse your analyzed photos:
-
+Launch the unified application:
 ```bash
 python visualizer/visualizer.py
 ```
-
-Open the folder that you analyzed to explore its contents and Kestrel's analysis:
-![alt text](readme_imgs/image-10.png)
+*(Note: In the unified version, the visualizer serves as the main entry point for both analysis and browsing.)*
 
 Features of the visualizer:
 - **Scene View**: Browse grouped similar images
@@ -212,6 +170,23 @@ your_photos/
 ```
 
 The `.kestrel` folder will require an additional 1MB of disk space for every ~100MB of RAW files. This folder may also include error or warning logs.
+
+### Building Logo Files (Development)
+
+If you update the logo (`assets/logo.svg`), you can regenerate all logo assets (PNG, ICO, and Microsoft Store formats) using the build script:
+
+```bash
+cd assets
+python build_logo_files.py
+```
+
+This script will:
+- Convert `logo.svg` to `.ico` file
+- Generate PNG files at various sizes (256×256, 44×44, 150×150, 310×310)
+- Create Microsoft Store app package logos (StoreLogo, Wide310x150Logo, SplashScreen)
+- Copy the generated `.ico` and `.svg` to the `analyzer/` directory
+
+The script automatically installs required dependencies (cairosvg, Pillow) on first run and maintains the original SVG's aspect ratio when creating square logo variants.
 
 ## 🤝 Contributing
 
