@@ -1,5 +1,6 @@
 # Project Kestrel To-Do and Changelog
 
+* Fix UI - Live Analysis Page
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
 
