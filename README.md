@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 Launch the unified application:
 ```bash
-python visualizer/visualizer.py
+python analyzer/visualizer.py
 ```
 *(Note: In the unified version, the visualizer serves as the main entry point for both analysis and browsing.)*
 
