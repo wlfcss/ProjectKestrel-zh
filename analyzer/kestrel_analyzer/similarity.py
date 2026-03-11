@@ -2,6 +2,24 @@ import cv2
 import numpy as np
 
 
+def compute_similarity_timestamp(path1, path2):
+    """
+    Return True if two image files were captured within the same second,
+    False if they were not, or None if timestamps could not be read for either file.
+    """
+    from datetime import timedelta
+    try:
+        try:
+            from .raw_exif import get_capture_time
+        except ImportError:
+            from raw_exif import get_capture_time
+        t1 = get_capture_time(path1)
+        t2 = get_capture_time(path2)
+        return abs(t1 - t2) <= timedelta(seconds=1)
+    except Exception:
+        return None
+
+
 def compute_image_similarity_akaze(img1, img2, max_dim=1600):
     if img1 is None or img2 is None or img1.shape != img2.shape:
         return {

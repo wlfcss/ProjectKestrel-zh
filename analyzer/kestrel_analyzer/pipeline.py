@@ -23,7 +23,7 @@ from .image_utils import read_image
 print("read_image imported successfully.")
 from .ratings import quality_to_rating
 print("Importing compute_image_similarity_akaze from similarity...")
-from .similarity import compute_image_similarity_akaze
+from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
 from .logging_utils import get_log_path, log_event, log_exception, log_warning
 print("Utility functions imported successfully.")
 
@@ -194,6 +194,7 @@ class AnalysisPipeline:
             self.load_models(status_cb=status_cb)
 
             previous_image = None
+            previous_image_path = None
             if not database.empty:
                 last_row = database.iloc[-1]
                 last_filename = last_row["filename"]
@@ -202,6 +203,7 @@ class AnalysisPipeline:
                     img = read_image(last_image_path)
                     if img is not None:
                         previous_image = img
+                        previous_image_path = last_image_path
             scene_count = database["scene_count"].max() if not database.empty else 0
 
             for idx, raw_file in enumerate(new_files, start=1):
@@ -251,20 +253,45 @@ class AnalysisPipeline:
                         raise RuntimeError("Image read returned None")
 
                     stage_ctx["stage"] = "compute_similarity"
-                    similarity = compute_image_similarity_akaze(previous_image, img)
-                    if not similarity["similar"]:
-                        scene_count += 1
-                    entry.update(
-                        {
-                            "feature_similarity": similarity["feature_similarity"],
-                            "feature_confidence": similarity["feature_confidence"],
-                            "color_similarity": similarity["color_similarity"],
-                            "color_confidence": similarity["color_confidence"],
-                            "scene_count": scene_count,
-                            "similar": similarity["similar"],
-                        }
-                    )
+                    timestamp_similar = None
+                    try:
+                        timestamp_similar = compute_similarity_timestamp(previous_image_path, image_path) if previous_image_path else None
+                    except Exception as e:
+                        log_warning(
+                            self._log_path,
+                            f"Timestamp similarity check failed: {e}",
+                            stage=stage_ctx["stage"],
+                            context={"file": raw_file, "folder": folder},
+                        )
+                    
+                    if timestamp_similar is True:
+                        # Images captured within the same second — treat as similar, skip AKAZE
+                        entry.update(
+                            {
+                                "feature_similarity": -1.0,
+                                "feature_confidence": -1.0,
+                                "color_similarity": -1.0,
+                                "color_confidence": -1.0,
+                                "scene_count": scene_count,
+                                "similar": True,
+                            }
+                        )
+                    else:
+                        similarity = compute_image_similarity_akaze(previous_image, img)
+                        if not similarity["similar"]:
+                            scene_count += 1
+                        entry.update(
+                            {
+                                "feature_similarity": similarity["feature_similarity"],
+                                "feature_confidence": similarity["feature_confidence"],
+                                "color_similarity": similarity["color_similarity"],
+                                "color_confidence": similarity["color_confidence"],
+                                "scene_count": scene_count,
+                                "similar": similarity["similar"],
+                            }
+                        )
                     previous_image = img.copy()
+                    previous_image_path = image_path
 
                     stage_ctx["stage"] = "export_image"
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
