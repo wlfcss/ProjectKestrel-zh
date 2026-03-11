@@ -849,6 +849,16 @@
       overflow-y: auto;
     }
 
+    /* Settings dialog: smaller, content-sized */
+    dialog.dlg-settings {
+      width: auto;
+      max-width: min(620px, 96vw);
+      height: auto;
+      max-height: min(620px,92vh);
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
     .modal {
       display: grid;
       grid-template-columns: minmax(0, 1fr) var(--divider-w) var(--right-w);
@@ -2728,7 +2738,7 @@
   </div>
 
   <!-- Settings dialog -->
-  <dialog id="settingsDlg" class="dlg-compact">
+  <dialog id="settingsDlg" class="dlg-settings">
     <div class="settings">
       <h3 style="margin:0">Settings</h3>
 
@@ -2737,25 +2747,33 @@
         <select id="editorChoice">
           <option value="system">System Default</option>
           <option value="darktable" selected>Darktable</option>
-          <option value="lightroom">Lightroom</option>
+          <option value="lightroom">Adobe Lightroom Classic</option>
+          <option value="photoshop">Adobe Photoshop</option>
+          <option value="capture_one">Capture One</option>
+          <option value="affinity">Affinity Photo</option>
+          <option value="gimp">GIMP</option>
+          <option value="rawtherapee">RawTherapee</option>
+          <option value="luminar">Luminar Neo</option>
+          <option value="dxo">DxO PhotoLab</option>
+          <option value="on1">ON1 Photo RAW</option>
+          <option value="acdsee">ACDSee</option>
+          <option value="paintshop">PaintShop Pro</option>
+          <option value="faststone">FastStone Image Viewer</option>
+          <option value="xnview">XnView MP</option>
+          <option value="irfanview">IrfanView</option>
+          <option value="custom">Custom Application…</option>
         </select>
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Choose which editor Kestrel should use
-        when opening originals. "System Default" will use your OS default application.</div>
-
-      <div class="row">
-        <label for="backendUrl">Bridge URL</label>
-        <input id="backendUrl" type="text" placeholder="http://127.0.0.1:8765" />
+        when opening originals. &ldquo;System Default&rdquo; will use your OS default application.</div>
+      <div class="row hidden" id="customEditorRow">
+        <label for="customEditorPath">Application Path</label>
+        <input id="customEditorPath" type="text" placeholder="Path to application executable…" style="flex:1" />
+        <button id="customEditorBrowse" style="flex-shrink:0" title="Browse for application">Browse…</button>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">URL for the local visualizer bridge
-        (used when opening images in external editors). Leave as the default unless you changed the bridge port.</div>
-
-      <div class="row">
-        <label for="rootHint">Local Root (hint)</label>
-        <input id="rootHint" type="text" placeholder="/path/to/your/photos" />
+      <div class="muted hidden" id="customEditorHint" style="font-size:12px;margin-top:-6px;margin-bottom:8px">
+        Full path to an application executable (e.g. C:\Program Files\MyEditor\editor.exe or /Applications/MyEditor.app).
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Optional path hint to speed up
-        locating your photo library (helps the folder tree). Not required.</div>
 
       <div class="row">
         <label for="treeScanDepth">Tree scan depth</label>
@@ -4627,9 +4645,35 @@
 
     function showSettings() {
       const dlg = document.getElementById('settingsDlg');
-      document.getElementById('backendUrl').value = getSetting('backendUrl', 'http://127.0.0.1:8765');
-      document.getElementById('rootHint').value = getSetting('rootHint', '');
-      document.getElementById('editorChoice').value = getSetting('editor', 'darktable');
+      const editor = getSetting('editor', 'darktable');
+      const editorSelect = document.getElementById('editorChoice');
+      const customRow = document.getElementById('customEditorRow');
+      const customHint = document.getElementById('customEditorHint');
+      const customPath = document.getElementById('customEditorPath');
+      editorSelect.value = editor;
+      // If saved editor isn't in the dropdown options, treat as custom
+      if (editorSelect.value !== editor) {
+        editorSelect.value = 'custom';
+      }
+      customPath.value = getSetting('customEditorPath', '');
+      const isCustom = editorSelect.value === 'custom';
+      customRow.classList.toggle('hidden', !isCustom);
+      customHint.classList.toggle('hidden', !isCustom);
+      // Show/hide custom row when selection changes
+      editorSelect.onchange = () => {
+        const c = editorSelect.value === 'custom';
+        customRow.classList.toggle('hidden', !c);
+        customHint.classList.toggle('hidden', !c);
+      };
+      // Browse button
+      document.getElementById('customEditorBrowse').onclick = async () => {
+        if (window.pywebview?.api?.choose_application) {
+          const path = await window.pywebview.api.choose_application();
+          if (path) customPath.value = path;
+        } else {
+          showToast('Browse is only available in the desktop app', 3000);
+        }
+      };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
@@ -4650,15 +4694,15 @@
       dlg.showModal();
     }
     async function applySettings() {
-      const backendUrl = document.getElementById('backendUrl').value.trim() || 'http://127.0.0.1:8765';
-      const rootHint = document.getElementById('rootHint').value.trim();
-      const editor = document.getElementById('editorChoice').value || 'darktable';
+      const editorSelect = document.getElementById('editorChoice');
+      const editor = editorSelect.value || 'darktable';
+      const customEditorPath = document.getElementById('customEditorPath').value.trim();
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
       const settings = {
-        ...existing, backendUrl, rootHint, editor, treeScanDepth,
+        ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true
       };
       saveSettings(settings);
@@ -4666,6 +4710,7 @@
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
       try {
+        const backendUrl = getSetting('backendUrl', 'http://127.0.0.1:8765');
         const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
         await fetch(backendUrl.replace(/\/$/, '') + '/settings', {
           method: 'POST',

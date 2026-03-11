@@ -560,7 +560,11 @@ if not AUTH_TOKEN:
     # Generate an ephemeral token per run; injected into served page via /bridge_config.js
     AUTH_TOKEN = secrets.token_urlsafe(32)
 MAX_REQUEST_BYTES = int(os.environ.get('KESTREL_MAX_REQUEST_BYTES', '4096'))
-ALLOWED_EDITORS: Set[str] = {'system', 'darktable', 'lightroom'}
+ALLOWED_EDITORS: Set[str] = {
+    'system', 'darktable', 'lightroom', 'photoshop', 'capture_one',
+    'affinity', 'gimp', 'rawtherapee', 'luminar', 'dxo', 'on1',
+    'acdsee', 'paintshop', 'faststone', 'xnview', 'irfanview', 'custom',
+}
 _default_exts = ['.cr3', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.sr2', '.jpg', '.jpeg', '.png', '.tif', '.tiff']
 ALLOWED_EXTENSIONS: Set[str] = set(os.environ.get('KESTREL_ALLOWED_EXTENSIONS', ','.join(_default_exts)).lower().split(','))
 ALLOW_ANY_EXTENSION = os.environ.get('KESTREL_ALLOW_ANY_EXTENSION') == '1'
@@ -713,50 +717,198 @@ def launch(path: str, editor: str):
     if not os.path.exists(path):
         print(f"[LAUNCH] ERROR: path does not exist: {path}", flush=True)
         raise FileNotFoundError(path)
-    # Windows
-    if sys.platform.startswith('win'):
-        if editor == 'darktable':
-            dt = _find_darktable_exe()
+
+    # Custom editor: load path from settings
+    if editor == 'custom':
+        settings = load_persisted_settings()
+        custom_exe = (settings.get('customEditorPath') or '').strip()
+        if custom_exe:
             try:
-                subprocess.Popen([dt, path]); return
-            except FileNotFoundError:
-                log('darktable not found at', dt, 'falling back to system default')
-        if editor == 'lightroom':
-            # Common Lightroom Classic executable names/locations
-            lr_candidates = [
+                if sys.platform == 'darwin' and custom_exe.endswith('.app'):
+                    subprocess.Popen(['open', '-a', custom_exe, path]); return
+                else:
+                    subprocess.Popen([custom_exe, path]); return
+            except Exception as e:
+                log(f'Custom editor launch failed ({custom_exe}): {e}, falling back to system default')
+        # Fall through to system default
+        editor = 'system'
+
+    # Editor name → (Windows exe candidates, macOS app name, Linux commands)
+    _EDITOR_REGISTRY = {
+        'darktable': {
+            'win_find': lambda: [_find_darktable_exe()],
+            'mac_app': 'darktable',
+            'linux': [['flatpak', 'run', 'org.darktable.Darktable'], ['darktable']],
+        },
+        'lightroom': {
+            'win_candidates': [
                 os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Lightroom Classic', 'Lightroom.exe'),
                 os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Lightroom', 'Lightroom.exe'),
-                'lightroom.exe',
-                'Lightroom.exe'
-            ]
-            for exe in lr_candidates:
+                'Lightroom.exe',
+            ],
+            'mac_app': 'Adobe Lightroom Classic',
+            'linux': [['lightroom']],
+        },
+        'photoshop': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Photoshop 2025', 'Photoshop.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Photoshop 2024', 'Photoshop.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Photoshop 2023', 'Photoshop.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Adobe', 'Adobe Photoshop CC 2022', 'Photoshop.exe'),
+                'Photoshop.exe',
+            ],
+            'mac_app': 'Adobe Photoshop 2025',
+            'mac_app_fallbacks': ['Adobe Photoshop 2024', 'Adobe Photoshop 2023', 'Adobe Photoshop'],
+            'linux': [],
+        },
+        'capture_one': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Capture One', 'CaptureOne.exe'),
+                'CaptureOne.exe',
+            ],
+            'mac_app': 'Capture One',
+            'linux': [],
+        },
+        'affinity': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Affinity', 'Photo 2', 'Photo.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Affinity', 'Photo', 'Photo.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Affinity Photo 2', 'Photo.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Affinity Photo', 'Photo.exe'),
+            ],
+            'mac_app': 'Affinity Photo 2',
+            'mac_app_fallbacks': ['Affinity Photo'],
+            'linux': [],
+        },
+        'gimp': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'GIMP 2', 'bin', 'gimp-2.10.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'GIMP 2', 'bin', 'gimp.exe'),
+                'gimp.exe',
+            ],
+            'mac_app': 'GIMP',
+            'linux': [['flatpak', 'run', 'org.gimp.GIMP'], ['gimp']],
+        },
+        'rawtherapee': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'RawTherapee', 'rawtherapee.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'RawTherapee', '5.9', 'rawtherapee.exe'),
+                'rawtherapee.exe',
+            ],
+            'mac_app': 'RawTherapee',
+            'linux': [['flatpak', 'run', 'com.rawtherapee.RawTherapee'], ['rawtherapee']],
+        },
+        'luminar': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Skylum', 'Luminar Neo', 'Luminar Neo.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Luminar Neo', 'Luminar Neo.exe'),
+            ],
+            'mac_app': 'Luminar Neo',
+            'mac_app_fallbacks': ['Luminar AI', 'Luminar 4'],
+            'linux': [],
+        },
+        'dxo': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'DxO', 'DxO PhotoLab 7', 'DxO.PhotoLab.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'DxO', 'DxO PhotoLab 6', 'DxO.PhotoLab.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'DxO', 'DxO PhotoLab', 'DxO.PhotoLab.exe'),
+            ],
+            'mac_app': 'DxO PhotoLab 7',
+            'mac_app_fallbacks': ['DxO PhotoLab 6', 'DxO PhotoLab'],
+            'linux': [],
+        },
+        'on1': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'ON1', 'ON1 Photo RAW 2024', 'ON1 Photo RAW.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'ON1', 'ON1 Photo RAW', 'ON1 Photo RAW.exe'),
+            ],
+            'mac_app': 'ON1 Photo RAW 2024',
+            'mac_app_fallbacks': ['ON1 Photo RAW'],
+            'linux': [],
+        },
+        'acdsee': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'ACD Systems', 'ACDSee Photo Studio Ultimate 2024', 'ACDSee.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'ACD Systems', 'ACDSee', 'ACDSee.exe'),
+                'ACDSee.exe',
+            ],
+            'mac_app': None,
+            'linux': [],
+        },
+        'paintshop': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Corel', 'Corel PaintShop Pro 2024', 'Corel PaintShop Pro.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'Corel', 'Corel PaintShop Pro', 'Corel PaintShop Pro.exe'),
+            ],
+            'mac_app': None,
+            'linux': [],
+        },
+        'faststone': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'FastStone Image Viewer', 'FSViewer.exe'),
+                os.path.join(os.environ.get('ProgramFiles', ''), 'FastStone Image Viewer', 'FSViewer.exe'),
+                'FSViewer.exe',
+            ],
+            'mac_app': None,
+            'linux': [],
+        },
+        'xnview': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'XnViewMP', 'xnviewmp.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'XnViewMP', 'xnviewmp.exe'),
+                'xnviewmp.exe',
+            ],
+            'mac_app': 'XnViewMP',
+            'linux': [['xnviewmp']],
+        },
+        'irfanview': {
+            'win_candidates': [
+                os.path.join(os.environ.get('ProgramFiles', ''), 'IrfanView', 'i_view64.exe'),
+                os.path.join(os.environ.get('ProgramFiles(x86)', ''), 'IrfanView', 'i_view32.exe'),
+                'i_view64.exe',
+            ],
+            'mac_app': None,
+            'linux': [],
+        },
+    }
+
+    info = _EDITOR_REGISTRY.get(editor)
+
+    # Windows
+    if sys.platform.startswith('win'):
+        if info:
+            # Special finder for darktable
+            if 'win_find' in info:
+                candidates = info['win_find']()
+            else:
+                candidates = info.get('win_candidates', [])
+            for exe in candidates:
                 if exe and os.path.exists(exe):
                     try:
                         subprocess.Popen([exe, path]); return
                     except Exception:
                         continue
-            # Fallback to system default if Lightroom not found
+            log(f'{editor} not found on Windows, falling back to system default')
         os.startfile(path)  # type: ignore[attr-defined]
         return
+
     # macOS
     if sys.platform == 'darwin':
-        # Try editor-specific bundles first
-        if editor == 'darktable':
-            try:
-                cmd = ['open', '-a', 'darktable', path]
-                print(f"[LAUNCH] macOS: running: {cmd}", flush=True)
-                subprocess.Popen(cmd)
-                return
-            except Exception as e:
-                print(f"[LAUNCH] macOS darktable launch failed: {e}", flush=True)
-        if editor == 'lightroom':
-            try:
-                cmd = ['open', '-a', 'Adobe Lightroom Classic', path]
-                print(f"[LAUNCH] macOS: running: {cmd}", flush=True)
-                subprocess.Popen(cmd)
-                return
-            except Exception as e:
-                print(f"[LAUNCH] macOS lightroom launch failed: {e}", flush=True)
+        if info:
+            apps_to_try = []
+            if info.get('mac_app'):
+                apps_to_try.append(info['mac_app'])
+            apps_to_try.extend(info.get('mac_app_fallbacks', []))
+            for app_name in apps_to_try:
+                try:
+                    cmd = ['open', '-a', app_name, path]
+                    print(f"[LAUNCH] macOS: running: {cmd}", flush=True)
+                    subprocess.Popen(cmd)
+                    return
+                except Exception as e:
+                    print(f"[LAUNCH] macOS {app_name} launch failed: {e}", flush=True)
+            if not apps_to_try:
+                log(f'{editor} not available on macOS, falling back to system default')
 
         # System default: try a couple of strategies and log results
         try:
@@ -769,7 +921,7 @@ def launch(path: str, editor: str):
         except Exception as e:
             print(f"[LAUNCH] macOS: open() raised: {e}", flush=True)
 
-        # Fallback: try AppleScript via osascript to make Finder open the file (sometimes works when 'open' prompts)
+        # Fallback: try AppleScript via osascript
         try:
             script = f'tell application "Finder" to open (POSIX file "{path}")'
             print(f"[LAUNCH] macOS: trying osascript: {script}", flush=True)
@@ -780,7 +932,7 @@ def launch(path: str, editor: str):
         except Exception as e:
             print(f"[LAUNCH] macOS: osascript failed: {e}", flush=True)
 
-        # Last resort: reveal the file in Finder
+        # Last resort: reveal in Finder
         try:
             cmd = ['open', '-R', path]
             print(f"[LAUNCH] macOS: fallback reveal: {cmd}", flush=True)
@@ -789,14 +941,14 @@ def launch(path: str, editor: str):
         except Exception as e:
             print(f"[LAUNCH] macOS: reveal fallback failed: {e}", flush=True)
         return
+
     # Linux / other
-    if editor == 'darktable':
-        try: subprocess.Popen(['flatpak', 'run', 'org.darktable.Darktable', path]); return
-        except FileNotFoundError: pass
-    if editor == 'lightroom':
-        # Linux users may have a wrapper script named lightroom; attempt it
-        try: subprocess.Popen(['lightroom', path]); return
-        except FileNotFoundError: pass
+    if info:
+        for cmd_args in info.get('linux', []):
+            try:
+                subprocess.Popen(cmd_args + [path]); return
+            except FileNotFoundError:
+                continue
     subprocess.Popen(['xdg-open', path])
 class Api:
     """JavaScript API exposed to webview for native file/folder operations."""
@@ -911,6 +1063,38 @@ class Api:
             log(f"Error in choose_directory: {e}")
             return None
     
+    def choose_application(self):
+        """Open native file picker for choosing an application executable.
+        Returns: absolute path to selected file, or None if cancelled.
+        """
+        try:
+            if sys.platform == 'darwin':
+                import subprocess as _sp
+                script = 'POSIX path of (choose file of type {"app","APPL"} with prompt "Select an application")'
+                result = _sp.run(['osascript', '-e', script], capture_output=True, text=True, timeout=120)
+                if result.returncode == 0 and result.stdout.strip():
+                    return result.stdout.strip()
+                return None
+            else:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                if sys.platform.startswith('win'):
+                    filetypes = [('Executables', '*.exe'), ('All Files', '*.*')]
+                else:
+                    filetypes = [('All Files', '*.*')]
+                filepath = filedialog.askopenfilename(
+                    title="Select application executable",
+                    filetypes=filetypes
+                )
+                root.destroy()
+                return filepath if filepath else None
+        except Exception as e:
+            print(f"[API] choose_application() -> Error: {e}", flush=True)
+            return None
+
     def read_kestrel_csv(self, folder_path):
         """Read the kestrel_database.csv from the given folder path.
         

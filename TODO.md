@@ -1,9 +1,8 @@
 # Project Kestrel To-Do and Changelog
 
-* Fix UI - Live Analysis Page
+
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
-
 
 
 
@@ -31,3 +30,5 @@
 * Add un-group scene dialog box to the scene view.
 * Add "Save changes before opening Culling Assistant" check and verify "Save changes before exiting" check
 * Fix UI for scene editing view.
+* Fixed UI for settings page and expanded number of potential editors to several new options with a dedicated "Custom application" page.
+* Fix UI - Live Analysis Page
