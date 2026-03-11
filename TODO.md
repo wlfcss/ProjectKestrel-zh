@@ -3,11 +3,9 @@
 * Fix UI - Live Analysis Page
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
+* Fix UI for 
 
 
-* Add "Clear Kestrel Analysis" button to a right-click menu. 
-* Add un-group scene dialog box to the scene view.
-* Add "Save changes before opening Culling Assistant" check and verify "Save changes before exiting" check
 
 
 # Priority Issues
@@ -29,3 +27,6 @@
 * Removed tendency to identify other non-bird animals and placed behind a dedicated checkbox
 * Hidden "Use GPU When Available" if app is frozen due to lack of implementation in current system
 * Add check for analysis version, prompt user whether they want to re-analyze an already analyzed folder that is on a lower version. I.e. italicize if version is lower.
+* Add "Clear Kestrel Analysis" button to a right-click menu. 
+* Add un-group scene dialog box to the scene view.
+* Add "Save changes before opening Culling Assistant" check and verify "Save changes before exiting" check

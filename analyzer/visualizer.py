@@ -813,6 +813,12 @@ class Api:
         # Cache os.path.realpath(root_path) — root_path is constant for the session
         # but realpath() does a GetFinalPathNameByHandle syscall on Windows each time.
         self._realpath_cache: dict = {}
+        self._has_unsaved_changes: bool = False
+
+    def notify_dirty(self, is_dirty: bool) -> dict:
+        """Called from JS whenever the dirty flag changes."""
+        self._has_unsaved_changes = bool(is_dirty)
+        return {'success': True}
 
     def _root_realpath(self, root_path: str) -> str:
         """Return os.path.realpath(root_path), cached for the lifetime of this Api."""
@@ -2197,13 +2203,9 @@ def main():
             # When the analysis queue is running, intercept the close event so the
             # window minimizes to the taskbar instead of killing mid-analysis.
             def _on_closing():
-                # Check for unsaved changes via JS dirty flag
-                has_unsaved = False
-                try:
-                    result = win.evaluate_js('typeof dirty !== "undefined" && dirty')
-                    has_unsaved = result is True or result == 'true'
-                except Exception:
-                    pass
+                # Check for unsaved changes via the Python-side flag
+                # (avoid evaluate_js here — it deadlocks because closing runs on the GUI thread)
+                has_unsaved = getattr(api, '_has_unsaved_changes', False)
 
                 # When an analysis is running or paused, prompt the user with
                 # options to Minimize, Exit (cancel) or Cancel the close.
@@ -2276,36 +2278,25 @@ def main():
                     try:
                         if sys.platform.startswith('win'):
                             import ctypes
-                            MB_YESNOCANCEL = 0x00000003
-                            MB_ICONQUESTION = 0x00000020
-                            msg = 'You have unsaved changes. Save before closing?'
+                            MB_YESNO = 0x00000004
+                            MB_ICONWARNING = 0x00000030
+                            msg = 'You have unsaved changes that will be lost. Close anyway?'
                             title = 'Unsaved Changes'
-                            resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNOCANCEL | MB_ICONQUESTION)
-                            if resp == 6:  # Yes – save then close
-                                try:
-                                    win.evaluate_js('saveCsv()')
-                                except Exception:
-                                    pass
+                            resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNO | MB_ICONWARNING)
+                            if resp == 6:  # Yes – close and discard
                                 return True
-                            if resp == 2:  # Cancel – don't close
-                                return False
-                            return True  # No – discard and close
+                            return False  # No – don't close
                         else:
                             import tkinter as _tk
                             from tkinter import messagebox as _mb
                             root = _tk.Tk()
                             root.withdraw()
-                            res = _mb.askyesnocancel('Unsaved Changes',
-                                                     'You have unsaved changes. Save before closing?')
+                            res = _mb.askyesno('Unsaved Changes',
+                                               'You have unsaved changes that will be lost. Close anyway?')
                             root.destroy()
-                            if res is True:
-                                try:
-                                    win.evaluate_js('saveCsv()')
-                                except Exception:
-                                    pass
+                            if res:
                                 return True
-                            if res is None:
-                                return False
+                            return False
                             return True
                     except Exception:
                         return True  # on failure, allow close

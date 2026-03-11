@@ -2628,25 +2628,30 @@
       <!-- New draggable divider -->
       <div class="divider" id="colDivider" title="Drag to resize"></div>
       <div class="right">
-        <div class="inline">
+        <!-- Rename row: only visible in edit mode -->
+        <div class="inline hidden" id="sceneRenameRow">
           <input id="sceneName" type="text" placeholder="Rename this scene…" />
           <button id="applySceneName">Apply</button>
         </div>
+        <!-- Scene info + tag chips (always visible, chips become editable in edit mode) -->
         <div class="detail" id="sceneMeta">—</div>
         <div class="detail" id="sceneFolderPath"
           style="cursor:default;user-select:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">—
         </div>
-        <!-- Editable species & tags panel (hidden by default) -->
+        <!-- Edit-only: add inputs for species and family -->
         <div id="editPanel" class="edit-panel hidden">
-          <div class="edit-section">
-            <label>Scene Species Tags</label>
-            <div id="editChips" class="edit-chips"></div>
-          </div>
           <div class="edit-section">
             <label>Add Species</label>
             <div class="inline">
               <input id="editAddSpecies" type="text" placeholder="Type a species name…" style="flex:1" />
-              <button id="editAddSpeciesBtn" title="Add species tag">+ Add</button>
+              <button id="editAddSpeciesBtn" title="Add species tag to all images">+ Add</button>
+            </div>
+          </div>
+          <div class="edit-section">
+            <label>Add Family</label>
+            <div class="inline">
+              <input id="editAddFamily" type="text" placeholder="Type a family name…" style="flex:1" />
+              <button id="editAddFamilyBtn" title="Add family tag to all images">+ Add</button>
             </div>
           </div>
         </div>
@@ -2963,6 +2968,10 @@
     let header = [];               // CSV header fields
     let scenes = [];               // Aggregated scene objects
     let dirty = false;             // Track unsaved edits
+    // Notify Python backend whenever dirty state changes (for close-prompt)
+    function _notifyDirty(val) {
+      try { if (window.pywebview?.api?.notify_dirty) window.pywebview.api.notify_dirty(!!val); } catch (_) {}
+    }
     let _cleanSnapshot = null;      // Snapshot of rows+header at last clean state (load or save)
     let selectedSceneIds = new Set(); // Multi-select: selected scene IDs ("slot:count")
     let collapsedFolders = new Set(); // rootPaths of collapsed folder groups
@@ -3568,7 +3577,7 @@
       if (changed) {
         row.rating = v;
         row.rating_origin = newOrigin;
-        dirty = true; el('#saveCsv').disabled = false; el('#revertCsv').disabled = false;
+        dirty = true; _notifyDirty(true); el('#saveCsv').disabled = false; el('#revertCsv').disabled = false;
         // If filter is active, refresh the image grid so items appear/disappear accordingly
         if (typeof window.refreshSceneFilter === 'function') window.refreshSceneFilter();
       }
@@ -3840,7 +3849,7 @@
         }
       }
       if (changed) {
-        dirty = true;
+        dirty = true; _notifyDirty(true);
         el('#saveCsv').disabled = false;
         el('#revertCsv').disabled = false;
         setStatus(`Merged ${ids.length} scenes into #${targetCount}. ${changed} rows updated.`);
@@ -3922,26 +3931,93 @@
 
     // Render: Scene dialog
     let _splitMode = false;
+    let _sceneEditMode = false;
+
+    function collectSceneSpecies(sceneId) {
+      const sceneRows = getSceneRows(sceneId);
+      const speciesSet = new Set();
+      const familySet = new Set();
+      for (const r of sceneRows) {
+        if (r.species && r.species !== 'No Bird') speciesSet.add(r.species);
+        if (r.family && r.family !== 'Unknown' && r.family !== 'N/A') familySet.add(r.family);
+      }
+      return { species: Array.from(speciesSet).sort(), families: Array.from(familySet).sort() };
+    }
+
+    function renderSceneMetaChips(scene, editable) {
+      const _sceneLocalNum = String(scene.id).split(':').pop();
+      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
+      const { species, families } = collectSceneSpecies(scene.id);
+
+      let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
+      if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
+      html += `</div>`;
+      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>`;
+
+      // Species chips
+      html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
+      if (species.length) {
+        html += `<span class="edit-chips" style="display:inline-flex">`;
+        for (const sp of species) {
+          if (editable) {
+            html += `<span class="edit-chip">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">&times;</span></span>`;
+          } else {
+            html += `<span class="chip">${escapeHtml(sp)}</span>`;
+          }
+        }
+        html += `</span>`;
+      } else {
+        html += `<span class="muted">—</span>`;
+      }
+      html += `</div>`;
+
+      // Family chips
+      html += `<div style="margin-top:4px"><span class="muted" style="font-size:12px">Family:</span> `;
+      if (families.length) {
+        html += `<span class="edit-chips" style="display:inline-flex">`;
+        for (const fm of families) {
+          if (editable) {
+            html += `<span class="edit-chip">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">&times;</span></span>`;
+          } else {
+            html += `<span class="chip">${escapeHtml(fm)}</span>`;
+          }
+        }
+        html += `</span>`;
+      } else {
+        html += `<span class="muted">—</span>`;
+      }
+      html += `</div>`;
+
+      el('#sceneMeta').innerHTML = html;
+
+      // Wire up remove buttons if editable
+      if (editable) {
+        el('#sceneMeta').querySelectorAll('[data-remove-species]').forEach(btn => {
+          btn.onclick = () => removeSpeciesFromScene(scene, btn.dataset.removeSpecies);
+        });
+        el('#sceneMeta').querySelectorAll('[data-remove-family]').forEach(btn => {
+          btn.onclick = () => removeFamilyFromScene(scene, btn.dataset.removeFamily);
+        });
+      }
+    }
 
     async function openSceneDialog(sceneId) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
       currentSceneId = scene.id;
       _splitMode = false;
+      _sceneEditMode = false;
 
       el('#sceneName').value = scene.sceneName || '';
-      const _sceneLocalNum = String(scene.id).split(':').pop();
-      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
-      el('#sceneMeta').innerHTML = `
-      <div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}</div>
-      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
-      <div style="margin-top:6px">Species: ${scene.species.length ? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
-    `;
 
-      // Reset edit panel
+      // Reset to non-edit mode
+      el('#sceneRenameRow').classList.add('hidden');
       el('#editPanel').classList.add('hidden');
       el('#editToggleBtn').textContent = 'Edit Species & Tags\u2026';
       el('#splitSceneBtn').textContent = 'Split Scene\u2026';
+
+      // Render meta with non-editable chips
+      renderSceneMetaChips(scene, false);
 
       // Populate folder path and wire double-click to open in system file browser
       const folderPathEl = el('#sceneFolderPath');
@@ -3982,18 +4058,22 @@
 
       // Edit Species & Tags toggle
       el('#editToggleBtn').onclick = () => {
-        const panel = el('#editPanel');
-        const nowHidden = panel.classList.toggle('hidden');
-        el('#editToggleBtn').textContent = nowHidden ? 'Edit Species & Tags\u2026' : 'Done Editing';
-        if (!nowHidden) {
-          // Panel is now visible — render editable chips
-          renderEditableSpecies(scene);
-        }
+        _sceneEditMode = !_sceneEditMode;
+        el('#editPanel').classList.toggle('hidden', !_sceneEditMode);
+        el('#sceneRenameRow').classList.toggle('hidden', !_sceneEditMode);
+        el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags\u2026';
+        // Re-render meta chips (editable or not)
+        const updatedScene = reloadScene(scene.id) || scene;
+        renderSceneMetaChips(updatedScene, _sceneEditMode);
       };
 
       // Add species via button or Enter key
       el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
       el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
+
+      // Add family via button or Enter key
+      el('#editAddFamilyBtn').onclick = () => addFamilyToScene(scene);
+      el('#editAddFamily').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addFamilyToScene(scene); } };
 
       // Split Scene toggle
       el('#splitSceneBtn').onclick = () => {
@@ -4009,7 +4089,6 @@
 
     function applySceneName(sceneId, name) {
       const newName = String(name || '').trim();
-      // sceneId may be slot-prefixed (e.g. "0:3"); split to get slot + raw scene_count
       const parts = String(sceneId).split(':');
       const sceneCount = parts.pop();
       const slot = parts.length ? parseInt(parts[0], 10) : null;
@@ -4020,12 +4099,18 @@
           if ((r.scene_name || '') !== newName) { r.scene_name = newName; changed++; }
         }
       }
-      if (changed) { dirty = true; el('#saveCsv').disabled = false; el('#revertCsv').disabled = false; renderScenes(); }
+      if (changed) {
+        markDirty();
+        const updatedScene = reloadScene(sceneId);
+        if (updatedScene) renderSceneMetaChips(updatedScene, _sceneEditMode);
+        renderScenes();
+      }
     }
 
-    // --- Species editing helpers ---
+    // --- Species & Family editing helpers ---
     function markDirty() {
       dirty = true;
+      _notifyDirty(true);
       el('#saveCsv').disabled = false;
       el('#revertCsv').disabled = false;
     }
@@ -4040,26 +4125,6 @@
       });
     }
 
-    function renderEditableSpecies(scene) {
-      const container = el('#editChips');
-      container.innerHTML = '';
-      // Collect unique species from scene images
-      const speciesSet = new Set();
-      for (const r of scene.images) {
-        if (r.species && r.species !== 'No Bird') speciesSet.add(r.species);
-      }
-      for (const sp of Array.from(speciesSet).sort()) {
-        const chip = document.createElement('span');
-        chip.className = 'edit-chip';
-        chip.innerHTML = `${escapeHtml(sp)}<span class="chip-x" title="Remove '${escapeHtml(sp)}' from all images in this scene">&times;</span>`;
-        chip.querySelector('.chip-x').onclick = () => removeSpeciesFromScene(scene, sp);
-        container.appendChild(chip);
-      }
-      if (speciesSet.size === 0) {
-        container.innerHTML = '<span class="muted">No species tags</span>';
-      }
-    }
-
     function removeSpeciesFromScene(scene, speciesName) {
       const sceneRows = getSceneRows(scene.id);
       let changed = 0;
@@ -4072,15 +4137,35 @@
       }
       if (changed) {
         markDirty();
-        // Re-aggregate to update species list
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
-          renderEditableSpecies(updatedScene);
-          refreshSceneMeta(updatedScene);
+          renderSceneMetaChips(updatedScene, _sceneEditMode);
           renderSceneImages(updatedScene);
         }
         renderScenes();
         showToast(`Removed "${speciesName}" from ${changed} image(s)`, 3000);
+      }
+    }
+
+    function removeFamilyFromScene(scene, familyName) {
+      const sceneRows = getSceneRows(scene.id);
+      let changed = 0;
+      for (const r of sceneRows) {
+        if (r.family === familyName) {
+          r.family = 'Unknown';
+          r.family_confidence = '0';
+          changed++;
+        }
+      }
+      if (changed) {
+        markDirty();
+        const updatedScene = reloadScene(scene.id);
+        if (updatedScene) {
+          renderSceneMetaChips(updatedScene, _sceneEditMode);
+          renderSceneImages(updatedScene);
+        }
+        renderScenes();
+        showToast(`Removed family "${familyName}" from ${changed} image(s)`, 3000);
       }
     }
 
@@ -4089,42 +4174,50 @@
       const name = (input.value || '').trim();
       if (!name) return;
       const sceneRows = getSceneRows(scene.id);
-      // Only apply to images that currently have no species or "No Bird"
       let changed = 0;
       for (const r of sceneRows) {
-        if (!r.species || r.species === 'No Bird') {
-          r.species = name;
-          r.species_confidence = '1.000';
-          changed++;
-        }
-      }
-      // If all images already have species, add to all of them if user really wants
-      if (changed === 0) {
-        // Ask via confirm
-        if (confirm(`All images already have species assigned. Replace all ${sceneRows.length} images' species with "${name}"?`)) {
-          for (const r of sceneRows) {
-            r.species = name;
-            r.species_confidence = '1.000';
-            changed++;
-          }
-        }
+        r.species = name;
+        r.species_confidence = '1.000';
+        changed++;
       }
       if (changed) {
         input.value = '';
         markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
-          renderEditableSpecies(updatedScene);
-          refreshSceneMeta(updatedScene);
+          renderSceneMetaChips(updatedScene, _sceneEditMode);
           renderSceneImages(updatedScene);
         }
         renderScenes();
-        showToast(`Added "${name}" to ${changed} image(s)`, 3000);
+        showToast(`Set species "${name}" on ${changed} image(s)`, 3000);
+      }
+    }
+
+    function addFamilyToScene(scene) {
+      const input = el('#editAddFamily');
+      const name = (input.value || '').trim();
+      if (!name) return;
+      const sceneRows = getSceneRows(scene.id);
+      let changed = 0;
+      for (const r of sceneRows) {
+        r.family = name;
+        r.family_confidence = '1.000';
+        changed++;
+      }
+      if (changed) {
+        input.value = '';
+        markDirty();
+        const updatedScene = reloadScene(scene.id);
+        if (updatedScene) {
+          renderSceneMetaChips(updatedScene, _sceneEditMode);
+          renderSceneImages(updatedScene);
+        }
+        renderScenes();
+        showToast(`Set family "${name}" on ${changed} image(s)`, 3000);
       }
     }
 
     function reloadScene(sceneId) {
-      // Re-aggregate scenes and find the updated one
       const minC = parseFloat(el('#speciesConf').value) || 0;
       const search = el('#search').value;
       const sortBy = el('#sortBy').value;
@@ -4134,13 +4227,7 @@
     }
 
     function refreshSceneMeta(scene) {
-      const _sceneLocalNum = String(scene.id).split(':').pop();
-      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
-      el('#sceneMeta').innerHTML = `
-      <div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}</div>
-      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
-      <div style="margin-top:6px">Species: ${scene.species.length ? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
-    `;
+      renderSceneMetaChips(scene, _sceneEditMode);
     }
 
     // --- Scene split helpers ---
@@ -4287,7 +4374,7 @@
       if (!_cleanSnapshot) return;
       rows = _cleanSnapshot.rows.map(r => ({ ...r }));
       header = _cleanSnapshot.header.slice();
-      dirty = false;
+      dirty = false; _notifyDirty(false);
       el('#saveCsv').disabled = true;
       el('#revertCsv').disabled = true;
       blobUrlCache.clear();
@@ -4305,7 +4392,7 @@
       rows = (parsed.data || []).map(r => ({ ...r, scene_count: r.scene_count }));
       ensureSceneNameColumn();
       ensureRatingColumns();
-      dirty = false; el('#saveCsv').disabled = true;
+      dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
       takeSnapshot();
       await renderScenes();
     }
@@ -4391,7 +4478,7 @@
         const writable = await csvFileHandle.createWritable();
         await writable.write(content);
         await writable.close();
-        dirty = false; el('#saveCsv').disabled = true;
+        dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
         takeSnapshot();
         setStatus('Saved changes to kestrel_database.csv');
         return;
@@ -4415,7 +4502,7 @@
             else { failed++; console.warn('[save] Failed for', rp, res.error); }
           } catch (e) { failed++; console.warn('[save] Error for', rp, e); }
         }
-        dirty = false; el('#saveCsv').disabled = true;
+        dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
         takeSnapshot();
         setStatus(failed > 0 ? `Saved ${saved} folder(s), ${failed} failed` : `Saved changes to ${saved} folder(s)`);
         return;
@@ -6513,7 +6600,7 @@
       rootDirHandle = null;
       ensureSceneNameColumn();
       ensureRatingColumns();
-      dirty = false;
+      dirty = false; _notifyDirty(false);
       takeSnapshot();
       const mergeBtn = document.getElementById('openMerge');
       if (mergeBtn) mergeBtn.disabled = true;
@@ -6853,7 +6940,7 @@
           const idStr = String(r.scene_count);
           if (ids.includes(idStr) && idStr !== targetId) { r.scene_count = targetId; changed++; }
         }
-        if (changed) { dirty = true; document.getElementById('saveCsv').disabled = false; setStatus(`Merged scenes into ${targetId}. ${changed} rows updated.`); }
+        if (changed) { dirty = true; _notifyDirty(true); document.getElementById('saveCsv').disabled = false; setStatus(`Merged scenes into ${targetId}. ${changed} rows updated.`); }
         renderScenes();
         dlg.close();
       };
