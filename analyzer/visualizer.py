@@ -2197,6 +2197,14 @@ def main():
             # When the analysis queue is running, intercept the close event so the
             # window minimizes to the taskbar instead of killing mid-analysis.
             def _on_closing():
+                # Check for unsaved changes via JS dirty flag
+                has_unsaved = False
+                try:
+                    result = win.evaluate_js('typeof dirty !== "undefined" && dirty')
+                    has_unsaved = result is True or result == 'true'
+                except Exception:
+                    pass
+
                 # When an analysis is running or paused, prompt the user with
                 # options to Minimize, Exit (cancel) or Cancel the close.
                 if _queue_manager.is_running or _queue_manager.is_paused:
@@ -2262,6 +2270,46 @@ def main():
                         except Exception:
                             pass
                         return False
+
+                # Prompt for unsaved changes when no analysis is running
+                if has_unsaved:
+                    try:
+                        if sys.platform.startswith('win'):
+                            import ctypes
+                            MB_YESNOCANCEL = 0x00000003
+                            MB_ICONQUESTION = 0x00000020
+                            msg = 'You have unsaved changes. Save before closing?'
+                            title = 'Unsaved Changes'
+                            resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNOCANCEL | MB_ICONQUESTION)
+                            if resp == 6:  # Yes – save then close
+                                try:
+                                    win.evaluate_js('saveCsv()')
+                                except Exception:
+                                    pass
+                                return True
+                            if resp == 2:  # Cancel – don't close
+                                return False
+                            return True  # No – discard and close
+                        else:
+                            import tkinter as _tk
+                            from tkinter import messagebox as _mb
+                            root = _tk.Tk()
+                            root.withdraw()
+                            res = _mb.askyesnocancel('Unsaved Changes',
+                                                     'You have unsaved changes. Save before closing?')
+                            root.destroy()
+                            if res is True:
+                                try:
+                                    win.evaluate_js('saveCsv()')
+                                except Exception:
+                                    pass
+                                return True
+                            if res is None:
+                                return False
+                            return True
+                    except Exception:
+                        return True  # on failure, allow close
+
                 return True  # allow normal close
 
             try:

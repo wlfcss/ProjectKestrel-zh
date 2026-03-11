@@ -494,6 +494,76 @@
       white-space: nowrap;
     }
 
+    /* Editable species chips in scene edit mode */
+    .edit-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .edit-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--chip);
+      border: 1px solid #2a3040;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #cbd2dc;
+    }
+    .edit-chip .chip-x {
+      cursor: pointer;
+      color: #8a6060;
+      font-weight: bold;
+      font-size: 13px;
+      margin-left: 2px;
+      line-height: 1;
+    }
+    .edit-chip .chip-x:hover { color: #e06060; }
+    .chip-add-btn {
+      cursor: pointer;
+      background: transparent;
+      border: 1px dashed #3a84e6;
+      color: #6aa0ff;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+    }
+    .chip-add-btn:hover { background: #1a2a44; }
+    .edit-panel {
+      display: grid;
+      gap: 8px;
+      background: #10131a;
+      border: 1px solid #1f2533;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+    }
+    .edit-panel label { color: var(--muted); font-size: 12px; }
+    .edit-section { display: grid; gap: 4px; }
+    /* Scene split mode: checkboxes on image cards */
+    .card.split-mode { position: relative; }
+    .card.split-mode .split-check {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 3;
+      width: 18px;
+      height: 18px;
+      accent-color: #3a84e6;
+    }
+    .card.split-selected { outline: 2px solid #3a84e6; outline-offset: -2px; border-radius: 10px; }
+    /* Yellow save button when dirty */
+    #saveCsv:not(:disabled) {
+      background: #b59b2e;
+      color: #fff;
+      border-color: #d4b72e;
+    }
+    #saveCsv:not(:disabled):hover {
+      background: #c9ae34;
+    }
+
     /* Anti-clipping improvements */
     .meta {
       gap: 8px;
@@ -797,8 +867,9 @@
       padding: 12px;
       display: grid;
       gap: 10px;
-      grid-template-rows: auto auto 1fr auto;
-      overflow: hidden;
+      grid-template-rows: auto auto auto auto 1fr auto auto;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .modal .grid {
@@ -2565,9 +2636,25 @@
         <div class="detail" id="sceneFolderPath"
           style="cursor:default;user-select:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">—
         </div>
+        <!-- Editable species & tags panel (hidden by default) -->
+        <div id="editPanel" class="edit-panel hidden">
+          <div class="edit-section">
+            <label>Scene Species Tags</label>
+            <div id="editChips" class="edit-chips"></div>
+          </div>
+          <div class="edit-section">
+            <label>Add Species</label>
+            <div class="inline">
+              <input id="editAddSpecies" type="text" placeholder="Type a species name…" style="flex:1" />
+              <button id="editAddSpeciesBtn" title="Add species tag">+ Add</button>
+            </div>
+          </div>
+        </div>
         <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
         <div class="detail" id="previewInfo">—</div>
         <div class="footer">
+          <button id="editToggleBtn">Edit Species &amp; Tags…</button>
+          <button id="splitSceneBtn">Split Scene…</button>
           <button id="closeDlg">Close</button>
         </div>
       </div>
@@ -3834,10 +3921,13 @@
     };
 
     // Render: Scene dialog
+    let _splitMode = false;
+
     async function openSceneDialog(sceneId) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
       currentSceneId = scene.id;
+      _splitMode = false;
 
       el('#sceneName').value = scene.sceneName || '';
       const _sceneLocalNum = String(scene.id).split(':').pop();
@@ -3847,6 +3937,11 @@
       <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
       <div style="margin-top:6px">Species: ${scene.species.length ? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
     `;
+
+      // Reset edit panel
+      el('#editPanel').classList.add('hidden');
+      el('#editToggleBtn').textContent = 'Edit Species & Tags\u2026';
+      el('#splitSceneBtn').textContent = 'Split Scene\u2026';
 
       // Populate folder path and wire double-click to open in system file browser
       const folderPathEl = el('#sceneFolderPath');
@@ -3860,7 +3955,6 @@
               ev?.preventDefault(); ev?.stopPropagation();
               if (window.pywebview?.api && window.pywebview.api.open_folder) {
                 const res = await window.pywebview.api.open_folder(fp);
-                // pywebview may return a dict-like result; check for failure
                 if (res && typeof res === 'object' && res.success === false) {
                   showToast('Failed to open folder: ' + (res.error || 'Unknown'), 5000, () => showSettings());
                 }
@@ -3881,7 +3975,34 @@
 
       // Hook up actions
       el('#applySceneName').onclick = () => applySceneName(scene.id, el('#sceneName').value);
-      el('#closeDlg').onclick = () => sceneDlg.close();
+      el('#closeDlg').onclick = () => {
+        if (_splitMode) { exitSplitMode(); }
+        sceneDlg.close();
+      };
+
+      // Edit Species & Tags toggle
+      el('#editToggleBtn').onclick = () => {
+        const panel = el('#editPanel');
+        const nowHidden = panel.classList.toggle('hidden');
+        el('#editToggleBtn').textContent = nowHidden ? 'Edit Species & Tags\u2026' : 'Done Editing';
+        if (!nowHidden) {
+          // Panel is now visible — render editable chips
+          renderEditableSpecies(scene);
+        }
+      };
+
+      // Add species via button or Enter key
+      el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
+      el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
+
+      // Split Scene toggle
+      el('#splitSceneBtn').onclick = () => {
+        if (_splitMode) {
+          applySplitScene(scene);
+        } else {
+          enterSplitMode(scene);
+        }
+      };
 
       sceneDlg.showModal();
     }
@@ -3900,6 +4021,256 @@
         }
       }
       if (changed) { dirty = true; el('#saveCsv').disabled = false; el('#revertCsv').disabled = false; renderScenes(); }
+    }
+
+    // --- Species editing helpers ---
+    function markDirty() {
+      dirty = true;
+      el('#saveCsv').disabled = false;
+      el('#revertCsv').disabled = false;
+    }
+
+    function getSceneRows(sceneId) {
+      const parts = String(sceneId).split(':');
+      const sceneCount = parts.pop();
+      const slot = parts.length ? parseInt(parts[0], 10) : null;
+      return rows.filter(r => {
+        const slotMatch = slot === null || (r.__folderSlot ?? 0) === slot;
+        return slotMatch && String(r.scene_count) === sceneCount;
+      });
+    }
+
+    function renderEditableSpecies(scene) {
+      const container = el('#editChips');
+      container.innerHTML = '';
+      // Collect unique species from scene images
+      const speciesSet = new Set();
+      for (const r of scene.images) {
+        if (r.species && r.species !== 'No Bird') speciesSet.add(r.species);
+      }
+      for (const sp of Array.from(speciesSet).sort()) {
+        const chip = document.createElement('span');
+        chip.className = 'edit-chip';
+        chip.innerHTML = `${escapeHtml(sp)}<span class="chip-x" title="Remove '${escapeHtml(sp)}' from all images in this scene">&times;</span>`;
+        chip.querySelector('.chip-x').onclick = () => removeSpeciesFromScene(scene, sp);
+        container.appendChild(chip);
+      }
+      if (speciesSet.size === 0) {
+        container.innerHTML = '<span class="muted">No species tags</span>';
+      }
+    }
+
+    function removeSpeciesFromScene(scene, speciesName) {
+      const sceneRows = getSceneRows(scene.id);
+      let changed = 0;
+      for (const r of sceneRows) {
+        if (r.species === speciesName) {
+          r.species = 'No Bird';
+          r.species_confidence = '0';
+          changed++;
+        }
+      }
+      if (changed) {
+        markDirty();
+        // Re-aggregate to update species list
+        const updatedScene = reloadScene(scene.id);
+        if (updatedScene) {
+          renderEditableSpecies(updatedScene);
+          refreshSceneMeta(updatedScene);
+          renderSceneImages(updatedScene);
+        }
+        renderScenes();
+        showToast(`Removed "${speciesName}" from ${changed} image(s)`, 3000);
+      }
+    }
+
+    function addSpeciesToScene(scene) {
+      const input = el('#editAddSpecies');
+      const name = (input.value || '').trim();
+      if (!name) return;
+      const sceneRows = getSceneRows(scene.id);
+      // Only apply to images that currently have no species or "No Bird"
+      let changed = 0;
+      for (const r of sceneRows) {
+        if (!r.species || r.species === 'No Bird') {
+          r.species = name;
+          r.species_confidence = '1.000';
+          changed++;
+        }
+      }
+      // If all images already have species, add to all of them if user really wants
+      if (changed === 0) {
+        // Ask via confirm
+        if (confirm(`All images already have species assigned. Replace all ${sceneRows.length} images' species with "${name}"?`)) {
+          for (const r of sceneRows) {
+            r.species = name;
+            r.species_confidence = '1.000';
+            changed++;
+          }
+        }
+      }
+      if (changed) {
+        input.value = '';
+        markDirty();
+        const updatedScene = reloadScene(scene.id);
+        if (updatedScene) {
+          renderEditableSpecies(updatedScene);
+          refreshSceneMeta(updatedScene);
+          renderSceneImages(updatedScene);
+        }
+        renderScenes();
+        showToast(`Added "${name}" to ${changed} image(s)`, 3000);
+      }
+    }
+
+    function reloadScene(sceneId) {
+      // Re-aggregate scenes and find the updated one
+      const minC = parseFloat(el('#speciesConf').value) || 0;
+      const search = el('#search').value;
+      const sortBy = el('#sortBy').value;
+      const includeSecondary = document.getElementById('includeSecondarySpecies')?.checked ?? true;
+      const all = aggregateScenes(minC, search, sortBy, includeSecondary, true);
+      return all.find(s => String(s.id) === String(sceneId));
+    }
+
+    function refreshSceneMeta(scene) {
+      const _sceneLocalNum = String(scene.id).split(':').pop();
+      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
+      el('#sceneMeta').innerHTML = `
+      <div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}</div>
+      <div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>
+      <div style="margin-top:6px">Species: ${scene.species.length ? scene.species.join(', ') : '<span class="muted">—</span>'}</div>
+    `;
+    }
+
+    // --- Scene split helpers ---
+    let _splitSelected = new Set();
+
+    function enterSplitMode(scene) {
+      _splitMode = true;
+      _splitSelected.clear();
+      el('#splitSceneBtn').textContent = 'Create New Scene from Selected';
+      showToast('Click images to select them for the new scene, then press "Create New Scene from Selected"', 4000);
+      // Re-render images with checkboxes
+      renderSceneImagesWithSplit(scene);
+    }
+
+    function exitSplitMode() {
+      _splitMode = false;
+      _splitSelected.clear();
+      el('#splitSceneBtn').textContent = 'Split Scene\u2026';
+      // Re-render images without checkboxes
+      const scene = scenes.find(s => String(s.id) === String(currentSceneId));
+      if (scene) renderSceneImages(scene);
+    }
+
+    function renderSceneImagesWithSplit(scene) {
+      const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
+      imageGrid.innerHTML = '';
+      const images = scene.images;
+
+      for (const r of images) {
+        const card = document.createElement('article');
+        card.className = 'card split-mode';
+        const key = r.filename || r.export_path || '';
+
+        // Checkbox for split selection
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'split-check';
+        cb.checked = _splitSelected.has(key);
+        cb.onchange = () => {
+          if (cb.checked) { _splitSelected.add(key); card.classList.add('split-selected'); }
+          else { _splitSelected.delete(key); card.classList.remove('split-selected'); }
+        };
+        card.appendChild(cb);
+
+        const th = document.createElement('div'); th.className = 'thumb';
+        const img = document.createElement('img'); img.alt = r.filename || ''; img.loading = 'lazy';
+        lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
+        th.appendChild(img); card.appendChild(th);
+        const body = document.createElement('div'); body.className = 'body';
+        body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename || '')}"><b>${escapeHtml(r.filename || '')}</b></div>
+          <div class="meta"><span class="truncate" title="${escapeHtml(r.species || 'Unknown')}">${escapeHtml(r.species || 'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
+        const stars = createStarBar(r);
+        body.appendChild(stars);
+        card.appendChild(body);
+
+        // Click card to toggle selection
+        card.addEventListener('click', (ev) => {
+          if (ev.target === cb) return; // checkbox handles itself
+          cb.checked = !cb.checked;
+          cb.onchange();
+        });
+
+        card.addEventListener('mouseenter', async () => {
+          const pv = el('#previewBox'); pv.innerHTML = '';
+          const pimg = document.createElement('img');
+          const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
+          if (purl) { pimg.src = purl; pv.appendChild(pimg); }
+          else { pv.innerHTML = '<span class="muted">No preview</span>'; }
+          const info = el('#previewInfo');
+          if (info) {
+            const rn = getRating(r);
+            const ro = getOrigin(r);
+            const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
+            info.innerHTML = `
+              <div><b>${escapeHtml(r.filename || '')}</b></div>
+              <div class="meta"><span title="Species confidence">${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
+              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5 - rn)} ${originTxt ? `(${originTxt})` : ''}</span></div>
+            `;
+          }
+        });
+
+        imageGrid.appendChild(card);
+      }
+    }
+
+    function applySplitScene(scene) {
+      if (_splitSelected.size === 0) {
+        showToast('Select at least one image to split into a new scene', 3000);
+        return;
+      }
+      if (_splitSelected.size === scene.images.length) {
+        showToast('Cannot move all images — at least one must remain in the original scene', 3000);
+        return;
+      }
+      // Find next available scene_count across the same folder slot
+      const parts = String(scene.id).split(':');
+      const slot = parts.length > 1 ? parseInt(parts[0], 10) : null;
+      let maxCount = 0;
+      for (const r of rows) {
+        const slotMatch = slot === null || (r.__folderSlot ?? 0) === slot;
+        if (slotMatch) {
+          const c = parseInt(r.scene_count, 10);
+          if (Number.isFinite(c) && c > maxCount) maxCount = c;
+        }
+      }
+      const newSceneCount = String(maxCount + 1);
+      let moved = 0;
+      for (const r of getSceneRows(scene.id)) {
+        const key = r.filename || r.export_path || '';
+        if (_splitSelected.has(key)) {
+          r.scene_count = newSceneCount;
+          r.scene_name = '';
+          moved++;
+        }
+      }
+      if (moved) {
+        markDirty();
+        _splitMode = false;
+        _splitSelected.clear();
+        el('#splitSceneBtn').textContent = 'Split Scene\u2026';
+        renderScenes();
+        // Refresh the scene dialog with the remaining images
+        const updatedScene = reloadScene(scene.id);
+        if (updatedScene) {
+          refreshSceneMeta(updatedScene);
+          renderSceneImages(updatedScene);
+          el('#sceneName').value = updatedScene.sceneName || '';
+        }
+        showToast(`Split ${moved} image(s) into new scene #${newSceneCount}`, 3000);
+      }
     }
 
     function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
@@ -6782,6 +7153,13 @@
       if (!window.pywebview?.api) {
         showToast('Culling Assistant requires desktop mode', 4000);
         return;
+      }
+      // Prompt to save unsaved changes before opening
+      if (dirty) {
+        const choice = confirm('You have unsaved changes. Save before opening the Culling Assistant?');
+        if (choice) {
+          await saveCsv();
+        }
       }
       try {
         showToast('Opening Culling Assistant\u2026', 2000);
