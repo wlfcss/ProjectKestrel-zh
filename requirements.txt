@@ -25,3 +25,7 @@ pywebview==6.1
 # installer
 pyinstaller==6.18.0
 msvc-runtime==14.44.35112
+
+# EXIF reading
+exifread
+Pillow

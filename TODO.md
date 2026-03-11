@@ -3,6 +3,8 @@
 * Fix UI - Live Analysis Page
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
+* Clarify logo and branding License - may not be used or modified by any other party for any purpose
+* BUG with inability to handle birds in flight and failure to properly capture scenes.
 
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 

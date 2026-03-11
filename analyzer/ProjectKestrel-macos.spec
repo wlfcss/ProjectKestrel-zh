@@ -15,7 +15,7 @@ datas = [('models', 'models'), ('kestrel_telemetry.py', '.'), ('folder_inspector
 sample_sets_tree = Tree('sample_sets', prefix='sample_sets')
 datas += [(item[0], item[1]) for item in sample_sets_tree]  # Only use first 2 elements of each tuple
 binaries = []
-hiddenimports = ['pywebview', 'certifi']
+hiddenimports = ['pywebview', 'certifi','PIL','exifread']
 binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('onnxruntime')
 binaries += collect_dynamic_libs('tensorflow')
