@@ -1,9 +1,9 @@
 # Project Kestrel To-Do and Changelog
-
-
-* Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
-
+* Improve version handling
+* Improve star rating system - this sort of punishes people with different equipment by setting all their photos to "1 star" and thus making the system pretty bad. Add a normalization option in settings that essentially fits the ratings distribution folder-wide to a uniform distribution with 20% splits. this would make sure the star ratings cover the entire breadth of the folder and propbably improve culling performance too ?
+* Investigate refinements to image quality thresholding from recent pull request #14. 
+* Investigate poor performance in poorly-lit circumstances, even if it is just to add an up to 1-2 stop exposure adjust.? - For this we need to finish Kestrel Workshop. 
 
 
 
