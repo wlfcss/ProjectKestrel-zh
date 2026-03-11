@@ -1705,20 +1705,25 @@
 
     /* ── Live Analysis Details dialog ───────────────────────────────────── */
     .live-dlg {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 2.2fr 0.8fr;
+      grid-template-rows: auto auto 1fr;
       gap: 12px;
       padding: 16px;
-      width: min(900px, 96vw);
-      max-height: 94vh;
+      width: min(96vw, calc(100vw - 80px));
+      height: min(88vh, calc(100vh - 80px));
+      box-sizing: border-box;
       overflow: hidden;
     }
 
     .live-dlg-hdr {
+      grid-column: 1 / -1;
+      grid-row: 1;
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      flex: 0 0 auto;
     }
 
     .live-dlg-title {
@@ -1740,18 +1745,26 @@
     }
 
     .live-dlg-status-bar {
+      grid-column: 1 / -1;
+      grid-row: 2;
       font-size: 12px;
       color: var(--muted);
       min-height: 16px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      flex: 0 0 auto;
     }
 
     .live-dlg-preview-row {
+      grid-column: 1;
+      grid-row: 3;
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .live-dlg-img-cell {
@@ -1762,6 +1775,8 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .live-dlg-img-label {
@@ -1769,15 +1784,27 @@
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: .05em;
+      flex: 0 0 auto;
     }
 
     .live-dlg-img {
+      flex: 1 1 0;
+      min-height: 0;
       width: 100%;
-      aspect-ratio: 4/3;
       object-fit: contain;
       background: #020508;
       border-radius: 4px;
       display: block;
+    }
+
+    .live-dlg-detections-section {
+      grid-column: 2;
+      grid-row: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .live-dlg-section-label {
@@ -1786,13 +1813,18 @@
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: .06em;
-      margin-top: 2px;
+      margin-top: 0;
+      flex: 0 0 auto;
     }
 
     .live-dlg-crops-row {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     .live-dlg-crop-card {
@@ -2930,7 +2962,7 @@
   </dialog>
 
   <!-- Live Analysis Details dialog -->
-  <dialog id="liveAnalysisDlg">
+  <dialog id="liveAnalysisDlg" class="dlg-compact">
     <div class="live-dlg">
       <div class="live-dlg-hdr">
         <span class="live-dlg-title">👁 Live Analysis: <span id="liveDlgFolderName">–</span></span>
@@ -2948,8 +2980,10 @@
           <img id="liveDlgOverlay" class="live-dlg-img" alt="" />
         </div>
       </div>
-      <span class="live-dlg-section-label">Top Detections</span>
-      <div class="live-dlg-crops-row" id="liveDlgCrops"></div>
+      <div class="live-dlg-detections-section">
+        <span class="live-dlg-section-label">Top Detections</span>
+        <div class="live-dlg-crops-row" id="liveDlgCrops"></div>
+      </div>
     </div>
   </dialog>
 
@@ -5462,6 +5496,7 @@
 
     let _dlgSelected = new Set();
     let _dlgExpandedPaths = new Set();
+    let _dlgReanalyze = new Set(); // paths confirmed for re-analysis (fully analyzed folders)
 
     /** Build a tree node for the Analyze dialog (amber checkboxes, no load-cb). */
     function buildAnalyzeDlgNode(node, selectedSet, onChangeCallback) {
@@ -5487,8 +5522,22 @@
       cb.checked = selectedSet.has(node.path);
       cb.addEventListener('change', (e) => {
         e.stopPropagation();
-        if (cb.checked) selectedSet.add(node.path);
-        else selectedSet.delete(node.path);
+        if (cb.checked) {
+          // Prompt before re-queuing a fully analyzed folder
+          if (row.classList.contains('analyzed-full')) {
+            const confirmed = confirm(
+              `"${node.name}" has already been fully analyzed.\n\n` +
+              `Re-analyzing will delete the existing analysis data (.kestrel folder) and process it again.\n\n` +
+              `Continue?`
+            );
+            if (!confirmed) { cb.checked = false; return; }
+            _dlgReanalyze.add(node.path);
+          }
+          selectedSet.add(node.path);
+        } else {
+          selectedSet.delete(node.path);
+          _dlgReanalyze.delete(node.path);
+        }
         row.classList.toggle('queue-sel', cb.checked);
         onChangeCallback();
       });
@@ -5731,6 +5780,7 @@
           removeBtn.title = 'Remove from selection';
           removeBtn.addEventListener('click', () => {
             _dlgSelected.delete(path);
+            _dlgReanalyze.delete(path);
             const treeRows = document.querySelectorAll('#analyzeDlgTree .adlg-node-row');
             for (const r of treeRows) {
               if (r.dataset.path === path) {
@@ -5746,6 +5796,14 @@
             _refreshAnalyzeDlgQueuePreview();
           });
           row.appendChild(nameEl);
+          if (_dlgReanalyze.has(path)) {
+            const badge = document.createElement('span');
+            badge.className = 'adlg-qi-status';
+            badge.style.color = '#f0a040';
+            badge.style.fontStyle = 'italic';
+            badge.textContent = 'Will be Re-analyzed';
+            row.appendChild(badge);
+          }
           row.appendChild(removeBtn);
           willAddEl.appendChild(row);
         }
@@ -5779,6 +5837,7 @@
       // Seed the dialog's selected set from any previously-queued paths
       _dlgSelected = new Set(queuedFolderPaths);
       _dlgExpandedPaths = new Set([folderTreeRootNode.path]);
+      _dlgReanalyze = new Set();
 
       function refreshDlg() {
         const countEl = document.getElementById('analyzeDlgCount');
@@ -7030,7 +7089,7 @@
         const useGpu = document.getElementById('analyzeUseGpu')?.checked ?? true;
         const wildlifeEnabled = document.getElementById('analyzeWildlife')?.checked ?? false;
 
-        // Check for folders analyzed on an older version — prompt user
+        // Check for outdated-version folders not already confirmed for re-analysis
         const outdatedPaths = [];
         function findNode(node, targetPath) {
           if (node.path === targetPath) return node;
@@ -7043,6 +7102,7 @@
           return null;
         }
         for (const p of paths) {
+          if (_dlgReanalyze.has(p)) continue; // already confirmed at selection time
           const node = folderTreeRootNode ? findNode(folderTreeRootNode, p) : null;
           if (node && isVersionOutdated(node)) {
             outdatedPaths.push({ path: p, name: node.name, version: node.kestrel_version });
@@ -7068,6 +7128,18 @@
             } catch (e) {
               console.warn('Failed to clear kestrel data for', o.path, e);
             }
+          }
+        }
+
+        // Clear .kestrel for fully-analyzed re-queue folders (confirmed at selection time)
+        for (const p of _dlgReanalyze) {
+          if (!paths.includes(p)) continue;
+          try {
+            await window.pywebview.api.clear_kestrel_data(p);
+            const node = folderTreeRootNode ? findNode(folderTreeRootNode, p) : null;
+            if (node) { node.has_kestrel = false; node.kestrel_version = ''; }
+          } catch (e) {
+            console.warn('Failed to clear kestrel data for re-analyze', p, e);
           }
         }
 
