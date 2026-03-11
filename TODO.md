@@ -4,7 +4,10 @@
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
 * Clarify logo and branding License - may not be used or modified by any other party for any purpose
-* BUG with inability to handle birds in flight and failure to properly capture scenes.
+* BUG with inability to handle birds in flight and failure to properly capture scenes. - Impelemnted but needs to be tested.
+* Add check for analysis version, prompt user whether they want to re-analyze an already analyzed folder that is on a lower version. I.e. italicize if version is lower.
+* Add "Clear Kestrel Analysis" button to a right-click menu. 
+
 
 # Priority Issues
 * Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
