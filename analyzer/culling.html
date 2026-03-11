@@ -197,7 +197,7 @@
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
     .cull-card.moved-card { opacity: 0.85; }
     .cull-card.moved-card::after {
-      content: '\u21C4 moved';
+      content: '↔ moved';
       position: absolute;
       top: 2px;
       right: 3px;
@@ -835,6 +835,18 @@
       line-height: 1.35;
       white-space: nowrap;
     }
+
+    /* Scene bulk actions (Accept/Reject All) */
+    .scene-bulk-actions {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .scene-bulk-actions .btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -1393,6 +1405,34 @@
       manuallyMoved.add(row.filename);
     }
 
+    // ---- Accept all images in a scene ----
+    function acceptAllInScene(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      for (const row of scene.images) {
+        cullingState.set(row.filename, 'accept');
+        row.culled = 'accept';
+        manuallyMoved.add(row.filename);
+      }
+      renderScene(sceneId);
+      updateStats();
+      debouncedSave();
+    }
+
+    // ---- Reject all images in a scene ----
+    function rejectAllInScene(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      for (const row of scene.images) {
+        cullingState.set(row.filename, 'reject');
+        row.culled = 'reject';
+        manuallyMoved.add(row.filename);
+      }
+      renderScene(sceneId);
+      updateStats();
+      debouncedSave();
+    }
+
     // ---- Build an image card ----
     function buildImageCard(row) {
       const rating = getRating(row);
@@ -1479,6 +1519,32 @@
           (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
           (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
+        
+        // Add bulk action buttons
+        const bulkActionsDiv = document.createElement('div');
+        bulkActionsDiv.className = 'scene-bulk-actions';
+        
+        const acceptAllBtn = document.createElement('button');
+        acceptAllBtn.className = 'btn primary';
+        acceptAllBtn.textContent = '✓ Accept All';
+        acceptAllBtn.title = 'Move all images in this scene to Accept';
+        acceptAllBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          acceptAllInScene(scene.id);
+        });
+        
+        const rejectAllBtn = document.createElement('button');
+        rejectAllBtn.className = 'btn danger';
+        rejectAllBtn.textContent = '✗ Reject All';
+        rejectAllBtn.title = 'Move all images in this scene to Reject';
+        rejectAllBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          rejectAllInScene(scene.id);
+        });
+        
+        bulkActionsDiv.appendChild(acceptAllBtn);
+        bulkActionsDiv.appendChild(rejectAllBtn);
+        label.appendChild(bulkActionsDiv);
         row.appendChild(label);
 
         // Columns

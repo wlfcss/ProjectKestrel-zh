@@ -32,3 +32,4 @@
 * Fix UI for scene editing view.
 * Fixed UI for settings page and expanded number of potential editors to several new options with a dedicated "Custom application" page.
 * Fix UI - Live Analysis Page
+* Added "Accept All" and "Reject All" buttons in changelog
