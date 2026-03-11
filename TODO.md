@@ -3,7 +3,7 @@
 * Fix UI - Live Analysis Page
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate GPU support from recent pull request #14
-* Fix UI for 
+
 
 
 
@@ -30,3 +30,4 @@
 * Add "Clear Kestrel Analysis" button to a right-click menu. 
 * Add un-group scene dialog box to the scene view.
 * Add "Save changes before opening Culling Assistant" check and verify "Save changes before exiting" check
+* Fix UI for scene editing view.

@@ -2631,7 +2631,6 @@
         <!-- Rename row: only visible in edit mode -->
         <div class="inline hidden" id="sceneRenameRow">
           <input id="sceneName" type="text" placeholder="Rename this scene…" />
-          <button id="applySceneName">Apply</button>
         </div>
         <!-- Scene info + tag chips (always visible, chips become editable in edit mode) -->
         <div class="detail" id="sceneMeta">—</div>
@@ -4050,7 +4049,6 @@
       renderSceneImages(scene);
 
       // Hook up actions
-      el('#applySceneName').onclick = () => applySceneName(scene.id, el('#sceneName').value);
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
         sceneDlg.close();
@@ -4061,7 +4059,11 @@
         _sceneEditMode = !_sceneEditMode;
         el('#editPanel').classList.toggle('hidden', !_sceneEditMode);
         el('#sceneRenameRow').classList.toggle('hidden', !_sceneEditMode);
+        el('#previewBox').classList.toggle('hidden', _sceneEditMode);
+        el('#previewInfo').classList.toggle('hidden', _sceneEditMode);
         el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags\u2026';
+        // On exit: auto-apply any rename
+        if (!_sceneEditMode) { applySceneName(scene.id, el('#sceneName').value); }
         // Re-render meta chips (editable or not)
         const updatedScene = reloadScene(scene.id) || scene;
         renderSceneMetaChips(updatedScene, _sceneEditMode);
