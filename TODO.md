@@ -7,6 +7,7 @@
 * BUG with inability to handle birds in flight and failure to properly capture scenes. - Impelemnted but needs to be tested.
 * Add check for analysis version, prompt user whether they want to re-analyze an already analyzed folder that is on a lower version. I.e. italicize if version is lower.
 * Add "Clear Kestrel Analysis" button to a right-click menu. 
+* Add experimental checkbox toggle for checking additional wildlife species that are not birds.
 
 
 # Priority Issues
