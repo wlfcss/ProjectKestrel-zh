@@ -1144,6 +1144,49 @@
       color: #c8dcf5;
     }
 
+    /* Outdated version styling (analyzed on an earlier Kestrel version) */
+    .tree-node-row.version-outdated .tree-label {
+      color: var(--ok);
+      cursor: pointer;
+      font-weight: 600;
+      font-style: italic;
+    }
+    .adlg-node-row.version-outdated .tree-label {
+      color: var(--ok);
+      font-weight: 600;
+      font-style: italic;
+    }
+
+    /* Context menu for folder tree */
+    .kestrel-ctx-menu {
+      position: fixed;
+      z-index: 9999;
+      background: #23272e;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 4px 0;
+      min-width: 220px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .kestrel-ctx-menu-item {
+      padding: 7px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #ddd;
+      white-space: nowrap;
+    }
+    .kestrel-ctx-menu-item:hover {
+      background: #3a3f4b;
+      color: #fff;
+    }
+    .kestrel-ctx-menu-item.danger {
+      color: #e74c3c;
+    }
+    .kestrel-ctx-menu-item.danger:hover {
+      background: #5a2020;
+      color: #ff6b6b;
+    }
+
     .tree-node-row.no-kestrel {
       opacity: 0.38;
     }
@@ -2678,6 +2721,7 @@
       </div>
       <p style="margin:0;font-size:12px;color:var(--muted)">Check folders to add to the analysis queue.
         <span style="color:var(--ok);">●</span>&thinsp;finished
+        &nbsp;<span style="color:var(--ok);font-style:italic;">●</span>&thinsp;<i>outdated version</i>
         &nbsp;<span style="color:#b36bff;">●</span>&thinsp;in progress
         &nbsp;<span style="color:var(--brand);">●</span>&thinsp;not started
         &nbsp;<span style="color:#555;font-size:11px;">● faded = no photos</span></p>
@@ -2707,9 +2751,13 @@
         </div>
       </div>
       <div class="analyze-dlg-options">
-        <label class="inline">
+        <label class="inline" id="analyzeGpuLabel">
           <input id="analyzeUseGpu" type="checkbox" checked />
           <span class="muted">Use GPU when available</span>
+        </label>
+        <label class="inline">
+          <input id="analyzeWildlife" type="checkbox" />
+          <span class="muted">(Experimental) Check for other wildlife species in addition to birds</span>
         </label>
       </div>
       <div class="analyze-dlg-footer">
@@ -4458,10 +4506,27 @@
     let checkedFolderPaths = new Set(); // folders checked for multi-load
     let queuedFolderPaths = new Set(); // folders queued for analysis (dialog selection)
     let _treeFlatOrder = [];           // flat ordered list of visible tree paths for range-select
+    let _appVersion = '';              // current app version, fetched once
+    let _isFrozenApp = false;          // whether running as frozen (PyInstaller) build
 
     async function scanFolderTree(rootPath) {
       if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return false;
       if (!rootPath) return false;
+
+      // Fetch app version once (for outdated-version detection)
+      if (!_appVersion && window.pywebview?.api?.get_app_version) {
+        try {
+          const vr = await window.pywebview.api.get_app_version();
+          if (vr && vr.success) _appVersion = vr.version || '';
+        } catch (e) { /* ignore */ }
+      }
+      // Fetch frozen status once
+      if (!_isFrozenApp && window.pywebview?.api?.is_frozen_app) {
+        try {
+          const fr = await window.pywebview.api.is_frozen_app();
+          _isFrozenApp = !!(fr && fr.frozen);
+        } catch (e) { /* ignore */ }
+      }
 
       folderTreeRoot = rootPath;
       const depth = getSetting('treeScanDepth', 3);
@@ -4480,6 +4545,7 @@
           name: rootName,
           path: rootPath,
           has_kestrel: folderTreeRootHasKestrel,
+          kestrel_version: result.root_kestrel_version || '',
           children: folderTreeData,
         };
         // Auto-expand the root
@@ -4490,6 +4556,78 @@
       } catch (e) {
         console.error('[tree] scanFolderTree error:', e);
         return false;
+      }
+    }
+
+    /** Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b. */
+    function compareVersions(a, b) {
+      if (!a || !b) return 0;
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = pa[i] || 0, nb = pb[i] || 0;
+        if (na < nb) return -1;
+        if (na > nb) return 1;
+      }
+      return 0;
+    }
+
+    /** Check if a node's kestrel_version is older than the current app version. */
+    function isVersionOutdated(node) {
+      if (!node || !node.has_kestrel || !node.kestrel_version || !_appVersion) return false;
+      return compareVersions(node.kestrel_version, _appVersion) < 0;
+    }
+
+    /** Show a custom context menu at (x, y) with given items. */
+    function showContextMenu(x, y, items) {
+      dismissContextMenu();
+      const menu = document.createElement('div');
+      menu.className = 'kestrel-ctx-menu';
+      menu.id = '_kestrelCtxMenu';
+      for (const item of items) {
+        const el = document.createElement('div');
+        el.className = 'kestrel-ctx-menu-item' + (item.danger ? ' danger' : '');
+        el.textContent = item.label;
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dismissContextMenu();
+          item.action();
+        });
+        menu.appendChild(el);
+      }
+      menu.style.left = x + 'px';
+      menu.style.top = y + 'px';
+      document.body.appendChild(menu);
+      // Adjust if off-screen
+      const rect = menu.getBoundingClientRect();
+      if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+      if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+      // Dismiss on any click outside
+      setTimeout(() => document.addEventListener('click', dismissContextMenu, { once: true }), 0);
+    }
+
+    function dismissContextMenu() {
+      const old = document.getElementById('_kestrelCtxMenu');
+      if (old) old.remove();
+    }
+
+    /** Clear kestrel analysis data for a folder (with confirmation). */
+    async function clearKestrelDataForFolder(folderPath, folderName, refreshCallback) {
+      const confirmed = confirm(
+        `Are you sure you want to delete all Kestrel analysis data for "${folderName}"?\n\n` +
+        `This will permanently remove the .kestrel folder and all its contents (database, exports, thumbnails) ` +
+        `in:\n${folderPath}\n\nThis action cannot be undone.`
+      );
+      if (!confirmed) return;
+      try {
+        const result = await window.pywebview.api.clear_kestrel_data(folderPath);
+        if (result && result.success) {
+          showToast('Kestrel analysis data cleared for ' + folderName);
+          if (refreshCallback) refreshCallback();
+        } else {
+          alert('Failed to clear analysis data:\n\n' + (result?.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Failed to clear analysis data:\n\n' + (e.message || e));
       }
     }
 
@@ -4566,8 +4704,10 @@
       }
 
       const effectiveHasKestrel = subtreeHasKestrel(node);
-      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel');
+      const outdated = isVersionOutdated(node);
+      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '');
       if (node.path === treeActivePath) row.classList.add('active');
+      if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
 
       // Arrow toggle
       const arrow = document.createElement('span');
@@ -4666,6 +4806,24 @@
           renderFolderTree();
           await loadFolderFromPath(node.path);
         });
+        // Right-click context menu for clearing analysis data
+        row.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showContextMenu(e.clientX, e.clientY, [
+            {
+              label: '🗑 Clear Kestrel Analysis Data',
+              danger: true,
+              action: () => {
+                clearKestrelDataForFolder(node.path, node.name, () => {
+                  node.has_kestrel = false;
+                  node.kestrel_version = '';
+                  renderFolderTree();
+                });
+              }
+            }
+          ]);
+        });
       }
 
       return wrap;
@@ -4760,13 +4918,26 @@
           return false;
         }
 
+        // Helper: look up kestrel_version from tree node by path
+        function findNodeVersion(node, targetPath) {
+          if (!node) return '';
+          if (node.path === targetPath) return node.kestrel_version || '';
+          if (node.children) {
+            for (const c of node.children) {
+              const v = findNodeVersion(c, targetPath);
+              if (v) return v;
+            }
+          }
+          return '';
+        }
+
         for (const np of uniq) {
           const info = inspectionMap.get(np);
           const related = pathToRows.get(np) || [];
           for (const row of related) {
             const span = row.querySelector('.tree-count');
             row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none',
-                                 'no-photos', 'no-photos-deep', 'no-photos-shallow');
+                                 'no-photos', 'no-photos-deep', 'no-photos-shallow', 'version-outdated');
             row.title = '';
             if (span) { span.title = ''; span.textContent = ''; }
 
@@ -4779,6 +4950,13 @@
               if (span) span.textContent = ` ${processedImgs}/${totalImgs}`;
               if (processedImgs >= totalImgs) {
                 row.classList.add('analyzed-full');          // green: finished
+                // Check if analyzed on an outdated version
+                const origPath = normToOriginal.get(np) || np;
+                const nodeVer = findNodeVersion(folderTreeRootNode, origPath);
+                if (nodeVer && _appVersion && compareVersions(nodeVer, _appVersion) < 0) {
+                  row.classList.add('version-outdated');
+                  row.title = `Analyzed on Kestrel v${nodeVer} (current: v${_appVersion}). Consider re-analyzing.`;
+                }
               } else if (processedImgs > 0) {
                 row.classList.add('analyzed-partial');       // purple: started not finished
               } else {
@@ -4833,7 +5011,11 @@
       const row = document.createElement('div');
       const hasChildren = node.children && node.children.length > 0;
       const isExpanded = _dlgExpandedPaths.has(node.path);
-      row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '') + (node.has_kestrel ? ' has-kestrel' : '');
+      const outdated = isVersionOutdated(node);
+      row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '') + (node.has_kestrel ? ' has-kestrel' : '') + (outdated ? ' version-outdated' : '');
+      if (outdated) {
+        row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion}). Consider re-analyzing.`;
+      }
 
       const arrow = document.createElement('span');
       arrow.className = 'tree-arrow' + (hasChildren ? (isExpanded ? ' open' : '') : ' leaf');
@@ -4858,7 +5040,15 @@
       const label = document.createElement('span');
       label.className = 'tree-label';
       label.textContent = node.name;
-      label.title = node.path;
+      if (!outdated) label.title = node.path;
+      else label.title = `v${node.kestrel_version} → v${_appVersion} (outdated)`;
+
+      // Version badge for outdated folders
+      const versionBadge = document.createElement('span');
+      if (outdated) {
+        versionBadge.style.cssText = 'font-size:10px;color:var(--ok);opacity:0.7;margin-left:4px;font-style:italic;';
+        versionBadge.textContent = `v${node.kestrel_version}`;
+      }
 
       // Attach path for async inspection and add count placeholder
       row.dataset.path = node.path;
@@ -4870,7 +5060,38 @@
       row.appendChild(cb);
       row.appendChild(icon);
       row.appendChild(label);
+      if (outdated) row.appendChild(versionBadge);
       row.appendChild(countSpan);
+
+      // Right-click context menu for clearing analysis data
+      if (node.has_kestrel) {
+        row.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const folderName = node.name;
+          showContextMenu(e.clientX, e.clientY, [
+            {
+              label: '🗑 Clear Kestrel Analysis Data',
+              danger: true,
+              action: () => {
+                clearKestrelDataForFolder(node.path, folderName, () => {
+                  // Update the node state in-memory
+                  node.has_kestrel = false;
+                  node.kestrel_version = '';
+                  // Re-render the dialog tree
+                  const treeEl = document.getElementById('analyzeDlgTree');
+                  if (treeEl && folderTreeRootNode) {
+                    treeEl.innerHTML = '';
+                    treeEl.appendChild(buildAnalyzeDlgNode(folderTreeRootNode, _dlgSelected, onChangeCallback));
+                    populateAnalyzeFolderCounts();
+                  }
+                });
+              }
+            }
+          ]);
+        });
+      }
+
       wrap.appendChild(row);
 
       if (hasChildren) {
@@ -5086,6 +5307,15 @@
         await scanFolderTree(fp);
         if (!folderTreeRootNode) return;
       }
+      // Hide GPU checkbox in frozen (PyInstaller) builds — GPU not supported there
+      const gpuLabel = document.getElementById('analyzeGpuLabel');
+      if (gpuLabel) {
+        gpuLabel.style.display = _isFrozenApp ? 'none' : '';
+        if (_isFrozenApp) {
+          const gpuCb = document.getElementById('analyzeUseGpu');
+          if (gpuCb) gpuCb.checked = false;
+        }
+      }
       // Seed the dialog's selected set from any previously-queued paths
       _dlgSelected = new Set(queuedFolderPaths);
       _dlgExpandedPaths = new Set([folderTreeRootNode.path]);
@@ -5131,13 +5361,13 @@
     const CONF_LOW = 0.30;
 
     /** Call the backend (pywebview API or HTTP) to start the queue. */
-    async function apiStartQueue(paths, useGpu = true) {
+    async function apiStartQueue(paths, useGpu = true, wildlifeEnabled = true) {
       if (hasPywebviewApi && window.pywebview?.api?.start_analysis_queue) {
-        return window.pywebview.api.start_analysis_queue(JSON.stringify(paths), useGpu);
+        return window.pywebview.api.start_analysis_queue(JSON.stringify(paths), useGpu, wildlifeEnabled);
       }
       // HTTP fallback (browser mode)
       const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
-      const res = await fetch('/queue/start', { method: 'POST', headers, body: JSON.stringify({ paths, use_gpu: useGpu }) });
+      const res = await fetch('/queue/start', { method: 'POST', headers, body: JSON.stringify({ paths, use_gpu: useGpu, wildlife_enabled: wildlifeEnabled }) });
       return res.json();
     }
 
@@ -6338,12 +6568,55 @@
         const paths = Array.from(_dlgSelected);
         if (paths.length === 0) return;
         const useGpu = document.getElementById('analyzeUseGpu')?.checked ?? true;
+        const wildlifeEnabled = document.getElementById('analyzeWildlife')?.checked ?? false;
+
+        // Check for folders analyzed on an older version — prompt user
+        const outdatedPaths = [];
+        function findNode(node, targetPath) {
+          if (node.path === targetPath) return node;
+          if (node.children) {
+            for (const c of node.children) {
+              const found = findNode(c, targetPath);
+              if (found) return found;
+            }
+          }
+          return null;
+        }
+        for (const p of paths) {
+          const node = folderTreeRootNode ? findNode(folderTreeRootNode, p) : null;
+          if (node && isVersionOutdated(node)) {
+            outdatedPaths.push({ path: p, name: node.name, version: node.kestrel_version });
+          }
+        }
+
+        if (outdatedPaths.length > 0) {
+          const names = outdatedPaths.map(o => `  • ${o.name} (v${o.version})`).join('\n');
+          const confirmed = confirm(
+            `The following folder(s) were analyzed on an older version of Kestrel:\n\n${names}\n\n` +
+            `Current version: v${_appVersion}\n\n` +
+            `Re-analyzing will DELETE existing analysis data (.kestrel folder) before proceeding.\n\n` +
+            `Continue?`
+          );
+          if (!confirmed) return;
+          // Clear .kestrel for outdated folders before re-analysis
+          for (const o of outdatedPaths) {
+            try {
+              await window.pywebview.api.clear_kestrel_data(o.path);
+              // Update in-memory node
+              const node = findNode(folderTreeRootNode, o.path);
+              if (node) { node.has_kestrel = false; node.kestrel_version = ''; }
+            } catch (e) {
+              console.warn('Failed to clear kestrel data for', o.path, e);
+            }
+          }
+        }
+
         document.getElementById('analyzeQueueDlg').close();
         analyzeDlgAdd.disabled = true;
         try {
           // Show loading overlay while analyzer imports models (lazy-load)
           showLoadingAnalyzer();
-          const result = await apiStartQueue(paths, useGpu);
+          const result = await apiStartQueue(paths, useGpu, wildlifeEnabled);
           if (result && result.success) {
             queuedFolderPaths.clear();
             _dlgSelected.clear();

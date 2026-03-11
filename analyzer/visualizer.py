@@ -195,6 +195,7 @@ class QueueManager:
         self._thread: threading.Thread | None = None
         self._pipeline = None
         self._use_gpu = True
+        self._wildlife_enabled = True
 
     # ---- public read-only properties ----
 
@@ -218,7 +219,7 @@ class QueueManager:
 
     # ---- control ----
 
-    def enqueue(self, paths: list, use_gpu: bool = True) -> dict:
+    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True) -> dict:
         if not _PIPELINE_AVAILABLE:
             return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
         with self._lock:
@@ -257,6 +258,7 @@ class QueueManager:
             self._cancel_event.clear()
             self._pause_event.set()
             self._use_gpu = use_gpu
+            self._wildlife_enabled = wildlife_enabled
             self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
             self._thread.start()
         return {'success': True, 'added': added}
@@ -457,6 +459,7 @@ class QueueManager:
                         'on_species': _on_species,
                     },
                     analyzer_name='visualizer-queue',
+                    wildlife_enabled=self._wildlife_enabled,
                 )
                 with self._lock:
                     if self._cancel_event.is_set():
@@ -972,6 +975,54 @@ class Api:
                 'data': ''
             }
 
+    def read_kestrel_metadata(self, folder_path: str):
+        """Read kestrel_metadata.json from a folder's .kestrel directory."""
+        try:
+            folder_path = str(folder_path).strip()
+            meta_path = os.path.join(folder_path, '.kestrel', 'kestrel_metadata.json')
+            if not os.path.isfile(meta_path):
+                return {'success': False, 'error': 'Metadata file not found'}
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return {'success': True, 'metadata': data}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def clear_kestrel_data(self, folder_path: str):
+        """Delete the contents of the .kestrel folder within the given folder."""
+        try:
+            folder_path = str(folder_path).strip()
+            kestrel_dir = os.path.join(folder_path, '.kestrel')
+            if not os.path.isdir(kestrel_dir):
+                return {'success': True, 'message': 'No .kestrel folder found'}
+            # Verify the .kestrel dir is actually inside folder_path (prevent path traversal)
+            real_parent = os.path.realpath(folder_path)
+            real_kestrel = os.path.realpath(kestrel_dir)
+            if not real_kestrel.startswith(real_parent + os.sep) and real_kestrel != os.path.join(real_parent, '.kestrel'):
+                return {'success': False, 'error': 'Invalid path'}
+            shutil.rmtree(kestrel_dir)
+            print(f"[API] clear_kestrel_data() -> Removed .kestrel from {folder_path}", flush=True)
+            return {'success': True, 'message': 'Kestrel analysis data cleared'}
+        except Exception as e:
+            print(f"[API] clear_kestrel_data() -> Error: {e}", flush=True)
+            return {'success': False, 'error': str(e)}
+
+    def is_frozen_app(self):
+        """Return whether the application is running as a frozen (PyInstaller) build."""
+        return {'frozen': getattr(sys, 'frozen', False)}
+
+    def get_app_version(self):
+        """Return the current application version from config."""
+        try:
+            from kestrel_analyzer.config import VERSION
+            return {'success': True, 'version': VERSION}
+        except Exception:
+            try:
+                from analyzer.kestrel_analyzer.config import VERSION
+                return {'success': True, 'version': VERSION}
+            except Exception:
+                return {'success': True, 'version': 'unknown'}
+
     def inspect_folder(self, folder_path: str):
         """Return lightweight folder summary (total images, processed count).
 
@@ -1121,17 +1172,36 @@ class Api:
                     node_count[0] += 1
                     full = entry.path
                     has_kestrel = os.path.isfile(os.path.join(full, '.kestrel', 'kestrel_database.csv'))
+                    kestrel_version = ''
+                    if has_kestrel:
+                        try:
+                            meta_path = os.path.join(full, '.kestrel', 'kestrel_metadata.json')
+                            if os.path.isfile(meta_path):
+                                with open(meta_path, 'r', encoding='utf-8') as mf:
+                                    kestrel_version = json.load(mf).get('version', '')
+                        except Exception:
+                            pass
                     children = _scan(full, depth - 1)
                     result.append({
                         'name': name,
                         'path': full,
                         'has_kestrel': has_kestrel,
+                        'kestrel_version': kestrel_version,
                         'children': children,
                     })
                 return result
 
             tree = _scan(root_path, max_depth)
             root_has_kestrel = os.path.isfile(os.path.join(root_path, '.kestrel', 'kestrel_database.csv'))
+            root_kestrel_version = ''
+            if root_has_kestrel:
+                try:
+                    meta_path = os.path.join(root_path, '.kestrel', 'kestrel_metadata.json')
+                    if os.path.isfile(meta_path):
+                        with open(meta_path, 'r', encoding='utf-8') as mf:
+                            root_kestrel_version = json.load(mf).get('version', '')
+                except Exception:
+                    pass
             if limit_reached[0]:
                 print(f"[API] list_subfolders() -> Node limit reached ({MAX_NODES}); scan truncated at {node_count[0]} nodes", flush=True)
             else:
@@ -1140,6 +1210,7 @@ class Api:
                 'success': True,
                 'tree': tree,
                 'root_has_kestrel': root_has_kestrel,
+                'root_kestrel_version': root_kestrel_version,
                 'error': '',
                 'nodes': node_count[0],
                 'truncated': bool(limit_reached[0]),
@@ -1452,7 +1523,7 @@ class Api:
     #  Analysis Queue API (called from JavaScript in pywebview mode)       #
     # ------------------------------------------------------------------ #
 
-    def start_analysis_queue(self, paths, use_gpu=True):
+    def start_analysis_queue(self, paths, use_gpu=True, wildlife_enabled=True):
         """Enqueue folders for analysis. ``paths`` may be a JSON string or list."""
         try:
             if isinstance(paths, str):
@@ -1460,7 +1531,8 @@ class Api:
             if not isinstance(paths, list):
                 return {'success': False, 'error': 'paths must be a list'}
             paths = [str(p).strip() for p in paths if p]
-            return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu))
+            return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu),
+                                          wildlife_enabled=bool(wildlife_enabled))
         except Exception as e:
             print(f'[API] start_analysis_queue() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}

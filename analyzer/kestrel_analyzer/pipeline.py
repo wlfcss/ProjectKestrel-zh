@@ -92,6 +92,7 @@ class AnalysisPipeline:
         cancel_event=None,
         callbacks: Optional[Dict[str, Callable]] = None,
         analyzer_name: str = "pipeline",
+        wildlife_enabled: bool = True,
     ) -> None:
         callbacks = callbacks or {}
         status_cb = callbacks.get("on_status")
@@ -103,6 +104,8 @@ class AnalysisPipeline:
         quality_cb = callbacks.get("on_quality")
         species_cb = callbacks.get("on_species")
         error_cb = callbacks.get("on_error")
+
+        active_wildlife_categories = WILDLIFE_CATEGORIES if wildlife_enabled else []
 
         self._log_path = get_log_path(folder)
         stage_ctx = {"stage": "startup", "file": None}
@@ -348,7 +351,7 @@ class AnalysisPipeline:
                             progress_cb(idx + processed_count, total)
                         continue
 
-                    wildlife_indices = [i for i, c in enumerate(pred_class) if c in WILDLIFE_CATEGORIES]
+                    wildlife_indices = [i for i, c in enumerate(pred_class) if c in active_wildlife_categories]
                     bird_indices = [i for i, c in enumerate(pred_class) if c == "bird"]
                     bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
 

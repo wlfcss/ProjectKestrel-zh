@@ -21,13 +21,9 @@ EXIF_IFD_TAG = 0x8769
 
 DATE_FORMAT = "%Y:%m:%d %H:%M:%S"
 
-# Canon's metadata UUID in CR3 files
 CANON_METADATA_UUID = bytes.fromhex('85c0b687820f11e08111f4ce462b6a48')
 
-# Extensions handled via Pillow rather than the native parser
 PILLOW_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
-
-# Known unsupported formats — fail fast with a clear message
 UNSUPPORTED_EXTENSIONS = {'.raf', '.x3f'}
 
 
@@ -43,14 +39,10 @@ def _read_pillow_exif(filepath: Path) -> str | None:
             f"Pillow is required to read {filepath.suffix} files. "
             "Install it with: pip install Pillow"
         )
-
     with Image.open(filepath) as img:
         exif = img._getexif()
-
     if not exif:
         return None
-
-    # Prefer DateTimeOriginal, fall back to DateTime
     val = exif.get(DATETIME_ORIGINAL_TAG) or exif.get(DATETIME_TAG)
     return val.strip() if val else None
 
@@ -75,7 +67,6 @@ def _read_tiff_exif(f) -> str | None:
         return None
 
     ifd_offset = struct.unpack(endian + 'I', f.read(4))[0]
-
     return _walk_ifd(f, endian, tiff_start + ifd_offset, tiff_start)
 
 
@@ -89,7 +80,7 @@ def _walk_ifd(f, endian: str, offset: int, tiff_start: int, _depth: int = 0) -> 
     except struct.error:
         return None
 
-    if num_entries > 256:  # sanity check against misreads
+    if num_entries > 256:
         return None
 
     exif_ifd_offset = None
@@ -116,7 +107,6 @@ def _walk_ifd(f, endian: str, offset: int, tiff_start: int, _depth: int = 0) -> 
         elif tag == EXIF_IFD_TAG:
             exif_ifd_offset = tiff_start + struct.unpack(endian + 'I', raw_value)[0]
 
-    # Recurse into EXIF sub-IFD
     if exif_ifd_offset:
         pos = f.tell()
         result = _walk_ifd(f, endian, exif_ifd_offset, tiff_start, _depth + 1)
@@ -128,17 +118,16 @@ def _walk_ifd(f, endian: str, offset: int, tiff_start: int, _depth: int = 0) -> 
 
 
 def _read_ascii(f, endian: str, type_: int, count: int, raw_value: bytes, tiff_start: int) -> str | None:
-    if type_ != 2:  # ASCII
+    if type_ != 2:
         return None
     if count <= 4:
         return raw_value[:count].decode('ascii', errors='ignore')
-    else:
-        offset = tiff_start + struct.unpack(endian + 'I', raw_value)[0]
-        pos = f.tell()
-        f.seek(offset)
-        val = f.read(count).decode('ascii', errors='ignore')
-        f.seek(pos)
-        return val
+    offset = tiff_start + struct.unpack(endian + 'I', raw_value)[0]
+    pos = f.tell()
+    f.seek(offset)
+    val = f.read(count).decode('ascii', errors='ignore')
+    f.seek(pos)
+    return val
 
 
 # ---------------------------------------------------------------------------
@@ -146,13 +135,20 @@ def _read_ascii(f, endian: str, type_: int, count: int, raw_value: bytes, tiff_s
 # ---------------------------------------------------------------------------
 
 def _read_cr3_exif(f) -> str | None:
-    """Walk top-level ISOBMFF boxes, find Canon's metadata UUID,
-    then parse CMT1/CMT2 sub-boxes which contain raw TIFF/EXIF data."""
+    """Entry point: find file size and start recursive ISOBMFF walk."""
     f.seek(0, 2)
     file_size = f.tell()
     f.seek(0)
+    return _walk_isobmff(f, file_size)
 
-    while f.tell() < file_size - 8:
+
+def _walk_isobmff(f, end: int, _depth: int = 0) -> str | None:
+    """Recursively walk ISOBMFF boxes looking for Canon's metadata UUID.
+    The UUID lives inside the moov box, not at the top level."""
+    if _depth > 4:
+        return None
+
+    while f.tell() < end - 8:
         box_start = f.tell()
         header = f.read(8)
         if len(header) < 8:
@@ -165,11 +161,17 @@ def _read_cr3_exif(f) -> str | None:
             ext = f.read(8)
             size = struct.unpack('>Q', ext)[0]
         elif size == 0:
-            size = file_size - box_start
+            size = end - box_start
 
         box_end = box_start + size
 
-        if box_type == b'uuid':
+        if box_type == b'moov':
+            # Canon UUID is nested inside moov — recurse
+            result = _walk_isobmff(f, box_end, _depth + 1)
+            if result:
+                return result
+
+        elif box_type == b'uuid':
             uuid_bytes = f.read(16)
             if uuid_bytes == CANON_METADATA_UUID:
                 result = _walk_canon_uuid(f, box_end)
@@ -194,7 +196,7 @@ def _walk_canon_uuid(f, end: int) -> str | None:
         box_end = box_start + size
 
         if box_type in (b'CMT1', b'CMT2'):
-            # Pass real file handle so tiff_start resolves against the actual file
+            # Real file handle — tiff_start resolves correctly against the file
             try:
                 result = _read_tiff_exif(f)
                 if result:
@@ -253,10 +255,9 @@ def get_capture_time(filepath: str | Path) -> datetime:
     if ext in UNSUPPORTED_EXTENSIONS:
         raise ValueError(
             f"{ext.upper()} ({filepath.name}) is not supported. "
-            f"RAF (Fujifilm) and X3F (Sigma) support is not implemented."
+            "RAF (Fujifilm) and X3F (Sigma) are not implemented."
         )
 
-    # JPEG/PNG/TIFF — delegate to Pillow
     if ext in PILLOW_EXTENSIONS:
         raw_str = _read_pillow_exif(filepath)
         if not raw_str:
@@ -295,3 +296,25 @@ def get_capture_time(filepath: str | Path) -> datetime:
         return datetime.strptime(raw_str.strip(), DATE_FORMAT)
     except ValueError:
         raise ValueError(f"Unrecognised datetime format: {raw_str!r}")
+
+
+# Convenience alias
+get_datetime = get_capture_time
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python raw_exif.py <file1> [file2 ...]")
+        sys.exit(1)
+
+    for path in sys.argv[1:]:
+        try:
+            dt = get_capture_time(path)
+            print(f"{path}: {dt}")
+        except (ValueError, RuntimeError) as e:
+            print(f"{path}: ERROR — {e}")
