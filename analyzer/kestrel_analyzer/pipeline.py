@@ -21,7 +21,7 @@ from .config import (
 )
 from .database import load_database, save_database
 print("Importing read_image from image_utils...")
-from .image_utils import read_image
+from .image_utils import read_image, read_image_for_pipeline
 print("read_image imported successfully.")
 from .ratings import quality_to_rating
 print("Importing compute_image_similarity_akaze from similarity...")
@@ -70,6 +70,80 @@ class AnalysisPipeline:
                 overlay[mask_bool] * (1.0 - alpha) + np.array(color, dtype=np.uint8) * alpha
             ).astype(np.uint8)
         return overlay
+
+    @staticmethod
+    def _compute_exposure_stops(img: np.ndarray, mask: np.ndarray) -> float:
+        """Compute how many stops of exposure correction are needed to bring
+        the masked subject region to a perceptual middle-grey target.
+
+        Returns 0.0 when no correction is needed (|stops| < 0.5) or when
+        the region is too dark to correct reliably.  Otherwise returns a
+        value in [-2.5, +2.5] (positive = lift underexposed, negative = pull
+        overexposed).
+        """
+        TARGET_LUMINANCE = 0.45  # slightly below true middle-grey (0.5)
+        MIN_MEAN = 1e-3           # avoid log2(0) on near-black crops
+        try:
+            img_f = img.astype(np.float32) / 255.0
+            mask_bool = mask.astype(bool) if mask is not None else None
+            if (
+                mask_bool is not None
+                and mask_bool.any()
+                and img_f.ndim == 3
+                and img_f.shape[:2] == mask_bool.shape
+            ):
+                pixels = img_f[mask_bool]
+            else:
+                pixels = img_f.reshape(-1, 3)
+            # Perceptual luminance weights (Rec. 709)
+            lum = 0.2126 * pixels[:, 0] + 0.7152 * pixels[:, 1] + 0.0722 * pixels[:, 2]
+            mean_lum = float(np.mean(lum))
+            if mean_lum < MIN_MEAN:
+                return 0.0
+            stops = float(np.log2(TARGET_LUMINANCE / mean_lum))
+            stops = float(np.clip(stops, -2.5, 2.5))
+            if abs(stops) < 0.5:
+                return 0.0
+            return stops
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def _apply_exposure_correction(
+        img: np.ndarray, stops: float, raw_obj=None
+    ) -> np.ndarray:
+        """Return a copy of *img* with exposure shifted by *stops* stops.
+
+        When *raw_obj* is a live rawpy.RawPy instance (RAW files), the
+        correction is applied via rawpy.postprocess(exp_shift=…) in the linear
+        domain before demosaicing, which correctly recovers highlight detail
+        on overexposed subjects rather than clipping.
+
+        For non-RAW sources (JPEG/PNG, or if rawpy re-process fails) the
+        method falls back to pixel-level multiplication.
+
+        Positive stops lifts (brightens), negative stops pulls (darkens).
+        Returns the original array unchanged when stops == 0.0.
+        """
+        if stops == 0.0:
+            return img
+        if raw_obj is not None:
+            try:
+                # exp_shift is in linear scale: 2^stops.
+                # rawpy usable range: 0.25 (−2 stops) … 8.0 (+3 stops).
+                linear_scale = float(np.clip(2.0 ** stops, 0.25, 8.0))
+                # Preserve highlights when brightening to avoid blowing out
+                # any remaining highlight detail.
+                preserve = 0.8 if stops > 0 else 0.0
+                return raw_obj.postprocess(
+                    no_auto_bright=True,
+                    exp_shift=linear_scale,
+                    exp_preserve_highlights=preserve,
+                )
+            except Exception:
+                pass  # fall through to pixel-level fallback below
+        factor = 2.0 ** stops
+        return (img.astype(np.float32) * factor).clip(0.0, 255.0).astype(np.uint8)
 
     def load_models(self, status_cb: Optional[Callable[[str], None]] = None) -> None:
         if self.mask_rcnn and self.species_clf and self.quality_clf:
@@ -249,11 +323,12 @@ class AnalysisPipeline:
                 }
 
                 image_path = None
+                raw_obj = None
                 try:
                     stage_ctx["stage"] = "read_image"
                     stage_ctx["file"] = raw_file
                     image_path = os.path.join(folder, raw_file)
-                    img = read_image(image_path)
+                    img, raw_obj = read_image_for_pipeline(image_path)
                     if img is None:
                         raise RuntimeError("Image read returned None")
 
@@ -369,8 +444,10 @@ class AnalysisPipeline:
 
                     def process_nonbird(primary_mask_i):
                         stage_ctx["stage"] = "process_nonbird"
+                        stops = self._compute_exposure_stops(img, masks[primary_mask_i])
+                        img_src = self._apply_exposure_correction(img, stops, raw_obj)
                         quality_crop, quality_mask = self.mask_rcnn.get_square_crop(
-                            masks[primary_mask_i], img, resize=True
+                            masks[primary_mask_i], img_src, resize=True
                         )
                         quality_score = self.quality_clf.classify(quality_crop, quality_mask)
                         return {
@@ -389,8 +466,10 @@ class AnalysisPipeline:
                         for i in indices:
                             # Process per-crop results. Pause is checked at the
                             # top of the image loop so we avoid pausing mid-image.
-                            species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img)
-                            quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img, resize=True)
+                            stops = self._compute_exposure_stops(img, masks[i])
+                            img_src = self._apply_exposure_correction(img, stops, raw_obj)
+                            species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img_src)
+                            quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img_src, resize=True)
                             items.append(
                                 {
                                     "index": i,
@@ -610,6 +689,12 @@ class AnalysisPipeline:
                 # Explicitly clear large temporary variables after each image
                 # so that pausing between images doesn't retain large buffers.
                 try:
+                    # Close the rawpy object first to release the RAW file buffer.
+                    try:
+                        if raw_obj is not None:
+                            raw_obj.close()
+                        del raw_obj
+                    except Exception: pass
                     try: del masks
                     except Exception: pass
                     try: del pred_boxes

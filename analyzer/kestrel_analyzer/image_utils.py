@@ -58,3 +58,43 @@ def read_image(path: str):
         print(f"Error in read_image({path}): {e}", flush=True)
         traceback.print_exc()
         return None
+
+
+def read_image_for_pipeline(path: str):
+    """
+    Like read_image, but for RAW files returns the rawpy.RawPy object *open*
+    alongside the postprocessed RGB array so that the pipeline can request a
+    re-processed image with different exposure settings without re-reading the
+    file from disk.
+
+    Returns: (ndarray | None, rawpy.RawPy | None)
+      - For RAW files: (rgb_array, raw_obj)  — caller must call raw_obj.close()
+      - For non-RAW:   (rgb_array, None)
+      - On failure:    (None, None)
+    """
+    try:
+        print(f"read_image_for_pipeline: Reading {path}", flush=True)
+        ext = os.path.splitext(path)[1].lower()
+        raw_extensions = {'.cr2', '.cr3', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2', '.srw'}
+
+        if ext in raw_extensions:
+            print(f"read_image_for_pipeline: Detected RAW file, keeping rawpy object open", flush=True)
+            # Do NOT use a context manager — we intentionally keep the object open.
+            raw = rawpy.imread(path)
+            rgb = raw.postprocess()  # same defaults as read_image()
+            print(f"read_image_for_pipeline: Successfully read RAW image, shape={rgb.shape}", flush=True)
+            return rgb, raw
+        else:
+            return read_image(path), None
+
+    except rawpy.LibRawFileUnsupportedError:
+        print(f"read_image_for_pipeline: RAW format not supported for {path}", flush=True)
+        return None, None
+    except rawpy.LibRawIOError as e:
+        print(f"read_image_for_pipeline: I/O error reading RAW file {path}: {e}", flush=True)
+        return None, None
+    except Exception as e:
+        import traceback
+        print(f"Error in read_image_for_pipeline({path}): {e}", flush=True)
+        traceback.print_exc()
+        return None, None
