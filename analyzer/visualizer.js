@@ -251,7 +251,7 @@
           const resp = await fetch('https://api.projectkestrel.org/version', { cache: 'no-store' });
           if (!resp.ok) return;
           const remote = (await resp.text()).trim();
-          if (remote && remote !== 'Yellow Warbler') {
+          if (remote && remote !== 'Swamp Sparrow') {
             showToast('There is a new update available! Please download the latest version from www.projectkestrel.org', 15000);
           }
         } catch (e) {
