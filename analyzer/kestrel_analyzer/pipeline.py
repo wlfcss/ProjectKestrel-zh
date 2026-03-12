@@ -90,7 +90,7 @@ class AnalysisPipeline:
         value in [-2.5, +2.5] (positive = lift underexposed, negative = pull
         overexposed).
         """
-        TARGET_LUMINANCE = 0.45  # slightly below true middle-grey (0.5)
+        TARGET_LUMINANCE = 0.50  # slightly below true middle-grey (0.5)
         MIN_MEAN = 1e-3           # avoid log2(0) on near-black crops
         try:
             img_f = img.astype(np.float32) / 255.0
@@ -110,7 +110,7 @@ class AnalysisPipeline:
             if mean_lum < MIN_MEAN:
                 return 0.0
             stops = float(np.log2(TARGET_LUMINANCE / mean_lum))
-            stops = float(np.clip(stops, -1.5, 3.0))
+            stops = float(np.clip(stops, -1.25, 3.0))
             if abs(stops) < 0.5:
                 return 0.0
             return stops

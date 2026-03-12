@@ -577,6 +577,103 @@
       return _scenedata[rp];
     }
 
+    function _getSceneIdParts(sceneId) {
+      const parts = String(sceneId).split(':');
+      const sceneCount = parts.pop();
+      const slot = parts.length ? parseInt(parts[0], 10) : null;
+      return { slot, sceneCount };
+    }
+
+    function _getSceneScenedataEntry(sceneOrId, create = false, sceneRows = null) {
+      const sceneId = typeof sceneOrId === 'string' ? sceneOrId : sceneOrId?.id;
+      if (!sceneId) return null;
+      const { sceneCount } = _getSceneIdParts(sceneId);
+      const rowsForScene = sceneRows || getSceneRows(sceneId);
+      const rp = rowsForScene[0]?.__rootPath || rootPath || '';
+      if (!rp) return null;
+      const sd = _initScenedata(rp);
+      if (!create) return sd.scenes?.[sceneCount] || null;
+      if (!sd.scenes[sceneCount]) {
+        sd.scenes[sceneCount] = {
+          scene_id: sceneCount,
+          image_filenames: rowsForScene.map(r => r.filename || '').filter(Boolean),
+          name: '',
+          status: 'pending',
+          user_tags: { species: [], families: [], finalized: false }
+        };
+      }
+      return sd.scenes[sceneCount];
+    }
+
+    function _computeSceneTagsFromRows(sceneRows, confThreshold, includeSecondary, includeFamilies = true) {
+      const speciesSet = new Set();
+      const familySet = new Set();
+      for (const r of sceneRows) {
+        const conf = parseNumber(r.species_confidence);
+        if (conf >= confThreshold && r.species && r.species !== 'No Bird') speciesSet.add(r.species);
+        if (includeFamilies) {
+          const fconf = parseNumber(r.family_confidence);
+          if (fconf >= confThreshold && r.family && r.family !== 'Unknown' && r.family !== 'N/A') familySet.add(r.family);
+        }
+        if (includeSecondary) {
+          const secondary = parseSecondarySpecies(r);
+          for (const { name, score } of secondary) {
+            if (score >= confThreshold && name && name !== 'No Bird') speciesSet.add(name);
+          }
+          if (includeFamilies) {
+            const secFams = parseSecondaryFamilies(r);
+            for (const { name, score } of secFams) {
+              if (score >= confThreshold && name && name !== 'Unknown' && name !== 'N/A') familySet.add(name);
+            }
+          }
+        }
+      }
+      return {
+        species: Array.from(speciesSet).sort(),
+        families: Array.from(familySet).sort(),
+      };
+    }
+
+    function _collectCurrentlyVisibleSceneTags(sceneId) {
+      const thresholdEl = el('#speciesConf');
+      const confThreshold = thresholdEl ? (parseFloat(thresholdEl.value) || 0) : 0;
+      const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
+      const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
+      return _computeSceneTagsFromRows(getSceneRows(sceneId), confThreshold, includeSecondary, true);
+    }
+
+    function _normalizeScenedataForSave(rp, groupRows) {
+      const sd = _initScenedata(rp);
+      const existingScenes = sd.scenes || {};
+      const grouped = new Map();
+      for (const r of groupRows) {
+        const sceneCount = String(r.scene_count);
+        if (!grouped.has(sceneCount)) grouped.set(sceneCount, []);
+        grouped.get(sceneCount).push(r);
+      }
+
+      const normalizedScenes = {};
+      for (const [sceneCount, sceneRows] of grouped) {
+        const existing = existingScenes[sceneCount] || {};
+        const existingTags = existing.user_tags || {};
+        const finalized = existingTags.finalized === true;
+        normalizedScenes[sceneCount] = {
+          scene_id: sceneCount,
+          image_filenames: sceneRows.map(r => r.filename || '').filter(Boolean),
+          name: String(existing.name || sceneRows.find(r => String(r.scene_name || '').trim().length)?.scene_name || '').trim(),
+          status: finalized ? 'accepted' : (existing.status === 'rejected' ? 'rejected' : 'pending'),
+          user_tags: {
+            species: finalized ? Array.from(new Set((existingTags.species || []).map(String).filter(Boolean))).sort() : [],
+            families: finalized ? Array.from(new Set((existingTags.families || []).map(String).filter(Boolean))).sort() : [],
+            finalized,
+          },
+        };
+      }
+
+      sd.scenes = normalizedScenes;
+      return sd;
+    }
+
     // Helper: is this image manually rated (>0 stars)?
     function isManualRated(r) { return getRating(r) > 0 && getOrigin(r) === 'manual'; }
 
@@ -595,33 +692,10 @@
         let rep = arr[0];
         for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
 
-        const speciesSet = new Set();
-        const familySet = new Set();
-        for (const r of arr) {
-          const conf = parseNumber(r.species_confidence);
-          if (conf >= minSpeciesConf && r.species && r.species !== 'No Bird') speciesSet.add(r.species);
-          if (includeFamilies) {
-            const fconf = parseNumber(r.family_confidence);
-            if (fconf >= minSpeciesConf && r.family && r.family !== 'Unknown' && r.family !== 'N/A') familySet.add(r.family);
-          }
-          if (includeSecondary) {
-            // Add secondary species passing threshold
-            const secondary = parseSecondarySpecies(r);
-            for (const { name, score } of secondary) {
-              if (score >= minSpeciesConf && name && name !== 'No Bird') speciesSet.add(name);
-            }
-            if (includeFamilies) {
-              const secFams = parseSecondaryFamilies(r);
-              for (const { name, score } of secFams) {
-                if (score >= minSpeciesConf && name && name !== 'Unknown' && name !== 'N/A') familySet.add(name);
-              }
-            }
-          }
-        }
-        let species = Array.from(speciesSet).sort();
+        const computedTags = _computeSceneTagsFromRows(arr, minSpeciesConf, includeSecondary, includeFamilies);
+        let species = computedTags.species.slice();
         if (includeFamilies) {
-          const families = Array.from(familySet).sort();
-          const merged = new Set([...species, ...families]);
+          const merged = new Set([...species, ...computedTags.families]);
           species = Array.from(merged).sort();
         }
 
@@ -630,8 +704,9 @@
         const rowSc = arr[0] ? String(arr[0].scene_count) : '';
         const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
         const sceneName = sdScene?.name || (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
+        const isApproved = !!sdScene?.user_tags?.finalized;
         // If this scene has finalized user_tags, use them for species/family display
-        if (sdScene?.user_tags?.finalized) {
+        if (isApproved) {
           const utSpecies = (sdScene.user_tags.species || []).slice().sort();
           const utFams = includeFamilies ? (sdScene.user_tags.families || []).slice().sort() : [];
           species = utFams.length ? Array.from(new Set([...utSpecies, ...utFams])).sort() : utSpecies;
@@ -644,7 +719,8 @@
           imageCount: arr.length,
           species,
           maxQuality: maxQ,
-          sceneName
+          sceneName,
+          isApproved
         });
       }
 
@@ -864,8 +940,16 @@
         meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
+        if (s.isApproved) {
+          card.classList.add('scene-approved');
+          chips.classList.add('chips-approved');
+          const approvedBadge = document.createElement('span');
+          approvedBadge.className = 'chip manual-approved scene-approved-badge';
+          approvedBadge.textContent = 'Approved';
+          meta.appendChild(approvedBadge);
+        }
         for (const sp of s.species.slice(0, 3)) {
-          const c = document.createElement('span'); c.className = 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
+          const c = document.createElement('span'); c.className = s.isApproved ? 'chip manual-approved' : 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
         }
         if (s.species.length > 3) { const more = document.createElement('span'); more.className = 'chip badge'; more.textContent = `+${s.species.length - 3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
         // Put title and badges on the same physical line: left = title, right = badges
@@ -1353,28 +1437,29 @@
     let _sceneEditMode = false;
 
     function collectSceneSpecies(sceneId) {
-      const sceneRows = getSceneRows(sceneId);
-      const speciesSet = new Set();
-      const familySet = new Set();
-      const confThreshold = getSetting('detection_threshold', 0.75);
-      for (const r of sceneRows) {
-        if (r.species && r.species !== 'No Bird' && parseNumber(r.species_confidence) >= confThreshold)
-          speciesSet.add(r.species);
-        if (r.family && r.family !== 'Unknown' && r.family !== 'N/A' && parseNumber(r.family_confidence) >= confThreshold)
-          familySet.add(r.family);
+      const sdScene = _getSceneScenedataEntry(sceneId, false);
+      if (sdScene?.user_tags?.finalized) {
+        return {
+          species: (sdScene.user_tags.species || []).slice().sort(),
+          families: (sdScene.user_tags.families || []).slice().sort(),
+          approved: true,
+        };
       }
-      return { species: Array.from(speciesSet).sort(), families: Array.from(familySet).sort() };
+      const computed = _collectCurrentlyVisibleSceneTags(sceneId);
+      return { ...computed, approved: false };
     }
 
     function renderSceneMetaChips(scene, editable) {
       const _sceneLocalNum = String(scene.id).split(':').pop();
       const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
-      const { species, families } = collectSceneSpecies(scene.id);
+      const { species, families, approved } = collectSceneSpecies(scene.id);
+      const chipClass = approved ? 'chip manual-approved' : 'chip';
+      const editChipClass = approved ? 'edit-chip manual-approved' : 'edit-chip';
 
       let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
       if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
       html += `</div>`;
-      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}</div>`;
+      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually approved</span>' : ''}</div>`;
 
       // Species chips
       html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
@@ -1382,9 +1467,9 @@
         html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const sp of species) {
           if (editable) {
-            html += `<span class="edit-chip">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">&times;</span></span>`;
+            html += `<span class="${editChipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">&times;</span></span>`;
           } else {
-            html += `<span class="chip">${escapeHtml(sp)}</span>`;
+            html += `<span class="${chipClass}">${escapeHtml(sp)}</span>`;
           }
         }
         html += `</span>`;
@@ -1399,9 +1484,9 @@
         html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const fm of families) {
           if (editable) {
-            html += `<span class="edit-chip">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">&times;</span></span>`;
+            html += `<span class="${editChipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">&times;</span></span>`;
           } else {
-            html += `<span class="chip">${escapeHtml(fm)}</span>`;
+            html += `<span class="${chipClass}">${escapeHtml(fm)}</span>`;
           }
         }
         html += `</span>`;
@@ -1514,26 +1599,26 @@
 
     function applySceneName(sceneId, name) {
       const newName = String(name || '').trim();
-      const parts = String(sceneId).split(':');
-      const sceneCount = parts.pop();
-      const slot = parts.length ? parseInt(parts[0], 10) : null;
+      const { slot, sceneCount } = _getSceneIdParts(sceneId);
       let rowChanged = 0;
       let rp = null;
+      const sceneRows = [];
       for (const r of rows) {
         const slotMatch = slot === null || (r.__folderSlot ?? 0) === slot;
         if (slotMatch && String(r.scene_count) === sceneCount) {
           if (!rp && r.__rootPath) rp = r.__rootPath;
+          sceneRows.push(r);
           if ((r.scene_name || '') !== newName) { r.scene_name = newName; rowChanged++; }
         }
       }
       // Persist scene name in scenedata (pywebview mode)
       let sdChanged = false;
       if (hasPywebviewApi && rp) {
-        const sd = _initScenedata(rp);
-        if (!sd.scenes[sceneCount]) {
-          sd.scenes[sceneCount] = { scene_id: sceneCount, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+        const sceneEntry = _getSceneScenedataEntry(sceneId, true, sceneRows);
+        if (sceneEntry) {
+          sceneEntry.image_filenames = sceneRows.map(r => r.filename || '').filter(Boolean);
+          if (sceneEntry.name !== newName) { sceneEntry.name = newName; sdChanged = true; }
         }
-        if (sd.scenes[sceneCount].name !== newName) { sd.scenes[sceneCount].name = newName; sdChanged = true; }
       }
       if (rowChanged || sdChanged) {
         markDirty();
@@ -1552,21 +1637,19 @@
     }
 
     /**
-     * After a species/family edit, rebuild user_tags for the scene from the current row state
-     * and mark them as finalized so aggregateScenes uses the overridden values.
+     * After a species/family edit, save the threshold-filtered scene tags the user is
+     * currently looking at and mark the scene as manually approved.
      */
     function _syncSceneUserTags(scene, sceneRows) {
       if (!hasPywebviewApi || !sceneRows[0]?.__rootPath) return;
-      const rp = sceneRows[0].__rootPath;
-      const parts = String(scene.id).split(':');
-      const sceneCount = parts.pop();
-      const sd = _initScenedata(rp);
-      if (!sd.scenes[sceneCount]) {
-        sd.scenes[sceneCount] = { scene_id: sceneCount, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
-      }
-      const ut = sd.scenes[sceneCount].user_tags;
-      ut.species = Array.from(new Set(sceneRows.filter(r => r.species && r.species !== 'No Bird').map(r => r.species))).sort();
-      ut.families = Array.from(new Set(sceneRows.filter(r => r.family && r.family !== 'Unknown' && r.family !== 'N/A').map(r => r.family))).sort();
+      const sceneEntry = _getSceneScenedataEntry(scene.id, true, sceneRows);
+      if (!sceneEntry) return;
+      const visibleTags = _collectCurrentlyVisibleSceneTags(scene.id);
+      const ut = sceneEntry.user_tags;
+      sceneEntry.image_filenames = sceneRows.map(r => r.filename || '').filter(Boolean);
+      sceneEntry.status = 'accepted';
+      ut.species = visibleTags.species.slice();
+      ut.families = visibleTags.families.slice();
       ut.finalized = true;
     }
 
@@ -1974,9 +2057,9 @@
           groups.get(rp).push(r);
         }
         let saved = 0, failed = 0;
-        for (const [rp] of groups) {
+        for (const [rp, groupRows] of groups) {
           if (!rp) { failed++; continue; }
-          const sd = _scenedata[rp] || { version: '2.0', image_ratings: {}, scenes: {} };
+          const sd = _normalizeScenedataForSave(rp, groupRows);
           try {
             const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
             if (res.success) saved++;
