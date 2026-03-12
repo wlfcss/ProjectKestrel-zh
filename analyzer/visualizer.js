@@ -8,6 +8,7 @@
     let rootPath = '';             // Absolute path to root folder (for Python API)
     let csvFileHandle = null;      // .kestrel/kestrel_database.csv
     let rows = [];                 // CSV rows (objects)
+    let _scenedata = {};           // Map of rootPath → kestrel_scenedata.json contents
     let header = [];               // CSV header fields
     let scenes = [];               // Aggregated scene objects
     let dirty = false;             // Track unsaved edits
@@ -570,6 +571,12 @@
       }
     }
 
+    /** Get (or lazily initialise) the scenedata object for a rootPath. */
+    function _initScenedata(rp) {
+      if (!_scenedata[rp]) _scenedata[rp] = { version: '2.0', image_ratings: {}, scenes: {} };
+      return _scenedata[rp];
+    }
+
     // Helper: is this image manually rated (>0 stars)?
     function isManualRated(r) { return getRating(r) > 0 && getOrigin(r) === 'manual'; }
 
@@ -619,7 +626,16 @@
         }
 
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
-        const sceneName = (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
+        const rowRp = arr[0]?.__rootPath || rootPath || '';
+        const rowSc = arr[0] ? String(arr[0].scene_count) : '';
+        const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
+        const sceneName = sdScene?.name || (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
+        // If this scene has finalized user_tags, use them for species/family display
+        if (sdScene?.user_tags?.finalized) {
+          const utSpecies = (sdScene.user_tags.species || []).slice().sort();
+          const utFams = includeFamilies ? (sdScene.user_tags.families || []).slice().sort() : [];
+          species = utFams.length ? Array.from(new Set([...utSpecies, ...utFams])).sort() : utSpecies;
+        }
 
         list.push({
           id: sceneId,
@@ -647,32 +663,53 @@
     }
 
     function getRating(row) {
-      // For manually-rated photos, always honour the user's explicit rating.
+      const rp = row?.__rootPath || rootPath || '';
+      const fn = row?.filename || '';
+      // 1. Manual rating stored in scenedata (pywebview desktop mode)
+      const sd = _scenedata[rp];
+      if (sd?.image_ratings && fn && fn in sd.image_ratings) {
+        const n = parseInt(sd.image_ratings[fn], 10);
+        return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      }
+      // 2. Legacy row-level manual rating (FSAPI browser mode or pre-migration data)
       if (String(row?.rating_origin).toLowerCase() === 'manual') {
         const n = parseInt(row?.rating, 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
-      // For auto-rated photos prefer normalized_rating (falls back to raw rating).
-      const norm = parseInt(row?.normalized_rating, 10);
+      // 3. Auto: normalized rating computed by last apply_normalization call
+      const norm = parseInt(row?.__normalized_rating ?? row?.normalized_rating, 10);
       if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
-      const raw = parseInt(row?.rating, 10);
-      return Number.isFinite(raw) ? Math.max(0, Math.min(5, raw)) : 0;
+      return 0;
     }
     function getOrigin(row) {
+      const rp = row?.__rootPath || rootPath || '';
+      const fn = row?.filename || '';
+      const sd = _scenedata[rp];
+      if (sd?.image_ratings && fn && fn in sd.image_ratings) return 'manual';
       const s = String(row?.rating_origin || '').toLowerCase();
-      return s === 'manual' ? 'manual' : (s === 'auto' ? 'auto' : '');
+      if (s === 'manual') return 'manual';
+      const hasNorm = row?.__normalized_rating != null || (row?.normalized_rating != null && row?.normalized_rating !== '');
+      return hasNorm ? 'auto' : '';
     }
     function setRating(row, val, origin = 'manual') {
-      const v = String(Math.max(0, Math.min(5, parseInt(val, 10) || 0)));
-      const newOrigin = origin;
-      const changed = (row.rating || '') !== v || (row.rating_origin || '') !== newOrigin;
-      if (changed) {
-        row.rating = v;
-        row.rating_origin = newOrigin;
-        dirty = true; _notifyDirty(true); el('#saveCsv').disabled = false; el('#revertCsv').disabled = false;
-        // If filter is active, refresh the image grid so items appear/disappear accordingly
-        if (typeof window.refreshSceneFilter === 'function') window.refreshSceneFilter();
+      const v = Math.max(0, Math.min(5, parseInt(val, 10) || 0));
+      const rp = row?.__rootPath || rootPath || '';
+      const fn = row?.filename || '';
+      if (hasPywebviewApi && rp && fn) {
+        // pywebview desktop mode: persist rating in scenedata only
+        const sd = _initScenedata(rp);
+        const current = sd.image_ratings[fn];
+        if (current === v && v !== 0) return; // no change
+        if (v === 0) delete sd.image_ratings[fn]; else sd.image_ratings[fn] = v;
+      } else {
+        // FSAPI browser mode: legacy row-level storage
+        const vs = String(v);
+        if ((row.rating || '') === vs && (row.rating_origin || '') === origin) return;
+        row.rating = vs;
+        row.rating_origin = origin;
       }
+      markDirty();
+      if (typeof window.refreshSceneFilter === 'function') window.refreshSceneFilter();
     }
     function createStarBar(row) {
       const wrap = document.createElement('div');
@@ -1052,6 +1089,26 @@
         if ((r.__folderSlot ?? 0) !== slot) continue;
         if (parsed.some(p => p.count === String(r.scene_count)) && String(r.scene_count) !== targetCount) {
           r.scene_count = targetCount; changed++;
+        }
+      }
+      // Update scenedata: move filenames from non-target scenes into target scene
+      if (hasPywebviewApi) {
+        const rpForMerge = rows.find(r => (r.__folderSlot ?? 0) === slot)?.__rootPath || rootPath || '';
+        if (rpForMerge) {
+          const sd = _initScenedata(rpForMerge);
+          const allMovedFiles = new Set();
+          for (const p of parsed) {
+            if (p.count !== targetCount && sd.scenes[p.count]) {
+              for (const f of sd.scenes[p.count].image_filenames || []) allMovedFiles.add(f);
+              delete sd.scenes[p.count];
+            }
+          }
+          if (!sd.scenes[targetCount]) {
+            sd.scenes[targetCount] = { scene_id: targetCount, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+          }
+          for (const f of allMovedFiles) {
+            if (!sd.scenes[targetCount].image_filenames.includes(f)) sd.scenes[targetCount].image_filenames.push(f);
+          }
         }
       }
       if (changed) {
@@ -1460,14 +1517,25 @@
       const parts = String(sceneId).split(':');
       const sceneCount = parts.pop();
       const slot = parts.length ? parseInt(parts[0], 10) : null;
-      let changed = 0;
+      let rowChanged = 0;
+      let rp = null;
       for (const r of rows) {
         const slotMatch = slot === null || (r.__folderSlot ?? 0) === slot;
         if (slotMatch && String(r.scene_count) === sceneCount) {
-          if ((r.scene_name || '') !== newName) { r.scene_name = newName; changed++; }
+          if (!rp && r.__rootPath) rp = r.__rootPath;
+          if ((r.scene_name || '') !== newName) { r.scene_name = newName; rowChanged++; }
         }
       }
-      if (changed) {
+      // Persist scene name in scenedata (pywebview mode)
+      let sdChanged = false;
+      if (hasPywebviewApi && rp) {
+        const sd = _initScenedata(rp);
+        if (!sd.scenes[sceneCount]) {
+          sd.scenes[sceneCount] = { scene_id: sceneCount, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+        }
+        if (sd.scenes[sceneCount].name !== newName) { sd.scenes[sceneCount].name = newName; sdChanged = true; }
+      }
+      if (rowChanged || sdChanged) {
         markDirty();
         const updatedScene = reloadScene(sceneId);
         if (updatedScene) renderSceneMetaChips(updatedScene, _sceneEditMode);
@@ -1481,6 +1549,25 @@
       _notifyDirty(true);
       el('#saveCsv').disabled = false;
       el('#revertCsv').disabled = false;
+    }
+
+    /**
+     * After a species/family edit, rebuild user_tags for the scene from the current row state
+     * and mark them as finalized so aggregateScenes uses the overridden values.
+     */
+    function _syncSceneUserTags(scene, sceneRows) {
+      if (!hasPywebviewApi || !sceneRows[0]?.__rootPath) return;
+      const rp = sceneRows[0].__rootPath;
+      const parts = String(scene.id).split(':');
+      const sceneCount = parts.pop();
+      const sd = _initScenedata(rp);
+      if (!sd.scenes[sceneCount]) {
+        sd.scenes[sceneCount] = { scene_id: sceneCount, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+      }
+      const ut = sd.scenes[sceneCount].user_tags;
+      ut.species = Array.from(new Set(sceneRows.filter(r => r.species && r.species !== 'No Bird').map(r => r.species))).sort();
+      ut.families = Array.from(new Set(sceneRows.filter(r => r.family && r.family !== 'Unknown' && r.family !== 'N/A').map(r => r.family))).sort();
+      ut.finalized = true;
     }
 
     function getSceneRows(sceneId) {
@@ -1504,6 +1591,7 @@
         }
       }
       if (changed) {
+        _syncSceneUserTags(scene, sceneRows);
         markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
@@ -1526,6 +1614,7 @@
         }
       }
       if (changed) {
+        _syncSceneUserTags(scene, sceneRows);
         markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
@@ -1550,6 +1639,7 @@
       }
       if (changed) {
         input.value = '';
+        _syncSceneUserTags(scene, sceneRows);
         markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
@@ -1574,6 +1664,7 @@
       }
       if (changed) {
         input.value = '';
+        _syncSceneUserTags(scene, sceneRows);
         markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
@@ -1702,8 +1793,11 @@
         }
       }
       const newSceneCount = String(maxCount + 1);
+      // Snapshot scene rows BEFORE mutation so we can build scenedata diff
+      const sceneRowsBefore = getSceneRows(scene.id).slice();
+      const rpForSplit = sceneRowsBefore[0]?.__rootPath || rootPath || '';
       let moved = 0;
-      for (const r of getSceneRows(scene.id)) {
+      for (const r of sceneRowsBefore) {
         const key = r.filename || r.export_path || '';
         if (_splitSelected.has(key)) {
           r.scene_count = newSceneCount;
@@ -1712,6 +1806,24 @@
         }
       }
       if (moved) {
+        // Update scenedata scene membership
+        if (hasPywebviewApi && rpForSplit) {
+          const parts2 = String(scene.id).split(':');
+          const oldSceneCount = parts2.pop();
+          const sd = _initScenedata(rpForSplit);
+          const movedFilenames = sceneRowsBefore.filter(r => _splitSelected.has(r.filename || r.export_path || '')).map(r => r.filename || '').filter(Boolean);
+          const remainFilenames = sceneRowsBefore.filter(r => !_splitSelected.has(r.filename || r.export_path || '')).map(r => r.filename || '').filter(Boolean);
+          if (sd.scenes[oldSceneCount]) {
+            sd.scenes[oldSceneCount].image_filenames = remainFilenames;
+          }
+          sd.scenes[newSceneCount] = {
+            scene_id: newSceneCount,
+            image_filenames: movedFilenames,
+            name: '',
+            status: 'pending',
+            user_tags: { species: [], families: [], finalized: false }
+          };
+        }
         markDirty();
         _splitMode = false;
         _splitSelected.clear();
@@ -1734,7 +1846,7 @@
 
     // Snapshot helpers for revert
     function takeSnapshot() {
-      _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice() };
+      _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice(), scenedata: JSON.parse(JSON.stringify(_scenedata)) };
       const btn = el('#revertCsv');
       if (btn) btn.disabled = true;
     }
@@ -1742,6 +1854,7 @@
       if (!_cleanSnapshot) return;
       rows = _cleanSnapshot.rows.map(r => ({ ...r }));
       header = _cleanSnapshot.header.slice();
+      if (_cleanSnapshot.scenedata !== undefined) _scenedata = JSON.parse(JSON.stringify(_cleanSnapshot.scenedata));
       dirty = false; _notifyDirty(false);
       el('#saveCsv').disabled = true;
       el('#revertCsv').disabled = true;
@@ -1852,7 +1965,7 @@
         return;
       }
 
-      // Pywebview desktop mode: partition rows by __rootPath and save each CSV separately
+      // Pywebview desktop mode: save scenedata (CSV is read-only; user edits go to JSON)
       if (window.pywebview?.api) {
         const groups = new Map();
         for (const r of rows) {
@@ -1861,14 +1974,14 @@
           groups.get(rp).push(r);
         }
         let saved = 0, failed = 0;
-        for (const [rp, groupRows] of groups) {
+        for (const [rp] of groups) {
           if (!rp) { failed++; continue; }
-          const content = rowsToCsvString(allCols, groupRows);
+          const sd = _scenedata[rp] || { version: '2.0', image_ratings: {}, scenes: {} };
           try {
-            const res = await window.pywebview.api.write_kestrel_csv(rp, content);
+            const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
             if (res.success) saved++;
-            else { failed++; console.warn('[save] Failed for', rp, res.error); }
-          } catch (e) { failed++; console.warn('[save] Error for', rp, e); }
+            else { failed++; console.warn('[save scenedata] Failed for', rp, res.error); }
+          } catch (e) { failed++; console.warn('[save scenedata] Error for', rp, e); }
         }
         dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
         takeSnapshot();
@@ -2071,7 +2184,7 @@
             const mapping = res.normalized_ratings;
             for (const r of rows) {
               if (r.__rootPath === p && r.filename in mapping) {
-                r.normalized_rating = String(mapping[r.filename]);
+                r.__normalized_rating = mapping[r.filename];
               }
             }
           }
@@ -3928,6 +4041,25 @@
           rows = rows.filter(r => r.__rootPath !== root);
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = slot; }
           rows = rows.concat(newRows);
+          // Reload scenedata for this root
+          if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
+            try {
+              const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
+              if (sdRes?.success) _scenedata[root] = sdRes.data;
+            } catch (_) {}
+          }
+          // Apply normalization for newly-loaded rows
+          if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+            try {
+              const normRes = await window.pywebview.api.apply_normalization(root);
+              if (normRes?.success && normRes?.normalized_ratings) {
+                const mapping = normRes.normalized_ratings;
+                for (const r of newRows) {
+                  if (r.filename in mapping) r.__normalized_rating = mapping[r.filename];
+                }
+              }
+            } catch (_) {}
+          }
           changed = true;
         } catch (e) {
           console.warn('[autorefresh]', p, e);
@@ -3935,9 +4067,7 @@
       }
 
       if (changed) {
-        ensureSceneNameColumn();
-        ensureRatingColumns();
-        await renderScenes();
+        ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
         setStatus(`Auto-refreshed ${toRefresh.length} newly-analyzed folder(s)`);
       }
     }
@@ -4041,10 +4171,6 @@
         const folderName = p.replace(/.*[/\\]/, '');
         showProgress(`Loading ${i + 1} / ${total}: ${folderName}`, (i / total) * 90);
         try {
-          // Ensure normalized_rating is up to date before reading
-          if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
-            try { await window.pywebview.api.apply_normalization(p); } catch (_) { }
-          }
           const result = await window.pywebview.api.read_kestrel_csv(p);
           if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
           if (!result.success) continue;
@@ -4056,6 +4182,25 @@
           const currentSlot = slot++;
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = currentSlot; }
           rows = rows.concat(newRows);
+          // Load scenedata for this folder
+          if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
+            try {
+              const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
+              if (sdRes?.success) _scenedata[root] = sdRes.data;
+            } catch (_) {}
+          }
+          // Apply normalization (in-memory: sets r.__normalized_rating)
+          if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+            try {
+              const normRes = await window.pywebview.api.apply_normalization(root);
+              if (normRes?.success && normRes?.normalized_ratings) {
+                const mapping = normRes.normalized_ratings;
+                for (const r of newRows) {
+                  if (r.filename in mapping) r.__normalized_rating = mapping[r.filename];
+                }
+              }
+            } catch (_) {}
+          }
           loadedCount++;
         } catch (e) {
           console.warn('[multi] Failed to load', p, e);
@@ -4089,11 +4234,6 @@
       if (!folderPath) return;
 
       try {
-        // Ensure normalized_rating is up to date before reading the CSV
-        if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
-          try { await window.pywebview.api.apply_normalization(folderPath); } catch (_) { }
-        }
-
         // Use pywebview API to read the CSV file
         const result = await window.pywebview.api.read_kestrel_csv(folderPath);
 
@@ -4106,6 +4246,28 @@
         header = parsed.meta.fields || [];
         const loadedRoot = result.root || folderPath;
         rows = (parsed.data || []).map(r => ({ ...r, __rootPath: loadedRoot, __folderSlot: 0 }));
+        
+        // Load scenedata for this folder
+        if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
+          try {
+            const sdRes = await window.pywebview.api.read_kestrel_scenedata(loadedRoot);
+            if (sdRes?.success) _scenedata[loadedRoot] = sdRes.data;
+          } catch (_) {}
+        }
+        
+        // Apply normalization (in-memory: sets r.__normalized_rating)
+        if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+          try {
+            const normRes = await window.pywebview.api.apply_normalization(loadedRoot);
+            if (normRes?.success && normRes?.normalized_ratings) {
+              const mapping = normRes.normalized_ratings;
+              for (const r of rows) {
+                if (r.filename in mapping) r.__normalized_rating = mapping[r.filename];
+              }
+            }
+          } catch (_) {}
+        }
+        
         ensureSceneNameColumn();
         ensureRatingColumns();
         blobUrlCache.clear(); // new folder — clear stale cache entries
@@ -4383,7 +4545,9 @@
         let rep = arr[0];
         for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
-        const name = (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
+        const rowRp = arr[0]?.__rootPath || rootPath || '';
+        const sdScene = rowRp ? _scenedata[rowRp]?.scenes?.[id] : null;
+        const name = sdScene?.name || (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
         list.push({ id, imageCount: arr.length, maxQuality: maxQ, sceneName: name, repPath: (rep.export_path || rep.crop_path || ''), repFilename: rep.filename || '' });
       }
       // Sort numerically by id where possible
@@ -4454,6 +4618,27 @@
         for (const r of rows) {
           const idStr = String(r.scene_count);
           if (ids.includes(idStr) && idStr !== targetId) { r.scene_count = targetId; changed++; }
+        }
+        // Update scenedata: move filenames from non-target scenes into target scene
+        if (hasPywebviewApi && changed > 0) {
+          const rowSample = rows.find(r => ids.includes(String(r.scene_count)));
+          const rpForMerge = rowSample?.__rootPath || rootPath || '';
+          if (rpForMerge) {
+            const sd = _initScenedata(rpForMerge);
+            const allMovedFiles = new Set();
+            for (const id of ids) {
+              if (id !== targetId && sd.scenes[id]) {
+                for (const f of sd.scenes[id].image_filenames || []) allMovedFiles.add(f);
+                delete sd.scenes[id];
+              }
+            }
+            if (!sd.scenes[targetId]) {
+              sd.scenes[targetId] = { scene_id: targetId, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+            }
+            for (const f of allMovedFiles) {
+              if (!sd.scenes[targetId].image_filenames.includes(f)) sd.scenes[targetId].image_filenames.push(f);
+            }
+          }
         }
         if (changed) { dirty = true; _notifyDirty(true); document.getElementById('saveCsv').disabled = false; setStatus(`Merged scenes into ${targetId}. ${changed} rows updated.`); }
         renderScenes();

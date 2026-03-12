@@ -20,7 +20,14 @@ from .config import (
     METADATA_FILENAME,
     VERSION,
 )
-from .database import load_database, save_database
+from .database import (
+    load_database,
+    save_database,
+    load_scenedata,
+    save_scenedata,
+    build_scenedata_from_database,
+    update_scenedata_with_database,
+)
 print("Importing read_image from image_utils...")
 from .image_utils import read_image, read_image_for_pipeline
 print("read_image imported successfully.")
@@ -314,7 +321,6 @@ class AnalysisPipeline:
                     "export_path": "N/A",
                     "crop_path": "N/A",
                     "scene_count": scene_count,
-                    "rating": 0,
                     "feature_similarity": -1.0,
                     "feature_confidence": -1.0,
                     "color_similarity": -1.0,
@@ -591,7 +597,6 @@ class AnalysisPipeline:
                                 "family": primary_bird["family"],
                                 "family_confidence": primary_bird["family_confidence"],
                                 "quality": primary_bird["quality"],
-                                "rating": primary_bird["rating"],
                                 "exposure_correction": primary_bird["exposure_correction"],
                             }
                         )
@@ -648,7 +653,6 @@ class AnalysisPipeline:
                                     "family": result["family"],
                                     "family_confidence": result["family_confidence"],
                                     "quality": result["quality"],
-                                    "rating": result["rating"],
                                     "exposure_correction": result["exposure_correction"],
                                 }
                             )
@@ -681,9 +685,11 @@ class AnalysisPipeline:
                         image_cb(entry)
 
                     if status_cb:
+                        _q = entry.get('quality', -1)
+                        _display_q = f"{float(_q):.3f}" if _q not in (None, 'N/A', -1) else '—'
                         status_cb(
-                            f"Processed {raw_file}: {entry['species']} Q={entry['quality']:.3f} "
-                            f"R={entry['rating']} ({idx + processed_count}/{total})"
+                            f"Processed {raw_file}: {entry['species']} Q={_display_q}"
+                            f" ({idx + processed_count}/{total})"
                         )
                 except Exception as e:
                     log_exception(
@@ -742,21 +748,15 @@ class AnalysisPipeline:
             # === Post-analysis: compute quality distribution and normalized ratings ===
             stage_ctx["stage"] = "post_analysis_normalization"
             try:
-                from .ratings import compute_quality_distribution, compute_normalized_rating
+                from .ratings import compute_quality_distribution
                 if not database.empty and "quality" in database.columns:
                     quality_scores = database["quality"].tolist()
                     distribution = compute_quality_distribution(quality_scores)
 
-                    # Apply per-folder normalization as the default normalized rating
-                    database["normalized_rating"] = database["quality"].apply(
-                        lambda q: compute_normalized_rating(
-                            float(q) if (q is not None and str(q) not in ("", "nan")) else -1,
-                            distribution,
-                        )
-                    )
+                    # Save analysis results (no normalized_rating; computed at runtime)
                     save_database(database, db_path)
 
-                    # Store distribution in kestrel_metadata.json
+                    # Cache quality distribution in kestrel_metadata.json for runtime normalization
                     metadata_path = os.path.join(kestrel_dir, METADATA_FILENAME)
                     try:
                         import json as _json
@@ -773,6 +773,22 @@ class AnalysisPipeline:
                         log_warning(
                             self._log_path,
                             f"Failed to write quality distribution to metadata: {_meta_e}",
+                            stage="post_analysis_normalization",
+                        )
+
+                    # Create or update kestrel_scenedata.json
+                    try:
+                        existing_scenedata = load_scenedata(kestrel_dir)
+                        if not existing_scenedata.get("scenes"):
+                            new_scenedata = build_scenedata_from_database(database)
+                            save_scenedata(new_scenedata, kestrel_dir)
+                        else:
+                            update_scenedata_with_database(existing_scenedata, database)
+                            save_scenedata(existing_scenedata, kestrel_dir)
+                    except Exception as _sd_e:
+                        log_warning(
+                            self._log_path,
+                            f"Failed to create/update kestrel_scenedata.json: {_sd_e}",
                             stage="post_analysis_normalization",
                         )
 

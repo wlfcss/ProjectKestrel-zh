@@ -506,11 +506,11 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     def apply_normalization(self, folder_path: str, mode: str = None) -> dict:
-        """Recompute normalized_rating for all rows in a folder's database.
+        """Compute normalized ratings for all rows in a folder's database.
 
         Reads the current ``rating_normalization`` setting (or uses *mode* if provided),
-        builds or retrieves the quality-score distribution for the folder, applies the
-        chosen normalization, and saves the updated CSV.
+        builds or retrieves the quality-score distribution, applies the chosen normalization,
+        and returns the computed map WITHOUT writing to the CSV file.
 
         Also caches the folder's quality distribution in settings.json and
         kestrel_metadata.json so it is available for global normalization.
@@ -578,15 +578,13 @@ class Api:
             except Exception:
                 pass
 
-            # --- Choose distribution to use ---
+            # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
             if mode == 'none':
-                # Raw thresholds: just copy quality_to_rating result
                 def _get_norm(q_val):
                     try:
                         return quality_to_rating(float(q_val))
                     except (TypeError, ValueError):
                         return 0
-                df['normalized_rating'] = df['quality'].apply(_get_norm)
 
             elif mode == 'global':
                 global_dist = [0] * 100
@@ -594,33 +592,31 @@ class Api:
                     if isinstance(dist, list) and len(dist) == 100:
                         for i, v in enumerate(dist):
                             global_dist[i] += int(v)
-                distribution = global_dist
+                _dist = global_dist
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), distribution)
+                        return compute_normalized_rating(float(q_val), _dist)
                     except (TypeError, ValueError):
                         return 0
-                df['normalized_rating'] = df['quality'].apply(_get_norm)
 
             else:  # per_folder (default)
-                distribution = folder_dist
+                _dist = folder_dist
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), distribution)
+                        return compute_normalized_rating(float(q_val), _dist)
                     except (TypeError, ValueError):
                         return 0
-                df['normalized_rating'] = df['quality'].apply(_get_norm)
 
-            df.to_csv(csv_path, index=False)
+            if 'filename' not in df.columns or 'quality' not in df.columns:
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
 
             normalized_map = {
-                str(row['filename']): int(row['normalized_rating'])
+                str(row['filename']): _get_norm(row['quality'])
                 for _, row in df.iterrows()
-                if 'filename' in df.columns
             }
-            print(f'[API] apply_normalization({folder_path!r}, mode={mode!r}) -> {len(normalized_map)} rows updated', flush=True)
+            print(f'[API] apply_normalization({folder_path!r}, mode={mode!r}) -> {len(normalized_map)} ratings computed (no CSV write)', flush=True)
             return {
                 'success': True,
                 'normalized_ratings': normalized_map,
@@ -630,6 +626,70 @@ class Api:
         except Exception as e:
             print(f'[API] apply_normalization() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e), 'normalized_ratings': {}, 'mode_used': ''}
+
+    def read_kestrel_scenedata(self, folder_path: str) -> dict:
+        """Read kestrel_scenedata.json from a folder's .kestrel directory.
+
+        Returns:
+            {'success': bool, 'data': dict, 'error': str}
+        """
+        try:
+            folder_path = str(folder_path).strip().rstrip('/\\')
+            folder_name = os.path.basename(folder_path)
+            if folder_name == '.kestrel':
+                scenedata_path = os.path.join(folder_path, 'kestrel_scenedata.json')
+            else:
+                scenedata_path = os.path.join(folder_path, '.kestrel', 'kestrel_scenedata.json')
+
+            if not os.path.exists(scenedata_path):
+                # Return an empty-but-valid structure; the UI will fall back to scene_count grouping
+                print(f'[API] read_kestrel_scenedata({folder_path!r}) -> not found, returning empty', flush=True)
+                return {'success': True, 'data': {'version': '2.0', 'image_ratings': {}, 'scenes': {}}, 'error': ''}
+
+            with open(scenedata_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            # Ensure expected keys
+            data.setdefault('version', '2.0')
+            data.setdefault('image_ratings', {})
+            data.setdefault('scenes', {})
+            print(f'[API] read_kestrel_scenedata({folder_path!r}) -> {len(data["scenes"])} scenes', flush=True)
+            return {'success': True, 'data': data, 'error': ''}
+        except Exception as e:
+            print(f'[API] read_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'data': {}, 'error': str(e)}
+
+    def write_kestrel_scenedata(self, folder_path: str, scenedata: dict) -> dict:
+        """Write kestrel_scenedata.json to a folder's .kestrel directory.
+
+        Args:
+            folder_path: Absolute path to folder (parent or .kestrel itself).
+            scenedata: The scenedata dict (version, image_ratings, scenes).
+
+        Returns:
+            {'success': bool, 'path': str, 'error': str}
+        """
+        try:
+            folder_path = str(folder_path).strip().rstrip('/\\')
+            folder_name = os.path.basename(folder_path)
+            if folder_name == '.kestrel':
+                kestrel_dir = folder_path
+            else:
+                kestrel_dir = os.path.join(folder_path, '.kestrel')
+
+            if not os.path.isdir(kestrel_dir):
+                return {'success': False, 'error': f'.kestrel directory not found at: {kestrel_dir}', 'path': ''}
+
+            scenedata_path = os.path.join(kestrel_dir, 'kestrel_scenedata.json')
+            if not isinstance(scenedata, dict):
+                return {'success': False, 'error': 'scenedata must be a dict', 'path': ''}
+
+            with open(scenedata_path, 'w', encoding='utf-8') as f:
+                json.dump(scenedata, f, indent=2)
+            print(f'[API] write_kestrel_scenedata({folder_path!r}) -> {scenedata_path}', flush=True)
+            return {'success': True, 'path': scenedata_path, 'error': ''}
+        except Exception as e:
+            print(f'[API] write_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e), 'path': ''}
 
     def open_folder(self, path: str):
         """Open a folder in the system file browser (pywebview desktop mode)."""

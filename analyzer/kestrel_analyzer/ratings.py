@@ -63,3 +63,29 @@ def compute_normalized_rating(quality: float, distribution: list) -> int:
     if fraction_rank >= 0.225:
         return 2
     return 1
+
+
+def get_image_display_rating(
+    filename: str,
+    quality: float,
+    user_image_ratings: dict,
+    distribution: list,
+) -> tuple:
+    """Return (rating, origin) for display, preferring user-specified over auto-computed.
+
+    Args:
+        filename: Image filename (key into user_image_ratings).
+        quality: Raw quality score from analysis pipeline.
+        user_image_ratings: Dict mapping filename -> int (from kestrel_scenedata.json).
+        distribution: Quality distribution list (100 buckets) for normalization.
+
+    Returns:
+        (rating: int 0-5, origin: str 'manual' | 'auto')
+    """
+    if filename in user_image_ratings:
+        r = user_image_ratings[filename]
+        try:
+            return max(0, min(5, int(r))), "manual"
+        except (TypeError, ValueError):
+            pass
+    return compute_normalized_rating(quality, distribution), "auto"
