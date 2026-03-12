@@ -1435,8 +1435,43 @@
     // Render: Scene dialog
     let _splitMode = false;
     let _sceneEditMode = false;
+    let _sceneEditDraft = null;
+
+    function _beginSceneEditDraft(sceneId) {
+      const current = collectSceneSpecies(sceneId);
+      _sceneEditDraft = {
+        sceneId: String(sceneId),
+        species: current.species.slice().sort(),
+        families: current.families.slice().sort(),
+      };
+    }
+
+    function _finalizeSceneReview(sceneId) {
+      if (!hasPywebviewApi) return false;
+      const sceneRows = getSceneRows(sceneId);
+      if (!sceneRows.length) return false;
+      const sceneEntry = _getSceneScenedataEntry(sceneId, true, sceneRows);
+      if (!sceneEntry) return false;
+      const draft = (_sceneEditDraft && _sceneEditDraft.sceneId === String(sceneId))
+        ? _sceneEditDraft
+        : _collectCurrentlyVisibleSceneTags(sceneId);
+      sceneEntry.image_filenames = sceneRows.map(r => r.filename || '').filter(Boolean);
+      sceneEntry.status = 'accepted';
+      sceneEntry.user_tags.species = draft.species.slice().sort();
+      sceneEntry.user_tags.families = draft.families.slice().sort();
+      sceneEntry.user_tags.finalized = true;
+      markDirty();
+      return true;
+    }
 
     function collectSceneSpecies(sceneId) {
+      if (_sceneEditMode && _sceneEditDraft && _sceneEditDraft.sceneId === String(sceneId)) {
+        return {
+          species: _sceneEditDraft.species.slice().sort(),
+          families: _sceneEditDraft.families.slice().sort(),
+          approved: false,
+        };
+      }
       const sdScene = _getSceneScenedataEntry(sceneId, false);
       if (sdScene?.user_tags?.finalized) {
         return {
@@ -1514,6 +1549,7 @@
       currentSceneId = scene.id;
       _splitMode = false;
       _sceneEditMode = false;
+      _sceneEditDraft = null;
 
       el('#sceneName').value = scene.sceneName || '';
 
@@ -1559,22 +1595,33 @@
       // Hook up actions
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
+        _sceneEditDraft = null;
+        _sceneEditMode = false;
         sceneDlg.close();
       };
 
       // Edit Species & Tags toggle
       el('#editToggleBtn').onclick = () => {
-        _sceneEditMode = !_sceneEditMode;
+        const nextEditMode = !_sceneEditMode;
+        if (nextEditMode) {
+          _beginSceneEditDraft(scene.id);
+        }
+        _sceneEditMode = nextEditMode;
         el('#editPanel').classList.toggle('hidden', !_sceneEditMode);
         el('#sceneRenameRow').classList.toggle('hidden', !_sceneEditMode);
         el('#previewBox').classList.toggle('hidden', _sceneEditMode);
         el('#previewInfo').classList.toggle('hidden', _sceneEditMode);
-        el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags\u2026';
-        // On exit: auto-apply any rename
-        if (!_sceneEditMode) { applySceneName(scene.id, el('#sceneName').value); }
+        el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags…';
+        // On exit: apply rename and finalize the exact tags visible in edit mode.
+        if (!_sceneEditMode) {
+          applySceneName(scene.id, el('#sceneName').value);
+          _finalizeSceneReview(scene.id);
+          _sceneEditDraft = null;
+        }
         // Re-render meta chips (editable or not)
         const updatedScene = reloadScene(scene.id) || scene;
         renderSceneMetaChips(updatedScene, _sceneEditMode);
+        if (!_sceneEditMode) renderScenes();
       };
 
       // Add species via button or Enter key
@@ -1636,21 +1683,8 @@
       el('#revertCsv').disabled = false;
     }
 
-    /**
-     * After a species/family edit, save the threshold-filtered scene tags the user is
-     * currently looking at and mark the scene as manually approved.
-     */
-    function _syncSceneUserTags(scene, sceneRows) {
-      if (!hasPywebviewApi || !sceneRows[0]?.__rootPath) return;
-      const sceneEntry = _getSceneScenedataEntry(scene.id, true, sceneRows);
-      if (!sceneEntry) return;
-      const visibleTags = _collectCurrentlyVisibleSceneTags(scene.id);
-      const ut = sceneEntry.user_tags;
-      sceneEntry.image_filenames = sceneRows.map(r => r.filename || '').filter(Boolean);
-      sceneEntry.status = 'accepted';
-      ut.species = visibleTags.species.slice();
-      ut.families = visibleTags.families.slice();
-      ut.finalized = true;
+    function _syncSceneUserTags() {
+      // Tag edits stay in the edit-session draft until the user clicks Done Editing.
     }
 
     function getSceneRows(sceneId) {
@@ -1664,48 +1698,30 @@
     }
 
     function removeSpeciesFromScene(scene, speciesName) {
-      const sceneRows = getSceneRows(scene.id);
-      let changed = 0;
-      for (const r of sceneRows) {
-        if (r.species === speciesName) {
-          r.species = 'No Bird';
-          r.species_confidence = '0';
-          changed++;
-        }
-      }
+      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      const before = _sceneEditDraft.species.length;
+      _sceneEditDraft.species = _sceneEditDraft.species.filter(sp => sp !== speciesName).sort();
+      const changed = before - _sceneEditDraft.species.length;
       if (changed) {
-        _syncSceneUserTags(scene, sceneRows);
-        markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           renderSceneMetaChips(updatedScene, _sceneEditMode);
-          renderSceneImages(updatedScene);
         }
-        renderScenes();
-        showToast(`Removed "${speciesName}" from ${changed} image(s)`, 3000);
+        showToast(`Removed "${speciesName}" from reviewed scene tags`, 2000);
       }
     }
 
     function removeFamilyFromScene(scene, familyName) {
-      const sceneRows = getSceneRows(scene.id);
-      let changed = 0;
-      for (const r of sceneRows) {
-        if (r.family === familyName) {
-          r.family = 'Unknown';
-          r.family_confidence = '0';
-          changed++;
-        }
-      }
+      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      const before = _sceneEditDraft.families.length;
+      _sceneEditDraft.families = _sceneEditDraft.families.filter(fm => fm !== familyName).sort();
+      const changed = before - _sceneEditDraft.families.length;
       if (changed) {
-        _syncSceneUserTags(scene, sceneRows);
-        markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           renderSceneMetaChips(updatedScene, _sceneEditMode);
-          renderSceneImages(updatedScene);
         }
-        renderScenes();
-        showToast(`Removed family "${familyName}" from ${changed} image(s)`, 3000);
+        showToast(`Removed family "${familyName}" from reviewed scene tags`, 2000);
       }
     }
 
@@ -1713,24 +1729,17 @@
       const input = el('#editAddSpecies');
       const name = (input.value || '').trim();
       if (!name) return;
-      const sceneRows = getSceneRows(scene.id);
-      let changed = 0;
-      for (const r of sceneRows) {
-        r.species = name;
-        r.species_confidence = '1.000';
-        changed++;
-      }
+      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      const before = _sceneEditDraft.species.length;
+      _sceneEditDraft.species = Array.from(new Set([..._sceneEditDraft.species, name])).sort();
+      const changed = _sceneEditDraft.species.length !== before;
       if (changed) {
         input.value = '';
-        _syncSceneUserTags(scene, sceneRows);
-        markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           renderSceneMetaChips(updatedScene, _sceneEditMode);
-          renderSceneImages(updatedScene);
         }
-        renderScenes();
-        showToast(`Set species "${name}" on ${changed} image(s)`, 3000);
+        showToast(`Added species "${name}" to reviewed scene tags`, 2000);
       }
     }
 
@@ -1738,24 +1747,17 @@
       const input = el('#editAddFamily');
       const name = (input.value || '').trim();
       if (!name) return;
-      const sceneRows = getSceneRows(scene.id);
-      let changed = 0;
-      for (const r of sceneRows) {
-        r.family = name;
-        r.family_confidence = '1.000';
-        changed++;
-      }
+      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      const before = _sceneEditDraft.families.length;
+      _sceneEditDraft.families = Array.from(new Set([..._sceneEditDraft.families, name])).sort();
+      const changed = _sceneEditDraft.families.length !== before;
       if (changed) {
         input.value = '';
-        _syncSceneUserTags(scene, sceneRows);
-        markDirty();
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           renderSceneMetaChips(updatedScene, _sceneEditMode);
-          renderSceneImages(updatedScene);
         }
-        renderScenes();
-        showToast(`Set family "${name}" on ${changed} image(s)`, 3000);
+        showToast(`Added family "${name}" to reviewed scene tags`, 2000);
       }
     }
 
