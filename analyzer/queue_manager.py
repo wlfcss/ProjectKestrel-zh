@@ -145,6 +145,7 @@ class QueueManager:
         self._pipeline = None
         self._use_gpu = True
         self._wildlife_enabled = True
+        self._detection_threshold = 0.75
 
     # ---- public read-only properties ----
 
@@ -168,7 +169,7 @@ class QueueManager:
 
     # ---- control ----
 
-    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True) -> dict:
+    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True, detection_threshold: float = 0.75) -> dict:
         if not _PIPELINE_AVAILABLE:
             return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
         with self._lock:
@@ -208,6 +209,7 @@ class QueueManager:
             self._pause_event.set()
             self._use_gpu = use_gpu
             self._wildlife_enabled = wildlife_enabled
+            self._detection_threshold = float(detection_threshold)
             self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
             self._thread.start()
         return {'success': True, 'added': added}
@@ -398,6 +400,7 @@ class QueueManager:
                     },
                     analyzer_name='visualizer-queue',
                     wildlife_enabled=self._wildlife_enabled,
+                    detection_threshold=self._detection_threshold,
                 )
                 with self._lock:
                     if self._cancel_event.is_set():

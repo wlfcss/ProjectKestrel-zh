@@ -38,7 +38,7 @@ class MaskRCNNWrapper:
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
-    def get_prediction(self, image_data, threshold=0.5):
+    def get_prediction(self, image_data, threshold=0.75):
         for attempt in range(3):
             try:
                 transform = T.Compose([T.ToTensor()])

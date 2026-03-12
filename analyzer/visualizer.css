@@ -905,6 +905,31 @@
       object-fit: contain;
     }
 
+    /* Scene dialog RAW zoom mode */
+    .right .preview.zoom-active {
+      overflow: hidden;
+      cursor: crosshair;
+      border: 1px solid var(--brand);
+      position: relative;
+    }
+    .right .preview.zoom-active img {
+      object-fit: cover;
+      transition: none;
+    }
+    .right .preview.raw-loaded::after {
+      content: 'RAW';
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: var(--brand);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
     .muted {
       color: var(--muted);
     }

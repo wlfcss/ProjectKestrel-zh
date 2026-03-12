@@ -3,7 +3,12 @@
 * Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 * Investigate whether recent implementation of timestamp based burst detection has broken akaze similarity testing.
-* test new exposure correction algorithm
+* Fix scene tags issue
+* RAW preview within visualizer
+* Setting to control false positivity rate.
+* Consider making the auto-grouping threshold an adjustable analysis setting and storing timestamp metadata for future use in a timeline view. And consider changing scene naming (from #123) to reflect timestamp of the first img in the scene and then you can group it by hour? That'd be sick. Let's do that as a much more intuitive main interface. Will need a database upgrade though.
+
+
 
 
 
@@ -39,3 +44,4 @@
 * Refactor code to make it easier to edit.
 * Investigate poor performance in poorly-lit circumstances, even if it is just to add an up to 1-2 stop exposure adjust.? - For this we need to finish Kestrel Workshop. 
 * Improve star rating system - this sort of punishes people with different equipment by setting all their photos to "1 star" and thus making the system pretty bad. Add a normalization option in settings that essentially fits the ratings distribution folder-wide to a uniform distribution with 20% splits. this would make sure the star ratings cover the entire breadth of the folder and propbably improve culling performance too ? Default = within folder normalization
+* test new exposure correction algorithm

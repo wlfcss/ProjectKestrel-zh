@@ -28,6 +28,8 @@ BASE_COLUMNS = [
     "secondary_species_scores",
     "secondary_family_list",
     "secondary_family_scores",
+    "exposure_correction",
+    "detection_scores",
 ]
 
 REQUIRED_COLUMNS = [
@@ -83,6 +85,10 @@ def ensure_columns(database: pd.DataFrame) -> pd.DataFrame:
                 database[col] = "Unknown" if "family" in col else 0.0
     if "normalized_rating" not in database.columns:
         database["normalized_rating"] = 0
+    if "exposure_correction" not in database.columns:
+        database["exposure_correction"] = 0.0
+    if "detection_scores" not in database.columns:
+        database["detection_scores"] = [[] for _ in range(len(database))]
     return database
 
 

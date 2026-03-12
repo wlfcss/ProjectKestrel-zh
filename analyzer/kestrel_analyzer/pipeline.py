@@ -101,7 +101,7 @@ class AnalysisPipeline:
             if mean_lum < MIN_MEAN:
                 return 0.0
             stops = float(np.log2(TARGET_LUMINANCE / mean_lum))
-            stops = float(np.clip(stops, -2.5, 2.5))
+            stops = float(np.clip(stops, -1.5, 3.0))
             if abs(stops) < 0.5:
                 return 0.0
             return stops
@@ -169,6 +169,7 @@ class AnalysisPipeline:
         callbacks: Optional[Dict[str, Callable]] = None,
         analyzer_name: str = "pipeline",
         wildlife_enabled: bool = True,
+        detection_threshold: float = 0.75,
     ) -> None:
         callbacks = callbacks or {}
         status_cb = callbacks.get("on_status")
@@ -320,6 +321,8 @@ class AnalysisPipeline:
                     "secondary_species_scores": [],
                     "secondary_family_list": [],
                     "secondary_family_scores": [],
+                    "exposure_correction": 0.0,
+                    "detection_scores": [],
                 }
 
                 image_path = None
@@ -391,7 +394,7 @@ class AnalysisPipeline:
                     # MaskRCNN inference can take many seconds. Pause semantics are
                     # handled at the start of each image loop so we do not check
                     # repeatedly inside the image processing path.
-                    masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img)
+                    masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img, threshold=detection_threshold)
                     if masks is None or len(masks) == 0:
                         if detection_cb:
                             detection_cb(
@@ -428,6 +431,9 @@ class AnalysisPipeline:
                             progress_cb(idx + processed_count, total)
                         continue
 
+                    # Store top-5 raw MaskRCNN detection confidence scores
+                    entry["detection_scores"] = sorted(pred_score, reverse=True)[:5]
+
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in active_wildlife_categories]
                     bird_indices = [i for i, c in enumerate(pred_class) if c == "bird"]
                     bird_indices = sorted(bird_indices, key=lambda i: pred_score[i], reverse=True)[:5]
@@ -458,6 +464,7 @@ class AnalysisPipeline:
                             "quality": quality_score,
                             "rating": quality_to_rating(quality_score),
                             "quality_crop": quality_crop,
+                            "exposure_correction": round(stops, 4),
                         }
 
                     def process_bird_items(indices):
@@ -477,6 +484,7 @@ class AnalysisPipeline:
                                     "species_crop": species_crop,
                                     "quality_crop": quality_crop,
                                     "quality_mask": quality_mask,
+                                    "stops": stops,
                                 }
                             )
                         if crops_cb:
@@ -516,6 +524,7 @@ class AnalysisPipeline:
                                 item["species_confidence"] = float(pred_score[i])
                                 item["family"] = "N/A"
                                 item["family_confidence"] = 0.0
+                            item["exposure_correction"] = round(item["stops"], 4)
                             stage_ctx["stage"] = "quality_score"
                             quality_score = self.quality_clf.classify(item["quality_crop"], item["quality_mask"])
                             item["quality"] = quality_score
@@ -557,6 +566,7 @@ class AnalysisPipeline:
                                 "quality": i["quality"],
                                 "rating": i["rating"],
                                 "quality_crop": i["quality_crop"],
+                                "exposure_correction": i.get("exposure_correction", 0.0),
                             }
                             for i in bird_items
                         ]
@@ -569,6 +579,7 @@ class AnalysisPipeline:
                                 "family_confidence": primary_bird["family_confidence"],
                                 "quality": primary_bird["quality"],
                                 "rating": primary_bird["rating"],
+                                "exposure_correction": primary_bird["exposure_correction"],
                             }
                         )
                         all_species = np.array([b["species"] for b in bird_data])
@@ -625,6 +636,7 @@ class AnalysisPipeline:
                                     "family_confidence": result["family_confidence"],
                                     "quality": result["quality"],
                                     "rating": result["rating"],
+                                    "exposure_correction": result["exposure_correction"],
                                 }
                             )
                             crop_img = result["quality_crop"]

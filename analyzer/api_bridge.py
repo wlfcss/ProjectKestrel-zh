@@ -900,8 +900,13 @@ class Api:
             if not isinstance(paths, list):
                 return {'success': False, 'error': 'paths must be a list'}
             paths = [str(p).strip() for p in paths if p]
+            from .settings_utils import load_persisted_settings
+            sett = load_persisted_settings()
+            detection_threshold = float(sett.get('detection_threshold', 0.75))
+            detection_threshold = max(0.1, min(0.99, detection_threshold))
             return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu),
-                                          wildlife_enabled=bool(wildlife_enabled))
+                                          wildlife_enabled=bool(wildlife_enabled),
+                                          detection_threshold=detection_threshold)
         except Exception as e:
             print(f'[API] start_analysis_queue() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
@@ -1097,10 +1102,15 @@ class Api:
             log(f'notify_main_window_refresh error: {e}')
             return {'success': False, 'error': str(e)}
 
-    def read_raw_full(self, filename: str, root_path: str):
+    def read_raw_full(self, filename: str, root_path: str, exp_correction: float = 0.0):
         """Process a RAW file and return full-resolution JPEG as base64.
         Results are cached in {root}/.kestrel/culling_TMP/ for fast subsequent loads.
-        Falls back to read_image_file for non-RAW formats."""
+        Falls back to read_image_file for non-RAW formats.
+        
+        exp_correction: exposure offset in stops applied during postprocessing.
+            0.0 (default) = no correction, matches standard display preview.
+            Positive = brighten, negative = darken.  Clamped to [-1.5, +3.0].
+        """
         from io import BytesIO
 
         try:
@@ -1118,12 +1128,23 @@ class Api:
             if ext not in raw_extensions:
                 return self.read_image_file(filename, root_path)
 
+            # Clamp exposure correction to the same limits as the pipeline
+            try:
+                exp_correction = float(exp_correction)
+            except (TypeError, ValueError):
+                exp_correction = 0.0
+            exp_correction = max(-1.5, min(3.0, exp_correction))
+
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
-            cache_name = os.path.splitext(os.path.basename(filename))[0] + '_preview.jpg'
+            base = os.path.splitext(os.path.basename(filename))[0]
+            if abs(exp_correction) > 0.01:
+                cache_name = f"{base}_{exp_correction:+.3f}_preview.jpg"
+            else:
+                cache_name = f"{base}_preview.jpg"
             cache_path = os.path.join(cache_dir, cache_name)
 
             if os.path.exists(cache_path):
-                log(f'read_raw_full: Cache hit for {filename}')
+                log(f'read_raw_full: Cache hit for {filename} (exp={exp_correction:+.3f})')
                 with open(cache_path, 'rb') as f:
                     b64 = base64.b64encode(f.read()).decode('ascii')
                 return {'success': True, 'data': b64}
@@ -1131,14 +1152,26 @@ class Api:
             import rawpy
             from PIL import Image
 
-            log(f'read_raw_full: Processing RAW file {filename}')
+            log(f'read_raw_full: Processing RAW file {filename} (exp={exp_correction:+.3f})')
             with rawpy.imread(full_path) as raw:
-                rgb = raw.postprocess(
-                    use_camera_wb=True,
-                    no_auto_bright=False,
-                    output_bps=8,
-                    fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
-                )
+                if abs(exp_correction) > 0.01:
+                    linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
+                    preserve = 0.8 if exp_correction > 0 else 0.0
+                    rgb = raw.postprocess(
+                        use_camera_wb=True,
+                        no_auto_bright=True,
+                        output_bps=8,
+                        exp_shift=linear_scale,
+                        exp_preserve_highlights=preserve,
+                        fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
+                    )
+                else:
+                    rgb = raw.postprocess(
+                        use_camera_wb=True,
+                        no_auto_bright=False,
+                        output_bps=8,
+                        fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
+                    )
 
             img = Image.fromarray(rgb)
 

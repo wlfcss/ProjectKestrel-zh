@@ -524,10 +524,14 @@
       if (!header.includes('rating')) header.push('rating');
       if (!header.includes('rating_origin')) header.push('rating_origin');
       if (!header.includes('normalized_rating')) header.push('normalized_rating');
+      if (!header.includes('exposure_correction')) header.push('exposure_correction');
+      if (!header.includes('detection_scores')) header.push('detection_scores');
       for (const r of rows) {
         if (!('rating' in r)) r.rating = '';
         if (!('rating_origin' in r)) r.rating_origin = '';
         if (!('normalized_rating' in r)) r.normalized_rating = '';
+        if (!('exposure_correction' in r)) r.exposure_correction = '0';
+        if (!('detection_scores' in r)) r.detection_scores = '';
       }
     }
 
@@ -917,6 +921,119 @@
     }
 
     // Render images inside the scene dialog, honoring the manual-rated filter and stable ordering
+    // ---- Scene dialog RAW zoom (click-drag on thumbnail → zoom in previewBox) ----
+    let sceneZoomActive = false;
+    let sceneZoomRow = null;
+    const sceneRawCache = new Map();   // filename key -> base64 data URL
+    const sceneRawLoading = new Set(); // filenames currently being fetched
+
+    function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
+      const rect = thumbEl.getBoundingClientRect();
+      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
+      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
+      imgEl.style.transform = `scale(${scale})`;
+      imgEl.style.transformOrigin = `${xPct}% ${yPct}%`;
+    }
+
+    async function loadSceneRawAsync(row) {
+      const key = (row.__rootPath || '') + '|' + row.filename;
+      sceneRawLoading.add(key);
+      try {
+        const expCorr = parseFloat(row.exposure_correction) || 0;
+        const res = await window.pywebview.api.read_raw_full(
+          row.filename, row.__rootPath || '', expCorr
+        );
+        if (res && res.success && res.data) {
+          const url = `data:image/jpeg;base64,${res.data}`;
+          sceneRawCache.set(key, url);
+          // Upgrade preview if this row is still the active zoom row
+          if (sceneZoomActive && sceneZoomRow === row) {
+            const box = el('#previewBox');
+            const curImg = box?.querySelector('img');
+            if (curImg) {
+              curImg.src = url;
+              curImg.dataset.isRaw = '1';
+              box.classList.add('raw-loaded');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('loadSceneRawAsync error:', e);
+      } finally {
+        sceneRawLoading.delete(key);
+      }
+    }
+
+    function startSceneZoomPreview(row, thumbEl, mouseEv) {
+      sceneZoomActive = true;
+      sceneZoomRow = row;
+      const SCALE = 5;
+      const key = (row.__rootPath || '') + '|' + row.filename;
+      const previewBox = el('#previewBox');
+      previewBox.classList.add('zoom-active');
+
+      async function applyBestImage(clientX, clientY) {
+        let imgEl = previewBox.querySelector('img');
+        const cachedRaw = sceneRawCache.get(key);
+
+        if (cachedRaw && imgEl?.dataset?.isRaw !== '1') {
+          // Upgrade to cached RAW immediately
+          previewBox.innerHTML = '';
+          imgEl = document.createElement('img');
+          imgEl.src = cachedRaw;
+          imgEl.dataset.isRaw = '1';
+          previewBox.appendChild(imgEl);
+          previewBox.classList.add('raw-loaded');
+        } else if (!imgEl) {
+          // Nothing in previewBox yet — load export/crop image
+          const url = await getBlobUrlForPath(row.export_path || row.crop_path, row.__rootPath);
+          if (!sceneZoomActive || sceneZoomRow !== row) return;
+          if (url) {
+            previewBox.innerHTML = '';
+            imgEl = document.createElement('img');
+            imgEl.src = url;
+            previewBox.appendChild(imgEl);
+          }
+        }
+
+        if (imgEl && sceneZoomActive && sceneZoomRow === row) {
+          applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, SCALE);
+        }
+      }
+
+      applyBestImage(mouseEv.clientX, mouseEv.clientY);
+
+      // Kick off RAW load if not yet cached
+      if (!sceneRawCache.has(key) && !sceneRawLoading.has(key) && hasPywebviewApi) {
+        loadSceneRawAsync(row);
+      }
+
+      const onMove = (ev) => {
+        if (!sceneZoomActive) return;
+        const curImg = el('#previewBox')?.querySelector('img');
+        if (curImg) applySceneZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, SCALE);
+      };
+
+      const onUp = () => {
+        sceneZoomActive = false;
+        sceneZoomRow = null;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        const box = el('#previewBox');
+        box.classList.remove('zoom-active', 'raw-loaded');
+        const curImg = box?.querySelector('img');
+        if (curImg) {
+          curImg.style.transform = '';
+          curImg.style.transformOrigin = '';
+          delete curImg.dataset.isRaw;
+        }
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }
+    // ---- End scene dialog RAW zoom ----
+
     function renderSceneImages(scene) {
       const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
       imageGrid.innerHTML = '';
@@ -942,7 +1059,15 @@
 
           card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
 
+          // Click-drag on thumbnail → zoom preview with RAW upgrade
+          card.addEventListener('mousedown', (ev) => {
+            if (ev.button !== 0) return;  // left button only
+            ev.preventDefault();
+            startSceneZoomPreview(r, th, ev);
+          });
+
           card.addEventListener('mouseenter', async () => {
+            if (sceneZoomActive) return;  // don't interfere with drag zoom
             const pv = el('#previewBox'); pv.innerHTML = '';
             const pimg = document.createElement('img');
             const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
@@ -990,9 +1115,12 @@
       const sceneRows = getSceneRows(sceneId);
       const speciesSet = new Set();
       const familySet = new Set();
+      const confThreshold = getSetting('detection_threshold', 0.75);
       for (const r of sceneRows) {
-        if (r.species && r.species !== 'No Bird') speciesSet.add(r.species);
-        if (r.family && r.family !== 'Unknown' && r.family !== 'N/A') familySet.add(r.family);
+        if (r.species && r.species !== 'No Bird' && parseNumber(r.species_confidence) >= confThreshold)
+          speciesSet.add(r.species);
+        if (r.family && r.family !== 'Unknown' && r.family !== 'N/A' && parseNumber(r.family_confidence) >= confThreshold)
+          familySet.add(r.family);
       }
       return { species: Array.from(speciesSet).sort(), families: Array.from(familySet).sort() };
     }
@@ -1680,6 +1808,9 @@
       // Rating normalization
       const normSelect = document.getElementById('ratingNormalization');
       if (normSelect) normSelect.value = getSetting('rating_normalization', 'per_folder');
+      // Detection confidence threshold
+      const dtEl = document.getElementById('detectionThreshold');
+      if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
       const cb = document.getElementById('settingsAnalyticsOptIn');
@@ -1706,6 +1837,8 @@
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       const normalizationEl = document.getElementById('ratingNormalization');
       const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
+      const dtEl2 = document.getElementById('detectionThreshold');
+      const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
       const prevNormalization = existing.rating_normalization || 'per_folder';
@@ -1713,6 +1846,7 @@
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
         rating_normalization: ratingNormalization,
+        detection_threshold: detectionThreshold,
       };
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {

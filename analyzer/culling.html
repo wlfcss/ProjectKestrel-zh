@@ -1271,11 +1271,15 @@
       if (!header.includes('normalized_rating')) header.push('normalized_rating');
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
+      if (!header.includes('exposure_correction')) header.push('exposure_correction');
+      if (!header.includes('detection_scores')) header.push('detection_scores');
       for (const r of rows) {
         if (r.rating === undefined || r.rating === '') r.rating = '0';
         if (r.rating_origin === undefined) r.rating_origin = '';
         if (r.normalized_rating === undefined) r.normalized_rating = '';
         if (r.culled === undefined) r.culled = '';
+        if (r.exposure_correction === undefined) r.exposure_correction = '0';
+        if (r.detection_scores === undefined) r.detection_scores = '';
       }
     }
 
@@ -2155,7 +2159,8 @@
     async function loadRawAsync(row) {
       rawLoading.add(row.filename);
       try {
-        const res = await window.pywebview.api.read_raw_full(row.filename, rootPath);
+        const expCorr = parseFloat(row.exposure_correction) || 0;
+        const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
         if (res && res.success && res.data) {
           const url = `data:image/jpeg;base64,${res.data}`;
           rawCache.set(row.filename, url);
