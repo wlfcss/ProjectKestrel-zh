@@ -1111,6 +1111,8 @@
     let cullingState = new Map(); // filename -> 'accept' | 'reject'
     let manuallyMoved = new Set(); // filenames the user has shift-clicked
     let blobUrlCache = new Map();
+    let _normalizedRatings = {};   // filename -> auto rating from apply_normalization()
+    let _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
     let rejectFilenames = [];    // for undo after move
     let moveCompleted = false;
     let thumbDragPixels = 0;  // how many px the mouse moved during last thumb mousedown
@@ -1188,24 +1190,50 @@
 
     // ---- Rating helpers ----
     function getRating(row) {
-      // For manually-rated photos, always honour the user's explicit rating.
-      if (String(row?.rating_origin).toLowerCase() === 'manual') {
-        const n = parseInt(row?.rating, 10);
+      const fn = row?.filename || '';
+
+      // 1) Manual ratings from scenedata
+      if (fn && _scenedata?.image_ratings && Object.prototype.hasOwnProperty.call(_scenedata.image_ratings, fn)) {
+        const n = parseInt(_scenedata.image_ratings[fn], 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
-      // For auto-rated photos prefer normalized_rating (falls back to raw rating).
+
+      // 2) Auto ratings returned by apply_normalization (runtime only)
+      if (fn && _normalizedRatings && Object.prototype.hasOwnProperty.call(_normalizedRatings, fn)) {
+        const n = parseInt(_normalizedRatings[fn], 10);
+        return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      }
+
+      // 3) Legacy CSV fallback
       const norm = parseInt(row?.normalized_rating, 10);
       if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
       const raw = parseInt(row?.rating, 10);
       return Number.isFinite(raw) ? Math.max(0, Math.min(5, raw)) : 0;
     }
     function getOrigin(row) {
+      const fn = row?.filename || '';
+      if (fn && _scenedata?.image_ratings && Object.prototype.hasOwnProperty.call(_scenedata.image_ratings, fn)) {
+        return 'manual';
+      }
+      if (fn && _normalizedRatings && Object.prototype.hasOwnProperty.call(_normalizedRatings, fn)) {
+        return 'auto';
+      }
       const s = String(row?.rating_origin || '').toLowerCase();
       return s === 'manual' ? 'manual' : (s === 'auto' ? 'auto' : '');
     }
     function setRating(row, val, origin = 'manual') {
-      row.rating = String(Math.max(0, Math.min(5, parseInt(val, 10) || 0)));
+      const n = Math.max(0, Math.min(5, parseInt(val, 10) || 0));
+      const fn = row?.filename || '';
+      if (!fn) return;
+
+      // Keep legacy row fields in-memory only for compatibility with existing UI code.
+      row.rating = String(n);
       row.rating_origin = origin;
+
+      // Persist manual overrides in scenedata only.
+      if (!_scenedata.image_ratings) _scenedata.image_ratings = {};
+      if (n > 0) _scenedata.image_ratings[fn] = n;
+      else delete _scenedata.image_ratings[fn];
     }
 
     function isAccept(row) {
@@ -1266,17 +1294,11 @@
 
     // ---- Ensure columns ----
     function ensureColumns() {
-      if (!header.includes('rating')) header.push('rating');
-      if (!header.includes('rating_origin')) header.push('rating_origin');
-      if (!header.includes('normalized_rating')) header.push('normalized_rating');
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
       if (!header.includes('exposure_correction')) header.push('exposure_correction');
       if (!header.includes('detection_scores')) header.push('detection_scores');
       for (const r of rows) {
-        if (r.rating === undefined || r.rating === '') r.rating = '0';
-        if (r.rating_origin === undefined) r.rating_origin = '';
-        if (r.normalized_rating === undefined) r.normalized_rating = '';
         if (r.culled === undefined) r.culled = '';
         if (r.exposure_correction === undefined) r.exposure_correction = '0';
         if (r.detection_scores === undefined) r.detection_scores = '';
@@ -1663,6 +1685,9 @@
         const exportCols = header.filter(c => !c.startsWith('__'));
         const content = rowsToCsvString(exportCols, rows);
         await window.pywebview.api.write_kestrel_csv(rootPath, content);
+        if (typeof window.pywebview?.api?.write_kestrel_scenedata === 'function') {
+          await window.pywebview.api.write_kestrel_scenedata(rootPath, _scenedata);
+        }
       } catch (e) {
         console.warn('Auto-save failed', e);
       }
@@ -1944,9 +1969,34 @@
         throw new Error('read_kestrel_csv is not available on the API');
       }
 
-      // Ensure normalized_rating is up to date before loading
+      // Compute runtime normalized ratings map (no CSV write)
       if (typeof window.pywebview?.api?.apply_normalization === 'function') {
-        try { await window.pywebview.api.apply_normalization(rootPath); } catch (_) { }
+        try {
+          const normRes = await window.pywebview.api.apply_normalization(rootPath);
+          _normalizedRatings = (normRes && normRes.success && normRes.normalized_ratings) ? normRes.normalized_ratings : {};
+        } catch (_) {
+          _normalizedRatings = {};
+        }
+      } else {
+        _normalizedRatings = {};
+      }
+
+      // Load scenedata for manual ratings
+      if (typeof window.pywebview?.api?.read_kestrel_scenedata === 'function') {
+        try {
+          const sdRes = await window.pywebview.api.read_kestrel_scenedata(rootPath);
+          if (sdRes && sdRes.success && sdRes.data) {
+            _scenedata = sdRes.data;
+            if (!_scenedata.image_ratings) _scenedata.image_ratings = {};
+            if (!_scenedata.scenes) _scenedata.scenes = {};
+          } else {
+            _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
+          }
+        } catch (_) {
+          _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
+        }
+      } else {
+        _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
       }
 
       const res = await window.pywebview.api.read_kestrel_csv(rootPath);
