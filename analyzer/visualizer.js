@@ -748,35 +748,48 @@
       // Flat index for shift-click range selection
       _visibleSceneOrder = visibleScenes.map(s => String(s.id));
 
-      // Group by folder and/or capture time
+      // ---- Two-level grouping: folder → time-buckets ----
       function getTimeBucket(s) {
         const ct = s.representative?.capture_time;
         if (!ct) return '';
         try {
           const d = new Date(ct);
           if (isNaN(d)) return '';
-          // bucket = YYYY-MM-DDTHH (local hour)
           const pad = n => String(n).padStart(2, '0');
           return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
         } catch (_) { return ''; }
       }
-      function formatTimeBucket(bucket) {
+      function getBucketDay(bucket) { return bucket ? bucket.split('T')[0] : ''; }
+      function formatNodeTime(bucket) {
         if (!bucket) return 'Unknown time';
         try {
-          const d = new Date(bucket + ':00'); // ensure parseable
-          return d.toLocaleString(undefined, { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          const d = new Date(bucket + ':00');
+          if (isNaN(d)) return bucket;
+          return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
         } catch (_) { return bucket; }
       }
-      const folderGroups = new Map();
-      const groupOrder = [];
-      for (const s of visibleScenes) {
-        const rp = (groupByFolder && s.representative?.__rootPath) ? s.representative.__rootPath : '';
-        const tb = groupByTime ? getTimeBucket(s) : '';
-        const key = (rp && tb) ? rp + '|||' + tb : (rp || tb || '__single__');
-        if (!folderGroups.has(key)) { folderGroups.set(key, []); groupOrder.push(key); }
-        folderGroups.get(key).push(s);
+      function formatNodeDay(bucket) {
+        if (!bucket) return '';
+        try {
+          const d = new Date(bucket + ':00');
+          if (isNaN(d)) return '';
+          return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        } catch (_) { return ''; }
       }
-      const multiFolder = (groupByFolder || groupByTime) && folderGroups.size >= 1;
+
+      // Build folderMap: folderKey → { folderPath, buckets: Map<tb, scene[]>, bucketOrder: [] }
+      const folderOrder = [];
+      const folderMap = new Map();
+      for (const s of visibleScenes) {
+        const rp = groupByFolder ? (s.representative?.__rootPath || '') : '';
+        const fk = rp || '__single__';
+        if (!folderMap.has(fk)) { folderMap.set(fk, { folderPath: rp, buckets: new Map(), bucketOrder: [] }); folderOrder.push(fk); }
+        const fd = folderMap.get(fk);
+        const tb = groupByTime ? (getTimeBucket(s) || '__notime__') : '__all__';
+        if (!fd.buckets.has(tb)) { fd.buckets.set(tb, []); fd.bucketOrder.push(tb); }
+        fd.buckets.get(tb).push(s);
+      }
+      const showFolderHeaders = groupByFolder;
 
       function buildCard(s) {
         const card = document.createElement('article');
@@ -803,7 +816,7 @@
         const _folderName = folderBaseName(s.representative?.__rootPath || '');
         // Show folder name in title only when a single folder is loaded;
         // in multi-folder mode the folder group header already shows it.
-        const _titleHtml = (_folderName && !multiFolder)
+        const _titleHtml = (_folderName && !showFolderHeaders)
           ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
           : `<b>#${_localNum}</b>`;
         title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${escapeHtml(s.sceneName)}</span>` : '');
@@ -862,71 +875,138 @@
       }
 
       const batch = 24;
-      for (const rp of groupOrder) {
-        const groupScenes = folderGroups.get(rp);
-        let gridEl;
 
-        if (multiFolder) {
-          // Determine header label from group key
-          let headerLabel;
-          const parts = rp.split('|||');
-          const rpPart = parts[0];
-          const tbPart = parts[1];
-          if (rpPart && tbPart) {
-            headerLabel = `${escapeHtml(folderBaseName(rpPart) || rpPart)} · ${escapeHtml(formatTimeBucket(tbPart))}`;
-          } else if (tbPart || (groupByTime && !groupByFolder)) {
-            headerLabel = escapeHtml(formatTimeBucket(tbPart || rp));
-          } else {
-            headerLabel = escapeHtml(folderBaseName(rpPart || rp) || rpPart || rp || '(unknown folder)');
+      // ---- Timeline builder (used when groupByTime is on) ----
+      function buildTimeline(fd, containerEl) {
+        const timelineEl = document.createElement('div');
+        timelineEl.className = 'timeline-body';
+        let prevDay = null;
+        const allBuckets = fd.bucketOrder;
+
+        for (let ni = 0; ni < allBuckets.length; ni++) {
+          const tb = allBuckets[ni];
+          const tbScenes = fd.buckets.get(tb);
+          const isLast = ni === allBuckets.length - 1;
+          const thisDay = getBucketDay(tb);
+
+          // Day banner when the calendar date changes between buckets
+          if (thisDay && thisDay !== '__notime__' && thisDay !== prevDay) {
+            const banner = document.createElement('div');
+            banner.className = 'timeline-day-banner';
+            banner.textContent = formatNodeDay(tb);
+            timelineEl.appendChild(banner);
+            prevDay = thisDay;
           }
-          const collapsed = collapsedFolders.has(rp);
+
+          const nodeEl = document.createElement('div');
+          nodeEl.className = 'timeline-node';
+
+          // Rail column: dot + connecting line
+          const railCol = document.createElement('div');
+          railCol.className = 'timeline-rail-col';
+          const dot = document.createElement('div');
+          dot.className = 'timeline-dot';
+          const line = document.createElement('div');
+          line.className = 'timeline-line' + (isLast ? ' last' : '');
+          railCol.appendChild(dot);
+          railCol.appendChild(line);
+
+          // Content column: time label + scene cards
+          const contentCol = document.createElement('div');
+          contentCol.className = 'timeline-content-col';
+
+          if (tb !== '__all__') {
+            const hdr = document.createElement('div');
+            hdr.className = 'timeline-node-header';
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'timeline-node-time';
+            timeSpan.textContent = tb === '__notime__' ? 'Unknown time' : formatNodeTime(tb);
+            const countSpan = document.createElement('span');
+            countSpan.className = 'timeline-node-count muted';
+            countSpan.textContent = `${tbScenes.length} scene${tbScenes.length === 1 ? '' : 's'}`;
+            hdr.appendChild(timeSpan);
+            hdr.appendChild(countSpan);
+            contentCol.appendChild(hdr);
+          }
+
+          const gridEl = document.createElement('div');
+          gridEl.className = 'grid timeline-grid';
+          contentCol.appendChild(gridEl);
+
+          nodeEl.appendChild(railCol);
+          nodeEl.appendChild(contentCol);
+          timelineEl.appendChild(nodeEl);
+
+          for (let i = 0; i < tbScenes.length; i += batch) {
+            if (myVer !== _renderScenesVersion) return;
+            const slice = tbScenes.slice(i, i + batch);
+            const frag = document.createDocumentFragment();
+            for (const s of slice) frag.appendChild(buildCard(s));
+            gridEl.appendChild(frag);
+          }
+        }
+        containerEl.appendChild(timelineEl);
+      }
+
+      // ---- Main folder rendering loop ----
+      for (const fk of folderOrder) {
+        const fd = folderMap.get(fk);
+        const allScenesInFolder = [...fd.buckets.values()].flat();
+        let bodyEl; // receives the timeline or flat grid
+
+        if (showFolderHeaders && fd.folderPath) {
+          const folderName = folderBaseName(fd.folderPath) || fd.folderPath || '(unknown folder)';
+          const collapsed = collapsedFolders.has(fk);
+
           const groupEl = document.createElement('div');
           groupEl.className = 'folder-group';
 
           const hdr = document.createElement('div');
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
-          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${headerLabel}</span><span class="folder-group-count muted">${groupScenes.length} scene${groupScenes.length === 1 ? '' : 's'}</span>`;
+          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} scene${allScenesInFolder.length === 1 ? '' : 's'}</span>`;
 
-          // Add Culling Assistant / Write Metadata buttons (only when a real folder path is present)
-          const _folderPath = rpPart || rp;
-          if (_folderPath && _folderPath !== '__single__') {
-            const cullingBtn = document.createElement('button');
-            cullingBtn.className = 'culling-btn';
-            cullingBtn.textContent = 'Open Culling Assistant';
-            cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(_folderPath); });
-            hdr.appendChild(cullingBtn);
+          const cullingBtn = document.createElement('button');
+          cullingBtn.className = 'culling-btn';
+          cullingBtn.textContent = 'Open Culling Assistant';
+          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
+          hdr.appendChild(cullingBtn);
 
-            const writeMetaBtn = document.createElement('button');
-            writeMetaBtn.className = 'write-metadata-btn';
-            writeMetaBtn.textContent = 'Write Metadata';
-            writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(_folderPath); });
-            hdr.appendChild(writeMetaBtn);
-          }
+          const writeMetaBtn = document.createElement('button');
+          writeMetaBtn.className = 'write-metadata-btn';
+          writeMetaBtn.textContent = 'Write Metadata';
+          writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
+          hdr.appendChild(writeMetaBtn);
 
-          gridEl = document.createElement('div');
-          gridEl.className = 'folder-group-grid grid' + (collapsed ? ' hidden' : '');
+          bodyEl = document.createElement('div');
+          bodyEl.className = 'folder-group-body' + (collapsed ? ' hidden' : '');
 
-          const _rp = rp, _gridEl = gridEl, _hdr = hdr;
+          const _fk = fk, _bodyEl = bodyEl, _hdr = hdr;
           hdr.addEventListener('click', () => {
-            if (collapsedFolders.has(_rp)) collapsedFolders.delete(_rp); else collapsedFolders.add(_rp);
+            if (collapsedFolders.has(_fk)) collapsedFolders.delete(_fk); else collapsedFolders.add(_fk);
             _hdr.classList.toggle('collapsed');
-            _gridEl.classList.toggle('hidden');
+            _bodyEl.classList.toggle('hidden');
           });
           groupEl.appendChild(hdr);
-          groupEl.appendChild(gridEl);
+          groupEl.appendChild(bodyEl);
           sceneGrid.appendChild(groupEl);
         } else {
-          gridEl = document.createElement('div');
-          gridEl.className = 'grid';
-          sceneGrid.appendChild(gridEl);
+          bodyEl = document.createElement('div');
+          sceneGrid.appendChild(bodyEl);
         }
 
-        for (let i = 0; i < groupScenes.length; i += batch) {
-          if (myVer !== _renderScenesVersion) return;
-          const slice = groupScenes.slice(i, i + batch);
-          const frag = document.createDocumentFragment();
-          for (const s of slice) frag.appendChild(buildCard(s));
-          gridEl.appendChild(frag);
+        if (groupByTime) {
+          buildTimeline(fd, bodyEl);
+        } else {
+          const gridEl = document.createElement('div');
+          gridEl.className = 'folder-group-grid grid';
+          bodyEl.appendChild(gridEl);
+          for (let i = 0; i < allScenesInFolder.length; i += batch) {
+            if (myVer !== _renderScenesVersion) return;
+            const slice = allScenesInFolder.slice(i, i + batch);
+            const frag = document.createDocumentFragment();
+            for (const s of slice) frag.appendChild(buildCard(s));
+            gridEl.appendChild(frag);
+          }
         }
       }
     }
@@ -4226,7 +4306,8 @@
       if (!mainEl || !indicator) return;
       let hideTimer = null;
       mainEl.addEventListener('scroll', () => {
-        const headers = sceneGrid.querySelectorAll('.folder-group-header');
+        // Track both folder headers and timeline day banners
+        const headers = [...sceneGrid.querySelectorAll('.folder-group-header, .timeline-day-banner')];
         if (!headers.length) { indicator.style.opacity = '0'; return; }
         const mainRect = mainEl.getBoundingClientRect();
         const thresholdY = mainRect.top + mainRect.height * 0.25;
@@ -4238,7 +4319,7 @@
         }
         if (!bestHeader) { indicator.style.opacity = '0'; return; }
         const nameEl = bestHeader.querySelector('.folder-group-name');
-        const text = nameEl ? nameEl.textContent.trim() : '';
+        const text = nameEl ? nameEl.textContent.trim() : bestHeader.textContent.trim();
         if (!text) { indicator.style.opacity = '0'; return; }
         indicator.textContent = text;
         indicator.style.opacity = '1';
