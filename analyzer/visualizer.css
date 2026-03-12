@@ -917,7 +917,7 @@
       transition: none;
     }
     .right .preview.raw-loaded::after {
-      content: 'RAW';
+      content: 'RAW · scroll to zoom';
       position: absolute;
       top: 6px;
       right: 6px;
@@ -2468,3 +2468,27 @@
       transition: color .15s;
     }
     .donate-dlg-close-btn:hover { color: var(--text); background: transparent; border: none; }
+
+    /* Scroll position indicator */
+    #scrollPositionIndicator {
+      position: fixed;
+      right: 22px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(10, 12, 15, 0.88);
+      border: 1px solid #2a3040;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 9000;
+      transition: opacity 0.25s ease;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+    }

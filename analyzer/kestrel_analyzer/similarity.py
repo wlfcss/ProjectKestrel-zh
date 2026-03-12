@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 
 
-def compute_similarity_timestamp(path1, path2):
+def compute_similarity_timestamp(path1, path2, threshold_seconds: float = 1.0):
     """
-    Return True if two image files were captured within the same second,
+    Return True if two image files were captured within threshold_seconds of each other,
     False if they were not, or None if timestamps could not be read for either file.
     """
     from datetime import timedelta
@@ -15,7 +15,7 @@ def compute_similarity_timestamp(path1, path2):
             from raw_exif import get_capture_time
         t1 = get_capture_time(path1)
         t2 = get_capture_time(path2)
-        return abs(t1 - t2) <= timedelta(seconds=1)
+        return abs(t1 - t2) <= timedelta(seconds=threshold_seconds)
     except Exception:
         return None
 

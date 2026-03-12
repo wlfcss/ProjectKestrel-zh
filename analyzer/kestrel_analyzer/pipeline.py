@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import warnings
@@ -26,6 +27,7 @@ print("read_image imported successfully.")
 from .ratings import quality_to_rating
 print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
+from .raw_exif import get_capture_time
 from .logging_utils import get_log_path, log_event, log_exception, log_warning
 print("Utility functions imported successfully.")
 
@@ -170,6 +172,7 @@ class AnalysisPipeline:
         analyzer_name: str = "pipeline",
         wildlife_enabled: bool = True,
         detection_threshold: float = 0.75,
+        scene_time_threshold: float = 1.0,
     ) -> None:
         callbacks = callbacks or {}
         status_cb = callbacks.get("on_status")
@@ -323,6 +326,7 @@ class AnalysisPipeline:
                     "secondary_family_scores": [],
                     "exposure_correction": 0.0,
                     "detection_scores": [],
+                    "capture_time": "",
                 }
 
                 image_path = None
@@ -335,10 +339,19 @@ class AnalysisPipeline:
                     if img is None:
                         raise RuntimeError("Image read returned None")
 
+                    try:
+                        ct = get_capture_time(image_path)
+                        entry["capture_time"] = ct.isoformat() if ct is not None else ""
+                    except Exception:
+                        pass
+
                     stage_ctx["stage"] = "compute_similarity"
                     timestamp_similar = None
                     try:
-                        timestamp_similar = compute_similarity_timestamp(previous_image_path, image_path) if previous_image_path else None
+                        timestamp_similar = compute_similarity_timestamp(
+                            previous_image_path, image_path,
+                            threshold_seconds=scene_time_threshold
+                        ) if previous_image_path else None
                     except Exception as e:
                         log_warning(
                             self._log_path,
@@ -432,7 +445,7 @@ class AnalysisPipeline:
                         continue
 
                     # Store top-5 raw MaskRCNN detection confidence scores
-                    entry["detection_scores"] = sorted(pred_score, reverse=True)[:5]
+                    entry["detection_scores"] = json.dumps(sorted(pred_score, reverse=True)[:5])
 
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in active_wildlife_categories]
                     bird_indices = [i for i, c in enumerate(pred_class) if c == "bird"]
@@ -582,16 +595,16 @@ class AnalysisPipeline:
                                 "exposure_correction": primary_bird["exposure_correction"],
                             }
                         )
-                        all_species = np.array([b["species"] for b in bird_data])
-                        all_species_conf = np.array([b["species_confidence"] for b in bird_data])
-                        all_families = np.array([b["family"] for b in bird_data])
-                        all_family_conf = np.array([b["family_confidence"] for b in bird_data])
+                        all_species = [b["species"] for b in bird_data]
+                        all_species_conf = [b["species_confidence"] for b in bird_data]
+                        all_families = [b["family"] for b in bird_data]
+                        all_family_conf = [b["family_confidence"] for b in bird_data]
                         entry.update(
                             {
-                                "secondary_species_list": all_species,
-                                "secondary_species_scores": all_species_conf,
-                                "secondary_family_list": all_families,
-                                "secondary_family_scores": all_family_conf,
+                                "secondary_species_list": json.dumps(all_species),
+                                "secondary_species_scores": json.dumps(all_species_conf),
+                                "secondary_family_list": json.dumps(all_families),
+                                "secondary_family_scores": json.dumps(all_family_conf),
                             }
                         )
                         crop_img = primary_bird["quality_crop"]

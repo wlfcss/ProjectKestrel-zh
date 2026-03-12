@@ -79,6 +79,10 @@
               <input id="groupByFolder" type="checkbox" checked />
               <span class="muted">Group by folder</span>
             </label>
+            <label class="inline">
+              <input id="groupByTime" type="checkbox" />
+              <span class="muted">Group by capture time</span>
+            </label>
           </div>
           <div class="inline" aria-label="Sort order">
             <span class="muted">Sort by:</span>
@@ -253,6 +257,10 @@
         <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
         <div class="detail" id="previewInfo">—</div>
         <div class="footer">
+          <label class="inline" id="sceneZoomWrap" style="font-size:11px;display:none;gap:4px">
+            <span class="muted">Zoom</span>
+            <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:70px">
+          </label>
           <button id="editToggleBtn">Edit Species &amp; Tags…</button>
           <button id="splitSceneBtn">Split Scene…</button>
           <button id="closeDlg">Close</button>
@@ -361,6 +369,16 @@
         (0.10–0.99) that the bird detector must reach before Kestrel counts something as a detection. Lowering
         this value may increase <b>false positive</b> detections on difficult images. Requires re-analysis to
         take effect. Also filters which species and family tags are shown in scene dialogs.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
+        <label for="sceneTimeThreshold">Scene Grouping Time Threshold (seconds)</label>
+        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0"
+          style="width:80px" title="Images captured within this many seconds of each other are considered part of the same scene burst" />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Images captured within this
+        many seconds of each other are treated as the same burst/scene (using EXIF timestamp). Requires
+        re-analysis to take effect.</div>
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div class="row">
@@ -601,6 +619,9 @@
   </dialog>
 
   <script src="visualizer.js"></script>
+
+  <!-- Scroll position indicator: shows current folder/time section while scrolling -->
+  <div id="scrollPositionIndicator" aria-hidden="true"></div>
 
 </body>
 

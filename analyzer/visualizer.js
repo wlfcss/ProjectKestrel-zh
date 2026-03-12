@@ -451,7 +451,9 @@
       return Number.isFinite(n) ? n : -1;
     }
 
-    // Parse secondary species columns (strings like "['A' 'B']" and "[0.9 0.2]")
+    // Parse secondary species columns.
+    // New format: JSON array strings e.g. '["Greater Yellowlegs","Vaux\'s Swift"]'.
+    // Legacy format: numpy str() repr e.g. "[\'Greater Yellowlegs\' \"Vaux\'s Swift\"]".
     function parseSecondarySpecies(row) {
       if (row.__secondaryCache) return row.__secondaryCache;
       const listRaw = row.secondary_species_list;
@@ -459,32 +461,47 @@
       const result = [];
       if (!listRaw || !scoresRaw) { row.__secondaryCache = result; return result; }
       try {
-        // Extract species tokens inside quotes (single or double)
-        const species = [];
-        const listStr = String(listRaw);
-        const regex = /['"]([^'"\n\r]+?)['"]/g;
-        let m;
-        while ((m = regex.exec(listStr)) !== null) {
-          const name = m[1].trim();
-          if (name) species.push(name);
+        let species = null, nums = null;
+        // Try JSON first (new format)
+        try {
+          const ls = String(listRaw).trim();
+          const ss = String(scoresRaw).trim();
+          if (ls.startsWith('[') && ss.startsWith('[')) {
+            const parsed = JSON.parse(ls);
+            const parsedScores = JSON.parse(ss);
+            if (Array.isArray(parsed) && Array.isArray(parsedScores)) {
+              species = parsed; nums = parsedScores;
+            }
+          }
+        } catch (_) { species = null; nums = null; }
+
+        if (species === null) {
+          // Legacy numpy repr fallback: numpy uses "..." for names with apostrophes
+          species = [];
+          const listStr = String(listRaw).replace(/\n\s*/g, ' ');
+          const dqRe = /"([^"]+)"/g;
+          const sqRe = /'([^']+)'/g;
+          let m;
+          while ((m = dqRe.exec(listStr)) !== null) { const n = m[1].trim(); if (n) species.push(n); }
+          if (!species.length) {
+            while ((m = sqRe.exec(listStr)) !== null) { const n = m[1].trim(); if (n) species.push(n); }
+          }
+          if (!species.length) {
+            const inner = listStr.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+            inner.split(/\s{2,}|\s/).forEach(tok => { const t = tok.trim(); if (t) species.push(t); });
+          }
+          const scoreStr = String(scoresRaw).replace(/^[^\[]*\[/, '[').replace(/\].*$/, '').replace(/[\[\]]/g, '').trim();
+          nums = scoreStr.split(/\s+/).map(parseNumber).filter(x => x >= 0);
         }
-        // Fallback: if nothing matched but we have bracketed content, split on spaces
-        if (!species.length) {
-          const inner = listStr.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
-          inner.split(/\s{2,}|\s/).forEach(tok => { const t = tok.trim(); if (t) species.push(t); });
-        }
-        // Parse scores
-        const scoreStr = String(scoresRaw).replace(/^[^\d\-\.]*\[/, '['); // normalize
-        const nums = scoreStr.replace(/^[^\[]*\[/, '[').replace(/\].*$/, '').replace(/[\[\]]/g, '').trim().split(/\s+/).map(parseNumber).filter(x => x >= 0);
         for (let i = 0; i < species.length && i < nums.length; i++) {
-          result.push({ name: species[i], score: nums[i] });
+          result.push({ name: String(species[i]), score: parseNumber(nums[i]) });
         }
       } catch (_) { }
       row.__secondaryCache = result;
       return result;
     }
 
-    // Parse secondary family columns similar to secondary species
+    // Parse secondary family columns similar to secondary species.
     function parseSecondaryFamilies(row) {
       if (row.__secondaryFamilyCache) return row.__secondaryFamilyCache;
       const listRaw = row.secondary_family_list;
@@ -492,22 +509,40 @@
       const result = [];
       if (!listRaw || !scoresRaw) { row.__secondaryFamilyCache = result; return result; }
       try {
-        const fams = [];
-        const listStr = String(listRaw);
-        const regex = /['"]([^'"\n\r]+?)['"]/g;
-        let m;
-        while ((m = regex.exec(listStr)) !== null) {
-          const name = m[1].trim();
-          if (name) fams.push(name);
+        let fams = null, nums = null;
+        // Try JSON first
+        try {
+          const ls = String(listRaw).trim();
+          const ss = String(scoresRaw).trim();
+          if (ls.startsWith('[') && ss.startsWith('[')) {
+            const parsed = JSON.parse(ls);
+            const parsedScores = JSON.parse(ss);
+            if (Array.isArray(parsed) && Array.isArray(parsedScores)) {
+              fams = parsed; nums = parsedScores;
+            }
+          }
+        } catch (_) { fams = null; nums = null; }
+
+        if (fams === null) {
+          // Legacy numpy repr fallback
+          fams = [];
+          const listStr = String(listRaw).replace(/\n\s*/g, ' ');
+          const dqRe = /"([^"]+)"/g;
+          const sqRe = /'([^']+)'/g;
+          let m;
+          while ((m = dqRe.exec(listStr)) !== null) { const n = m[1].trim(); if (n) fams.push(n); }
+          if (!fams.length) {
+            while ((m = sqRe.exec(listStr)) !== null) { const n = m[1].trim(); if (n) fams.push(n); }
+          }
+          if (!fams.length) {
+            const inner = listStr.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+            inner.split(/\s{2,}|\s/).forEach(tok => { const t = tok.trim(); if (t) fams.push(t); });
+          }
+          const scoreStr = String(scoresRaw).replace(/^[^\[]*\[/, '[').replace(/\].*$/, '').replace(/[\[\]]/g, '').trim();
+          nums = scoreStr.split(/\s+/).map(parseNumber).filter(x => x >= 0);
         }
-        if (!fams.length) {
-          const inner = listStr.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
-          inner.split(/\s{2,}|\s/).forEach(tok => { const t = tok.trim(); if (t) fams.push(t); });
-        }
-        const scoreStr = String(scoresRaw).replace(/^[^\[]*\[/, '[').replace(/\].*$/, '').replace(/[\[\]]/g, '').trim();
-        const nums = scoreStr.split(/\s+/).map(parseNumber).filter(x => x >= 0);
         for (let i = 0; i < fams.length && i < nums.length; i++) {
-          result.push({ name: fams[i], score: nums[i] });
+          result.push({ name: String(fams[i]), score: parseNumber(nums[i]) });
         }
       } catch (_) { }
       row.__secondaryFamilyCache = result;
@@ -694,6 +729,7 @@
       const sortBy = el('#sortBy').value;
       const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
       const groupByFolder = document.getElementById('groupByFolder')?.checked ?? getSetting('groupByFolder', true);
+      const groupByTime = document.getElementById('groupByTime')?.checked ?? getSetting('groupByTime', false);
       const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
       const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
       const includeFamilies = true;
@@ -712,15 +748,35 @@
       // Flat index for shift-click range selection
       _visibleSceneOrder = visibleScenes.map(s => String(s.id));
 
-      // Group by folder (rootPath) — only when groupByFolder is enabled AND multiple folders are loaded
+      // Group by folder and/or capture time
+      function getTimeBucket(s) {
+        const ct = s.representative?.capture_time;
+        if (!ct) return '';
+        try {
+          const d = new Date(ct);
+          if (isNaN(d)) return '';
+          // bucket = YYYY-MM-DDTHH (local hour)
+          const pad = n => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
+        } catch (_) { return ''; }
+      }
+      function formatTimeBucket(bucket) {
+        if (!bucket) return 'Unknown time';
+        try {
+          const d = new Date(bucket + ':00'); // ensure parseable
+          return d.toLocaleString(undefined, { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        } catch (_) { return bucket; }
+      }
       const folderGroups = new Map();
       const groupOrder = [];
       for (const s of visibleScenes) {
-        const rp = (groupByFolder && s.representative?.__rootPath) ? s.representative.__rootPath : '__single__';
-        if (!folderGroups.has(rp)) { folderGroups.set(rp, []); groupOrder.push(rp); }
-        folderGroups.get(rp).push(s);
+        const rp = (groupByFolder && s.representative?.__rootPath) ? s.representative.__rootPath : '';
+        const tb = groupByTime ? getTimeBucket(s) : '';
+        const key = (rp && tb) ? rp + '|||' + tb : (rp || tb || '__single__');
+        if (!folderGroups.has(key)) { folderGroups.set(key, []); groupOrder.push(key); }
+        folderGroups.get(key).push(s);
       }
-      const multiFolder = groupByFolder && folderGroups.size >= 1;
+      const multiFolder = (groupByFolder || groupByTime) && folderGroups.size >= 1;
 
       function buildCard(s) {
         const card = document.createElement('article');
@@ -811,28 +867,41 @@
         let gridEl;
 
         if (multiFolder) {
-          const folderName = folderBaseName(rp) || rp || '(unknown folder)';
+          // Determine header label from group key
+          let headerLabel;
+          const parts = rp.split('|||');
+          const rpPart = parts[0];
+          const tbPart = parts[1];
+          if (rpPart && tbPart) {
+            headerLabel = `${escapeHtml(folderBaseName(rpPart) || rpPart)} · ${escapeHtml(formatTimeBucket(tbPart))}`;
+          } else if (tbPart || (groupByTime && !groupByFolder)) {
+            headerLabel = escapeHtml(formatTimeBucket(tbPart || rp));
+          } else {
+            headerLabel = escapeHtml(folderBaseName(rpPart || rp) || rpPart || rp || '(unknown folder)');
+          }
           const collapsed = collapsedFolders.has(rp);
           const groupEl = document.createElement('div');
           groupEl.className = 'folder-group';
 
           const hdr = document.createElement('div');
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
-          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${groupScenes.length} scene${groupScenes.length === 1 ? '' : 's'}</span>`;
+          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${headerLabel}</span><span class="folder-group-count muted">${groupScenes.length} scene${groupScenes.length === 1 ? '' : 's'}</span>`;
 
-          // Add Culling Assistant button
-          const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'culling-btn';
-          cullingBtn.textContent = 'Open Culling Assistant';
-          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(rp); });
-          hdr.appendChild(cullingBtn);
+          // Add Culling Assistant / Write Metadata buttons (only when a real folder path is present)
+          const _folderPath = rpPart || rp;
+          if (_folderPath && _folderPath !== '__single__') {
+            const cullingBtn = document.createElement('button');
+            cullingBtn.className = 'culling-btn';
+            cullingBtn.textContent = 'Open Culling Assistant';
+            cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(_folderPath); });
+            hdr.appendChild(cullingBtn);
 
-          // Add Write Metadata button
-          const writeMetaBtn = document.createElement('button');
-          writeMetaBtn.className = 'write-metadata-btn';
-          writeMetaBtn.textContent = 'Write Metadata';
-          writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(rp); });
-          hdr.appendChild(writeMetaBtn);
+            const writeMetaBtn = document.createElement('button');
+            writeMetaBtn.className = 'write-metadata-btn';
+            writeMetaBtn.textContent = 'Write Metadata';
+            writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(_folderPath); });
+            hdr.appendChild(writeMetaBtn);
+          }
 
           gridEl = document.createElement('div');
           gridEl.className = 'folder-group-grid grid' + (collapsed ? ' hidden' : '');
@@ -924,6 +993,8 @@
     // ---- Scene dialog RAW zoom (click-drag on thumbnail → zoom in previewBox) ----
     let sceneZoomActive = false;
     let sceneZoomRow = null;
+    let sceneZoomScale = 5;   // adjustable via scroll or slider
+    let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
     const sceneRawCache = new Map();   // filename key -> base64 data URL
     const sceneRawLoading = new Set(); // filenames currently being fetched
 
@@ -967,51 +1038,81 @@
     function startSceneZoomPreview(row, thumbEl, mouseEv) {
       sceneZoomActive = true;
       sceneZoomRow = row;
-      const SCALE = 5;
       const key = (row.__rootPath || '') + '|' + row.filename;
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
+      zoomLastX = mouseEv.clientX;
+      zoomLastY = mouseEv.clientY;
 
-      async function applyBestImage(clientX, clientY) {
-        let imgEl = previewBox.querySelector('img');
+      // Step 1: Immediately show the already-loaded thumbnail as a placeholder
+      const thumbImgSrc = thumbEl.querySelector('img')?.src;
+      if (thumbImgSrc) {
+        previewBox.innerHTML = '';
+        const stub = document.createElement('img');
+        stub.src = thumbImgSrc;
+        previewBox.appendChild(stub);
+        applySceneZoomTransform(stub, thumbEl, mouseEv.clientX, mouseEv.clientY, sceneZoomScale);
+      }
+
+      // Step 2: Async — upgrade to full export or cached RAW
+      (async () => {
+        if (!sceneZoomActive || sceneZoomRow !== row) return;
         const cachedRaw = sceneRawCache.get(key);
-
-        if (cachedRaw && imgEl?.dataset?.isRaw !== '1') {
-          // Upgrade to cached RAW immediately
+        if (cachedRaw) {
           previewBox.innerHTML = '';
-          imgEl = document.createElement('img');
+          const imgEl = document.createElement('img');
           imgEl.src = cachedRaw;
           imgEl.dataset.isRaw = '1';
           previewBox.appendChild(imgEl);
           previewBox.classList.add('raw-loaded');
-        } else if (!imgEl) {
-          // Nothing in previewBox yet — load export/crop image
+          applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+        } else {
           const url = await getBlobUrlForPath(row.export_path || row.crop_path, row.__rootPath);
           if (!sceneZoomActive || sceneZoomRow !== row) return;
-          if (url) {
+          if (url && url !== thumbImgSrc) {
             previewBox.innerHTML = '';
-            imgEl = document.createElement('img');
+            const imgEl = document.createElement('img');
             imgEl.src = url;
             previewBox.appendChild(imgEl);
+            applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
           }
         }
+      })();
 
-        if (imgEl && sceneZoomActive && sceneZoomRow === row) {
-          applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, SCALE);
-        }
-      }
-
-      applyBestImage(mouseEv.clientX, mouseEv.clientY);
-
-      // Kick off RAW load if not yet cached
+      // Step 3: Kick off RAW load in background
       if (!sceneRawCache.has(key) && !sceneRawLoading.has(key) && hasPywebviewApi) {
         loadSceneRawAsync(row);
       }
 
+      // Show zoom slider
+      const zoomWrap = el('#sceneZoomWrap');
+      const slider = el('#sceneZoomSlider');
+      if (zoomWrap) zoomWrap.style.display = '';
+      if (slider) {
+        slider.value = sceneZoomScale;
+        slider.oninput = () => {
+          sceneZoomScale = parseFloat(slider.value);
+          const curImg = el('#previewBox')?.querySelector('img');
+          if (curImg) applySceneZoomTransform(curImg, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+        };
+      }
+
       const onMove = (ev) => {
         if (!sceneZoomActive) return;
+        zoomLastX = ev.clientX; zoomLastY = ev.clientY;
         const curImg = el('#previewBox')?.querySelector('img');
-        if (curImg) applySceneZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, SCALE);
+        if (curImg) applySceneZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, sceneZoomScale);
+      };
+
+      const onWheel = (ev) => {
+        if (!sceneZoomActive) return;
+        ev.preventDefault();
+        const delta = ev.deltaY < 0 ? 0.5 : -0.5;
+        sceneZoomScale = Math.max(2, Math.min(12, sceneZoomScale + delta));
+        if (slider) slider.value = sceneZoomScale;
+        const curImg = el('#previewBox')?.querySelector('img');
+        if (curImg) applySceneZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, sceneZoomScale);
+        zoomLastX = ev.clientX; zoomLastY = ev.clientY;
       };
 
       const onUp = () => {
@@ -1019,6 +1120,7 @@
         sceneZoomRow = null;
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+        window.removeEventListener('wheel', onWheel);
         const box = el('#previewBox');
         box.classList.remove('zoom-active', 'raw-loaded');
         const curImg = box?.querySelector('img');
@@ -1027,10 +1129,12 @@
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
         }
+        if (zoomWrap) zoomWrap.style.display = 'none';
       };
 
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
+      window.addEventListener('wheel', onWheel, { passive: false });
     }
     // ---- End scene dialog RAW zoom ----
 
@@ -1811,6 +1915,9 @@
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
+      // Scene grouping time threshold
+      const sttEl = document.getElementById('sceneTimeThreshold');
+      if (sttEl) sttEl.value = getSetting('scene_time_threshold', 1.0);
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
       const cb = document.getElementById('settingsAnalyticsOptIn');
@@ -1839,6 +1946,8 @@
       const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
+      const sttEl2 = document.getElementById('sceneTimeThreshold');
+      const sceneTimeThreshold = sttEl2 ? Math.max(0, parseFloat(sttEl2.value) || 1.0) : 1.0;
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
       const prevNormalization = existing.rating_normalization || 'per_folder';
@@ -1847,6 +1956,7 @@
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
         rating_normalization: ratingNormalization,
         detection_threshold: detectionThreshold,
+        scene_time_threshold: sceneTimeThreshold,
       };
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
@@ -4097,6 +4207,44 @@
       t.addEventListener('change', () => {
         const s = loadSettings(); s.groupByFolder = !!t.checked; saveSettings(s); renderScenes();
       });
+    })();
+
+    // Group-by-capture-time toggle
+    (function initGroupByTime() {
+      const t = document.getElementById('groupByTime');
+      if (!t) return;
+      try { t.checked = getSetting('groupByTime', false); } catch { }
+      t.addEventListener('change', () => {
+        const s = loadSettings(); s.groupByTime = !!t.checked; saveSettings(s); renderScenes();
+      });
+    })();
+
+    // Scroll position indicator — shows current folder/time-group while scrolling
+    (function initScrollPositionIndicator() {
+      const mainEl = document.querySelector('main');
+      const indicator = document.getElementById('scrollPositionIndicator');
+      if (!mainEl || !indicator) return;
+      let hideTimer = null;
+      mainEl.addEventListener('scroll', () => {
+        const headers = sceneGrid.querySelectorAll('.folder-group-header');
+        if (!headers.length) { indicator.style.opacity = '0'; return; }
+        const mainRect = mainEl.getBoundingClientRect();
+        const thresholdY = mainRect.top + mainRect.height * 0.25;
+        let bestHeader = null;
+        for (const h of headers) {
+          const r = h.getBoundingClientRect();
+          if (r.top <= thresholdY) bestHeader = h;
+          else if (!bestHeader) { bestHeader = h; break; }
+        }
+        if (!bestHeader) { indicator.style.opacity = '0'; return; }
+        const nameEl = bestHeader.querySelector('.folder-group-name');
+        const text = nameEl ? nameEl.textContent.trim() : '';
+        if (!text) { indicator.style.opacity = '0'; return; }
+        indicator.textContent = text;
+        indicator.style.opacity = '1';
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { indicator.style.opacity = '0'; }, 1800);
+      }, { passive: true });
     })();
 
     // Multi-select merge action bar

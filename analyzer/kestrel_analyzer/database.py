@@ -30,6 +30,7 @@ BASE_COLUMNS = [
     "secondary_family_scores",
     "exposure_correction",
     "detection_scores",
+    "capture_time",
 ]
 
 REQUIRED_COLUMNS = [
@@ -89,6 +90,8 @@ def ensure_columns(database: pd.DataFrame) -> pd.DataFrame:
         database["exposure_correction"] = 0.0
     if "detection_scores" not in database.columns:
         database["detection_scores"] = [[] for _ in range(len(database))]
+    if "capture_time" not in database.columns:
+        database["capture_time"] = ""
     return database
 
 
