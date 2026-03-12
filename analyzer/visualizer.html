@@ -339,6 +339,20 @@
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div class="row">
+        <label for="ratingNormalization">Star Rating Normalization</label>
+        <select id="ratingNormalization">
+          <option value="per_folder">Per folder &mdash; normalize within each analyzed folder</option>
+          <option value="global">Global &mdash; normalize across all analyzed photos</option>
+          <option value="none">None &mdash; use raw quality score thresholds</option>
+        </select>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are
+        converted to star ratings. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
+        overall quality. <b>Global</b> ranks photos against all folders you have analyzed. <b>None</b> uses fixed
+        quality thresholds.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
         <label style="flex:1">Kestrel's Impact</label>
         <span class="muted" id="settingsTotalImpact">—</span>
       </div>

@@ -1188,8 +1188,16 @@
 
     // ---- Rating helpers ----
     function getRating(row) {
-      const n = parseInt(row?.rating, 10);
-      return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      // For manually-rated photos, always honour the user's explicit rating.
+      if (String(row?.rating_origin).toLowerCase() === 'manual') {
+        const n = parseInt(row?.rating, 10);
+        return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      }
+      // For auto-rated photos prefer normalized_rating (falls back to raw rating).
+      const norm = parseInt(row?.normalized_rating, 10);
+      if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
+      const raw = parseInt(row?.rating, 10);
+      return Number.isFinite(raw) ? Math.max(0, Math.min(5, raw)) : 0;
     }
     function getOrigin(row) {
       const s = String(row?.rating_origin || '').toLowerCase();
@@ -1260,11 +1268,13 @@
     function ensureColumns() {
       if (!header.includes('rating')) header.push('rating');
       if (!header.includes('rating_origin')) header.push('rating_origin');
+      if (!header.includes('normalized_rating')) header.push('normalized_rating');
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
       for (const r of rows) {
         if (r.rating === undefined || r.rating === '') r.rating = '0';
         if (r.rating_origin === undefined) r.rating_origin = '';
+        if (r.normalized_rating === undefined) r.normalized_rating = '';
         if (r.culled === undefined) r.culled = '';
       }
     }
@@ -1929,7 +1939,12 @@
         console.error('[culling] read_kestrel_csv is not available! Available properties:', Object.keys(window.pywebview?.api || {}));
         throw new Error('read_kestrel_csv is not available on the API');
       }
-      
+
+      // Ensure normalized_rating is up to date before loading
+      if (typeof window.pywebview?.api?.apply_normalization === 'function') {
+        try { await window.pywebview.api.apply_normalization(rootPath); } catch (_) { }
+      }
+
       const res = await window.pywebview.api.read_kestrel_csv(rootPath);
       if (!res.success) throw new Error(res.error || 'Failed to read CSV');
 

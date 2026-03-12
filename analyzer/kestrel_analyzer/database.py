@@ -17,6 +17,7 @@ BASE_COLUMNS = [
     "export_path",
     "crop_path",
     "rating",
+    "normalized_rating",
     "scene_count",
     "feature_similarity",
     "feature_confidence",
@@ -80,6 +81,8 @@ def ensure_columns(database: pd.DataFrame) -> pd.DataFrame:
                 database[col] = [[] for _ in range(len(database))]
             else:
                 database[col] = "Unknown" if "family" in col else 0.0
+    if "normalized_rating" not in database.columns:
+        database["normalized_rating"] = 0
     return database
 
 

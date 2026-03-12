@@ -505,6 +505,132 @@ class Api:
             print(f'[API] write_kestrel_csv({folder_path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
 
+    def apply_normalization(self, folder_path: str, mode: str = None) -> dict:
+        """Recompute normalized_rating for all rows in a folder's database.
+
+        Reads the current ``rating_normalization`` setting (or uses *mode* if provided),
+        builds or retrieves the quality-score distribution for the folder, applies the
+        chosen normalization, and saves the updated CSV.
+
+        Also caches the folder's quality distribution in settings.json and
+        kestrel_metadata.json so it is available for global normalization.
+
+        Returns:
+            {
+              'success': bool,
+              'normalized_ratings': {filename: int, ...},  # 0-5 for every row
+              'mode_used': str,
+              'error': str
+            }
+        """
+        try:
+            import pandas as pd
+
+            try:
+                from kestrel_analyzer.ratings import (
+                    compute_quality_distribution,
+                    compute_normalized_rating,
+                    quality_to_rating,
+                )
+            except ImportError:
+                from analyzer.kestrel_analyzer.ratings import (
+                    compute_quality_distribution,
+                    compute_normalized_rating,
+                    quality_to_rating,
+                )
+
+            folder_path = str(folder_path).strip().rstrip('/\\')
+            kestrel_dir = os.path.join(folder_path, '.kestrel')
+            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
+            metadata_path = os.path.join(kestrel_dir, 'kestrel_metadata.json')
+
+            if not os.path.exists(csv_path):
+                return {'success': False, 'error': 'No database found', 'normalized_ratings': {}, 'mode_used': ''}
+
+            settings = load_persisted_settings()
+            if mode is None:
+                mode = settings.get('rating_normalization', 'per_folder')
+
+            df = pd.read_csv(csv_path)
+            if df.empty:
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
+
+            # --- Build / retrieve per-folder distribution ---
+            quality_scores = df['quality'].tolist() if 'quality' in df.columns else []
+            folder_dist = compute_quality_distribution(quality_scores)
+
+            # Cache in settings.json (overwrite with fresh computation each time)
+            dist_store = settings.setdefault('quality_scores_distribution', {})
+            dist_store[folder_path] = folder_dist
+            save_persisted_settings(settings)
+
+            # Cache in kestrel_metadata.json
+            try:
+                if os.path.exists(metadata_path):
+                    with open(metadata_path, 'r', encoding='utf-8') as mf:
+                        _meta = json.load(mf)
+                else:
+                    _meta = {}
+                _meta['quality_distribution'] = folder_dist
+                _meta['quality_distribution_stored'] = True
+                with open(metadata_path, 'w', encoding='utf-8') as mf:
+                    json.dump(_meta, mf, indent=2)
+            except Exception:
+                pass
+
+            # --- Choose distribution to use ---
+            if mode == 'none':
+                # Raw thresholds: just copy quality_to_rating result
+                def _get_norm(q_val):
+                    try:
+                        return quality_to_rating(float(q_val))
+                    except (TypeError, ValueError):
+                        return 0
+                df['normalized_rating'] = df['quality'].apply(_get_norm)
+
+            elif mode == 'global':
+                global_dist = [0] * 100
+                for dist in settings.get('quality_scores_distribution', {}).values():
+                    if isinstance(dist, list) and len(dist) == 100:
+                        for i, v in enumerate(dist):
+                            global_dist[i] += int(v)
+                distribution = global_dist
+
+                def _get_norm(q_val):
+                    try:
+                        return compute_normalized_rating(float(q_val), distribution)
+                    except (TypeError, ValueError):
+                        return 0
+                df['normalized_rating'] = df['quality'].apply(_get_norm)
+
+            else:  # per_folder (default)
+                distribution = folder_dist
+
+                def _get_norm(q_val):
+                    try:
+                        return compute_normalized_rating(float(q_val), distribution)
+                    except (TypeError, ValueError):
+                        return 0
+                df['normalized_rating'] = df['quality'].apply(_get_norm)
+
+            df.to_csv(csv_path, index=False)
+
+            normalized_map = {
+                str(row['filename']): int(row['normalized_rating'])
+                for _, row in df.iterrows()
+                if 'filename' in df.columns
+            }
+            print(f'[API] apply_normalization({folder_path!r}, mode={mode!r}) -> {len(normalized_map)} rows updated', flush=True)
+            return {
+                'success': True,
+                'normalized_ratings': normalized_map,
+                'mode_used': mode,
+                'error': '',
+            }
+        except Exception as e:
+            print(f'[API] apply_normalization() -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e), 'normalized_ratings': {}, 'mode_used': ''}
+
     def open_folder(self, path: str):
         """Open a folder in the system file browser (pywebview desktop mode)."""
         try:

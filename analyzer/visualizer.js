@@ -523,9 +523,11 @@
     function ensureRatingColumns() {
       if (!header.includes('rating')) header.push('rating');
       if (!header.includes('rating_origin')) header.push('rating_origin');
+      if (!header.includes('normalized_rating')) header.push('normalized_rating');
       for (const r of rows) {
         if (!('rating' in r)) r.rating = '';
         if (!('rating_origin' in r)) r.rating_origin = '';
+        if (!('normalized_rating' in r)) r.normalized_rating = '';
       }
     }
 
@@ -606,8 +608,16 @@
     }
 
     function getRating(row) {
-      const n = parseInt(row?.rating, 10);
-      return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      // For manually-rated photos, always honour the user's explicit rating.
+      if (String(row?.rating_origin).toLowerCase() === 'manual') {
+        const n = parseInt(row?.rating, 10);
+        return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
+      }
+      // For auto-rated photos prefer normalized_rating (falls back to raw rating).
+      const norm = parseInt(row?.normalized_rating, 10);
+      if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
+      const raw = parseInt(row?.rating, 10);
+      return Number.isFinite(raw) ? Math.max(0, Math.min(5, raw)) : 0;
     }
     function getOrigin(row) {
       const s = String(row?.rating_origin || '').toLowerCase();
@@ -1667,6 +1677,9 @@
         }
       };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
+      // Rating normalization
+      const normSelect = document.getElementById('ratingNormalization');
+      if (normSelect) normSelect.value = getSetting('rating_normalization', 'per_folder');
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
       const cb = document.getElementById('settingsAnalyticsOptIn');
@@ -1691,11 +1704,15 @@
       const customEditorPath = document.getElementById('customEditorPath').value.trim();
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
+      const normalizationEl = document.getElementById('ratingNormalization');
+      const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
+      const prevNormalization = existing.rating_normalization || 'per_folder';
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
-        analytics_opted_in: analyticsOptIn, analytics_consent_shown: true
+        analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
+        rating_normalization: ratingNormalization,
       };
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
@@ -1711,6 +1728,34 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
+      // If normalization mode changed and folders are loaded, reapply immediately
+      if (ratingNormalization !== prevNormalization && rows.length > 0) {
+        await reapplyNormalizationForLoadedFolders();
+      }
+    }
+
+    /** Recompute normalized_rating for every currently-loaded folder and refresh the view. */
+    async function reapplyNormalizationForLoadedFolders() {
+      if (!hasPywebviewApi || !window.pywebview?.api?.apply_normalization) return;
+      // Collect the unique root paths of all loaded rows
+      const folderPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
+      if (folderPaths.length === 0) return;
+      for (const p of folderPaths) {
+        try {
+          const res = await window.pywebview.api.apply_normalization(p);
+          if (res?.success && res?.normalized_ratings) {
+            const mapping = res.normalized_ratings;
+            for (const r of rows) {
+              if (r.__rootPath === p && r.filename in mapping) {
+                r.normalized_rating = String(mapping[r.filename]);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[normalization] Failed for', p, e);
+        }
+      }
+      await renderScenes();
     }
 
     document.getElementById('openSettings').addEventListener('click', showSettings);
@@ -3672,6 +3717,10 @@
         const folderName = p.replace(/.*[/\\]/, '');
         showProgress(`Loading ${i + 1} / ${total}: ${folderName}`, (i / total) * 90);
         try {
+          // Ensure normalized_rating is up to date before reading
+          if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+            try { await window.pywebview.api.apply_normalization(p); } catch (_) { }
+          }
           const result = await window.pywebview.api.read_kestrel_csv(p);
           if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
           if (!result.success) continue;
@@ -3716,6 +3765,11 @@
       if (!folderPath) return;
 
       try {
+        // Ensure normalized_rating is up to date before reading the CSV
+        if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+          try { await window.pywebview.api.apply_normalization(folderPath); } catch (_) { }
+        }
+
         // Use pywebview API to read the CSV file
         const result = await window.pywebview.api.read_kestrel_csv(folderPath);
 

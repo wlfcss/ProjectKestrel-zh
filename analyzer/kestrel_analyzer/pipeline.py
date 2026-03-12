@@ -16,6 +16,8 @@ from .config import (
     WILDLIFE_CATEGORIES,
     MODELS_DIR,
     KESTREL_DIR_NAME,
+    METADATA_FILENAME,
+    VERSION,
 )
 from .database import load_database, save_database
 print("Importing read_image from image_utils...")
@@ -626,6 +628,61 @@ class AnalysisPipeline:
                     except Exception: pass
                 except Exception:
                     pass
+
+            # === Post-analysis: compute quality distribution and normalized ratings ===
+            stage_ctx["stage"] = "post_analysis_normalization"
+            try:
+                from .ratings import compute_quality_distribution, compute_normalized_rating
+                if not database.empty and "quality" in database.columns:
+                    quality_scores = database["quality"].tolist()
+                    distribution = compute_quality_distribution(quality_scores)
+
+                    # Apply per-folder normalization as the default normalized rating
+                    database["normalized_rating"] = database["quality"].apply(
+                        lambda q: compute_normalized_rating(
+                            float(q) if (q is not None and str(q) not in ("", "nan")) else -1,
+                            distribution,
+                        )
+                    )
+                    save_database(database, db_path)
+
+                    # Store distribution in kestrel_metadata.json
+                    metadata_path = os.path.join(kestrel_dir, METADATA_FILENAME)
+                    try:
+                        import json as _json
+                        if os.path.exists(metadata_path):
+                            with open(metadata_path, "r", encoding="utf-8") as mf:
+                                _meta = _json.load(mf)
+                        else:
+                            _meta = {"version": VERSION, "analyzer": analyzer_name}
+                        _meta["quality_distribution"] = distribution
+                        _meta["quality_distribution_stored"] = True
+                        with open(metadata_path, "w", encoding="utf-8") as mf:
+                            _json.dump(_meta, mf, indent=2)
+                    except Exception as _meta_e:
+                        log_warning(
+                            self._log_path,
+                            f"Failed to write quality distribution to metadata: {_meta_e}",
+                            stage="post_analysis_normalization",
+                        )
+
+                log_event(
+                    self._log_path,
+                    {
+                        "level": "info",
+                        "event": "analysis_complete",
+                        "folder": folder,
+                        "total_files": len(database),
+                    },
+                )
+                if status_cb:
+                    status_cb("Analysis complete.")
+            except Exception as _post_e:
+                log_warning(
+                    self._log_path,
+                    f"Post-analysis normalization failed: {_post_e}",
+                    stage="post_analysis_normalization",
+                )
 
         except Exception as e:
             log_exception(
