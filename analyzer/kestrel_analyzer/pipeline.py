@@ -445,7 +445,7 @@ class AnalysisPipeline:
                         continue
 
                     # Store top-5 raw MaskRCNN detection confidence scores
-                    entry["detection_scores"] = json.dumps(sorted(pred_score, reverse=True)[:5])
+                    entry["detection_scores"] = json.dumps([float(s) for s in sorted(pred_score, reverse=True)[:5]])
 
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in active_wildlife_categories]
                     bird_indices = [i for i, c in enumerate(pred_class) if c == "bird"]
@@ -596,9 +596,9 @@ class AnalysisPipeline:
                             }
                         )
                         all_species = [b["species"] for b in bird_data]
-                        all_species_conf = [b["species_confidence"] for b in bird_data]
+                        all_species_conf = [float(b["species_confidence"]) for b in bird_data]
                         all_families = [b["family"] for b in bird_data]
-                        all_family_conf = [b["family_confidence"] for b in bird_data]
+                        all_family_conf = [float(b["family_confidence"]) for b in bird_data]
                         entry.update(
                             {
                                 "secondary_species_list": json.dumps(all_species),

@@ -900,7 +900,6 @@ class Api:
             if not isinstance(paths, list):
                 return {'success': False, 'error': 'paths must be a list'}
             paths = [str(p).strip() for p in paths if p]
-            from .settings_utils import load_persisted_settings
             sett = load_persisted_settings()
             detection_threshold = float(sett.get('detection_threshold', 0.75))
             detection_threshold = max(0.1, min(0.99, detection_threshold))
