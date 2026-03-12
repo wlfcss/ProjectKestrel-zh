@@ -638,7 +638,7 @@
       const thresholdEl = el('#speciesConf');
       const confThreshold = thresholdEl ? (parseFloat(thresholdEl.value) || 0) : 0;
       const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
-      const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
+      const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', false);
       return _computeSceneTagsFromRows(getSceneRows(sceneId), confThreshold, includeSecondary, true);
     }
 
@@ -842,9 +842,9 @@
       const sortBy = el('#sortBy').value;
       const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
       const groupByFolder = document.getElementById('groupByFolder')?.checked ?? getSetting('groupByFolder', true);
-      const groupByTime = document.getElementById('groupByTime')?.checked ?? getSetting('groupByTime', false);
+      const groupByTime = document.getElementById('groupByTime')?.checked ?? getSetting('groupByTime', true);
       const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
-      const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', true);
+      const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', false);
       const includeFamilies = true;
       scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
@@ -1765,7 +1765,7 @@
       const minC = parseFloat(el('#speciesConf').value) || 0;
       const search = el('#search').value;
       const sortBy = el('#sortBy').value;
-      const includeSecondary = document.getElementById('includeSecondarySpecies')?.checked ?? true;
+      const includeSecondary = document.getElementById('includeSecondarySpecies')?.checked ?? false;
       const all = aggregateScenes(minC, search, sortBy, includeSecondary, true);
       return all.find(s => String(s.id) === String(sceneId));
     }
@@ -4540,7 +4540,7 @@
     (function initGroupByTime() {
       const t = document.getElementById('groupByTime');
       if (!t) return;
-      try { t.checked = getSetting('groupByTime', false); } catch { }
+      try { t.checked = getSetting('groupByTime', true); } catch { }
       t.addEventListener('change', () => {
         const s = loadSettings(); s.groupByTime = !!t.checked; saveSettings(s); renderScenes();
       });
@@ -4609,7 +4609,7 @@
     (function initIncludeSecondary() {
       const t = document.getElementById('includeSecondarySpecies');
       if (!t) return;
-      try { t.checked = getSetting('includeSecondarySpecies', true); } catch { }
+      try { t.checked = getSetting('includeSecondarySpecies', false); } catch { }
       t.addEventListener('change', () => {
         const s = loadSettings(); s.includeSecondarySpecies = !!t.checked; saveSettings(s); renderScenes();
       });
