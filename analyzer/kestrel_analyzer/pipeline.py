@@ -82,16 +82,26 @@ class AnalysisPipeline:
 
     @staticmethod
     def _compute_exposure_stops(img: np.ndarray, mask: np.ndarray) -> float:
-        """Compute how many stops of exposure correction are needed to bring
-        the masked subject region to a perceptual middle-grey target.
+        """Estimate exposure correction in stops for the masked subject region.
 
-        Returns 0.0 when no correction is needed (|stops| < 0.5) or when
-        the region is too dark to correct reliably.  Otherwise returns a
-        value in [-2.5, +2.5] (positive = lift underexposed, negative = pull
-        overexposed).
+        This is histogram-aware (percentile based), not mean-only. It balances
+        two goals:
+        1) center subject mid-tones toward a neutral target, and
+        2) protect highlight/shadow detail in mixed-contrast scenes.
+
+        Returns a value in [-1.75, +2.5] where positive lifts exposure and
+        negative pulls it down.
         """
-        TARGET_LUMINANCE = 0.50  # slightly below true middle-grey (0.5)
-        MIN_MEAN = 1e-3           # avoid log2(0) on near-black crops
+        EPS = 1e-3
+        TARGET_MID = 0.42
+        TARGET_HI_P90 = 0.90
+        TARGET_HI_P98 = 0.975
+        TARGET_HI_P95_HOT = 0.88
+        SHADOW_FLOOR_P10 = 0.06
+        CLIP_THRESH = 0.985
+        HOT_CLIP_RATIO = 0.02
+        MAX_DARKEN = -1.75
+        MAX_BRIGHTEN = 2.5
         try:
             img_f = img.astype(np.float32) / 255.0
             mask_bool = mask.astype(bool) if mask is not None else None
@@ -106,12 +116,34 @@ class AnalysisPipeline:
                 pixels = img_f.reshape(-1, 3)
             # Perceptual luminance weights (Rec. 709)
             lum = 0.2126 * pixels[:, 0] + 0.7152 * pixels[:, 1] + 0.0722 * pixels[:, 2]
-            mean_lum = float(np.mean(lum))
-            if mean_lum < MIN_MEAN:
+            lum = lum[np.isfinite(lum)]
+            if lum.size == 0:
                 return 0.0
-            stops = float(np.log2(TARGET_LUMINANCE / mean_lum))
-            stops = float(np.clip(stops, -1.25, 3.0))
-            if abs(stops) < 0.5:
+            p10, p50, p90, p95, p98 = np.percentile(lum, [10, 50, 90, 95, 98])
+            clip_ratio = float(np.mean(lum >= CLIP_THRESH))
+
+            # Midtone intent (robust against small bright outliers).
+            mid_stop = float(np.log2(TARGET_MID / max(float(p50), EPS)))
+
+            # Highlight ceilings prevent over-bright outputs.
+            hi90_stop = float(np.log2(TARGET_HI_P90 / max(float(p90), EPS)))
+            hi98_stop = float(np.log2(TARGET_HI_P98 / max(float(p98), EPS)))
+            highlight_ceiling = min(hi90_stop, hi98_stop, MAX_BRIGHTEN)
+
+            # Shadow floor prevents excessive darkening in high dynamic-range masks.
+            shadow_floor = max(MAX_DARKEN, float(np.log2(SHADOW_FLOOR_P10 / max(float(p10), EPS))))
+
+            # Start from midtone intent, then clamp by highlight/shadow guardrails.
+            stops = float(np.clip(mid_stop, shadow_floor, highlight_ceiling))
+
+            # If a meaningful chunk is clipped/highlight-hot, bias a little darker
+            # to recover structure in bright regions.
+            if clip_ratio >= HOT_CLIP_RATIO:
+                hot_stop = float(np.log2(TARGET_HI_P95_HOT / max(float(p95), EPS)))
+                stops = min(stops, hot_stop)
+                stops = float(np.clip(stops, MAX_DARKEN, MAX_BRIGHTEN))
+
+            if not np.isfinite(stops):
                 return 0.0
             return stops
         except Exception:
