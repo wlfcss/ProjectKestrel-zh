@@ -945,7 +945,7 @@
           chips.classList.add('chips-approved');
           const approvedBadge = document.createElement('span');
           approvedBadge.className = 'chip manual-approved scene-approved-badge';
-          approvedBadge.textContent = 'Approved';
+          approvedBadge.textContent = 'Reviewed';
           meta.appendChild(approvedBadge);
         }
         for (const sp of s.species.slice(0, 3)) {
@@ -1503,7 +1503,7 @@
       let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
       if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
       html += `</div>`;
-      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually approved</span>' : ''}</div>`;
+      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
 
       // Species chips
       html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
