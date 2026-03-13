@@ -1216,11 +1216,16 @@
     let sceneZoomRow = null;
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
-    const sceneRawCache = new Map();   // (rootPath|filename) -> base64 data URL
+    const sceneRawCache = new Map();   // unique row key -> blob URL
     const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
 
     function getSceneRawCacheKey(row) {
-      return (row.__rootPath || '') + '|' + (row.filename || '');
+      return [
+        row.__rootPath || '',
+        row.filename || '',
+        row.export_path || '',
+        row.crop_path || ''
+      ].join('|');
     }
 
     function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
@@ -1248,7 +1253,7 @@
           row.filename, row.__rootPath || '', expCorr
         );
         if (res && res.success && res.data) {
-          const url = `data:image/jpeg;base64,${res.data}`;
+          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           sceneRawCache.set(key, url);
           // Upgrade preview if this row is still the active zoom row
           if (sceneZoomActive && sceneZoomRow === row) {

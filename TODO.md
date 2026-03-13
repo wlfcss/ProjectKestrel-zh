@@ -2,6 +2,7 @@
 * Investigate GPU support from recent pull request #14
 * Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
+* Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 
 Bugs
 * Exposure normalization step isn't really working right. Should target a histogram or make it histogram based (see kingbird photos, etc)
@@ -15,7 +16,7 @@ Bugs
 * May want to consider tightening mask probability threshold in mask-rcnn ?
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024)
 * The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
-* Split scene issue --> doesn't re-merge scenes.
+* Split scene issue --> Doesn't exactly save automatically..
 * Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
 * Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
 --> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.

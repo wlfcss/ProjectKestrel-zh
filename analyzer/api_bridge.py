@@ -1177,7 +1177,10 @@ class Api:
         from io import BytesIO
 
         try:
+            # Normalize separators from CSV/JS so macOS/Linux don't treat '\\' as a literal char.
+            filename = str(filename or '').replace('\\', '/')
             full_path = os.path.join(root_path, filename)
+            full_path = os.path.normpath(full_path)
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
             # Ensure the requested file is inside root_path (or exactly root_path).
@@ -1218,7 +1221,7 @@ class Api:
                 log(f'read_raw_full: Cache hit for {filename} (exp={exp_correction:+.3f})')
                 with open(cache_path, 'rb') as f:
                     b64 = base64.b64encode(f.read()).decode('ascii')
-                return {'success': True, 'data': b64}
+                return {'success': True, 'data': b64, 'mime': 'image/jpeg'}
 
             import rawpy
             from PIL import Image
@@ -1251,7 +1254,7 @@ class Api:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
             else:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cache disabled')
-            return {'success': True, 'data': b64}
+            return {'success': True, 'data': b64, 'mime': 'image/jpeg'}
         except Exception as e:
             log(f'read_raw_full error: {e}')
             return {'success': False, 'error': str(e)}

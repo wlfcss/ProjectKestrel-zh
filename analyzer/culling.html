@@ -1154,6 +1154,13 @@
     }
 
     // ---- Image loading ----
+    function _base64ToBlobUrl(b64, mime) {
+      const bin = atob(b64);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([buf], { type: mime || 'image/jpeg' }));
+    }
+
     async function getBlobUrl(relPath, root) {
       if (!relPath) return '';
       // Normalize path separators (convert backslashes to forward slashes on macOS)
@@ -1163,7 +1170,7 @@
       try {
         const res = await window.pywebview.api.read_image_file(relPath, root);
         if (res && res.success && res.data) {
-          const url = `data:${res.mime || 'image/jpeg'};base64,${res.data}`;
+          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           blobUrlCache.set(key, url);
           return url;
         }
@@ -2121,11 +2128,16 @@
     // ---- Preview zoom on click-drag ----
     let zoomActive = false;
     let zoomRow = null;
-    let rawCache = new Map();   // filename -> base64 data URL
+    let rawCache = new Map();   // unique row key -> blob URL
     let rawLoading = new Set(); // filename currently loading
 
     function getRawPreviewKey(row) {
-      return row.filename || '';
+      return [
+        rootPath || '',
+        row.filename || '',
+        row.export_path || '',
+        row.crop_path || ''
+      ].join('|');
     }
 
     function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
@@ -2225,7 +2237,7 @@
       try {
         const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
         if (res && res.success && res.data) {
-          const url = `data:image/jpeg;base64,${res.data}`;
+          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           rawCache.set(cacheKey, url);
           // If still zooming on this row, swap to the high-res source
           if (zoomActive && zoomRow === row) {
