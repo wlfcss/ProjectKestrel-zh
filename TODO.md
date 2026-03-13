@@ -5,9 +5,6 @@
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 
 Bugs
-* Exposure normalization step isn't really working right. Should target a histogram or make it histogram based (see kingbird photos, etc)
-* Exposure normalization should be global across all images - remove the minimum shift cap. 
-* Ratings are showing as 1 star by default for every single photo until a bit of database backlog happens. Fix this. 
 * Photos don't automaticallyroll in over time.
 * RAW preview seems downscaled in culling assistant clearly - something is broken there.
 * Some issues with underexposed birds being overcorrected too... Maybe just fix this exposure correction algorithm to just shift the extreme cases?
@@ -75,5 +72,7 @@ Whats working
 
 Next version changelog:
 * ETA calculation fails when resuming a folder that started to be analyzed.
-
 * Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
+* Exposure normalization should be global across all images - remove the minimum shift cap. 
+* Ratings are showing as 1 star by default for every single photo until a bit of database backlog happens. Fix this. 
+* Exposure normalization step isn't really working right. Should target a histogram or make it histogram based (see kingbird photos, etc)

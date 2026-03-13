@@ -1304,6 +1304,18 @@
       font-style: italic;
     }
 
+    /* In-progress analysis styling (purple italic text) */
+    .tree-node-row.in-progress .tree-label {
+      color: #b399cc;
+      font-style: italic;
+      font-weight: 600;
+      animation: pulse-purple 2s ease-in-out infinite;
+    }
+    @keyframes pulse-purple {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.75; }
+    }
+
     /* Context menu for folder tree */
     .kestrel-ctx-menu {
       position: fixed;

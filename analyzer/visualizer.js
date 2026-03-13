@@ -2923,11 +2923,16 @@
         return false;
       }
 
-      const effectiveHasKestrel = subtreeHasKestrel(node);
+      const norm = p => (p || '').replace(/\\/g, '/');
+      const normPath = norm(node.path);
+      const isInProgress = _inProgressFolderPaths.has(normPath);
+      
+      const effectiveHasKestrel = subtreeHasKestrel(node) || isInProgress; // Show checkbox for in-progress too
       const outdated = isVersionOutdated(node);
-      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '');
+      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '') + (isInProgress ? ' in-progress' : '');
       if (node.path === treeActivePath) row.classList.add('active');
-      if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
+      if (isInProgress) row.title = 'Currently analyzing...';
+      else if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
 
       // Arrow toggle
       const arrow = document.createElement('span');
@@ -2941,18 +2946,19 @@
         arrow.textContent = '▶';
       }
 
-      // Checkbox for loading ANALYZED folders (blue accent)
+      // Checkbox for loading ANALYZED folders OR in-progress folders (blue accent)
       let loadCheckbox = null;
-      if (node.has_kestrel) {
+      if (node.has_kestrel || isInProgress) {
         loadCheckbox = document.createElement('input');
         loadCheckbox.type = 'checkbox';
         loadCheckbox.className = 'tree-cb';
-        loadCheckbox.title = 'Include in multi-folder view';
+        loadCheckbox.title = isInProgress ? 'Include in multi-folder view (analyzing now)' : 'Include in multi-folder view';
         loadCheckbox.checked = checkedFolderPaths.has(node.path);
         loadCheckbox.addEventListener('change', (e) => {
           e.stopPropagation();
           if (loadCheckbox.checked) checkedFolderPaths.add(node.path);
           else checkedFolderPaths.delete(node.path);
+          _updateAutoRefreshTimers(); // Update auto-refresh for in-progress
           debouncedAutoLoad();
         });
       }
@@ -3562,6 +3568,26 @@
       }
       // Seed the dialog's selected set from any previously-queued paths
       _dlgSelected = new Set(queuedFolderPaths);
+      
+      // Try to restore last queue state if available
+      const savedQueue = getSetting('lastQueueState', null);
+      if (savedQueue && Array.isArray(savedQueue) && savedQueue.length > 0) {
+        const restoreBtn = document.getElementById('analyzeDlgRestoreQueue');
+        if (restoreBtn) {
+          restoreBtn.style.display = '';
+          restoreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _dlgSelected = new Set(savedQueue);
+            // Restore queue in settings so it looks restored
+            const s = loadSettings();
+            delete s.lastQueueState;
+            saveSettings(s);
+            restoreBtn.style.display = 'none';
+            refreshDlg();
+          }, { once: true }); // only trigger once per dialog open
+        }
+      }
+      
       _dlgExpandedPaths = new Set([folderTreeRootNode.path]);
       _dlgReanalyze = new Set();
 
@@ -3591,6 +3617,13 @@
     let _tempKestrelPaths = new Set(); // transiently-marked paths to prevent flicker
     let _analyticsConsentPending = false; // guard against showing consent dialog multiple times
     let _queueCountsTimer = null; // interval for updating folder counts from queue
+    
+    // In-progress folder tracking and auto-refresh for live updates
+    let _inProgressFolderPaths = new Set(); // folders with pending/running status
+    let _autoRefreshTimers = new Map(); // path -> intervalId for auto-refresh listeners
+    let _inProgressFoldersCheckedCount = 0; // count of in-progress folders that are checked
+    let _isFirstQueueStart = true; // used to detect Case 1 vs Case 2 for auto-load
+    
     // Session state for ETA calculations: track baseline state from folder inspection
     let _queueSessionStartState = new Map(); // path -> { initialProcessed: int, totalImages: int, toAnalyze: int }
     let _queueFolderInspections = new Map(); // path -> full inspection data from inspect_folder/inspect_folders
@@ -3886,26 +3919,55 @@
       }
       _queueLastDoneSet = nowDone;
 
-      // Detect newly-running items and schedule a targeted main-folder-tree update
+      // Update in-progress folder tracking and UI (pending + running folders)
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
+        const inProgressNow = new Set();
+        for (const item of items) {
+          if (item.status === 'pending' || item.status === 'running') {
+            inProgressNow.add(norm(item.path));
+          }
+        }
+        
+        // Detect newly-running items (first time moving from pending to running)
         const runningNow = new Set(items.filter(i => i.status === 'running').map(i => norm(i.path)));
         for (const p of runningNow) {
           if (!_queueLastRunningSet.has(p)) {
-            // Newly started — update the main folder tree for this path after 500ms
+            // Move out of pending and into running — implement Case 1 logic
+            _handleFirstFolderAnalysisStart(p);
+          }
+        }
+        _queueLastRunningSet = runningNow;
+        
+        // Update in-progress set and refresh tree styling
+        _inProgressFolderPaths = inProgressNow;
+        updateInProgressFoldersInTree();
+        _updateAutoRefreshTimers();
+        
+        // Newly-starting items: update the main folder tree after 500ms delay
+        for (const p of inProgressNow) {
+          if (!_queueLastRunningSet.has(p)) {
             setTimeout(() => {
               try {
-                // Only touch the main folder tree when it's visible
                 if (!folderTreeRootNode) return;
-                const rootNorm = norm(folderTreeRootNode.path || '');
-                if (!p.startsWith(rootNorm)) return; // outside current tree
                 updateFolderTreeNode(p);
               } catch (e) { /* ignore */ }
             }, 500);
           }
         }
-        _queueLastRunningSet = runningNow;
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.warn('[queue] in-progress tracking error:', e); }
+
+      // Remove auto-refresh timers for finished folders
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        const nowDone = new Set(items.filter(i => i.status === 'done').map(i => norm(i.path)));
+        for (const p of nowDone) {
+          if (_autoRefreshTimers.has(p)) {
+            clearInterval(_autoRefreshTimers.get(p));
+            _autoRefreshTimers.delete(p);
+          }
+        }
+      } catch (e) { console.warn('[timer] cleanup error:', e); }
 
       // Update live dialog if open
       if (_liveAnalysisDlgOpen) {
@@ -4007,6 +4069,12 @@
     function stopPollingQueue() {
       if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
       stopAutoRefresh();
+      // Cleanup auto-refresh timers for in-progress folders
+      for (const timerId of _autoRefreshTimers.values()) {
+        clearInterval(timerId);
+      }
+      _autoRefreshTimers.clear();
+      _inProgressFolderPaths.clear();
       // Cleanup session state
       _queueSessionStartState.clear();
       _queueFolderInspections.clear();
@@ -4337,6 +4405,107 @@
         } catch (e) { /* ignore */ }
         renderFolderTree();
       } catch (_) { }
+    }
+
+    /** Update UI to reflect in-progress folders with special styling and always-present checkboxes. */
+    function updateInProgressFoldersInTree() {
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        for (const inProgPath of _inProgressFolderPaths) {
+          const normPath = norm(inProgPath);
+          const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
+          for (const row of rows) {
+            const rp = norm(row.dataset.path || '');
+            if (rp !== normPath) continue;
+            
+            // Mark as in-progress with purple styling
+            row.classList.add('in-progress');
+            _tempKestrelPaths.add(normPath); // prevent checkbox removal on next rescan
+            
+            // Ensure checkbox exists (even if .kestrel doesn't)
+            if (!row.querySelector('.tree-cb')) {
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.className = 'tree-cb';
+              cb.title = 'Include in multi-folder view (analyzing now)';
+              cb.checked = checkedFolderPaths.has(row.dataset.path);
+              cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                if (cb.checked) checkedFolderPaths.add(row.dataset.path);
+                else checkedFolderPaths.delete(row.dataset.path);
+                _updateAutoRefreshTimers();
+                debouncedAutoLoad();
+              });
+              // Find icon and insert before it
+              const icon = row.querySelector('.tree-icon');
+              if (icon && icon.parentNode) icon.parentNode.insertBefore(cb, icon);
+              else row.insertBefore(cb, row.firstChild);
+            }
+          }
+        }
+      } catch (e) { console.warn('[tree] updateInProgressFoldersInTree error:', e); }
+    }
+
+    /** Start or stop auto-refresh timers for checked in-progress folders. */
+    function _updateAutoRefreshTimers() {
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        
+        // Stop timers for folders that are no longer checked or in-progress
+        for (const [path, timerId] of _autoRefreshTimers.entries()) {
+          const isStillInProgress = _inProgressFolderPaths.has(path);
+          const isStillChecked = checkedFolderPaths.has(path);
+          if (!isStillInProgress || !isStillChecked) {
+            clearInterval(timerId);
+            _autoRefreshTimers.delete(path);
+          }
+        }
+        
+        // Start timers for newly-checked in-progress folders
+        for (const inProgPath of _inProgressFolderPaths) {
+          if (checkedFolderPaths.has(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
+            // Auto-refresh every 10 seconds while folder is in progress and checked
+            const timerId = setInterval(async () => {
+              try {
+                // Reload the data for this folder (debounced to avoid thrashing)
+                debouncedAutoLoad();
+              } catch (e) { console.warn('[refresh] auto-refresh error:', e); }
+            }, 10000);
+            _autoRefreshTimers.set(inProgPath, timerId);
+          }
+        }
+      } catch (e) { console.warn('[timer] _updateAutoRefreshTimers error:', e); }
+    }
+
+    /** Count how many analyzed (non-in-progress) folders exist in the tree. */
+    function countAnalyzedFolders() {
+      try {
+        let count = 0;
+        function traverse(n) {
+          if (!n) return;
+          if (n.has_kestrel && !_inProgressFolderPaths.has(n.path)) count++;
+          (n.children || []).forEach(c => traverse(c));
+        }
+        traverse(folderTreeRootNode);
+        return count;
+      } catch (e) { return 0; }
+    }
+
+    /** Implement Case 1 logic: if first folder starts analysis and no other analyzed folders exist, auto-load it. */
+    async function _handleFirstFolderAnalysisStart(folderPath) {
+      try {
+        if (!_isFirstQueueStart) return; // only on first start
+        _isFirstQueueStart = false;
+        
+        const analyzedCount = countAnalyzedFolders();
+        if (analyzedCount === 0) {
+          // Case 1: Auto-check and auto-load the in-progress folder
+          checkedFolderPaths.add(folderPath);
+          renderFolderTree();
+          await debouncedAutoLoad();
+          setStatus('Auto-loaded in-progress folder (Case 1: no other analyzed folders)');
+        }
+      } catch (e) { console.warn('[case1] error:', e); }
     }
 
     // ── End Analysis Queue ────────────────────────────────────────────────────────
@@ -4955,6 +5124,12 @@
     const analyzeDlgCancel = document.getElementById('analyzeDlgCancel');
     if (analyzeDlgCancel) {
       analyzeDlgCancel.addEventListener('click', () => {
+        // Save the current selection so user can restore it on next dialog open
+        if (_dlgSelected && _dlgSelected.size > 0) {
+          const s = loadSettings();
+          s.lastQueueState = Array.from(_dlgSelected);
+          saveSettings(s);
+        }
         document.getElementById('analyzeQueueDlg').close();
       });
     }
@@ -5031,6 +5206,11 @@
           if (result && result.success) {
             queuedFolderPaths.clear();
             _dlgSelected.clear();
+            _isFirstQueueStart = true; // reset for Case 1 logic on next queue start
+            // Clear saved queue state since we're starting a new queue
+            const s = loadSettings();
+            delete s.lastQueueState;
+            saveSettings(s);
             // Clear session state for new queue start, so ETA calculations use fresh folder inspections
             _queueSessionStartState.clear();
             _queueFolderInspections.clear();
