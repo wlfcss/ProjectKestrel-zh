@@ -602,6 +602,14 @@
       backface-visibility: hidden;
       transform-style: preserve-3d;
     }
+    .preview-img-box.zoom-active canvas.zoom-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
     .preview-img-box.raw-loaded::after {
       content: 'RAW';
       position: absolute;
@@ -2128,6 +2136,8 @@
     // ---- Preview zoom on click-drag ----
     let zoomActive = false;
     let zoomRow = null;
+    let zoomThumbEl = null;
+    let zoomLastX = 0, zoomLastY = 0;
     let rawCache = new Map();   // unique row key -> blob URL
     let rawLoading = new Set(); // filename currently loading
 
@@ -2143,6 +2153,9 @@
     function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
       zoomActive = true;
       zoomRow = row;
+      zoomThumbEl = thumbEl;
+      zoomLastX = mouseEv.clientX;
+      zoomLastY = mouseEv.clientY;
       thumbDragPixels = 0;
 
       const exportBox = el('#previewExport');
@@ -2165,6 +2178,11 @@
           img.src = cachedRaw;
           img.dataset.isRaw = '1';
           img.style.imageRendering = 'crisp-edges';
+          img.onload = () => {
+            if (zoomActive && zoomRow === row && zoomThumbEl === thumbEl) {
+              applyZoomTransform(img, thumbEl, zoomLastX, zoomLastY, getScale());
+            }
+          };
           exportBox.appendChild(img);
           exportBox.classList.add('raw-loaded');
         } else if (!img) {
@@ -2176,6 +2194,11 @@
             img = document.createElement('img');
             img.src = url;
             img.style.imageRendering = 'crisp-edges';
+            img.onload = () => {
+              if (zoomActive && zoomRow === row && zoomThumbEl === thumbEl) {
+                applyZoomTransform(img, thumbEl, zoomLastX, zoomLastY, getScale());
+              }
+            };
             exportBox.appendChild(img);
           }
         }
@@ -2196,6 +2219,8 @@
       const startX = mouseEv.clientX, startY = mouseEv.clientY;
       const onMove = (ev) => {
         if (!zoomActive) return;
+        zoomLastX = ev.clientX;
+        zoomLastY = ev.clientY;
         thumbDragPixels = Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY);
         const s = getScale();
         const curImg = el('#previewExport')?.querySelector('img');
@@ -2205,13 +2230,17 @@
       const onUp = () => {
         zoomActive = false;
         zoomRow = null;
+        zoomThumbEl = null;
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         const box = el('#previewExport');
         box.classList.remove('zoom-active');
         box.classList.remove('raw-loaded');
+        const canvas = box.querySelector('canvas.zoom-canvas');
+        if (canvas) canvas.remove();
         const curImg = box.querySelector('img');
         if (curImg) {
+          curImg.style.visibility = '';
           curImg.style.transform = '';
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
@@ -2223,11 +2252,52 @@
     }
 
     function applyZoomTransform(img, thumbEl, clientX, clientY, scale) {
+      if (!img || !thumbEl) return;
+      const box = el('#previewExport');
+      if (!box) return;
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      if (!iw || !ih) return;
+
       const rect = thumbEl.getBoundingClientRect();
-      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
-      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
-      img.style.transform = `scale(${scale})`;
-      img.style.transformOrigin = `${xPct}% ${yPct}%`;
+      const xNorm = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const yNorm = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+      const z = Math.max(1, Number(scale) || 1);
+      let cropW = Math.max(1, iw / z);
+      let cropH = Math.max(1, ih / z);
+
+      const dpr = window.devicePixelRatio || 1;
+      const targetW = Math.max(1, Math.round(box.clientWidth * dpr));
+      const targetH = Math.max(1, Math.round(box.clientHeight * dpr));
+      const boxAspect = targetW / targetH;
+      if (cropW / cropH > boxAspect) cropW = cropH * boxAspect;
+      else cropH = cropW / boxAspect;
+
+      let sx = xNorm * iw - cropW * 0.5;
+      let sy = yNorm * ih - cropH * 0.5;
+      sx = Math.max(0, Math.min(iw - cropW, sx));
+      sy = Math.max(0, Math.min(ih - cropH, sy));
+
+      let canvas = box.querySelector('canvas.zoom-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'zoom-canvas';
+        box.appendChild(canvas);
+      }
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      img.style.visibility = 'hidden';
     }
 
     async function loadRawAsync(row) {
@@ -2245,8 +2315,16 @@
             if (img) {
               img.src = url;
               img.dataset.isRaw = '1';
+              img.onload = () => {
+                if (zoomActive && zoomRow === row && zoomThumbEl) {
+                  applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, parseInt(el('#previewZoomSlider')?.value || '5', 10));
+                }
+              };
               img.title = 'RAW (full resolution)';
               el('#previewExport')?.classList.add('raw-loaded');
+              if (zoomThumbEl) {
+                applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, parseInt(el('#previewZoomSlider')?.value || '5', 10));
+              }
             }
           }
         }
@@ -2266,10 +2344,8 @@
         if (label) label.textContent = slider.value + '\u00d7';
         if (zoomActive) {
           const img = el('#previewExport')?.querySelector('img');
-          if (img) {
-            const scale = parseInt(slider.value, 10);
-            img.style.transform = `scale(${scale})`;
-          }
+          const scale = parseInt(slider.value, 10);
+          if (img && zoomThumbEl) applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, scale);
         }
       });
     })();

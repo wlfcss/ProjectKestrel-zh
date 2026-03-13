@@ -958,6 +958,14 @@
       backface-visibility: hidden;
       transform-style: preserve-3d;
     }
+    .right .preview.zoom-active canvas.scene-zoom-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
     .right .preview.raw-loaded::after {
       content: attr(data-raw-label);
       position: absolute;

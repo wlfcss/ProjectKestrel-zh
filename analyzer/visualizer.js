@@ -1214,6 +1214,7 @@
     // ---- Scene dialog RAW zoom (click-drag on thumbnail → zoom in previewBox) ----
     let sceneZoomActive = false;
     let sceneZoomRow = null;
+    let sceneZoomThumbEl = null;
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
     const sceneRawCache = new Map();   // unique row key -> blob URL
@@ -1229,11 +1230,52 @@
     }
 
     function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
+      if (!imgEl || !thumbEl) return;
+      const box = imgEl.closest('#previewBox');
+      if (!box) return;
+      const iw = imgEl.naturalWidth || imgEl.width;
+      const ih = imgEl.naturalHeight || imgEl.height;
+      if (!iw || !ih) return;
+
       const rect = thumbEl.getBoundingClientRect();
-      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
-      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
-      imgEl.style.transform = `scale(${scale})`;
-      imgEl.style.transformOrigin = `${xPct}% ${yPct}%`;
+      const xNorm = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const yNorm = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+      const z = Math.max(1, Number(scale) || 1);
+      let cropW = Math.max(1, iw / z);
+      let cropH = Math.max(1, ih / z);
+
+      const dpr = window.devicePixelRatio || 1;
+      const targetW = Math.max(1, Math.round(box.clientWidth * dpr));
+      const targetH = Math.max(1, Math.round(box.clientHeight * dpr));
+      const boxAspect = targetW / targetH;
+      if (cropW / cropH > boxAspect) cropW = cropH * boxAspect;
+      else cropH = cropW / boxAspect;
+
+      let sx = xNorm * iw - cropW * 0.5;
+      let sy = yNorm * ih - cropH * 0.5;
+      sx = Math.max(0, Math.min(iw - cropW, sx));
+      sy = Math.max(0, Math.min(ih - cropH, sy));
+
+      let canvas = box.querySelector('canvas.scene-zoom-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'scene-zoom-canvas';
+        box.appendChild(canvas);
+      }
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imgEl, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      imgEl.style.visibility = 'hidden';
     }
 
     function formatExposureEv(v) {
@@ -1262,8 +1304,16 @@
             if (curImg) {
               curImg.src = url;
               curImg.dataset.isRaw = '1';
+              curImg.onload = () => {
+                if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl) {
+                  applySceneZoomTransform(curImg, sceneZoomThumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+                }
+              };
               if (box) box.dataset.rawLabel = `RAW (${formatExposureEv(expCorr)} EV)`;
               box.classList.add('raw-loaded');
+              if (sceneZoomThumbEl) {
+                applySceneZoomTransform(curImg, sceneZoomThumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+              }
             }
           }
         }
@@ -1277,6 +1327,7 @@
     function startSceneZoomPreview(row, thumbEl, mouseEv) {
       sceneZoomActive = true;
       sceneZoomRow = row;
+      sceneZoomThumbEl = thumbEl;
       const key = getSceneRawCacheKey(row);
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
@@ -1291,6 +1342,11 @@
         const stub = document.createElement('img');
         stub.src = thumbImgSrc;
         stub.style.imageRendering = 'crisp-edges';
+        stub.onload = () => {
+          if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+            applySceneZoomTransform(stub, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+          }
+        };
         previewBox.appendChild(stub);
         applySceneZoomTransform(stub, thumbEl, mouseEv.clientX, mouseEv.clientY, sceneZoomScale);
       }
@@ -1305,6 +1361,11 @@
           imgEl.src = cachedRaw;
           imgEl.dataset.isRaw = '1';
           imgEl.style.imageRendering = 'crisp-edges';
+          imgEl.onload = () => {
+            if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+              applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+            }
+          };
           previewBox.appendChild(imgEl);
           previewBox.classList.add('raw-loaded');
           applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
@@ -1316,6 +1377,11 @@
             const imgEl = document.createElement('img');
             imgEl.src = url;
             imgEl.style.imageRendering = 'crisp-edges';
+            imgEl.onload = () => {
+              if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+                applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+              }
+            };
             previewBox.appendChild(imgEl);
             applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
           }
@@ -1360,13 +1426,17 @@
       const onUp = () => {
         sceneZoomActive = false;
         sceneZoomRow = null;
+        sceneZoomThumbEl = null;
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         window.removeEventListener('wheel', onWheel);
         const box = el('#previewBox');
         box.classList.remove('zoom-active', 'raw-loaded');
+        const canvas = box?.querySelector('canvas.scene-zoom-canvas');
+        if (canvas) canvas.remove();
         const curImg = box?.querySelector('img');
         if (curImg) {
+          curImg.style.visibility = '';
           curImg.style.transform = '';
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
