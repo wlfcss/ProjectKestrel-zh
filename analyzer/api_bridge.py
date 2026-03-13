@@ -7,6 +7,7 @@ and serves as the bridge between the web UI and native OS operations.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import shutil
@@ -1179,7 +1180,8 @@ class Api:
             full_path = os.path.join(root_path, filename)
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
-            if not full_path_real.startswith(root_path_real):
+            # Ensure the requested file is inside root_path (or exactly root_path).
+            if full_path_real != root_path_real and not full_path_real.startswith(root_path_real + os.sep):
                 return {'success': False, 'error': 'Path escapes root directory'}
             if not os.path.exists(full_path):
                 return {'success': False, 'error': f'File not found: {filename}'}
@@ -1198,11 +1200,15 @@ class Api:
             exp_correction = max(-1.5, min(3.0, exp_correction))
 
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
+            # Cache key includes relative path + extension + file identity (+ exposure)
+            # so we never reuse another image's preview when basenames collide.
+            file_stat = os.stat(full_path)
+            rel_for_key = os.path.normpath(os.path.relpath(full_path_real, root_path_real)).replace('\\', '/')
+            exp_key = f'{exp_correction:+.3f}' if abs(exp_correction) > 0.01 else '0.000'
+            key_material = f'{rel_for_key}|{ext}|{int(file_stat.st_mtime_ns)}|{int(file_stat.st_size)}|{exp_key}'
+            cache_token = hashlib.sha1(key_material.encode('utf-8')).hexdigest()[:16]
             base = os.path.splitext(os.path.basename(filename))[0]
-            if abs(exp_correction) > 0.01:
-                cache_name = f"{base}_{exp_correction:+.3f}_preview.jpg"
-            else:
-                cache_name = f"{base}_preview.jpg"
+            cache_name = f'{base}_{cache_token}_preview.jpg'
             cache_path = os.path.join(cache_dir, cache_name)
 
             if os.path.exists(cache_path):
@@ -1239,7 +1245,7 @@ class Api:
 
             os.makedirs(cache_dir, exist_ok=True)
             buf = BytesIO()
-            img.save(buf, format='JPEG', quality=82, optimize=False, progressive=False)
+            img.save(buf, format='JPEG', quality=95, subsampling=0, optimize=True, progressive=False)
             jpg_bytes = buf.getvalue()
             with open(cache_path, 'wb') as f:
                 f.write(jpg_bytes)

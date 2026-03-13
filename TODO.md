@@ -19,6 +19,7 @@ Bugs
 * Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
 * Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
 --> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.
+* ETA calculation fails when resuming a folder that started to be analyzed.
     
 
 Whats working
