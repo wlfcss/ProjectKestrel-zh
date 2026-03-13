@@ -254,13 +254,13 @@
             </div>
           </div>
         </div>
-        <div class="preview" id="previewBox"><span class="muted">Hover a thumbnail…</span></div>
+        <label class="scene-zoom-topbar" id="sceneZoomWrap" title="Raw Zoom Level (press and hold for RAW preview)">
+          <span class="muted">Raw Zoom Level (press and hold for RAW preview)</span>
+          <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:100px">
+        </label>
+        <div class="preview" id="previewBox" data-raw-label="RAW"><span class="muted">Hover a thumbnail…</span></div>
         <div class="detail" id="previewInfo">—</div>
         <div class="footer">
-          <label class="inline" id="sceneZoomWrap" style="font-size:11px;display:none;gap:4px">
-            <span class="muted">Zoom</span>
-            <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:70px">
-          </label>
           <button id="editToggleBtn">Edit Species &amp; Tags…</button>
           <button id="splitSceneBtn">Split Scene…</button>
           <button id="closeDlg">Close</button>

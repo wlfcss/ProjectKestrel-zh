@@ -1227,6 +1227,14 @@
       imgEl.style.transformOrigin = `${xPct}% ${yPct}%`;
     }
 
+    function formatExposureEv(v) {
+      const n = parseFloat(v) || 0;
+      const abs = Math.abs(n);
+      if (abs < 0.005) return '+0.00';
+      const sign = n >= 0 ? '+' : '-';
+      return sign + abs.toFixed(2);
+    }
+
     async function loadSceneRawAsync(row) {
       const key = (row.__rootPath || '') + '|' + row.filename;
       sceneRawLoading.add(key);
@@ -1245,6 +1253,7 @@
             if (curImg) {
               curImg.src = url;
               curImg.dataset.isRaw = '1';
+              if (box) box.dataset.rawLabel = `RAW (${formatExposureEv(expCorr)} EV)`;
               box.classList.add('raw-loaded');
             }
           }
@@ -1262,6 +1271,7 @@
       const key = (row.__rootPath || '') + '|' + row.filename;
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
+      previewBox.dataset.rawLabel = `RAW (${formatExposureEv(row.exposure_correction)} EV)`;
       zoomLastX = mouseEv.clientX;
       zoomLastY = mouseEv.clientY;
 
@@ -1308,7 +1318,6 @@
       // Show zoom slider
       const zoomWrap = el('#sceneZoomWrap');
       const slider = el('#sceneZoomSlider');
-      if (zoomWrap) zoomWrap.style.display = '';
       if (slider) {
         slider.value = sceneZoomScale;
         slider.oninput = () => {
@@ -1350,7 +1359,7 @@
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
         }
-        if (zoomWrap) zoomWrap.style.display = 'none';
+        box.dataset.rawLabel = 'RAW';
       };
 
       window.addEventListener('mousemove', onMove);
