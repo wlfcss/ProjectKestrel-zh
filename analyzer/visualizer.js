@@ -3937,6 +3937,7 @@
             _handleFirstFolderAnalysisStart(p);
           }
         }
+        const prevRunningSet = _queueLastRunningSet;
         _queueLastRunningSet = runningNow;
         
         // Update in-progress set and refresh tree styling
@@ -3946,7 +3947,7 @@
         
         // Newly-starting items: update the main folder tree after 500ms delay
         for (const p of inProgressNow) {
-          if (!_queueLastRunningSet.has(p)) {
+          if (!prevRunningSet.has(p)) {
             setTimeout(() => {
               try {
                 if (!folderTreeRootNode) return;
