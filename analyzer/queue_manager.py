@@ -74,6 +74,25 @@ def _get_pipeline_class():
         return None
 
 
+def _quality_to_raw_rating(quality: float) -> int:
+    """Map raw quality score to fixed-threshold stars (1-5, or 0 for invalid)."""
+    try:
+        q = float(quality)
+    except (TypeError, ValueError):
+        return 0
+    if q < 0:
+        return 0
+    if q < 0.15:
+        return 1
+    if q < 0.3:
+        return 2
+    if q < 0.6:
+        return 3
+    if q < 0.9:
+        return 4
+    return 5
+
+
 class _QueueItem:
     __slots__ = ('path', 'name', 'status', 'processed', 'total', 'error',
                  'start_time', 'end_time', 'paused_duration', 'pause_start_time',
@@ -380,8 +399,25 @@ class QueueManager:
                             {'confidence': float(c)} for c in confidences[:5]]
 
                 def _on_quality(data, _it=item):
+                    incoming = list(data.get('results') or [])
+                    normalized = []
+                    for entry in incoming:
+                        if not isinstance(entry, dict):
+                            continue
+                        raw_quality = entry.get('quality', -1)
+                        try:
+                            quality = float(raw_quality)
+                        except (TypeError, ValueError):
+                            quality = -1.0
+                        raw_rating = _quality_to_raw_rating(quality)
+                        normalized.append({
+                            'quality': quality,
+                            'raw_rating': raw_rating,
+                            # Keep legacy field for compatibility with existing UI readers.
+                            'rating': raw_rating,
+                        })
                     with self._lock:
-                        _it.current_quality_results = list(data.get('results') or [])
+                        _it.current_quality_results = normalized
 
                 def _on_species(data, _it=item):
                     with self._lock:

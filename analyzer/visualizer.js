@@ -4011,6 +4011,16 @@
       return '★'.repeat(r) + '☆'.repeat(5 - r);
     }
 
+    function _rawQualityToRating(quality) {
+      const q = Number(quality);
+      if (!Number.isFinite(q) || q < 0) return 0;
+      if (q < 0.15) return 1;
+      if (q < 0.3) return 2;
+      if (q < 0.6) return 3;
+      if (q < 0.9) return 4;
+      return 5;
+    }
+
     function _updateLiveCropCards(item) {
       const row = document.getElementById('liveDlgCrops');
       if (!row) return;
@@ -4026,6 +4036,7 @@
         card.innerHTML = `
         <img class="live-dlg-crop-img" alt="" />
         <div class="ldc-conf">–</div>
+        <div class="ldc-quality">Quality: —</div>
         <div class="ldc-stars">☆☆☆☆☆</div>
         <div class="ldc-species">–</div>
         <div class="ldc-family">–</div>`;
@@ -4036,6 +4047,7 @@
         const card = row.children[i];
         const imgEl = card.querySelector('.live-dlg-crop-img');
         const confEl = card.querySelector('.ldc-conf');
+        const qualityEl = card.querySelector('.ldc-quality');
         const starsEl = card.querySelector('.ldc-stars');
         const spEl = card.querySelector('.ldc-species');
         const fmEl = card.querySelector('.ldc-family');
@@ -4055,6 +4067,7 @@
           if (imgEl.src) imgEl.removeAttribute('src');
           _liveLastCropKeys[i] = '';
           confEl.textContent = '–';
+          qualityEl.textContent = 'Quality: —';
           starsEl.textContent = '☆☆☆☆☆';
           spEl.textContent = '–'; spEl.className = 'ldc-species';
           fmEl.textContent = '–'; fmEl.className = 'ldc-family';
@@ -4066,9 +4079,17 @@
           ? `Conf: ${dets[i].confidence.toFixed(2)}`
           : '–';
 
-        // Rating stars
+        const qVal = i < quality.length ? Number(quality[i].quality) : NaN;
+        if (Number.isFinite(qVal) && qVal >= 0) {
+          qualityEl.textContent = `Quality: ${qVal.toFixed(3)}`;
+        } else {
+          qualityEl.textContent = i < crops.length ? 'Quality: …' : 'Quality: —';
+        }
+
+        // Live dialog intentionally uses raw quality thresholds (not normalized ratings).
+        const rawRating = Number.isFinite(qVal) ? _rawQualityToRating(qVal) : 0;
         starsEl.textContent = i < quality.length
-          ? _formatStars(quality[i].rating)
+          ? _formatStars(rawRating)
           : (i < crops.length ? '…' : '☆☆☆☆☆');
 
         // Species

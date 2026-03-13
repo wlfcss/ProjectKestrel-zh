@@ -1916,6 +1916,12 @@
       color: var(--muted);
     }
 
+    .ldc-quality {
+      font-size: 11px;
+      color: #9fb7cc;
+      font-variant-numeric: tabular-nums;
+    }
+
     .ldc-stars {
       font-size: 13px;
       letter-spacing: .05em;
