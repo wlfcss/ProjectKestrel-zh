@@ -1216,8 +1216,8 @@
     let sceneZoomRow = null;
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
-    const sceneRawCache = new Map();   // filename key -> base64 data URL
-    const sceneRawLoading = new Set(); // filenames currently being fetched
+    const sceneRawCache = new Map();   // (rootPath|filename|exposure) -> base64 data URL
+    const sceneRawLoading = new Set(); // (rootPath|filename|exposure) currently being fetched
 
     function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
       const rect = thumbEl.getBoundingClientRect();
@@ -1236,10 +1236,10 @@
     }
 
     async function loadSceneRawAsync(row) {
-      const key = (row.__rootPath || '') + '|' + row.filename;
+      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const key = (row.__rootPath || '') + '|' + row.filename + '|' + expCorr.toFixed(4);
       sceneRawLoading.add(key);
       try {
-        const expCorr = parseFloat(row.exposure_correction) || 0;
         const res = await window.pywebview.api.read_raw_full(
           row.filename, row.__rootPath || '', expCorr
         );
@@ -1268,7 +1268,8 @@
     function startSceneZoomPreview(row, thumbEl, mouseEv) {
       sceneZoomActive = true;
       sceneZoomRow = row;
-      const key = (row.__rootPath || '') + '|' + row.filename;
+      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const key = (row.__rootPath || '') + '|' + row.filename + '|' + expCorr.toFixed(4);
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
       previewBox.dataset.rawLabel = `RAW (${formatExposureEv(row.exposure_correction)} EV)`;

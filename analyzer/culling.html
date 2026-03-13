@@ -2117,8 +2117,8 @@
     // ---- Preview zoom on click-drag ----
     let zoomActive = false;
     let zoomRow = null;
-    let rawCache = new Map();   // filename -> base64 data URL
-    let rawLoading = new Set(); // filenames currently loading
+    let rawCache = new Map();   // (filename + exposure) -> base64 data URL
+    let rawLoading = new Set(); // (filename + exposure) currently loading
 
     function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
       zoomActive = true;
@@ -2135,7 +2135,9 @@
       async function applyBestImage(clientX, clientY) {
         let img = exportBox.querySelector('img');
         const scale = getScale();
-        const cachedRaw = rawCache.get(row.filename);
+        const expCorr = parseFloat(row.exposure_correction) || 0;
+        const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+        const cachedRaw = rawCache.get(cacheKey);
 
         if (cachedRaw && img?.dataset?.isRaw !== '1') {
           // Upgrade to cached RAW immediately
@@ -2165,7 +2167,9 @@
       applyBestImage(mouseEv.clientX, mouseEv.clientY);
 
       // Trigger RAW loading only on Shift+drag
-      if (loadRaw && !rawCache.has(row.filename) && !rawLoading.has(row.filename)) {
+      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+      if (loadRaw && !rawCache.has(cacheKey) && !rawLoading.has(cacheKey)) {
         loadRawAsync(row);
       }
 
@@ -2207,13 +2211,14 @@
     }
 
     async function loadRawAsync(row) {
-      rawLoading.add(row.filename);
+      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+      rawLoading.add(cacheKey);
       try {
-        const expCorr = parseFloat(row.exposure_correction) || 0;
         const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
         if (res && res.success && res.data) {
           const url = `data:image/jpeg;base64,${res.data}`;
-          rawCache.set(row.filename, url);
+          rawCache.set(cacheKey, url);
           // If still zooming on this row, swap to the high-res source
           if (zoomActive && zoomRow === row) {
             const img = el('#previewExport')?.querySelector('img');
@@ -2228,7 +2233,7 @@
       } catch (e) {
         console.warn('loadRawAsync error:', e);
       } finally {
-        rawLoading.delete(row.filename);
+        rawLoading.delete(cacheKey);
       }
     }
 
