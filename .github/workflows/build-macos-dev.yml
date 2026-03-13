@@ -1,0 +1,77 @@
+name: Build macOS Dev App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos-dev:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Download model files
+        shell: bash
+        run: |
+          echo "Downloading model files from GitHub release..."
+          mkdir -p analyzer/models
+
+          curl -L -o analyzer/models/mask_rcnn_resnet50_fpn_v2.pth \
+            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth"
+
+          echo "Verifying download..."
+          if [ ! -f analyzer/models/mask_rcnn_resnet50_fpn_v2.pth ]; then
+            echo "ERROR: mask_rcnn_resnet50_fpn_v2.pth not found after download"
+            exit 1
+          fi
+          FILE_SIZE=$(stat -f%z analyzer/models/mask_rcnn_resnet50_fpn_v2.pth 2>/dev/null || stat -c%s analyzer/models/mask_rcnn_resnet50_fpn_v2.pth)
+          echo "Downloaded file size: ${FILE_SIZE} bytes"
+          if [ "${FILE_SIZE}" -lt 100000 ]; then
+            echo "ERROR: Downloaded file too small (${FILE_SIZE} bytes)"
+            exit 1
+          fi
+          echo "Contents of analyzer/models/:"
+          ls -lh analyzer/models/
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Create venv and install dependencies
+        shell: bash
+        run: |
+          python -m venv .venv2
+          source .venv2/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements-macos.txt
+          pip install pyinstaller
+
+      - name: Run macOS headless build
+        shell: bash
+        run: |
+          chmod +x packaging/build_installer_headless.sh
+          ./packaging/build_installer_headless.sh
+
+      - name: Collect macOS .app
+        shell: bash
+        run: |
+          set -e
+          mkdir -p artifact
+          APP_PATH=$(find analyzer/dist -maxdepth 2 -name "*.app" | head -n 1 || true)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find release -type d -name "*.app" | head -n 1 || true)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found to upload"
+            exit 1
+          fi
+          echo "Found .app: $APP_PATH"
+          cp -a "$APP_PATH" artifact/
+
+      - name: Upload macOS dev app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dev-app
+          path: artifact/
