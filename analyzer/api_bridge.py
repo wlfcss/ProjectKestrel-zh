@@ -1265,16 +1265,18 @@ class Api:
                     }
                 except Exception:
                     raw_sizes = {}
-                linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
-                preserve = 0.8 if exp_correction > 0 else 0.0
-                rgb = raw.postprocess(
-                    use_camera_wb=True,
-                    no_auto_bright=True,
-                    output_bps=8,
-                    exp_shift=linear_scale,
-                    exp_preserve_highlights=preserve,
-                    fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
-                )
+                
+                # Match pipeline postprocess flow: first call with defaults, then expose-shift if needed
+                rgb = raw.postprocess()
+                
+                if exp_correction != 0.0:
+                    linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
+                    preserve = 0.8 if exp_correction > 0 else 0.0
+                    rgb = raw.postprocess(
+                        no_auto_bright=True,
+                        exp_shift=linear_scale,
+                        exp_preserve_highlights=preserve,
+                    )
 
             img = Image.fromarray(rgb)
 
