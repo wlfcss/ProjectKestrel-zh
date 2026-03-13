@@ -3593,15 +3593,16 @@
       // inspectionReady: inspection data exists for the running folder.
       // Until it arrives, suppress ETA entirely (show "Calculating ETA…") so the early
       // incorrect progress_cb(alreadyDone, total) call cannot produce a near-zero ETA.
-      const inspectionReady = cur && _queueSessionStartState.has(cur.path);
+      const normCurPath = normalizePath(cur?.path);
+      const inspectionReady = cur && _queueSessionStartState.has(normCurPath);
       if (cur && inspectionReady && cur.elapsed_seconds > 0) {
-        const sess = _queueSessionStartState.get(cur.path);
+        const sess = _queueSessionStartState.get(normCurPath);
         const initialProcessed = sess.initialProcessed || 0;
         const processedThisSession = Math.max(0, (cur.processed || 0) - initialProcessed);
         if (processedThisSession > 0) {
           const rawSecsPerImage = cur.elapsed_seconds / processedThisSession;
-          // Reset EMA if we moved to a different folder
-          if (_etaLastPath !== cur.path) { _etaSmoothed = null; _etaLastPath = cur.path; }
+          // Reset EMA if we moved to a different folder (compare normalized paths)
+          if (_etaLastPath !== normCurPath) { _etaSmoothed = null; _etaLastPath = normCurPath; }
           // Exponential moving average (α=0.15) — smooths per-image jitter without
           // lagging too far behind the true rate
           const alpha = 0.15;
@@ -3801,6 +3802,14 @@
       }
     }
 
+    // Normalize paths consistently: strip trailing slashes
+    function normalizePath(p) {
+      if (!p) return '';
+      let pp = String(p).trim();
+      while (pp && pp[pp.length - 1] in {'\\': 1, '/': 1}) pp = pp.slice(0, -1);
+      return pp;
+    }
+
     function startPollingQueue() {
       if (_queuePollingTimer) return;
       startAutoRefresh();
@@ -3819,11 +3828,12 @@
                 if (inspectRes && inspectRes.success && inspectRes.results) {
                   for (const [path, info] of Object.entries(inspectRes.results)) {
                     if (info) {
-                      _queueFolderInspections.set(path, info);
+                      const normPath = normalizePath(path);
+                      _queueFolderInspections.set(normPath, info);
                       const initialProcessed = info.processed || 0;
                       const totalImages = info.total || 0;
                       const toAnalyze = Math.max(0, totalImages - initialProcessed);
-                      _queueSessionStartState.set(path, {
+                      _queueSessionStartState.set(normPath, {
                         initialProcessed,
                         totalImages,
                         toAnalyze
@@ -3847,7 +3857,8 @@
           if (status && status.items) {
             const newPaths = [];
             for (const item of status.items) {
-              if (!_queueSessionStartState.has(item.path)) {
+              const normPath = normalizePath(item.path);
+              if (!_queueSessionStartState.has(normPath)) {
                 newPaths.push(item.path);
               }
             }
@@ -3857,11 +3868,12 @@
                 if (inspectRes && inspectRes.success && inspectRes.results) {
                   for (const [path, info] of Object.entries(inspectRes.results)) {
                     if (info) {
-                      _queueFolderInspections.set(path, info);
+                      const normPath = normalizePath(path);
+                      _queueFolderInspections.set(normPath, info);
                       const initialProcessed = info.processed || 0;
                       const totalImages = info.total || 0;
                       const toAnalyze = Math.max(0, totalImages - initialProcessed);
-                      _queueSessionStartState.set(path, {
+                      _queueSessionStartState.set(normPath, {
                         initialProcessed,
                         totalImages,
                         toAnalyze
