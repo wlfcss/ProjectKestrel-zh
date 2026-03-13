@@ -1285,6 +1285,7 @@
         previewBox.innerHTML = '';
         const stub = document.createElement('img');
         stub.src = thumbImgSrc;
+        stub.style.imageRendering = 'crisp-edges';
         previewBox.appendChild(stub);
         applySceneZoomTransform(stub, thumbEl, mouseEv.clientX, mouseEv.clientY, sceneZoomScale);
       }
@@ -1298,6 +1299,7 @@
           const imgEl = document.createElement('img');
           imgEl.src = cachedRaw;
           imgEl.dataset.isRaw = '1';
+          imgEl.style.imageRendering = 'crisp-edges';
           previewBox.appendChild(imgEl);
           previewBox.classList.add('raw-loaded');
           applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
@@ -1308,6 +1310,7 @@
             previewBox.innerHTML = '';
             const imgEl = document.createElement('img');
             imgEl.src = url;
+            imgEl.style.imageRendering = 'crisp-edges';
             previewBox.appendChild(imgEl);
             applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
           }

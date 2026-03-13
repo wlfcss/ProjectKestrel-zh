@@ -928,6 +928,7 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      image-rendering: crisp-edges;
     }
 
     .scene-zoom-topbar {
@@ -953,6 +954,9 @@
     .right .preview.zoom-active img {
       object-fit: cover;
       transition: none;
+      image-rendering: crisp-edges;
+      backface-visibility: hidden;
+      transform-style: preserve-3d;
     }
     .right .preview.raw-loaded::after {
       content: attr(data-raw-label);

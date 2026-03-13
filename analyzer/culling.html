@@ -277,6 +277,7 @@
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
+      image-rendering: crisp-edges;
     }
     .preview-img-box .muted {
       color: var(--muted);
@@ -597,6 +598,9 @@
       height: 100%;
       object-fit: cover;
       transition: none;
+      image-rendering: crisp-edges;
+      backface-visibility: hidden;
+      transform-style: preserve-3d;
     }
     .preview-img-box.raw-loaded::after {
       content: 'RAW';
@@ -2148,6 +2152,7 @@
           img = document.createElement('img');
           img.src = cachedRaw;
           img.dataset.isRaw = '1';
+          img.style.imageRendering = 'crisp-edges';
           exportBox.appendChild(img);
           exportBox.classList.add('raw-loaded');
         } else if (!img) {
@@ -2158,6 +2163,7 @@
             exportBox.innerHTML = '';
             img = document.createElement('img');
             img.src = url;
+            img.style.imageRendering = 'crisp-edges';
             exportBox.appendChild(img);
           }
         }
