@@ -3,6 +3,30 @@
 * Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
 
+Bugs
+* Exposure normalization step isn't really working right. Should target a histogram or make it histogram based (see kingbird photos, etc)
+* Exposure normalization should be global across all images - remove the minimum shift cap. 
+* Ratings are showing as 1 star by default for every single photo until a bit of database backlog happens. Fix this. 
+* Photos don't automaticallyroll in over time.
+* RAW preview seems downscaled in culling assistant clearly - something is broken there.
+* Some issues with underexposed birds being overcorrected too... Maybe just fix this exposure correction algorithm to just shift the extreme cases?
+    Bad examples:
+        005, 006 in high island 2024 should not be such high quality... ?
+* May want to consider tightening mask probability threshold in mask-rcnn ?
+* Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024)
+* The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
+* Split scene issue --> doesn't re-merge scenes.
+* Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
+* Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
+--> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.
+    
+
+Whats working
+* Filtering out the duplicates seems to be working
+* Burst detection seems to be working
+* Seems like species accuracy is indeed improved a bit.
+* Some issues with whether a particular folder appears as checkable or not
+
 
 
 
