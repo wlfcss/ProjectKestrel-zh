@@ -382,6 +382,27 @@
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div class="row">
+        <label for="maskThreshold">Mask Segmentation Threshold</label>
+        <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5"
+          style="width:80px" title="Pixel confidence threshold for bird mask segmentation (0.50–0.95). Higher = tighter masks." />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Confidence threshold for mask
+        segmentation (0.50–0.95). Higher values produce tighter masks around birds, lower values are more
+        inclusive. Requires re-analysis to take effect.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
+        <label for="rawPreviewCacheEnabled" style="flex:1">Cache RAW Preview Images</label>
+        <label class="inline" style="gap:6px">
+          <input type="checkbox" id="rawPreviewCacheEnabled" checked />
+          <span class="muted">Enable</span>
+        </label>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Cache full-resolution RAW previews
+        in .kestrel/culling_TMP for faster subsequent loads. Disable to save disk space (previews will be generated fresh each time).</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
         <label style="flex:1">Kestrel's Impact</label>
         <span class="muted" id="settingsTotalImpact">—</span>
       </div>

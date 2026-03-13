@@ -38,7 +38,16 @@ class MaskRCNNWrapper:
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
-    def get_prediction(self, image_data, threshold=0.75):
+    def get_prediction(self, image_data, threshold=0.75, mask_threshold=0.5):
+        """Get predictions from the model.
+        
+        Args:
+            image_data: Input image array (RGB).
+            threshold: Detection confidence threshold (0.1-0.99). Objects with lower confidence are filtered.
+            mask_threshold: Pixel confidence threshold for mask segmentation (0.5-0.95). 
+                          Controls tightness of bird masks. Higher = tighter masks.
+        """
+        mask_threshold = max(0.5, min(0.95, float(mask_threshold)))
         for attempt in range(3):
             try:
                 transform = T.Compose([T.ToTensor()])
@@ -49,7 +58,7 @@ class MaskRCNNWrapper:
                 if (np.array(pred_score) > threshold).sum() == 0:
                     return None, None, None, None
                 pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
-                masks = (pred[0]["masks"] > 0.5).squeeze().detach().cpu().numpy()
+                masks = (pred[0]["masks"] > mask_threshold).squeeze().detach().cpu().numpy()
                 if len(masks.shape) == 2:
                     masks = np.expand_dims(masks, axis=0)
                 pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]["labels"].numpy())]

@@ -966,10 +966,13 @@ class Api:
             detection_threshold = max(0.1, min(0.99, detection_threshold))
             scene_time_threshold = float(sett.get('scene_time_threshold', 1.0))
             scene_time_threshold = max(0.0, scene_time_threshold)
+            mask_threshold = float(sett.get('mask_threshold', 0.5))
+            mask_threshold = max(0.5, min(0.95, mask_threshold))
             return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu),
                                           wildlife_enabled=bool(wildlife_enabled),
                                           detection_threshold=detection_threshold,
-                                          scene_time_threshold=scene_time_threshold)
+                                          scene_time_threshold=scene_time_threshold,
+                                          mask_threshold=mask_threshold)
         except Exception as e:
             print(f'[API] start_analysis_queue() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}

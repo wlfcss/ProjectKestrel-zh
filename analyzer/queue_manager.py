@@ -166,6 +166,7 @@ class QueueManager:
         self._wildlife_enabled = True
         self._detection_threshold = 0.75
         self._scene_time_threshold = 1.0
+        self._mask_threshold = 0.5
 
     # ---- public read-only properties ----
 
@@ -189,7 +190,7 @@ class QueueManager:
 
     # ---- control ----
 
-    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True, detection_threshold: float = 0.75, scene_time_threshold: float = 1.0) -> dict:
+    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True, detection_threshold: float = 0.75, scene_time_threshold: float = 1.0, mask_threshold: float = 0.5) -> dict:
         if not _PIPELINE_AVAILABLE:
             return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
         with self._lock:
@@ -440,6 +441,7 @@ class QueueManager:
                     wildlife_enabled=self._wildlife_enabled,
                     detection_threshold=self._detection_threshold,
                     scene_time_threshold=self._scene_time_threshold,
+                    mask_threshold=self._mask_threshold,
                 )
                 with self._lock:
                     if self._cancel_event.is_set():

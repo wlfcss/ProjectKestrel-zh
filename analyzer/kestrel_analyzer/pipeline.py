@@ -212,6 +212,7 @@ class AnalysisPipeline:
         wildlife_enabled: bool = True,
         detection_threshold: float = 0.75,
         scene_time_threshold: float = 1.0,
+        mask_threshold: float = 0.5,
     ) -> None:
         callbacks = callbacks or {}
         status_cb = callbacks.get("on_status")
@@ -445,7 +446,7 @@ class AnalysisPipeline:
                     # MaskRCNN inference can take many seconds. Pause semantics are
                     # handled at the start of each image loop so we do not check
                     # repeatedly inside the image processing path.
-                    masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img, threshold=detection_threshold)
+                    masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img, threshold=detection_threshold, mask_threshold=mask_threshold)
                     if masks is None or len(masks) == 0:
                         if detection_cb:
                             detection_cb(

@@ -2313,6 +2313,12 @@
       // Scene grouping time threshold
       const sttEl = document.getElementById('sceneTimeThreshold');
       if (sttEl) sttEl.value = getSetting('scene_time_threshold', 1.0);
+      // Mask threshold
+      const maskThEl = document.getElementById('maskThreshold');
+      if (maskThEl) maskThEl.value = getSetting('mask_threshold', 0.5);
+      // RAW preview cache
+      const rawCacheCb = document.getElementById('rawPreviewCacheEnabled');
+      if (rawCacheCb) rawCacheCb.checked = getSetting('raw_preview_cache_enabled', true);
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
       const cb = document.getElementById('settingsAnalyticsOptIn');
@@ -2347,6 +2353,10 @@
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
       const sceneTimeThreshold = sttEl2 ? Math.max(0, parseFloat(sttEl2.value) || 1.0) : 1.0;
+      const maskThEl2 = document.getElementById('maskThreshold');
+      const maskThreshold = maskThEl2 ? Math.max(0.5, Math.min(0.95, parseFloat(maskThEl2.value) || 0.5)) : 0.5;
+      const rawCacheCb2 = document.getElementById('rawPreviewCacheEnabled');
+      const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
       
@@ -2359,6 +2369,8 @@
         rating_normalization: ratingNormalization,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
+        mask_threshold: maskThreshold,
+        raw_preview_cache_enabled: rawPreviewCacheEnabled,
         auto_save_enabled: autoSaveEnabled,
       };
       _autoSaveEnabled = autoSaveEnabled;

@@ -6,10 +6,7 @@
 
 Bugs
 * Photos don't automaticallyroll in over time.
-* RAW preview seems downscaled in culling assistant clearly - something is broken there.
-* Some issues with underexposed birds being overcorrected too... Maybe just fix this exposure correction algorithm to just shift the extreme cases?
-    Bad examples:
-        005, 006 in high island 2024 should not be such high quality... ?
+* test whether that has been fixed. 
 * May want to consider tightening mask probability threshold in mask-rcnn ?
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024)
 * The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
@@ -76,3 +73,7 @@ Next version changelog:
 * Exposure normalization should be global across all images - remove the minimum shift cap. 
 * Ratings are showing as 1 star by default for every single photo until a bit of database backlog happens. Fix this. 
 * Exposure normalization step isn't really working right. Should target a histogram or make it histogram based (see kingbird photos, etc)
+* RAW preview seems downscaled in culling assistant clearly - something is broken there.
+* Some issues with underexposed birds being overcorrected too... Maybe just fix this exposure correction algorithm to just shift the extreme cases?
+    Bad examples:
+        005, 006 in high island 2024 should not be such high quality... ?
