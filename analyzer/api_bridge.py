@@ -1199,19 +1199,22 @@ class Api:
                 exp_correction = 0.0
             exp_correction = max(-1.5, min(3.0, exp_correction))
 
+            settings = load_persisted_settings()
+            use_cache = bool(settings.get('raw_preview_cache_enabled', True))
+
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
-            # Cache key includes relative path + extension + file identity (+ exposure)
-            # so we never reuse another image's preview when basenames collide.
+            # Cache key includes relative path + extension + file identity.
+            # Exposure is intentionally excluded: the UI requests one RAW preview
+            # variant per file, already using the selected exposure correction.
             file_stat = os.stat(full_path)
             rel_for_key = os.path.normpath(os.path.relpath(full_path_real, root_path_real)).replace('\\', '/')
-            exp_key = f'{exp_correction:+.3f}' if abs(exp_correction) > 0.01 else '0.000'
-            key_material = f'{rel_for_key}|{ext}|{int(file_stat.st_mtime_ns)}|{int(file_stat.st_size)}|{exp_key}'
+            key_material = f'{rel_for_key}|{ext}|{int(file_stat.st_mtime_ns)}|{int(file_stat.st_size)}'
             cache_token = hashlib.sha1(key_material.encode('utf-8')).hexdigest()[:16]
             base = os.path.splitext(os.path.basename(filename))[0]
             cache_name = f'{base}_{cache_token}_preview.jpg'
             cache_path = os.path.join(cache_dir, cache_name)
 
-            if os.path.exists(cache_path):
+            if use_cache and os.path.exists(cache_path):
                 log(f'read_raw_full: Cache hit for {filename} (exp={exp_correction:+.3f})')
                 with open(cache_path, 'rb') as f:
                     b64 = base64.b64encode(f.read()).decode('ascii')
@@ -1220,38 +1223,34 @@ class Api:
             import rawpy
             from PIL import Image
 
-            log(f'read_raw_full: Processing RAW file {filename} (exp={exp_correction:+.3f})')
+            log(f'read_raw_full: Processing RAW file {filename} (exp={exp_correction:+.3f}, cache={use_cache})')
             with rawpy.imread(full_path) as raw:
-                if abs(exp_correction) > 0.01:
-                    linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
-                    preserve = 0.8 if exp_correction > 0 else 0.0
-                    rgb = raw.postprocess(
-                        use_camera_wb=True,
-                        no_auto_bright=True,
-                        output_bps=8,
-                        exp_shift=linear_scale,
-                        exp_preserve_highlights=preserve,
-                        fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
-                    )
-                else:
-                    rgb = raw.postprocess(
-                        use_camera_wb=True,
-                        no_auto_bright=False,
-                        output_bps=8,
-                        fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
-                    )
+                linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
+                preserve = 0.8 if exp_correction > 0 else 0.0
+                rgb = raw.postprocess(
+                    use_camera_wb=True,
+                    no_auto_bright=True,
+                    output_bps=8,
+                    exp_shift=linear_scale,
+                    exp_preserve_highlights=preserve,
+                    fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
+                )
 
             img = Image.fromarray(rgb)
 
-            os.makedirs(cache_dir, exist_ok=True)
             buf = BytesIO()
-            img.save(buf, format='JPEG', quality=95, subsampling=0, optimize=True, progressive=False)
+            img.save(buf, format='JPEG', quality=100, subsampling=0, optimize=False, progressive=False)
             jpg_bytes = buf.getvalue()
-            with open(cache_path, 'wb') as f:
-                f.write(jpg_bytes)
+            if use_cache:
+                os.makedirs(cache_dir, exist_ok=True)
+                with open(cache_path, 'wb') as f:
+                    f.write(jpg_bytes)
 
             b64 = base64.b64encode(jpg_bytes).decode('ascii')
-            log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
+            if use_cache:
+                log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
+            else:
+                log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cache disabled')
             return {'success': True, 'data': b64}
         except Exception as e:
             log(f'read_raw_full error: {e}')

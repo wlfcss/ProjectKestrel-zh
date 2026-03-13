@@ -1216,8 +1216,12 @@
     let sceneZoomRow = null;
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
-    const sceneRawCache = new Map();   // (rootPath|filename|exposure) -> base64 data URL
-    const sceneRawLoading = new Set(); // (rootPath|filename|exposure) currently being fetched
+    const sceneRawCache = new Map();   // (rootPath|filename) -> base64 data URL
+    const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
+
+    function getSceneRawCacheKey(row) {
+      return (row.__rootPath || '') + '|' + (row.filename || '');
+    }
 
     function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
       const rect = thumbEl.getBoundingClientRect();
@@ -1237,7 +1241,7 @@
 
     async function loadSceneRawAsync(row) {
       const expCorr = parseFloat(row.exposure_correction) || 0;
-      const key = (row.__rootPath || '') + '|' + row.filename + '|' + expCorr.toFixed(4);
+      const key = getSceneRawCacheKey(row);
       sceneRawLoading.add(key);
       try {
         const res = await window.pywebview.api.read_raw_full(
@@ -1268,8 +1272,7 @@
     function startSceneZoomPreview(row, thumbEl, mouseEv) {
       sceneZoomActive = true;
       sceneZoomRow = row;
-      const expCorr = parseFloat(row.exposure_correction) || 0;
-      const key = (row.__rootPath || '') + '|' + row.filename + '|' + expCorr.toFixed(4);
+      const key = getSceneRawCacheKey(row);
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
       previewBox.dataset.rawLabel = `RAW (${formatExposureEv(row.exposure_correction)} EV)`;
@@ -1687,10 +1690,7 @@
 
     // --- Species & Family editing helpers ---
     function markDirty() {
-      dirty = true;
-      _notifyDirty(true);
-      el('#saveCsv').disabled = false;
-      el('#revertCsv').disabled = false;
+      attemptAutoSave();
     }
 
     function _syncSceneUserTags() {
@@ -2146,11 +2146,36 @@
 
     // Settings storage
     const SETTINGS_KEY = 'kestrel-webviz-settings-v1';
+    let _autoSaveEnabled = true;  // cached value to avoid repeated lookups
+    let _autoSaveTimer = null;     // debounce timer for auto-saves
+    
     function loadSettings() {
       try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; }
     }
     function saveSettings(obj) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj || {})); }
     function getSetting(k, def) { const s = loadSettings(); return (k in s) ? s[k] : def; }
+    
+    // Auto-save logic: debounced save when auto-save is enabled
+    async function attemptAutoSave() {
+      dirty = true;
+      _notifyDirty(true);
+      el('#saveCsv').disabled = false;
+      el('#revertCsv').disabled = false;
+      
+      if (!_autoSaveEnabled) {
+        return;  // Save/Revert workflow; user will click Save button
+      }
+      
+      // Debounce to avoid saving on every keystroke/change (save after 2 seconds of inactivity)
+      clearTimeout(_autoSaveTimer);
+      _autoSaveTimer = setTimeout(async () => {
+        try {
+          await saveCsv();
+        } catch (e) {
+          console.warn('Auto-save failed:', e);
+        }
+      }, 2000);
+    }
 
     async function hydrateSettingsFromServer() {
       const backendUrl = (getSetting('backendUrl', window.location.origin) || window.location.origin).replace(/\/$/, '');
@@ -2161,6 +2186,7 @@
         const data = await res.json();
         if (data && data.settings && typeof data.settings === 'object') {
           saveSettings(data.settings);
+          _autoSaveEnabled = data.settings.auto_save_enabled !== false;
         }
       } catch (_) { }
     }
@@ -2222,6 +2248,10 @@
         impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
       }
       
+      // Auto-Save setting
+      const autoSaveCb = document.getElementById('settingsAutoSave');
+      if (autoSaveCb) autoSaveCb.checked = getSetting('auto_save_enabled', true);
+      
       dlg.showModal();
     }
     async function applySettings() {
@@ -2236,6 +2266,9 @@
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
       const sceneTimeThreshold = sttEl2 ? Math.max(0, parseFloat(sttEl2.value) || 1.0) : 1.0;
+      const autoSaveCb = document.getElementById('settingsAutoSave');
+      const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
+      
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
       const prevNormalization = existing.rating_normalization || 'per_folder';
@@ -2245,8 +2278,9 @@
         rating_normalization: ratingNormalization,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
+        auto_save_enabled: autoSaveEnabled,
       };
-      saveSettings(settings);
+      _autoSaveEnabled = autoSaveEnabled;
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
@@ -5082,15 +5116,18 @@
         showToast('Culling Assistant requires desktop mode', 4000);
         return;
       }
-      // Prompt to save unsaved changes before opening
+      // Prompt to save unsaved changes before opening (using custom dialog)
       if (dirty) {
-        const choice = confirm('You have unsaved changes. Save before opening the Culling Assistant?');
-        if (choice) {
+        const userChoice = await showCullingAssistantPrompt();
+        if (userChoice === 'cancel') {
+          return;
+        }
+        if (userChoice === 'save') {
           await saveCsv();
         }
       }
       try {
-        showToast('Opening Culling Assistant\u2026', 2000);
+        showToast('Opening Culling Assistant...', 2000);
         const res = await window.pywebview.api.open_culling_window(rootPath);
         if (res && !res.success) {
           showToast('Failed to open Culling Assistant: ' + (res.error || 'Unknown error'), 5000);
@@ -5099,6 +5136,58 @@
         console.error('openCullingAssistant error', e);
         showToast('Error opening Culling Assistant', 4000);
       }
+    }
+    
+    // Custom dialog prompt for Culling Assistant save decision
+    function showCullingAssistantPrompt() {
+      return new Promise((resolve) => {
+        const dlg = document.createElement('dialog');
+        dlg.style.cssText = 'border:none;border-radius:8px;background:#1a1d28;color:#e8f0f8;font-family:inherit;padding:0;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.3)';
+        
+        const content = document.createElement('div');
+        content.style.cssText = 'padding:24px;display:flex;flex-direction:column;gap:16px';
+        
+        const msg = document.createElement('div');
+        msg.style.cssText = 'font-size:16px;font-weight:500;line-height:1.4';
+        msg.textContent = 'You have unsaved changes. What would you like to do?';
+        content.appendChild(msg);
+        
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
+        
+        const btnCancel = document.createElement('button');
+        btnCancel.style.cssText = 'padding:8px 16px;border:1px solid #444;border-radius:4px;background:#2d3142;color:#e8f0f8;cursor:pointer;font-size:14px;transition:background 0.2s';
+        btnCancel.textContent = 'Cancel';
+        btnCancel.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('cancel'); });
+        btnContainer.appendChild(btnCancel);
+        
+        const btnDontSave = document.createElement('button');
+        btnDontSave.style.cssText = 'padding:8px 16px;border:1px solid #444;border-radius:4px;background:#2d3142;color:#e8f0f8;cursor:pointer;font-size:14px;transition:background 0.2s';
+        btnDontSave.textContent = 'Don\'t Save';
+        btnDontSave.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('dontsave'); });
+        btnContainer.appendChild(btnDontSave);
+        
+        const btnSave = document.createElement('button');
+        btnSave.style.cssText = 'padding:8px 16px;border:1px solid #5a9fd4;border-radius:4px;background:#3d5a7e;color:#e8f0f8;cursor:pointer;font-size:14px;font-weight:500;transition:background 0.2s';
+        btnSave.textContent = 'Save Changes';
+        btnSave.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('save'); });
+        btnContainer.appendChild(btnSave);
+        
+        content.appendChild(btnContainer);
+        dlg.appendChild(content);
+        
+        dlg.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') { 
+            e.preventDefault(); 
+            dlg.close(); 
+            document.body.removeChild(dlg); 
+            resolve('cancel');
+          }
+        });
+        
+        document.body.appendChild(dlg);
+        dlg.showModal();
+      });
     }
 
     // ---- Write Metadata launcher ----

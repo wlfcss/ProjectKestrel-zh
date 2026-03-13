@@ -460,6 +460,7 @@ def main():
             _init_settings = load_persisted_settings()
             _telemetry.get_machine_id(_init_settings)
             _init_settings['version'] = _telemetry._read_version()
+            _init_settings.setdefault('raw_preview_cache_enabled', True)
             save_persisted_settings(_init_settings)
     except Exception:
         pass  # failsafe

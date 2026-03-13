@@ -2117,8 +2117,12 @@
     // ---- Preview zoom on click-drag ----
     let zoomActive = false;
     let zoomRow = null;
-    let rawCache = new Map();   // (filename + exposure) -> base64 data URL
-    let rawLoading = new Set(); // (filename + exposure) currently loading
+    let rawCache = new Map();   // filename -> base64 data URL
+    let rawLoading = new Set(); // filename currently loading
+
+    function getRawPreviewKey(row) {
+      return row.filename || '';
+    }
 
     function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
       zoomActive = true;
@@ -2135,8 +2139,7 @@
       async function applyBestImage(clientX, clientY) {
         let img = exportBox.querySelector('img');
         const scale = getScale();
-        const expCorr = parseFloat(row.exposure_correction) || 0;
-        const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+        const cacheKey = getRawPreviewKey(row);
         const cachedRaw = rawCache.get(cacheKey);
 
         if (cachedRaw && img?.dataset?.isRaw !== '1') {
@@ -2167,8 +2170,7 @@
       applyBestImage(mouseEv.clientX, mouseEv.clientY);
 
       // Trigger RAW loading only on Shift+drag
-      const expCorr = parseFloat(row.exposure_correction) || 0;
-      const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+      const cacheKey = getRawPreviewKey(row);
       if (loadRaw && !rawCache.has(cacheKey) && !rawLoading.has(cacheKey)) {
         loadRawAsync(row);
       }
@@ -2212,7 +2214,7 @@
 
     async function loadRawAsync(row) {
       const expCorr = parseFloat(row.exposure_correction) || 0;
-      const cacheKey = (row.filename || '') + '|' + expCorr.toFixed(4);
+      const cacheKey = getRawPreviewKey(row);
       rawLoading.add(cacheKey);
       try {
         const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
