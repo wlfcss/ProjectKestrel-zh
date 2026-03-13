@@ -1294,6 +1294,9 @@
         const res = await window.pywebview.api.read_raw_full(
           row.filename, row.__rootPath || '', expCorr
         );
+        if (res && res.debug) {
+          console.info('[raw-debug][scene]', row.filename, res.debug);
+        }
         if (res && res.success && res.data) {
           const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           sceneRawCache.set(key, url);

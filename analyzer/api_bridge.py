@@ -1204,6 +1204,7 @@ class Api:
 
             settings = load_persisted_settings()
             use_cache = bool(settings.get('raw_preview_cache_enabled', True))
+            debug_logging_enabled = bool(settings.get('raw_preview_debug_logging_enabled', True))
 
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
             # Cache key includes relative path + extension + file identity.
@@ -1217,17 +1218,53 @@ class Api:
             cache_name = f'{base}_{cache_token}_preview.jpg'
             cache_path = os.path.join(cache_dir, cache_name)
 
+            debug_meta = {
+                'filename': filename,
+                'full_path': full_path,
+                'platform': sys.platform,
+                'exp_correction': round(float(exp_correction), 4),
+                'use_cache': bool(use_cache),
+                'cache_dir': cache_dir,
+                'cache_name': cache_name,
+                'cache_path': cache_path,
+                'key_material': key_material,
+                'cache_token': cache_token,
+            }
+
             if use_cache and os.path.exists(cache_path):
                 log(f'read_raw_full: Cache hit for {filename} (exp={exp_correction:+.3f})')
                 with open(cache_path, 'rb') as f:
-                    b64 = base64.b64encode(f.read()).decode('ascii')
-                return {'success': True, 'data': b64, 'mime': 'image/jpeg'}
+                    cache_bytes = f.read()
+                cache_stat = os.stat(cache_path)
+                debug_meta.update({
+                    'cache_hit': True,
+                    'cache_file_bytes': int(len(cache_bytes)),
+                    'cache_file_mtime_ns': int(cache_stat.st_mtime_ns),
+                    'storage_preview_path': cache_path,
+                })
+                if debug_logging_enabled:
+                    log(f'read_raw_full debug: {json.dumps(debug_meta, sort_keys=True)}')
+                b64 = base64.b64encode(cache_bytes).decode('ascii')
+                return {'success': True, 'data': b64, 'mime': 'image/jpeg', 'debug': debug_meta}
 
             import rawpy
             from PIL import Image
 
             log(f'read_raw_full: Processing RAW file {filename} (exp={exp_correction:+.3f}, cache={use_cache})')
             with rawpy.imread(full_path) as raw:
+                try:
+                    sizes = raw.sizes
+                    raw_sizes = {
+                        'width': int(getattr(sizes, 'width', 0) or 0),
+                        'height': int(getattr(sizes, 'height', 0) or 0),
+                        'raw_width': int(getattr(sizes, 'raw_width', 0) or 0),
+                        'raw_height': int(getattr(sizes, 'raw_height', 0) or 0),
+                        'iwidth': int(getattr(sizes, 'iwidth', 0) or 0),
+                        'iheight': int(getattr(sizes, 'iheight', 0) or 0),
+                        'flip': int(getattr(sizes, 'flip', 0) or 0),
+                    }
+                except Exception:
+                    raw_sizes = {}
                 linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
                 preserve = 0.8 if exp_correction > 0 else 0.0
                 rgb = raw.postprocess(
@@ -1244,19 +1281,43 @@ class Api:
             buf = BytesIO()
             img.save(buf, format='JPEG', quality=100, subsampling=0, optimize=False, progressive=False)
             jpg_bytes = buf.getvalue()
+            wrote_cache = False
             if use_cache:
                 os.makedirs(cache_dir, exist_ok=True)
                 with open(cache_path, 'wb') as f:
                     f.write(jpg_bytes)
+                wrote_cache = True
+
+            storage_preview_path = cache_path
+            if not wrote_cache:
+                # Even when cache is disabled, persist one debug copy for inspection.
+                os.makedirs(cache_dir, exist_ok=True)
+                debug_name = f'{base}_{cache_token}_preview_debug.jpg'
+                storage_preview_path = os.path.join(cache_dir, debug_name)
+                with open(storage_preview_path, 'wb') as f:
+                    f.write(jpg_bytes)
 
             b64 = base64.b64encode(jpg_bytes).decode('ascii')
+            debug_meta.update({
+                'cache_hit': False,
+                'cache_written': bool(wrote_cache),
+                'storage_preview_path': storage_preview_path,
+                'raw_sizes': raw_sizes,
+                'postprocess_rgb_shape': list(rgb.shape) if hasattr(rgb, 'shape') else [],
+                'postprocess_rgb_dtype': str(getattr(rgb, 'dtype', '')),
+                'jpeg_bytes': int(len(jpg_bytes)),
+                'jpeg_kb': round(len(jpg_bytes) / 1024.0, 2),
+                'jpeg_dimensions': {'width': int(img.width), 'height': int(img.height)},
+            })
+            if debug_logging_enabled:
+                log(f'read_raw_full debug: {json.dumps(debug_meta, sort_keys=True)}')
             if use_cache:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
             else:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cache disabled')
-            return {'success': True, 'data': b64, 'mime': 'image/jpeg'}
+            return {'success': True, 'data': b64, 'mime': 'image/jpeg', 'debug': debug_meta}
         except Exception as e:
-            log(f'read_raw_full error: {e}')
+            log(f'read_raw_full error: {e} (filename={filename}, root_path={root_path})')
             return {'success': False, 'error': str(e)}
 
     def cleanup_culling_cache(self, root_path: str):
