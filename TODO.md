@@ -2,7 +2,6 @@
 * Investigate GPU support from recent pull request #14
 * Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
-* Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 
 Bugs
 
@@ -19,14 +18,8 @@ Whats working
 * Seems like species accuracy is indeed improved a bit.
 * Some issues with whether a particular folder appears as checkable or not
 
-
-
-
-
-
 # Priority Issues
-* Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files. 
-- Add "Threshold"/basic customization support (star ratings or Q score) to culling assistant
+* Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files.
 
 ## Known Issues
 - Kestrel's data structure (csv database) is a bit messay and incomplete. Potentially need to switch to a JSON file structure while maintaining backward-compatibility or upgradeability in the visualizer.
@@ -64,7 +57,7 @@ Whats working
 * RAW preview within visualizer
 
 
-Next version changelog:
+# Version Lincoln Sparrow Changelog
 * ETA calculation fails when resuming a folder that started to be analyzed.
 * Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
 * Exposure normalization should be global across all images - remove the minimum shift cap. 
@@ -77,3 +70,4 @@ Next version changelog:
 * Auto updating folders and that behavior has been fixed. 
 * May want to consider tightening mask probability threshold in mask-rcnn ?
 * Split scene issue --> Doesn't exactly save automatically. The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
+* Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
