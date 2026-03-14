@@ -335,6 +335,12 @@
       color: var(--bad);
     }
     .btn.danger:hover { background: #4a2020; }
+    .btn.secondary {
+      background: #1a2a3a;
+      border-color: #4a7ac4;
+      color: #7ca3d9;
+    }
+    .btn.secondary:hover { background: #1f3548; }
     .btn:disabled { opacity: 0.4; cursor: default; }
 
     /* ---- Dialogs (base) ---- */
@@ -1507,6 +1513,25 @@
       debouncedSave();
     }
 
+    // ---- Mark unrated images as reviewed ----
+    function markSceneUnratedAsReviewed(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      
+      for (const row of scene.images) {
+        const rating = getRating(row);
+        if (rating === 0) { // only unrated images
+          const side = cullingState.get(row.filename) || 'accept';
+          // Set rating: 5 for accept, 1 for reject (to make yellow go away but preserve categorization)
+          const ratingValue = side === 'accept' ? 5 : 1;
+          setRating(row, ratingValue, 'manual');
+        }
+      }
+      renderScene(sceneId);
+      updateStats();
+      debouncedSave();
+    }
+
     // ---- Build an image card ----
     function buildImageCard(row) {
       const rating = getRating(row);
@@ -1618,6 +1643,20 @@
         
         bulkActionsDiv.appendChild(acceptAllBtn);
         bulkActionsDiv.appendChild(rejectAllBtn);
+        
+        // Add "Mark as Reviewed" button if there are unrated images
+        if (scene.hasAnyUnrated) {
+          const markReviewedBtn = document.createElement('button');
+          markReviewedBtn.className = 'btn secondary';
+          markReviewedBtn.textContent = '✓ Mark as Reviewed';
+          markReviewedBtn.title = 'Mark all unrated images in this scene as reviewed (no longer yellow)';
+          markReviewedBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            markSceneUnratedAsReviewed(scene.id);
+          });
+          bulkActionsDiv.appendChild(markReviewedBtn);
+        }
+        
         label.appendChild(bulkActionsDiv);
         row.appendChild(label);
 
