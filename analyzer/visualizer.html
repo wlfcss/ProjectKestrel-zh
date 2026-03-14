@@ -650,6 +650,24 @@
     </div>
   </dialog>
 
+  <!-- Version Update Notification dialog -->
+  <dialog id="versionUpdateDlg" style="width:min(640px,96vw);height:auto;max-height:92vh;overflow-x:hidden;overflow-y:auto;">
+    <div class="settings" style="width:min(600px,96vw)">
+      <h3 style="margin:0;display:flex;align-items:center;gap:8px;">
+        <span id="versionUpdatePriority" style="font-size:20px;"></span>
+        <span id="versionUpdateTitle">New Version Available</span>
+      </h3>
+      <div id="versionUpdateContent" style="margin:16px 0;">
+        <div id="versionUpdateNotes" style="margin-bottom:12px;"></div>
+        <div id="versionUpdateLinks" style="display:flex;flex-direction:column;gap:10px;margin:16px 0;"></div>
+        <div id="versionUpdateTraditional" style="font-size:12px;color:var(--muted);margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border);"></div>
+      </div>
+      <div class="footer">
+        <button id="versionUpdateClose">Close</button>
+      </div>
+    </div>
+  </dialog>
+
   <script src="visualizer.js"></script>
 
   <!-- Scroll position indicator: shows current folder/time section while scrolling -->

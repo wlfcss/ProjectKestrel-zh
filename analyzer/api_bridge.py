@@ -299,6 +299,30 @@ class Api:
             except Exception:
                 return {'success': True, 'version': 'unknown'}
 
+    def get_platform_info(self):
+        """Return platform information (windows, macos, linux)."""
+        import sys
+        if sys.platform == 'darwin':
+            return {'success': True, 'platform': 'macos'}
+        elif sys.platform == 'win32':
+            return {'success': True, 'platform': 'windows'}
+        else:
+            return {'success': True, 'platform': 'linux'}
+
+    def is_windows_store_app(self):
+        """Check if running as a Windows Store app."""
+        try:
+            import sys
+            if sys.platform != 'win32':
+                return {'success': True, 'is_store': False}
+            # Check if running from Program Files\WindowsApps (typical Store app location)
+            import os
+            app_path = os.path.dirname(sys.executable)
+            is_store = 'WindowsApps' in app_path or os.environ.get('APPX_PACKAGE_ROOT') is not None
+            return {'success': True, 'is_store': is_store}
+        except Exception:
+            return {'success': True, 'is_store': False}
+
     def inspect_folder(self, folder_path: str):
         """Return lightweight folder summary (total images, processed count)."""
         try:

@@ -245,19 +245,141 @@
         .catch(() => {
           versionBadge.textContent = 'Version: unknown';
         });
-      // Also check remote service version and warn if it differs from the expected value
-      (async function checkRemoteVersion() {
-        try {
-          const resp = await fetch('https://api.projectkestrel.org/version', { cache: 'no-store' });
-          if (!resp.ok) return;
-          const remote = (await resp.text()).trim();
-          if (remote && remote !== 'Swamp Sparrow') {
-            showToast('There is a new update available! Please download the latest version from www.projectkestrel.org', 15000);
-          }
-        } catch (e) {
-          // ignore network errors — offline use is fine
+      // Check for new versions from remote JSON endpoint
+      checkRemoteVersion();
+    }
+
+    // Check if running as Windows Store app
+    async function isWindowsStoreApp() {
+      try {
+        if (!window.pywebview?.api?.is_windows_store_app) return false;
+        const result = await window.pywebview.api.is_windows_store_app();
+        return result?.is_store ?? false;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Get platform info
+    async function getPlatformInfo() {
+      try {
+        if (!window.pywebview?.api?.get_platform_info) {
+          // Fallback to client-side detection
+          if (navigator.platform.includes('Mac')) return 'macos';
+          if (navigator.platform.includes('Win')) return 'windows';
+          return 'windows'; // default
         }
-      })();
+        const result = await window.pywebview.api.get_platform_info();
+        return result?.platform ?? 'windows';
+      } catch (e) {
+        return 'windows';
+      }
+    }
+
+    // Check remote version from JSON endpoint
+    async function checkRemoteVersion() {
+      try {
+        // Read current app version from VERSION.txt
+        let currentVer = _appVersion;
+        if (!currentVer) {
+          try {
+            const versionResp = await fetch('VERSION.txt', { cache: 'no-store' });
+            if (versionResp.ok) {
+              const text = await versionResp.text();
+              const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+              if (lines.length > 0) {
+                // Extract just the version part (e.g., "v(Swamp Sparrow)" from "Version: v(Swamp Sparrow)")
+                const line = lines[0];
+                currentVer = line.toLowerCase().startsWith('version') 
+                  ? line.replace(/^version:\s*/i, '').trim()
+                  : line;
+              }
+            }
+          } catch (e) { /* ignore */ }
+        }
+        
+        const resp = await fetch('https://projectkestrel.org/version.json', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const versionList = await resp.json();
+        if (!Array.isArray(versionList) || versionList.length === 0) return;
+        
+        const latestVersion = versionList[0]; // first entry is latest
+        
+        // Compare versions: check if latest name differs from current
+        if (!latestVersion.name || latestVersion.name === currentVer) return;
+        
+        // Show update notification
+        showVersionUpdateNotification(latestVersion);
+      } catch (e) {
+        // Network error, offline mode - ignore
+      }
+    }
+
+    // Display the version update notification dialog
+    async function showVersionUpdateNotification(versionInfo) {
+      const dlg = document.getElementById('versionUpdateDlg');
+      if (!dlg) return;
+      
+      // Priority symbol
+      const priorityEl = document.getElementById('versionUpdatePriority');
+      if (priorityEl) priorityEl.textContent = versionInfo.highPriority ? '⭐' : '•';
+      
+      // Title
+      const titleEl = document.getElementById('versionUpdateTitle');
+      if (titleEl) titleEl.textContent = `New Version: ${versionInfo.name}`;
+      
+      // Changelog notes (show first 3)
+      const notesEl = document.getElementById('versionUpdateNotes');
+      if (notesEl && versionInfo.notes && Array.isArray(versionInfo.notes)) {
+        const notesList = versionInfo.notes.slice(0, 3).map(note => `<li>${escapeHtml(note)}</li>`).join('');
+        notesEl.innerHTML = notesList.length > 0 ? `<ul style="margin:0;padding-left:20px;">${notesList}</ul>` : '';
+      }
+      
+      // Platform-specific download links
+      const linksEl = document.getElementById('versionUpdateLinks');
+      if (linksEl) {
+        linksEl.innerHTML = '';
+        const platform = await getPlatformInfo();
+        const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
+        
+        if (platform === 'macos' && versionInfo.downloadLinks?.macos) {
+          const linkBtn = document.createElement('a');
+          linkBtn.href = 'https://projectkestrel.org/download?platform=macos';
+          linkBtn.target = '_blank';
+          linkBtn.className = 'primary';
+          linkBtn.style.cssText = 'padding:12px 20px;border-radius:6px;text-align:center;text-decoration:none;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;cursor:pointer;display:inline-block;';
+          linkBtn.textContent = '→ Download for macOS';
+          linksEl.appendChild(linkBtn);
+        } else if (platform === 'windows' && isStore) {
+          const storeBtn = document.createElement('div');
+          storeBtn.style.cssText = 'background:#1a2a3a;border:1px solid #4a7ac4;border-radius:6px;padding:12px;color:#7ca3d9;';
+          storeBtn.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Windows Store will update automatically within 1-2 days</div>' +
+            '<a href="ms-windows-store://pdp/?productid=9NQR2WFFNP5J" style="color:#7ca3d9;text-decoration:underline;cursor:pointer;">Check Windows Store for updates</a>';
+          linksEl.appendChild(storeBtn);
+        } else if (platform === 'windows' && versionInfo.downloadLinks?.traditional) {
+          const linkBtn = document.createElement('a');
+          linkBtn.href = versionInfo.downloadLinks.traditional;
+          linkBtn.target = '_blank';
+          linkBtn.className = 'primary';
+          linkBtn.style.cssText = 'padding:12px 20px;border-radius:6px;text-align:center;text-decoration:none;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;cursor:pointer;display:inline-block;';
+          linkBtn.textContent = '→ Download Installer';
+          linksEl.appendChild(linkBtn);
+        }
+      }
+      
+      // Traditional installer note
+      const tradEl = document.getElementById('versionUpdateTraditional');
+      if (tradEl) {
+        tradEl.innerHTML = 'If you used the traditional installer to install Kestrel, visit <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> to manually update.';
+      }
+      
+      // Close button
+      const closeBtn = document.getElementById('versionUpdateClose');
+      if (closeBtn) {
+        closeBtn.onclick = () => dlg.close();
+      }
+      
+      dlg.showModal();
     }
 
     // Tooltip layer so tips can render over the main image area
