@@ -5,12 +5,9 @@
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 
 Bugs
-* Photos don't automaticallyroll in over time.
-* test whether that has been fixed. 
-* May want to consider tightening mask probability threshold in mask-rcnn ?
+
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024)
-* The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
-* Split scene issue --> Doesn't exactly save automatically..
+
 * Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
 --> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.
 
@@ -77,3 +74,6 @@ Next version changelog:
 * Some issues with underexposed birds being overcorrected too... Maybe just fix this exposure correction algorithm to just shift the extreme cases?
     Bad examples:
         005, 006 in high island 2024 should not be such high quality... ?
+* Auto updating folders and that behavior has been fixed. 
+* May want to consider tightening mask probability threshold in mask-rcnn ?
+* Split scene issue --> Doesn't exactly save automatically. The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 

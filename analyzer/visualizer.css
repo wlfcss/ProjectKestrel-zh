@@ -1304,16 +1304,22 @@
       font-style: italic;
     }
 
-    /* In-progress analysis styling (purple italic text) */
-    .tree-node-row.in-progress .tree-label {
-      color: #b399cc;
-      font-style: italic;
-      font-weight: 600;
-      animation: pulse-purple 2s ease-in-out infinite;
+    /* In-progress analysis styling (subtle purple indicator with text) */
+    .tree-node-row.in-progress {
+      background: rgba(179, 153, 204, 0.08);
+      border-left: 3px solid #b399cc;
+      padding-left: 6px;
     }
-    @keyframes pulse-purple {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.75; }
+    .tree-node-row.in-progress .tree-label {
+      color: #d4a3ff !important;
+      font-style: italic;
+      font-weight: 700;
+    }
+    .tree-node-row.in-progress .tree-label::after {
+      content: ' (analysis in progress)';
+      margin-left: 6px;
+      font-size: 0.9em;
+      opacity: 0.85;
     }
 
     /* Context menu for folder tree */
