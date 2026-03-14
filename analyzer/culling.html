@@ -912,6 +912,19 @@
             <span class="slider-val" id="maxPerSceneVal">∞</span>
           </div>
         </div>
+        <div class="slider-group">
+          <label>Unrated images — default to:</label>
+          <div class="slider-row">
+            <label style="display:flex; gap:8px; align-items:center; font-weight:600; color:var(--text)">
+              <input type="radio" name="unratedDefault" value="accept" id="unratedAccept" />
+              Accept
+            </label>
+            <label style="display:flex; gap:8px; align-items:center; font-weight:600; color:var(--text)">
+              <input type="radio" name="unratedDefault" value="reject" id="unratedReject" checked />
+              Reject
+            </label>
+          </div>
+        </div>
         <div class="panel-actions">
           <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current slider values; your manual Shift+Click decisions are preserved">↻ Re-apply</button>
           <button class="btn danger" id="resetAutoBtn" title="Clear all manual overrides and re-apply from scratch">⚠ Reset All</button>
@@ -1379,13 +1392,15 @@
       if (qEl)   qEl.textContent   = '\u2605' + cutoff;
       if (minEl) minEl.textContent = String(minKeep);
       if (maxEl) maxEl.textContent = maxKeep === Infinity ? '\u221e' : String(maxKeep);
+      const unratedDefault = document.querySelector('input[name="unratedDefault"]:checked')?.value || 'reject';
       const summary = el('#autoCatSummary');
       if (summary) summary.textContent =
-        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene`;
+        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene \u00b7 Unrated → ${unratedDefault}`;
     }
 
     function applyAutoCategorize(preserveManual = true) {
       const { cutoff, minKeep, maxKeep } = getSliderValues();
+      const unratedDefault = document.querySelector('input[name="unratedDefault"]:checked')?.value || 'reject';
       if (!preserveManual) manuallyMoved.clear();
       for (const scene of scenes) {
         // Sort by rating desc, then quality score desc
@@ -1394,9 +1409,13 @@
           return rb !== ra ? rb - ra : parseNumber(b.quality) - parseNumber(a.quality);
         });
 
-        // Phase 1: quality cutoff — accept images at/above cutoff; unrated (0) also accepted
+        // Phase 1: quality cutoff — accept images at/above cutoff; handle unrated based on setting
         const qualityAcceptSet = new Set(
-          sorted.filter(r => { const rt = getRating(r); return rt === 0 || rt >= cutoff; })
+          sorted.filter(r => {
+            const rt = getRating(r);
+            if (rt === 0) return unratedDefault === 'accept'; // unrated: use setting
+            return rt >= cutoff; // rated: check against cutoff
+          })
                 .map(r => r.filename)
         );
 
@@ -2691,6 +2710,16 @@
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {
       const sl = el('#' + id);
       if (sl) sl.addEventListener('input', () => { updateSliderLabels(); saveCullingSettings(); });
+    });
+    // Unrated image default radio buttons
+    document.querySelectorAll('input[name="unratedDefault"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        applyAutoCategorize(true);
+        renderAllScenes();
+        updateStats();
+        updateAutoCatSummary();
+        saveCullingSettings();
+      });
     });
     el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
     el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
