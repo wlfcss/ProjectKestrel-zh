@@ -199,12 +199,6 @@ jobs:
           name: macos-app
           path: artifact/
 
-      - name: Upload macOS installer (.pkg)
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-installer
-          path: release/**/ProjectKestrel-*.pkg
-
       - name: Upload macOS onedir bundle
         uses: actions/upload-artifact@v4
         with:
