@@ -1308,7 +1308,7 @@ class Api:
             img = Image.fromarray(rgb)
 
             buf = BytesIO()
-            img.save(buf, format='JPEG', quality=100, subsampling=0, optimize=False, progressive=False)
+            img.save(buf, format='JPEG', quality=90, subsampling=0, optimize=False, progressive=False)
             jpg_bytes = buf.getvalue()
             wrote_cache = False
             if use_cache:
