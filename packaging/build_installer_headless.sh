@@ -18,21 +18,22 @@ PROJECT_ROOT="${SCRIPT_DIR}/.."
 
 cd "${PROJECT_ROOT}"
 
-# Version strings (can be injected by caller; fall back to timestamp)
-RELEASE_TS="${RELEASE_TS:-$(date "+%Y.%m.%d.%H.%M")}"
-RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
-APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
-
-printf "Using release name: %s\n" "${RELEASE_NAME}"
-printf "Using app version:  %s\n" "${APP_VERSION}"
-echo
-
-# Write version info into the analyzer folder
-{
-  echo "Build: ${RELEASE_TS}"
-  echo "Version: ${APP_VERSION}"
-} > "analyzer/VERSION.txt"
-echo "[OK] VERSION.txt written to analyzer/"
+# Read VERSION.txt from repo root and copy to analyzer folder
+if [[ -f "VERSION.txt" ]]; then
+  echo "[OK] Reading VERSION.txt from repo root"
+  cp "VERSION.txt" "analyzer/VERSION.txt"
+  echo "[OK] VERSION.txt copied to analyzer/"
+else
+  echo "[WARNING] VERSION.txt not found in repo root, generating one..."
+  RELEASE_TS="${RELEASE_TS:-$(date "+%Y.%m.%d.%H.%M")}"
+  RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
+  APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
+  {
+    echo "Build: ${RELEASE_TS}"
+    echo "Version: ${APP_VERSION}"
+  } > "analyzer/VERSION.txt"
+  echo "[OK] Generated VERSION.txt in analyzer/"
+fi
 
 # ----------------------------------------
 # Activate Python virtual environment

@@ -30,12 +30,19 @@ echo.
 REM Change to project root
 cd /d "%PROJECT_ROOT%"
 
-REM Write version info into the analyzer folder
-(
-    echo Build: %RELEASE_TS%
-    echo Version: %APP_VERSION%
-) > "analyzer\VERSION.txt"
-echo [OK] VERSION.txt written to analyzer\
+REM Read VERSION.txt from repo root and copy to analyzer folder
+if exist "VERSION.txt" (
+    echo [OK] Reading VERSION.txt from repo root
+    copy "VERSION.txt" "analyzer\VERSION.txt" /Y
+    echo [OK] VERSION.txt copied to analyzer\
+) else (
+    echo [WARNING] VERSION.txt not found in repo root, generating one...
+    (
+        echo Build: %RELEASE_TS%
+        echo Version: %APP_VERSION%
+    ) > "analyzer\VERSION.txt"
+    echo [OK] Generated VERSION.txt in analyzer\
+)
 
 REM ----------------------------------------
 REM Activate Python virtual environment
