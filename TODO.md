@@ -71,3 +71,4 @@ Whats working
 * May want to consider tightening mask probability threshold in mask-rcnn ?
 * Split scene issue --> Doesn't exactly save automatically. The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
+* refresh behavior keeps refreshing when paused.
