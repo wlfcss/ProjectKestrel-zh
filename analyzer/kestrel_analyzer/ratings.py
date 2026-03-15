@@ -54,13 +54,13 @@ def compute_normalized_rating(quality: float, distribution: list) -> int:
     within = distribution[bucket]
     # fraction_rank: 0.0 = worst quality, 1.0 = best quality
     fraction_rank = (below + within * 0.5) / total
-    if fraction_rank >= 0.90:
+    if fraction_rank >= 0.88:
         return 5
-    if fraction_rank >= 0.675:
+    if fraction_rank >= 0.73:
         return 4
-    if fraction_rank >= 0.45:
+    if fraction_rank >= 0.53:
         return 3
-    if fraction_rank >= 0.225:
+    if fraction_rank >= 0.23:
         return 2
     return 1
 
