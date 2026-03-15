@@ -4704,17 +4704,14 @@
 
     function checkAllTreeFolders() {
       const all = collectKestrelPaths(folderTreeRootNode);
-      const btn = document.getElementById('treeCheckAll');
-      // If all are already checked, uncheck all; otherwise check all
-      const allChecked = all.length > 0 && all.every(p => checkedFolderPaths.has(p));
-      if (allChecked) {
-        checkedFolderPaths.clear();
-        if (btn) btn.textContent = 'Check all';
-      } else {
-        all.forEach(p => checkedFolderPaths.add(p));
-        if (btn) btn.textContent = 'Check none';
-      }
-      renderFolderTree(); // re-render so checkbox DOM matches state
+      all.forEach(p => checkedFolderPaths.add(p));
+      renderFolderTree();
+      debouncedAutoLoad();
+    }
+
+    function checkNoneTreeFolders() {
+      checkedFolderPaths.clear();
+      renderFolderTree();
       debouncedAutoLoad();
     }
 
@@ -4902,8 +4899,6 @@
       // folders from a previous root selection.
       try {
         checkedFolderPaths.clear();
-        const treeCheckAllBtn = document.getElementById('treeCheckAll');
-        if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
         renderFolderTree();
       } catch (e) { /* ignore */ }
 
@@ -5253,8 +5248,6 @@
         if (folderPath) {
           treeExpandedPaths.clear();
           checkedFolderPaths.clear();
-          const treeCheckAllBtn = document.getElementById('treeCheckAll');
-          if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
           const treeScanned = await scanFolderTree(folderPath);
           if (treeScanned && !folderTreeRootHasKestrel) {
             setStatus('Select a folder from the tree below to load its scenes');
@@ -5267,9 +5260,11 @@
       });
     }
 
-    // Wire "Check all / Check none" button
+    // Wire "Check all / Check none" buttons
     const treeCheckAllBtn = document.getElementById('treeCheckAll');
     if (treeCheckAllBtn) treeCheckAllBtn.addEventListener('click', checkAllTreeFolders);
+    const treeCheckNoneBtn = document.getElementById('treeCheckNone');
+    if (treeCheckNoneBtn) treeCheckNoneBtn.addEventListener('click', checkNoneTreeFolders);
 
     // Wire "Load checked" button (removed from HTML; kept as no-op guard)
     const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');
