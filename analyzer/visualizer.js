@@ -1059,7 +1059,9 @@
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
         meta.className = 'meta title-badges';
-        meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+        const rating = _rawQualityToRating(s.maxQuality);
+        const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
+        meta.innerHTML = `<span class="score">${starDisplay}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         if (s.isApproved) {
@@ -1710,7 +1712,9 @@
       let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
       if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
       html += `</div>`;
-      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
+      const rating = _rawQualityToRating(scene.maxQuality);
+      const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
+      html += `<div class="muted">${scene.imageCount} images • ${starDisplay}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
 
       // Species chips
       html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
