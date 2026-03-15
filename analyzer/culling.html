@@ -1528,7 +1528,9 @@
           setRating(row, ratingValue, 'manual');
         }
       }
-      renderScene(sceneId);
+      // Recompute scene aggregates and fully re-render scene rows so badges/colors update
+      scenes = aggregateScenes();
+      renderAllScenes();
       updateStats();
       debouncedSave();
     }
@@ -1620,32 +1622,11 @@
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
           (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
         
-        // Add bulk action buttons
+        // Add bulk action buttons (Mark Reviewed first, then Accept/Reject)
         const bulkActionsDiv = document.createElement('div');
         bulkActionsDiv.className = 'scene-bulk-actions';
-        
-        const acceptAllBtn = document.createElement('button');
-        acceptAllBtn.className = 'btn primary';
-        acceptAllBtn.textContent = '✓ Accept All';
-        acceptAllBtn.title = 'Move all images in this scene to Accept';
-        acceptAllBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          acceptAllInScene(scene.id);
-        });
-        
-        const rejectAllBtn = document.createElement('button');
-        rejectAllBtn.className = 'btn danger';
-        rejectAllBtn.textContent = '✗ Reject All';
-        rejectAllBtn.title = 'Move all images in this scene to Reject';
-        rejectAllBtn.addEventListener('click', (ev) => {
-          ev.stopPropagation();
-          rejectAllInScene(scene.id);
-        });
-        
-        bulkActionsDiv.appendChild(acceptAllBtn);
-        bulkActionsDiv.appendChild(rejectAllBtn);
-        
-        // Add "Mark as Reviewed" button if there are unrated images
+
+        // Add "Mark as Reviewed" button if there are unrated images (place it first)
         if (scene.hasAnyUnrated) {
           const markReviewedBtn = document.createElement('button');
           markReviewedBtn.className = 'btn secondary';
@@ -1657,7 +1638,28 @@
           });
           bulkActionsDiv.appendChild(markReviewedBtn);
         }
-        
+
+        const acceptAllBtn = document.createElement('button');
+        acceptAllBtn.className = 'btn primary';
+        acceptAllBtn.textContent = '✓ Accept All';
+        acceptAllBtn.title = 'Move all images in this scene to Accept';
+        acceptAllBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          acceptAllInScene(scene.id);
+        });
+
+        const rejectAllBtn = document.createElement('button');
+        rejectAllBtn.className = 'btn danger';
+        rejectAllBtn.textContent = '✗ Reject All';
+        rejectAllBtn.title = 'Move all images in this scene to Reject';
+        rejectAllBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          rejectAllInScene(scene.id);
+        });
+
+        bulkActionsDiv.appendChild(acceptAllBtn);
+        bulkActionsDiv.appendChild(rejectAllBtn);
+
         label.appendChild(bulkActionsDiv);
         row.appendChild(label);
 

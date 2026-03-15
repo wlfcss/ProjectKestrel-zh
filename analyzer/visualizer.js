@@ -574,6 +574,16 @@
       return Number.isFinite(n) ? n : -1;
     }
 
+    function parseCaptureTimeMs(v) {
+      if (v == null) return Number.NaN;
+      const raw = String(v).trim();
+      if (!raw) return Number.NaN;
+      let d = new Date(raw);
+      if (isNaN(d)) d = new Date(raw.replace(' ', 'T'));
+      const ms = d.getTime();
+      return Number.isFinite(ms) ? ms : Number.NaN;
+    }
+
     // Parse secondary species columns.
     // New format: JSON array strings e.g. '["Greater Yellowlegs","Vaux\'s Swift"]'.
     // Legacy format: numpy str() repr e.g. "[\'Greater Yellowlegs\' \"Vaux\'s Swift\"]".
@@ -822,6 +832,8 @@
         }
 
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+        const captureMsList = arr.map(a => parseCaptureTimeMs(a.capture_time)).filter(Number.isFinite);
+        const captureTimeMs = captureMsList.length ? Math.min(...captureMsList) : Number.POSITIVE_INFINITY;
         const rowRp = arr[0]?.__rootPath || rootPath || '';
         const rowSc = arr[0] ? String(arr[0].scene_count) : '';
         const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
@@ -841,6 +853,7 @@
           imageCount: arr.length,
           species,
           maxQuality: maxQ,
+          captureTimeMs,
           sceneName,
           isApproved
         });
@@ -852,8 +865,12 @@
 
       // sort
       const sorted = filtered.sort((a, b) => {
+        if (sortBy === 'captureTime') {
+          if (a.captureTimeMs !== b.captureTimeMs) return a.captureTimeMs - b.captureTimeMs;
+          return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
+        }
         if (sortBy === 'imageCount') return b.imageCount - a.imageCount;
-        if (sortBy === 'sceneId') return parseNumber(a.id) - parseNumber(b.id);
+        if (sortBy === 'sceneId') return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
         return b.maxQuality - a.maxQuality;
       });
 
@@ -1060,9 +1077,7 @@
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
         meta.className = 'meta title-badges';
-        const rating = _rawQualityToRating(s.maxQuality);
-        const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
-        meta.innerHTML = `<span class="score">${starDisplay}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+        meta.innerHTML = `<span class="score">★ ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         if (s.isApproved) {
@@ -4872,7 +4887,10 @@
 
         // Update active selection in tree if tree is open
         if (folderTreeData) {
-          treeActivePath = result.root || folderPath;
+          const loadedPath = result.root || folderPath;
+          treeActivePath = loadedPath;
+          checkedFolderPaths.clear();
+          checkedFolderPaths.add(loadedPath);
           renderFolderTree();
         }
       } catch (e) {
@@ -5018,7 +5036,18 @@
     el('#saveCsv').addEventListener('click', saveCsv);
     el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
     el('#speciesConf').addEventListener('change', () => renderScenes());
-    el('#sortBy').addEventListener('change', () => renderScenes());
+    el('#sortBy').addEventListener('change', () => {
+      const s = loadSettings();
+      s.sortBy = el('#sortBy').value;
+      saveSettings(s);
+      renderScenes();
+    });
+
+    (function initSortBy() {
+      const sortSel = document.getElementById('sortBy');
+      if (!sortSel) return;
+      try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
+    })();
 
     // Group-by-folder toggle
     (function initGroupByFolder() {

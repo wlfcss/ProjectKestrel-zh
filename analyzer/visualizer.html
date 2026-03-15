@@ -80,7 +80,7 @@
               <input id="groupByTime" type="checkbox" />
               <span class="muted">Group by capture time</span>
             </label>
-            <label class="inline">
+            <label class="inline" style="flex-basis:100%">
               <input id="groupByFolder" type="checkbox" checked />
               <span class="muted">Group by folder</span>
             </label>
@@ -88,7 +88,8 @@
           <div class="inline" aria-label="Sort order">
             <span class="muted">Sort by:</span>
             <select id="sortBy">
-              <option value="sceneId" selected>Scene ID</option>
+              <option value="captureTime" selected>Capture Time</option>
+              <option value="sceneId">Scene ID</option>
               <option value="maxQuality">Max Quality</option>
               <option value="imageCount">Image Count</option>
             </select>
