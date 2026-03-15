@@ -1291,13 +1291,14 @@
           st.classList.toggle('filled', filled);
           st.classList.toggle('manual', filled && origin === 'manual');
           st.classList.toggle('auto', filled && origin !== 'manual');
+          st.textContent = filled ? '\u2605' : '\u2606';
         });
       }
 
       for (let i = 1; i <= 5; i++) {
         const s = document.createElement('span');
         s.className = 'star';
-        s.textContent = '\u2605';
+          s.textContent = '\u2606';
         s.title = `Set rating to ${i}`;
         s.addEventListener('mouseenter', () => render(i));
         s.addEventListener('mouseleave', () => render());

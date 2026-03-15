@@ -1164,7 +1164,7 @@
     }
 
     #folderTree {
-      max-height: 38vh;
+      max-height: 32vh;
       overflow-x: hidden;
       overflow-y: auto;
       background: #0a0d12;

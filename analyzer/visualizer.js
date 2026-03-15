@@ -921,13 +921,14 @@
           st.classList.toggle('filled', filled);
           st.classList.toggle('manual', filled && origin === 'manual');
           st.classList.toggle('auto', filled && origin !== 'manual');
+          st.textContent = filled ? '★' : '☆';
         });
       }
 
       for (let i = 1; i <= 5; i++) {
         const s = document.createElement('span');
         s.className = 'star';
-        s.textContent = '★';
+        s.textContent = '☆';
         s.title = 'Click to set rating';
         // Click only — hover preview is handled by delegated listeners below
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });

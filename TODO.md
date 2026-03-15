@@ -5,10 +5,14 @@
 
 Bugs
 
-* Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024)
-
 * Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
 --> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.
+    - will fix this to utilize the model's individual weights as a default probably.
+
+* Change number of stars to always have blank stars at least
+* Add scene time to the header when you click into a scene
+* Make the check/uncheck system more robust, particularly when you change what is checked while it is loading. - this might be fine, it adds teh scene to the very end.
+
 
     
 
@@ -58,6 +62,22 @@ Whats working
 
 
 # Version Lincoln Sparrow Changelog
+* Major update: Substantial improvements to quality estimation using a new machine learning model.
+    - New exposure compensation algorithm applies exposure compensation to improve quality estimation performance in bright and dim images.
+    - New machine learning model reflects these changes in the quality determination pipeline.
+* New rating normalization algorithms let you control Kestrel's auto-determined ratings. Look for these options under "Settings" 
+* Significant improvements to group detection methodology should reduce the number of false groupings.
+* Several bug fixes and UI improvements
+    - Fixed bugs with RAW preview handling on MacOS devices being blurry
+    - Fixed bugs with inconsistent application of exposure correction algorithm
+    - Fixed bugs preventing the user interface from updating to reflect newly analyzed images while analysis is in progress.
+    - Fixed bugs in user interface related to the new split scene and scene tag modification system
+    - Improved UI by reorganizing settings menu and providing several options to customize analysis parameters.
+    - Improved UI to show max star rating rather than max Quality
+    - Improved UI to implement auto-save functionality by default.
+    - Improved UI to offer more information when a new version or update is available.
+
+    
 * ETA calculation fails when resuming a folder that started to be analyzed.
 * Massive issues with exposure correction --> Definitely needs to target a higher overall EV and needs to apply to all images for quality esitmation to work properly. Currently any dark photo gets heavily penalized once exposure correct shifts it down.
 * Exposure normalization should be global across all images - remove the minimum shift cap. 
@@ -72,3 +92,4 @@ Whats working
 * Split scene issue --> Doesn't exactly save automatically. The save changes feature isn't exactly working too well. I think we should just make it auto-save all changes and just maintain the revert changes button. 
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 * refresh behavior keeps refreshing when paused.
+* Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024) - fixed
