@@ -381,8 +381,34 @@
         re-analysis to take effect.</div>
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
-      <div class="row">
-        <label for="maskThreshold">Mask Segmentation Threshold</label>
+      <div style="margin-bottom:12px">
+        <label style="display:block;margin-bottom:6px">Star Rating Distribution (Percentile Thresholds)</label>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px">
+          <div>
+            <label for="ratingThreshold5" style="font-size:11px;display:block;margin-bottom:2px">5⭐ (top %)</label>
+            <input id="ratingThreshold5" type="number" min="1" max="50" step="1" value="12" style="width:100%;box-sizing:border-box" title="Percentage of images at the top for 5-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold4" style="font-size:11px;display:block;margin-bottom:2px">4⭐ (next %)</label>
+            <input id="ratingThreshold4" type="number" min="1" max="50" step="1" value="15" style="width:100%;box-sizing:border-box" title="Percentage of images for 4-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold3" style="font-size:11px;display:block;margin-bottom:2px">3⭐ (next %)</label>
+            <input id="ratingThreshold3" type="number" min="1" max="50" step="1" value="20" style="width:100%;box-sizing:border-box" title="Percentage of images for 3-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold2" style="font-size:11px;display:block;margin-bottom:2px">2⭐ (next %)</label>
+            <input id="ratingThreshold2" type="number" min="1" max="50" step="1" value="30" style="width:100%;box-sizing:border-box" title="Percentage of images for 2-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold1" style="font-size:11px;display:block;margin-bottom:2px">1⭐ (bottom %)</label>
+            <input id="ratingThreshold1" type="number" min="1" max="50" step="1" value="23" style="width:100%;box-sizing:border-box" title="Percentage of images for 1-star rating (bottom)" />
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are distributed across star ratings (only applies when rating normalization is enabled). Percentages should sum to 100%. Changes take effect immediately when re-applying normalization.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
         <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5"
           style="width:80px" title="Pixel confidence threshold for bird mask segmentation (0.50–0.95). Higher = tighter masks." />
       </div>

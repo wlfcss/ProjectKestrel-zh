@@ -604,6 +604,30 @@ class Api:
                 pass
 
             # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
+            
+            # Convert percentage settings to percentile thresholds (0.0-1.0)
+            pct_5 = settings.get('rating_threshold_5', 12) / 100.0
+            pct_4 = settings.get('rating_threshold_4', 15) / 100.0
+            pct_3 = settings.get('rating_threshold_3', 20) / 100.0
+            pct_2 = settings.get('rating_threshold_2', 30) / 100.0
+            # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
+            
+            # Convert percentages to cumulative percentiles from the top
+            # pct_5 is top 12% → threshold 0.88 (top 1 - 0.12)
+            # pct_4 is next 15% → threshold 0.73 (top 1 - 0.12 - 0.15)
+            # etc.
+            threshold_5 = 1.0 - pct_5
+            threshold_4 = threshold_5 - pct_4
+            threshold_3 = threshold_4 - pct_3
+            threshold_2 = threshold_3 - pct_2
+            
+            thresholds = {
+                'five': threshold_5,
+                'four': threshold_4,
+                'three': threshold_3,
+                'two': threshold_2,
+            }
+            
             if mode == 'none':
                 def _get_norm(q_val):
                     try:
@@ -621,7 +645,7 @@ class Api:
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -630,7 +654,7 @@ class Api:
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
