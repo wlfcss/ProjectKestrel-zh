@@ -14,6 +14,7 @@ from .config import (
     SPECIESCLASSIFIER_LABELS,
     SPECIESCLASSIFIER_PATH,
     QUALITYCLASSIFIER_PATH,
+    QUALITY_NORMALIZATION_DATA_PATH,
     WILDLIFE_CATEGORIES,
     MODELS_DIR,
     KESTREL_DIR_NAME,
@@ -198,7 +199,10 @@ class AnalysisPipeline:
             self.use_gpu,
             models_dir=str(MODELS_DIR),
         )
-        self.quality_clf = QualityClassifier(str(QUALITYCLASSIFIER_PATH))
+        self.quality_clf = QualityClassifier(
+            str(QUALITYCLASSIFIER_PATH),
+            normalization_data_path=str(QUALITY_NORMALIZATION_DATA_PATH),
+        )
         if status_cb:
             status_cb("Models loaded. Processing started.")
 
