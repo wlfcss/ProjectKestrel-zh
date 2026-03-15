@@ -44,7 +44,8 @@
         <div id="folderTreeWrap" class="folder-tree-wrap hidden">
           <div class="folder-tree-header">
             <span class="tree-title">Folder Tree</span>
-            <button id="treeCheckAll" title="Check all analyzed folders">Check all</button>
+            <button id="treeCheckAll" title="Check all folders">Check All</button>
+            <button id="treeCheckNone" title="Uncheck all folders">Check None</button>
             <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
           </div>
           <div id="folderScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
@@ -76,18 +77,19 @@
                 title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
             </label>
             <label class="inline">
-              <input id="groupByFolder" type="checkbox" checked />
-              <span class="muted">Group by folder</span>
-            </label>
-            <label class="inline">
               <input id="groupByTime" type="checkbox" />
               <span class="muted">Group by capture time</span>
+            </label>
+            <label class="inline" style="flex-basis:100%">
+              <input id="groupByFolder" type="checkbox" checked />
+              <span class="muted">Group by folder</span>
             </label>
           </div>
           <div class="inline" aria-label="Sort order">
             <span class="muted">Sort by:</span>
             <select id="sortBy">
-              <option value="sceneId" selected>Scene ID</option>
+              <option value="captureTime" selected>Capture Time</option>
+              <option value="sceneId">Scene ID</option>
               <option value="maxQuality">Max Quality</option>
               <option value="imageCount">Image Count</option>
             </select>
@@ -304,6 +306,8 @@
     <div class="settings">
       <h3 style="margin:0">Settings</h3>
 
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">UI & Editor</h4>
+
       <div class="row">
         <label for="editorChoice">Preferred Editor</label>
         <select id="editorChoice">
@@ -345,21 +349,51 @@
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">How many subfolder levels to scan when
         building the folder tree (1–6). Higher values may increase scan time.</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Star Rating System</h4>
+
       <div class="row">
-        <label for="ratingNormalization">Star Rating Normalization</label>
+        <label for="ratingNormalization">Normalization Mode</label>
         <select id="ratingNormalization">
+          <option value="none" selected>Default &mdash; use quality thresholds optimized to the Kestrel model</option>
           <option value="per_folder">Per folder &mdash; normalize within each analyzed folder</option>
           <option value="global">Global &mdash; normalize across all analyzed photos</option>
-          <option value="none">None &mdash; use raw quality score thresholds</option>
         </select>
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are
-        converted to star ratings. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
-        overall quality. <b>Global</b> ranks photos against all folders you have analyzed. <b>None</b> uses fixed
-        quality thresholds.</div>
+        converted to star ratings. <b>Default</b> uses Kestrel-optimized threshold cutoffs on percentile-normalized
+        quality values. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
+        overall quality. <b>Global</b> ranks photos against all folders you have analyzed.</div>
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div style="margin-bottom:12px">
+        <label style="display:block;margin-bottom:6px">Star Rating Distribution (Percentile Thresholds)</label>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px">
+          <div>
+            <label for="ratingThreshold5" style="font-size:11px;display:block;margin-bottom:2px">5⭐ (top %)</label>
+            <input id="ratingThreshold5" type="number" min="1" max="50" step="1" value="12" style="width:100%;box-sizing:border-box" title="Percentage of images at the top for 5-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold4" style="font-size:11px;display:block;margin-bottom:2px">4⭐ (next %)</label>
+            <input id="ratingThreshold4" type="number" min="1" max="50" step="1" value="15" style="width:100%;box-sizing:border-box" title="Percentage of images for 4-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold3" style="font-size:11px;display:block;margin-bottom:2px">3⭐ (next %)</label>
+            <input id="ratingThreshold3" type="number" min="1" max="50" step="1" value="20" style="width:100%;box-sizing:border-box" title="Percentage of images for 3-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold2" style="font-size:11px;display:block;margin-bottom:2px">2⭐ (next %)</label>
+            <input id="ratingThreshold2" type="number" min="1" max="50" step="1" value="30" style="width:100%;box-sizing:border-box" title="Percentage of images for 2-star rating" />
+          </div>
+          <div>
+            <label for="ratingThreshold1" style="font-size:11px;display:block;margin-bottom:2px">1⭐ (bottom %)</label>
+            <input id="ratingThreshold1" type="number" min="1" max="50" step="1" value="23" style="width:100%;box-sizing:border-box" title="Percentage of images for 1-star rating (bottom)" />
+          </div>
+        </div>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality percentiles are mapped across star ratings. Percentages should sum to 100%. Changes take effect immediately when re-applying ratings.</div>
+
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analysis Settings</h4>
+
       <div class="row">
         <label for="detectionThreshold">Detection Confidence Threshold</label>
         <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75"
@@ -380,7 +414,6 @@
         many seconds of each other are treated as the same burst/scene (using EXIF timestamp). Requires
         re-analysis to take effect.</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div class="row">
         <label for="maskThreshold">Mask Segmentation Threshold</label>
         <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5"
@@ -390,7 +423,8 @@
         segmentation (0.50–0.95). Higher values produce tighter masks around birds, lower values are more
         inclusive. Requires re-analysis to take effect.</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Data & Preview</h4>
+
       <div class="row">
         <label for="rawPreviewCacheEnabled" style="flex:1">Cache RAW Preview Images</label>
         <label class="inline" style="gap:6px">
@@ -401,7 +435,17 @@
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Cache full-resolution RAW previews
         in .kestrel/culling_TMP for faster subsequent loads. Disable to save disk space (previews will be generated fresh each time).</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
+        <label for="settingsAutoSave" style="flex:1">Auto-Save Changes</label>
+        <label class="inline" style="gap:6px">
+          <input type="checkbox" id="settingsAutoSave" checked />
+          <span class="muted">Enable</span>
+        </label>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Automatically save ratings, tags, and scene changes. When disabled, you'll see a Save/Revert workflow.</div>
+
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analytics & Privacy</h4>
+
       <div class="row">
         <label style="flex:1">Kestrel's Impact</label>
         <span class="muted" id="settingsTotalImpact">—</span>
@@ -420,17 +464,7 @@
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Helps improve Kestrel. No filenames,
         paths, or images are ever shared. You can change this at any time.</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
-      <div class="row">
-        <label for="settingsAutoSave" style="flex:1">Auto-Save Changes</label>
-        <label class="inline" style="gap:6px">
-          <input type="checkbox" id="settingsAutoSave" checked />
-          <span class="muted">Enable</span>
-        </label>
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Automatically save ratings, tags, and scene changes. When disabled, you'll see a Save/Revert workflow.</div>
-
-      <div class="row" style="justify-content:flex-end; margin-top: 4px;">
+      <div class="row" style="justify-content:flex-end; margin-top: 12px; gap:8px;">
         <button id="settingsCancel">Cancel</button>
         <button id="settingsSave" class="primary">Save</button>
       </div>
@@ -650,23 +684,19 @@
     </div>
   </dialog>
 
-  <!-- Version Update Notification dialog -->
-  <dialog id="versionUpdateDlg" style="width:min(640px,96vw);height:auto;max-height:92vh;overflow-x:hidden;overflow-y:auto;">
-    <div class="settings" style="width:min(600px,96vw)">
-      <h3 style="margin:0;display:flex;align-items:center;gap:8px;">
-        <span id="versionUpdatePriority" style="font-size:20px;"></span>
-        <span id="versionUpdateTitle">New Version Available</span>
+  <!-- Version Update Toast Notification -->
+  <div id="versionUpdateToast" style="display:none;position:fixed;bottom:20px;right:20px;max-width:380px;background:#1a2a1a;border:2px solid #4a7a4a;border-radius:8px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:9999;font-family:var(--font-family);">
+    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+      <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:16px;color:#6ec16e;">
+        <span id="versionUpdatePriority" style="font-size:18px;"></span>
+        <span id="versionUpdateTitle" style="flex:1;">New Version Available</span>
       </h3>
-      <div id="versionUpdateContent" style="margin:16px 0;">
-        <div id="versionUpdateNotes" style="margin-bottom:12px;"></div>
-        <div id="versionUpdateLinks" style="display:flex;flex-direction:column;gap:10px;margin:16px 0;"></div>
-        <div id="versionUpdateTraditional" style="font-size:12px;color:var(--muted);margin-top:16px;padding-top:16px;border-top:1px solid var(--card-border);"></div>
-      </div>
-      <div class="footer">
-        <button id="versionUpdateClose">Close</button>
-      </div>
+      <button id="versionUpdateClose" style="background:none;border:none;color:#7ca3d9;cursor:pointer;font-size:18px;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>
     </div>
-  </dialog>
+    <ul id="versionUpdateNotes" style="margin:12px 0;padding-left:20px;font-size:13px;color:#c0c0c0;line-height:1.5;"></ul>
+    <div id="versionUpdateWindowsNote" style="font-size:12px;color:#999;margin:12px 0;padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;display:none;"></div>
+    <button id="versionUpdateDownloadBtn" style="width:100%;padding:10px 16px;margin-top:12px;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;text-decoration:none;display:block;text-align:center;">Download Update</button>
+  </div>
 
   <script src="visualizer.js"></script>
 

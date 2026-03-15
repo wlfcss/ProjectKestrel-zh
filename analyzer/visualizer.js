@@ -245,8 +245,13 @@
         .catch(() => {
           versionBadge.textContent = 'Version: unknown';
         });
-      // Check for new versions from remote JSON endpoint
-      checkRemoteVersion();
+      // Check for new versions from remote JSON endpoint but we need pywebview to be ready, 
+      // so listen for the event or execute immediately if already mounted
+      if (window.pywebview?.api) {
+        checkRemoteVersion();
+      } else {
+        window.addEventListener('pywebviewready', checkRemoteVersion);
+      }
     }
 
     // Check if running as Windows Store app
@@ -298,15 +303,30 @@
           } catch (e) { /* ignore */ }
         }
         
-        const resp = await fetch('https://projectkestrel.org/version.json', { cache: 'no-store' });
-        if (!resp.ok) return;
-        const versionList = await resp.json();
+        let versionList;
+        if (window.pywebview?.api?.fetch_remote_version) {
+          const res = await window.pywebview.api.fetch_remote_version();
+          if (res && res.success && res.data) {
+            versionList = res.data;
+          }
+        }
+        
+        if (!versionList) {
+          const resp = await fetch('https://projectkestrel.org/version.json', { cache: 'no-store' });
+          if (!resp.ok) return;
+          versionList = await resp.json();
+        }
+        
         if (!Array.isArray(versionList) || versionList.length === 0) return;
         
         const latestVersion = versionList[0]; // first entry is latest
         
         // Compare versions: check if latest name differs from current
-        if (!latestVersion.name || latestVersion.name === currentVer) return;
+        if (!latestVersion.name) return;
+        const normalizedLocal = (currentVer || '').replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        const normalizedRemote = latestVersion.name.replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        
+        if (normalizedRemote === normalizedLocal) return;
         
         // Show update notification
         showVersionUpdateNotification(latestVersion);
@@ -315,10 +335,14 @@
       }
     }
 
-    // Display the version update notification dialog
+    // Display the version update notification as a toast
     async function showVersionUpdateNotification(versionInfo) {
-      const dlg = document.getElementById('versionUpdateDlg');
-      if (!dlg) return;
+      console.log('[DEBUG] Showing version update notification for version:', versionInfo);
+      const toast = document.getElementById('versionUpdateToast');
+      if (!toast) return;
+      
+      const platform = await getPlatformInfo();
+      const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
       
       // Priority symbol
       const priorityEl = document.getElementById('versionUpdatePriority');
@@ -326,60 +350,58 @@
       
       // Title
       const titleEl = document.getElementById('versionUpdateTitle');
-      if (titleEl) titleEl.textContent = `New Version: ${versionInfo.name}`;
+      if (titleEl) titleEl.textContent = `Update Available: ${versionInfo.name}`;
       
       // Changelog notes (show first 3)
       const notesEl = document.getElementById('versionUpdateNotes');
       if (notesEl && versionInfo.notes && Array.isArray(versionInfo.notes)) {
-        const notesList = versionInfo.notes.slice(0, 3).map(note => `<li>${escapeHtml(note)}</li>`).join('');
-        notesEl.innerHTML = notesList.length > 0 ? `<ul style="margin:0;padding-left:20px;">${notesList}</ul>` : '';
+        notesEl.innerHTML = '';
+        versionInfo.notes.slice(0, 3).forEach(note => {
+          const li = document.createElement('li');
+          li.textContent = note;
+          notesEl.appendChild(li);
+        });
       }
       
-      // Platform-specific download links
-      const linksEl = document.getElementById('versionUpdateLinks');
-      if (linksEl) {
-        linksEl.innerHTML = '';
-        const platform = await getPlatformInfo();
-        const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
-        
-        if (platform === 'macos' && versionInfo.downloadLinks?.macos) {
-          const linkBtn = document.createElement('a');
-          linkBtn.href = 'https://projectkestrel.org/download?platform=macos';
-          linkBtn.target = '_blank';
-          linkBtn.className = 'primary';
-          linkBtn.style.cssText = 'padding:12px 20px;border-radius:6px;text-align:center;text-decoration:none;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;cursor:pointer;display:inline-block;';
-          linkBtn.textContent = '→ Download for macOS';
-          linksEl.appendChild(linkBtn);
-        } else if (platform === 'windows' && isStore) {
-          const storeBtn = document.createElement('div');
-          storeBtn.style.cssText = 'background:#1a2a3a;border:1px solid #4a7ac4;border-radius:6px;padding:12px;color:#7ca3d9;';
-          storeBtn.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Windows Store will update automatically within 1-2 days</div>' +
-            '<a href="ms-windows-store://pdp/?productid=9NQR2WFFNP5J" style="color:#7ca3d9;text-decoration:underline;cursor:pointer;">Check Windows Store for updates</a>';
-          linksEl.appendChild(storeBtn);
-        } else if (platform === 'windows' && versionInfo.downloadLinks?.traditional) {
-          const linkBtn = document.createElement('a');
-          linkBtn.href = versionInfo.downloadLinks.traditional;
-          linkBtn.target = '_blank';
-          linkBtn.className = 'primary';
-          linkBtn.style.cssText = 'padding:12px 20px;border-radius:6px;text-align:center;text-decoration:none;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;cursor:pointer;display:inline-block;';
-          linkBtn.textContent = '→ Download Installer';
-          linksEl.appendChild(linkBtn);
+      // Windows-specific note (only show for Windows users)
+      const windowsNoteEl = document.getElementById('versionUpdateWindowsNote');
+      if (windowsNoteEl) {
+        if (platform === 'windows') {
+          windowsNoteEl.innerHTML = 'Windows users: Check for updates in the Microsoft Store within 1-3 days. If you used the traditional installer to install Kestrel, visit <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> to manually update.';
+          windowsNoteEl.style.display = 'block';
+        } else {
+          windowsNoteEl.style.display = 'none';
         }
       }
       
-      // Traditional installer note
-      const tradEl = document.getElementById('versionUpdateTraditional');
-      if (tradEl) {
-        tradEl.innerHTML = 'If you used the traditional installer to install Kestrel, visit <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> to manually update.';
+      // Download button
+      const downloadBtn = document.getElementById('versionUpdateDownloadBtn');
+      if (downloadBtn) {
+        downloadBtn.href = `https://projectkestrel.org/download?platform=${platform}`;
+        downloadBtn.textContent = platform === 'macos' ? 'Go to MacOS Download' : 'Go to Windows Download';
+        downloadBtn.onclick = (e) => {
+          e.preventDefault();
+          window.open(`https://projectkestrel.org/download?platform=${platform}`, '_blank');
+        };
       }
       
       // Close button
       const closeBtn = document.getElementById('versionUpdateClose');
       if (closeBtn) {
-        closeBtn.onclick = () => dlg.close();
+        closeBtn.onclick = () => {
+          toast.style.display = 'none';
+        };
       }
       
-      dlg.showModal();
+      // Show the toast
+      toast.style.display = 'block';
+      
+      // Auto-hide after 10 seconds
+      setTimeout(() => {
+        if (toast.style.display === 'block') {
+          toast.style.display = 'none';
+        }
+      }, 60000);
     }
 
     // Tooltip layer so tips can render over the main image area
@@ -572,6 +594,16 @@
     function parseNumber(v) {
       const n = parseFloat(v);
       return Number.isFinite(n) ? n : -1;
+    }
+
+    function parseCaptureTimeMs(v) {
+      if (v == null) return Number.NaN;
+      const raw = String(v).trim();
+      if (!raw) return Number.NaN;
+      let d = new Date(raw);
+      if (isNaN(d)) d = new Date(raw.replace(' ', 'T'));
+      const ms = d.getTime();
+      return Number.isFinite(ms) ? ms : Number.NaN;
     }
 
     // Parse secondary species columns.
@@ -822,6 +854,8 @@
         }
 
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+        const captureMsList = arr.map(a => parseCaptureTimeMs(a.capture_time)).filter(Number.isFinite);
+        const captureTimeMs = captureMsList.length ? Math.min(...captureMsList) : Number.POSITIVE_INFINITY;
         const rowRp = arr[0]?.__rootPath || rootPath || '';
         const rowSc = arr[0] ? String(arr[0].scene_count) : '';
         const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
@@ -841,6 +875,7 @@
           imageCount: arr.length,
           species,
           maxQuality: maxQ,
+          captureTimeMs,
           sceneName,
           isApproved
         });
@@ -852,8 +887,12 @@
 
       // sort
       const sorted = filtered.sort((a, b) => {
+        if (sortBy === 'captureTime') {
+          if (a.captureTimeMs !== b.captureTimeMs) return a.captureTimeMs - b.captureTimeMs;
+          return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
+        }
         if (sortBy === 'imageCount') return b.imageCount - a.imageCount;
-        if (sortBy === 'sceneId') return parseNumber(a.id) - parseNumber(b.id);
+        if (sortBy === 'sceneId') return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
         return b.maxQuality - a.maxQuality;
       });
 
@@ -921,13 +960,14 @@
           st.classList.toggle('filled', filled);
           st.classList.toggle('manual', filled && origin === 'manual');
           st.classList.toggle('auto', filled && origin !== 'manual');
+          st.textContent = filled ? '★' : '☆';
         });
       }
 
       for (let i = 1; i <= 5; i++) {
         const s = document.createElement('span');
         s.className = 'star';
-        s.textContent = '★';
+        s.textContent = '☆';
         s.title = 'Click to set rating';
         // Click only — hover preview is handled by delegated listeners below
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
@@ -1059,7 +1099,7 @@
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
         meta.className = 'meta title-badges';
-        meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+        meta.innerHTML = `<span class="score">★ ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         if (s.isApproved) {
@@ -1710,7 +1750,9 @@
       let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
       if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
       html += `</div>`;
-      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
+      const rating = _rawQualityToRating(scene.maxQuality);
+      const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
+      html += `<div class="muted">${scene.imageCount} images • ${starDisplay}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
 
       // Species chips
       html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
@@ -2428,7 +2470,13 @@
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
       // Rating normalization
       const normSelect = document.getElementById('ratingNormalization');
-      if (normSelect) normSelect.value = getSetting('rating_normalization', 'per_folder');
+      if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
+      // Rating distribution thresholds
+      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 12);
+      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 15);
+      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 20);
+      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 30);
+      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 23);
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
@@ -2470,7 +2518,7 @@
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       const normalizationEl = document.getElementById('ratingNormalization');
-      const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
+      const ratingNormalization = normalizationEl ? normalizationEl.value : 'none';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
@@ -2481,14 +2529,30 @@
       const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
+      // Rating distribution thresholds
+      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 12));
+      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 15));
+      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 20));
+      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 30));
+      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 23));
       
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
-      const prevNormalization = existing.rating_normalization || 'per_folder';
+      const prevNormalization = existing.rating_normalization || 'none';
+      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 12;
+      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 15;
+      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 20;
+      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 30;
+      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 23;
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
         rating_normalization: ratingNormalization,
+        rating_threshold_5: t5,
+        rating_threshold_4: t4,
+        rating_threshold_3: t3,
+        rating_threshold_2: t2,
+        rating_threshold_1: t1,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
         mask_threshold: maskThreshold,
@@ -2496,6 +2560,8 @@
         auto_save_enabled: autoSaveEnabled,
       };
       _autoSaveEnabled = autoSaveEnabled;
+      // Persist settings to localStorage immediately
+      saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
@@ -2509,8 +2575,14 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If normalization mode changed and folders are loaded, reapply immediately
-      if (ratingNormalization !== prevNormalization && rows.length > 0) {
+      // If normalization mode or thresholds changed and folders are loaded, reapply immediately
+      const thresholdsChanged =
+        t5 !== prevT5 ||
+        t4 !== prevT4 ||
+        t3 !== prevT3 ||
+        t2 !== prevT2 ||
+        t1 !== prevT1;
+      if ((ratingNormalization !== prevNormalization || thresholdsChanged) && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }
@@ -4164,6 +4236,8 @@
         try {
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
+          // Update auto-refresh timers based on pause state
+          _updateAutoRefreshTimers();
 
           // When new items appear, inspect and capture their baseline state
           if (status && status.items) {
@@ -4588,6 +4662,17 @@
     function _updateAutoRefreshTimers() {
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
+        const queueStatus = window._lastQueueStatus;
+        const isPaused = queueStatus && queueStatus.paused;
+        
+        // Stop all timers if queue is paused — no need to refresh when nothing is running
+        if (isPaused) {
+          for (const timerId of _autoRefreshTimers.values()) {
+            clearInterval(timerId);
+          }
+          _autoRefreshTimers.clear();
+          return;
+        }
         
         // Stop timers for folders that are no longer checked or in-progress
         for (const [path, timerId] of _autoRefreshTimers.entries()) {
@@ -4599,7 +4684,7 @@
           }
         }
         
-        // Start timers for newly-checked in-progress folders
+        // Start timers for newly-checked in-progress folders (only if queue is running, not paused)
         for (const inProgPath of _inProgressFolderPaths) {
           if (checkedFolderPaths.has(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
             // Auto-refresh every 10 seconds while folder is in progress and checked
@@ -4674,17 +4759,14 @@
 
     function checkAllTreeFolders() {
       const all = collectKestrelPaths(folderTreeRootNode);
-      const btn = document.getElementById('treeCheckAll');
-      // If all are already checked, uncheck all; otherwise check all
-      const allChecked = all.length > 0 && all.every(p => checkedFolderPaths.has(p));
-      if (allChecked) {
-        checkedFolderPaths.clear();
-        if (btn) btn.textContent = 'Check all';
-      } else {
-        all.forEach(p => checkedFolderPaths.add(p));
-        if (btn) btn.textContent = 'Check none';
-      }
-      renderFolderTree(); // re-render so checkbox DOM matches state
+      all.forEach(p => checkedFolderPaths.add(p));
+      renderFolderTree();
+      debouncedAutoLoad();
+    }
+
+    function checkNoneTreeFolders() {
+      checkedFolderPaths.clear();
+      renderFolderTree();
       debouncedAutoLoad();
     }
 
@@ -4838,7 +4920,10 @@
 
         // Update active selection in tree if tree is open
         if (folderTreeData) {
-          treeActivePath = result.root || folderPath;
+          const loadedPath = result.root || folderPath;
+          treeActivePath = loadedPath;
+          checkedFolderPaths.clear();
+          checkedFolderPaths.add(loadedPath);
           renderFolderTree();
         }
       } catch (e) {
@@ -4872,8 +4957,6 @@
       // folders from a previous root selection.
       try {
         checkedFolderPaths.clear();
-        const treeCheckAllBtn = document.getElementById('treeCheckAll');
-        if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
         renderFolderTree();
       } catch (e) { /* ignore */ }
 
@@ -4986,7 +5069,18 @@
     el('#saveCsv').addEventListener('click', saveCsv);
     el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
     el('#speciesConf').addEventListener('change', () => renderScenes());
-    el('#sortBy').addEventListener('change', () => renderScenes());
+    el('#sortBy').addEventListener('change', () => {
+      const s = loadSettings();
+      s.sortBy = el('#sortBy').value;
+      saveSettings(s);
+      renderScenes();
+    });
+
+    (function initSortBy() {
+      const sortSel = document.getElementById('sortBy');
+      if (!sortSel) return;
+      try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
+    })();
 
     // Group-by-folder toggle
     (function initGroupByFolder() {
@@ -5223,8 +5317,6 @@
         if (folderPath) {
           treeExpandedPaths.clear();
           checkedFolderPaths.clear();
-          const treeCheckAllBtn = document.getElementById('treeCheckAll');
-          if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
           const treeScanned = await scanFolderTree(folderPath);
           if (treeScanned && !folderTreeRootHasKestrel) {
             setStatus('Select a folder from the tree below to load its scenes');
@@ -5237,9 +5329,11 @@
       });
     }
 
-    // Wire "Check all / Check none" button
+    // Wire "Check all / Check none" buttons
     const treeCheckAllBtn = document.getElementById('treeCheckAll');
     if (treeCheckAllBtn) treeCheckAllBtn.addEventListener('click', checkAllTreeFolders);
+    const treeCheckNoneBtn = document.getElementById('treeCheckNone');
+    if (treeCheckNoneBtn) treeCheckNoneBtn.addEventListener('click', checkNoneTreeFolders);
 
     // Wire "Load checked" button (removed from HTML; kept as no-op guard)
     const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');

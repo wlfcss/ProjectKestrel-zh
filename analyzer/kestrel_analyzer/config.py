@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 ANALYZER_DIR = Path(__file__).resolve().parents[1]
 MODELS_DIR = ANALYZER_DIR / "models"
@@ -8,6 +8,7 @@ MODELS_DIR = ANALYZER_DIR / "models"
 SPECIESCLASSIFIER_PATH = MODELS_DIR / "model.onnx"
 SPECIESCLASSIFIER_LABELS = MODELS_DIR / "labels.txt"
 QUALITYCLASSIFIER_PATH = MODELS_DIR / "quality.keras"
+QUALITY_NORMALIZATION_DATA_PATH = MODELS_DIR / "quality_normalization_data.csv"
 MASK_RCNN_WEIGHTS_PATH = MODELS_DIR / "mask_rcnn_resnet50_fpn_v2.pth"
 
 WILDLIFE_CATEGORIES = [

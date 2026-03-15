@@ -1,15 +1,39 @@
-def quality_to_rating(q: float) -> int:
-    if q == -1:
+def quality_to_rating(q: float, thresholds: dict = None) -> int:
+    """Map a percentile-normalized quality score (0.0-1.0) to 1-5 stars.
+
+    Thresholds use cumulative percentile cutoffs from the top, matching the
+    format used by compute_normalized_rating():
+      {'five': 0.88, 'four': 0.73, 'three': 0.53, 'two': 0.23}
+    """
+    try:
+        q_f = float(q)
+    except (TypeError, ValueError):
         return 0
-    if q < 0.15:
-        return 1
-    if q < 0.3:
-        return 2
-    if q < 0.6:
-        return 3
-    if q < 0.9:
+    if q_f < 0:
+        return 0
+
+    if thresholds is None:
+        thresholds = {
+            'five': 0.88,   # top 12%
+            'four': 0.73,   # 12-27%
+            'three': 0.53,  # 27-47%
+            'two': 0.23,    # 47-77%
+        }
+
+    t5 = float(thresholds.get('five', 0.88))
+    t4 = float(thresholds.get('four', 0.73))
+    t3 = float(thresholds.get('three', 0.53))
+    t2 = float(thresholds.get('two', 0.23))
+
+    if q_f >= t5:
+        return 5
+    if q_f >= t4:
         return 4
-    return 5
+    if q_f >= t3:
+        return 3
+    if q_f >= t2:
+        return 2
+    return 1
 
 
 def compute_quality_distribution(quality_scores) -> list:
@@ -30,37 +54,55 @@ def compute_quality_distribution(quality_scores) -> list:
     return buckets
 
 
-def compute_normalized_rating(quality: float, distribution: list) -> int:
+def compute_normalized_rating(
+    quality: float,
+    distribution: list,
+    thresholds: dict = None,
+) -> int:
     """Map a quality score to a star rating using a quality distribution.
 
     Star assignment is based on the percentile rank of the photo among all
-    detected subjects, fitting the following target distribution:
-      - Top 10%       -> 5 stars
-      - 10 – 32.5%    -> 4 stars
-      - 32.5 – 55%    -> 3 stars
-      - 55 – 77.5%    -> 2 stars
-      - Bottom 22.5%  -> 1 star
-      - quality < 0   -> 0 stars (no detection / unprocessed)
+    detected subjects, using customizable thresholds.
 
-    Falls back to quality_to_rating() if the distribution is empty.
+    Args:
+        quality: Raw quality score (0.0 to 1.0, or -1 for no detection).
+        distribution: Quality distribution list (100 buckets) for normalization.
+        thresholds: Optional dict with keys 'five', 'four', 'three', 'two' (fractional
+                   percentiles). Defaults to standard thresholds if not provided.
+
+    Returns:
+        Star rating 0-5 (0 = no detection / unprocessed).
+
+    Example thresholds (as percentiles 0.0-1.0):
+        {'five': 0.88, 'four': 0.73, 'three': 0.53, 'two': 0.23}
     """
     if quality < 0:
         return 0
+    
+    # Default thresholds: 12%, 15%, 20%, 30%, 23%
+    if thresholds is None:
+        thresholds = {
+            'five': 0.88,   # top 12%
+            'four': 0.73,   # 12-27%
+            'three': 0.53,  # 27-47%
+            'two': 0.23,    # 47-77%
+        }
+    
     total = sum(distribution)
     if total == 0:
-        return quality_to_rating(quality)
+        return quality_to_rating(quality, thresholds)
     bucket = min(int(quality * 100), 99)
     below = sum(distribution[:bucket])
     within = distribution[bucket]
     # fraction_rank: 0.0 = worst quality, 1.0 = best quality
     fraction_rank = (below + within * 0.5) / total
-    if fraction_rank >= 0.90:
+    if fraction_rank >= thresholds.get('five', 0.88):
         return 5
-    if fraction_rank >= 0.675:
+    if fraction_rank >= thresholds.get('four', 0.73):
         return 4
-    if fraction_rank >= 0.45:
+    if fraction_rank >= thresholds.get('three', 0.53):
         return 3
-    if fraction_rank >= 0.225:
+    if fraction_rank >= thresholds.get('two', 0.23):
         return 2
     return 1
 
@@ -70,6 +112,7 @@ def get_image_display_rating(
     quality: float,
     user_image_ratings: dict,
     distribution: list,
+    thresholds: dict = None,
 ) -> tuple:
     """Return (rating, origin) for display, preferring user-specified over auto-computed.
 
@@ -78,6 +121,7 @@ def get_image_display_rating(
         quality: Raw quality score from analysis pipeline.
         user_image_ratings: Dict mapping filename -> int (from kestrel_scenedata.json).
         distribution: Quality distribution list (100 buckets) for normalization.
+        thresholds: Optional dict with percentile thresholds (see compute_normalized_rating).
 
     Returns:
         (rating: int 0-5, origin: str 'manual' | 'auto')
@@ -88,4 +132,4 @@ def get_image_display_rating(
             return max(0, min(5, int(r))), "manual"
         except (TypeError, ValueError):
             pass
-    return compute_normalized_rating(quality, distribution), "auto"
+    return compute_normalized_rating(quality, distribution, thresholds), "auto"

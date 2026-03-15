@@ -299,6 +299,31 @@ class Api:
             except Exception:
                 return {'success': True, 'version': 'unknown'}
 
+    def fetch_remote_version(self):
+        """Fetch version.json from projectkestrel.org to bypass CORS in JS."""
+        try:
+            import urllib.request
+            import urllib.error
+            import json
+            import ssl
+            import certifi
+            
+            url = "https://projectkestrel.org/version.json"
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            
+            req = urllib.request.Request(
+                url,
+                headers={'User-Agent': 'ProjectKestrel/1.0'},
+                method='GET'
+            )
+            
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                return {'success': True, 'data': data}
+        except Exception as e:
+            print(f"[API] fetch_remote_version() -> Error: {e}", flush=True)
+            return {'success': False, 'error': str(e)}
+
     def get_platform_info(self):
         """Return platform information (windows, macos, linux)."""
         import sys
@@ -574,7 +599,7 @@ class Api:
 
             settings = load_persisted_settings()
             if mode is None:
-                mode = settings.get('rating_normalization', 'per_folder')
+                mode = settings.get('rating_normalization', 'none')
 
             df = pd.read_csv(csv_path)
             if df.empty:
@@ -604,10 +629,34 @@ class Api:
                 pass
 
             # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
+            
+            # Convert percentage settings to percentile thresholds (0.0-1.0)
+            pct_5 = settings.get('rating_threshold_5', 12) / 100.0
+            pct_4 = settings.get('rating_threshold_4', 15) / 100.0
+            pct_3 = settings.get('rating_threshold_3', 20) / 100.0
+            pct_2 = settings.get('rating_threshold_2', 30) / 100.0
+            # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
+            
+            # Convert percentages to cumulative percentiles from the top
+            # pct_5 is top 12% → threshold 0.88 (top 1 - 0.12)
+            # pct_4 is next 15% → threshold 0.73 (top 1 - 0.12 - 0.15)
+            # etc.
+            threshold_5 = 1.0 - pct_5
+            threshold_4 = threshold_5 - pct_4
+            threshold_3 = threshold_4 - pct_3
+            threshold_2 = threshold_3 - pct_2
+            
+            thresholds = {
+                'five': threshold_5,
+                'four': threshold_4,
+                'three': threshold_3,
+                'two': threshold_2,
+            }
+            
             if mode == 'none':
                 def _get_norm(q_val):
                     try:
-                        return quality_to_rating(float(q_val))
+                        return quality_to_rating(float(q_val), thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -621,16 +670,16 @@ class Api:
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
-            else:  # per_folder (default)
+            else:  # per_folder
                 _dist = folder_dist
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -1308,7 +1357,7 @@ class Api:
             img = Image.fromarray(rgb)
 
             buf = BytesIO()
-            img.save(buf, format='JPEG', quality=100, subsampling=0, optimize=False, progressive=False)
+            img.save(buf, format='JPEG', quality=90, subsampling=0, optimize=False, progressive=False)
             jpg_bytes = buf.getvalue()
             wrote_cache = False
             if use_cache:

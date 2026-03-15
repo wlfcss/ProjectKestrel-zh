@@ -14,6 +14,7 @@ from .config import (
     SPECIESCLASSIFIER_LABELS,
     SPECIESCLASSIFIER_PATH,
     QUALITYCLASSIFIER_PATH,
+    QUALITY_NORMALIZATION_DATA_PATH,
     WILDLIFE_CATEGORIES,
     MODELS_DIR,
     KESTREL_DIR_NAME,
@@ -36,6 +37,15 @@ print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
 from .raw_exif import get_capture_time
 from .logging_utils import get_log_path, log_event, log_exception, log_warning
+
+try:
+    from ..settings_utils import load_persisted_settings
+except ImportError:
+    try:
+        from analyzer.settings_utils import load_persisted_settings
+    except ImportError:
+        load_persisted_settings = None
+
 print("Utility functions imported successfully.")
 
 print("Importing ML models... Starting with MaskRCNNWrapper...")
@@ -198,7 +208,10 @@ class AnalysisPipeline:
             self.use_gpu,
             models_dir=str(MODELS_DIR),
         )
-        self.quality_clf = QualityClassifier(str(QUALITYCLASSIFIER_PATH))
+        self.quality_clf = QualityClassifier(
+            str(QUALITYCLASSIFIER_PATH),
+            normalization_data_path=str(QUALITY_NORMALIZATION_DATA_PATH),
+        )
         if status_cb:
             status_cb("Models loaded. Processing started.")
 
@@ -224,6 +237,27 @@ class AnalysisPipeline:
         quality_cb = callbacks.get("on_quality")
         species_cb = callbacks.get("on_species")
         error_cb = callbacks.get("on_error")
+
+        rating_thresholds = None
+        if callable(load_persisted_settings):
+            try:
+                sett = load_persisted_settings() or {}
+                pct_5 = float(sett.get('rating_threshold_5', 12)) / 100.0
+                pct_4 = float(sett.get('rating_threshold_4', 15)) / 100.0
+                pct_3 = float(sett.get('rating_threshold_3', 20)) / 100.0
+                pct_2 = float(sett.get('rating_threshold_2', 30)) / 100.0
+                threshold_5 = 1.0 - pct_5
+                threshold_4 = threshold_5 - pct_4
+                threshold_3 = threshold_4 - pct_3
+                threshold_2 = threshold_3 - pct_2
+                rating_thresholds = {
+                    'five': threshold_5,
+                    'four': threshold_4,
+                    'three': threshold_3,
+                    'two': threshold_2,
+                }
+            except Exception:
+                rating_thresholds = None
 
         active_wildlife_categories = WILDLIFE_CATEGORIES if wildlife_enabled else []
 
@@ -514,7 +548,7 @@ class AnalysisPipeline:
                             "family": "N/A",
                             "family_confidence": 0.0,
                             "quality": quality_score,
-                            "rating": quality_to_rating(quality_score),
+                            "rating": quality_to_rating(quality_score, rating_thresholds),
                             "quality_crop": quality_crop,
                             "exposure_correction": round(stops, 4),
                         }
@@ -580,7 +614,7 @@ class AnalysisPipeline:
                             stage_ctx["stage"] = "quality_score"
                             quality_score = self.quality_clf.classify(item["quality_crop"], item["quality_mask"])
                             item["quality"] = quality_score
-                            item["rating"] = quality_to_rating(quality_score)
+                            item["rating"] = quality_to_rating(quality_score, rating_thresholds)
                         if quality_cb:
                             quality_cb(
                                 {

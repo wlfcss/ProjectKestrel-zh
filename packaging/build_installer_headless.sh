@@ -29,8 +29,7 @@ else
   RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
   APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
   {
-    echo "Build: ${RELEASE_TS}"
-    echo "Version: ${APP_VERSION}"
+    echo "${APP_VERSION}"
   } > "analyzer/VERSION.txt"
   echo "[OK] Generated VERSION.txt in analyzer/"
 fi
@@ -107,45 +106,7 @@ fi
 
 echo
 printf "%s\n" "========================================"
-printf "%s\n" "Building macOS installer (.pkg) ..."
-printf "%s\n" "========================================"
-echo
-
-RELEASE_DIR="${PROJECT_ROOT}/release/${APP_VERSION}"
-mkdir -p "${RELEASE_DIR}"
-
-PKG_ROOT="${RELEASE_DIR}/pkgroot"
-APP_INSTALL_DIR="${PKG_ROOT}/Applications/Project Kestrel"
-PKG_OUTPUT="${RELEASE_DIR}/ProjectKestrel-${APP_VERSION}.pkg"
-PKG_SCRIPTS="${RELEASE_DIR}/pkg-scripts"
-
-rm -rf "${PKG_ROOT}" "${PKG_SCRIPTS}"
-mkdir -p "${APP_INSTALL_DIR}"
-mkdir -p "${PKG_SCRIPTS}"
-
-# Copy the entire onedir bundle into the install location
-cp -R "${DIST_DIR}/." "${APP_INSTALL_DIR}/ProjectKestrel/"
-
-# Minimal postinstall script - makes the binary executable
-cat > "${PKG_SCRIPTS}/postinstall" <<'EOS'
-#!/bin/bash
-set -euo pipefail
-chmod +x "/Applications/Project Kestrel/ProjectKestrel/ProjectKestrel" 2>/dev/null || true
-EOS
-chmod +x "${PKG_SCRIPTS}/postinstall"
-
-pkgbuild \
-  --root "${PKG_ROOT}" \
-  --scripts "${PKG_SCRIPTS}" \
-  --identifier "org.ProjectKestrel" \
-  --version "${APP_VERSION}" \
-  --install-location "/" \
-  "${PKG_OUTPUT}"
-
-echo
-printf "%s\n" "========================================"
 printf "%s\n" "Build complete!"
 printf "%s\n" "========================================"
 echo
-printf "Bundle:    %s/\n" "${DIST_DIR}"
-printf "Installer: %s\n" "${PKG_OUTPUT}"
+printf "App Bundle: %s/\n" "${DIST_DIR}"
