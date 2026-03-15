@@ -4164,6 +4164,8 @@
         try {
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
+          // Update auto-refresh timers based on pause state
+          _updateAutoRefreshTimers();
 
           // When new items appear, inspect and capture their baseline state
           if (status && status.items) {
@@ -4588,6 +4590,17 @@
     function _updateAutoRefreshTimers() {
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
+        const queueStatus = window._lastQueueStatus;
+        const isPaused = queueStatus && queueStatus.paused;
+        
+        // Stop all timers if queue is paused — no need to refresh when nothing is running
+        if (isPaused) {
+          for (const timerId of _autoRefreshTimers.values()) {
+            clearInterval(timerId);
+          }
+          _autoRefreshTimers.clear();
+          return;
+        }
         
         // Stop timers for folders that are no longer checked or in-progress
         for (const [path, timerId] of _autoRefreshTimers.entries()) {
@@ -4599,7 +4612,7 @@
           }
         }
         
-        // Start timers for newly-checked in-progress folders
+        // Start timers for newly-checked in-progress folders (only if queue is running, not paused)
         for (const inProgPath of _inProgressFolderPaths) {
           if (checkedFolderPaths.has(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
             // Auto-refresh every 10 seconds while folder is in progress and checked
