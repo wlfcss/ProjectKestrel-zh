@@ -29,8 +29,7 @@ else
   RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
   APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
   {
-    echo "Build: ${RELEASE_TS}"
-    echo "Version: ${APP_VERSION}"
+    echo "${APP_VERSION}"
   } > "analyzer/VERSION.txt"
   echo "[OK] Generated VERSION.txt in analyzer/"
 fi

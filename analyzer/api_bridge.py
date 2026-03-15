@@ -574,7 +574,7 @@ class Api:
 
             settings = load_persisted_settings()
             if mode is None:
-                mode = settings.get('rating_normalization', 'per_folder')
+                mode = settings.get('rating_normalization', 'none')
 
             df = pd.read_csv(csv_path)
             if df.empty:
@@ -631,7 +631,7 @@ class Api:
             if mode == 'none':
                 def _get_norm(q_val):
                     try:
-                        return quality_to_rating(float(q_val))
+                        return quality_to_rating(float(q_val), thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -649,7 +649,7 @@ class Api:
                     except (TypeError, ValueError):
                         return 0
 
-            else:  # per_folder (default)
+            else:  # per_folder
                 _dist = folder_dist
 
                 def _get_norm(q_val):

@@ -354,37 +354,15 @@
       <div class="row">
         <label for="ratingNormalization">Normalization Mode</label>
         <select id="ratingNormalization">
+          <option value="none" selected>Default &mdash; use quality thresholds optimized to the Kestrel model</option>
           <option value="per_folder">Per folder &mdash; normalize within each analyzed folder</option>
           <option value="global">Global &mdash; normalize across all analyzed photos</option>
-          <option value="none">None &mdash; use raw quality score thresholds</option>
         </select>
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are
-        converted to star ratings. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
-        overall quality. <b>Global</b> ranks photos against all folders you have analyzed. <b>None</b> uses fixed
-        quality thresholds.</div>
-
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analysis Settings</h4>
-
-      <div class="row">
-        <label for="detectionThreshold">Detection Confidence Threshold</label>
-        <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75"
-          style="width:80px" title="Minimum MaskRCNN confidence score (0.10–0.99) required to count as a true detection" />
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Minimum confidence score
-        (0.10–0.99) that the bird detector must reach before Kestrel counts something as a detection. Lowering
-        this value may increase <b>false positive</b> detections on difficult images. Requires re-analysis to
-        take effect. Also filters which species and family tags are shown in scene dialogs.</div>
-
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
-      <div class="row">
-        <label for="sceneTimeThreshold">Scene Grouping Time Threshold (seconds)</label>
-        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0"
-          style="width:80px" title="Images captured within this many seconds of each other are considered part of the same scene burst" />
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Images captured within this
-        many seconds of each other are treated as the same burst/scene (using EXIF timestamp). Requires
-        re-analysis to take effect.</div>
+        converted to star ratings. <b>Default</b> uses Kestrel-optimized threshold cutoffs on percentile-normalized
+        quality values. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
+        overall quality. <b>Global</b> ranks photos against all folders you have analyzed.</div>
 
       <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
       <div style="margin-bottom:12px">
@@ -412,7 +390,29 @@
           </div>
         </div>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are distributed across star ratings (only applies when rating normalization is enabled). Percentages should sum to 100%. Changes take effect immediately when re-applying normalization.</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality percentiles are mapped across star ratings. Percentages should sum to 100%. Changes take effect immediately when re-applying ratings.</div>
+
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analysis Settings</h4>
+
+      <div class="row">
+        <label for="detectionThreshold">Detection Confidence Threshold</label>
+        <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75"
+          style="width:80px" title="Minimum MaskRCNN confidence score (0.10–0.99) required to count as a true detection" />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Minimum confidence score
+        (0.10–0.99) that the bird detector must reach before Kestrel counts something as a detection. Lowering
+        this value may increase <b>false positive</b> detections on difficult images. Requires re-analysis to
+        take effect. Also filters which species and family tags are shown in scene dialogs.</div>
+
+      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div class="row">
+        <label for="sceneTimeThreshold">Scene Grouping Time Threshold (seconds)</label>
+        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0"
+          style="width:80px" title="Images captured within this many seconds of each other are considered part of the same scene burst" />
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Images captured within this
+        many seconds of each other are treated as the same burst/scene (using EXIF timestamp). Requires
+        re-analysis to take effect.</div>
 
       <div class="row">
         <label for="maskThreshold">Mask Segmentation Threshold</label>

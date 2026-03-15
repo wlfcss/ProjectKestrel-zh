@@ -1046,6 +1046,12 @@
       width: 200px;
     }
 
+    #ratingNormalization {
+      min-width: 360px;
+      width: 100%;
+      max-width: 100%;
+    }
+
     /* Final override: allow wrapping in meta rows (was nowrap earlier) */
     .meta {
       white-space: normal;

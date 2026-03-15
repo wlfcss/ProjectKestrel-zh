@@ -306,7 +306,11 @@
         const latestVersion = versionList[0]; // first entry is latest
         
         // Compare versions: check if latest name differs from current
-        if (!latestVersion.name || latestVersion.name === currentVer) return;
+        if (!latestVersion.name) return;
+        const normalizedLocal = (currentVer || '').replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        const normalizedRemote = latestVersion.name.replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        
+        if (normalizedRemote === normalizedLocal) return;
         
         // Show update notification
         showVersionUpdateNotification(latestVersion);
@@ -344,17 +348,17 @@
         
         if (platform === 'macos' && versionInfo.downloadLinks?.macos) {
           const linkBtn = document.createElement('a');
-          linkBtn.href = 'https://projectkestrel.org/download?platform=macos';
+          linkBtn.href = versionInfo.downloadLinks.macos;
           linkBtn.target = '_blank';
           linkBtn.className = 'primary';
           linkBtn.style.cssText = 'padding:12px 20px;border-radius:6px;text-align:center;text-decoration:none;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;cursor:pointer;display:inline-block;';
           linkBtn.textContent = '→ Download for macOS';
           linksEl.appendChild(linkBtn);
-        } else if (platform === 'windows' && isStore) {
+        } else if (platform === 'windows' && isStore && versionInfo.downloadLinks?.windows) {
           const storeBtn = document.createElement('div');
           storeBtn.style.cssText = 'background:#1a2a3a;border:1px solid #4a7ac4;border-radius:6px;padding:12px;color:#7ca3d9;';
           storeBtn.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">Windows Store will update automatically within 1-2 days</div>' +
-            '<a href="ms-windows-store://pdp/?productid=9NQR2WFFNP5J" style="color:#7ca3d9;text-decoration:underline;cursor:pointer;">Check Windows Store for updates</a>';
+            '<a href="' + escapeHtml(versionInfo.downloadLinks.windows) + '" style="color:#7ca3d9;text-decoration:underline;cursor:pointer;">Check Windows Store for updates</a>';
           linksEl.appendChild(storeBtn);
         } else if (platform === 'windows' && versionInfo.downloadLinks?.traditional) {
           const linkBtn = document.createElement('a');
@@ -2448,7 +2452,7 @@
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
       // Rating normalization
       const normSelect = document.getElementById('ratingNormalization');
-      if (normSelect) normSelect.value = getSetting('rating_normalization', 'per_folder');
+      if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
       // Rating distribution thresholds
       document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 12);
       document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 15);
@@ -2496,7 +2500,7 @@
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       const normalizationEl = document.getElementById('ratingNormalization');
-      const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
+      const ratingNormalization = normalizationEl ? normalizationEl.value : 'none';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
@@ -2516,7 +2520,12 @@
       
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
-      const prevNormalization = existing.rating_normalization || 'per_folder';
+      const prevNormalization = existing.rating_normalization || 'none';
+      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 12;
+      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 15;
+      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 20;
+      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 30;
+      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 23;
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
@@ -2548,8 +2557,14 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If normalization mode changed and folders are loaded, reapply immediately
-      if (ratingNormalization !== prevNormalization && rows.length > 0) {
+      // If normalization mode or thresholds changed and folders are loaded, reapply immediately
+      const thresholdsChanged =
+        t5 !== prevT5 ||
+        t4 !== prevT4 ||
+        t3 !== prevT3 ||
+        t2 !== prevT2 ||
+        t1 !== prevT1;
+      if ((ratingNormalization !== prevNormalization || thresholdsChanged) && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }
