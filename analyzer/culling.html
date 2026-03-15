@@ -277,7 +277,6 @@
       max-width: 100%;
       max-height: 100%;
       object-fit: contain;
-      image-rendering: crisp-edges;
     }
     .preview-img-box .muted {
       color: var(--muted);
@@ -335,12 +334,6 @@
       color: var(--bad);
     }
     .btn.danger:hover { background: #4a2020; }
-    .btn.secondary {
-      background: #1a2a3a;
-      border-color: #4a7ac4;
-      color: #7ca3d9;
-    }
-    .btn.secondary:hover { background: #1f3548; }
     .btn:disabled { opacity: 0.4; cursor: default; }
 
     /* ---- Dialogs (base) ---- */
@@ -604,17 +597,6 @@
       height: 100%;
       object-fit: cover;
       transition: none;
-      image-rendering: crisp-edges;
-      backface-visibility: hidden;
-      transform-style: preserve-3d;
-    }
-    .preview-img-box.zoom-active canvas.zoom-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      pointer-events: none;
     }
     .preview-img-box.raw-loaded::after {
       content: 'RAW';
@@ -918,19 +900,6 @@
             <span class="slider-val" id="maxPerSceneVal">∞</span>
           </div>
         </div>
-        <div class="slider-group">
-          <label>Unrated images — default to:</label>
-          <div class="slider-row">
-            <label style="display:flex; gap:8px; align-items:center; font-weight:600; color:var(--text)">
-              <input type="radio" name="unratedDefault" value="accept" id="unratedAccept" />
-              Accept
-            </label>
-            <label style="display:flex; gap:8px; align-items:center; font-weight:600; color:var(--text)">
-              <input type="radio" name="unratedDefault" value="reject" id="unratedReject" checked />
-              Reject
-            </label>
-          </div>
-        </div>
         <div class="panel-actions">
           <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current slider values; your manual Shift+Click decisions are preserved">↻ Re-apply</button>
           <button class="btn danger" id="resetAutoBtn" title="Clear all manual overrides and re-apply from scratch">⚠ Reset All</button>
@@ -1181,13 +1150,6 @@
     }
 
     // ---- Image loading ----
-    function _base64ToBlobUrl(b64, mime) {
-      const bin = atob(b64);
-      const buf = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      return URL.createObjectURL(new Blob([buf], { type: mime || 'image/jpeg' }));
-    }
-
     async function getBlobUrl(relPath, root) {
       if (!relPath) return '';
       // Normalize path separators (convert backslashes to forward slashes on macOS)
@@ -1197,7 +1159,7 @@
       try {
         const res = await window.pywebview.api.read_image_file(relPath, root);
         if (res && res.success && res.data) {
-          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
+          const url = `data:${res.mime || 'image/jpeg'};base64,${res.data}`;
           blobUrlCache.set(key, url);
           return url;
         }
@@ -1291,14 +1253,13 @@
           st.classList.toggle('filled', filled);
           st.classList.toggle('manual', filled && origin === 'manual');
           st.classList.toggle('auto', filled && origin !== 'manual');
-          st.textContent = filled ? '\u2605' : '\u2606';
         });
       }
 
       for (let i = 1; i <= 5; i++) {
         const s = document.createElement('span');
         s.className = 'star';
-          s.textContent = '\u2606';
+        s.textContent = '\u2605';
         s.title = `Set rating to ${i}`;
         s.addEventListener('mouseenter', () => render(i));
         s.addEventListener('mouseleave', () => render());
@@ -1399,15 +1360,13 @@
       if (qEl)   qEl.textContent   = '\u2605' + cutoff;
       if (minEl) minEl.textContent = String(minKeep);
       if (maxEl) maxEl.textContent = maxKeep === Infinity ? '\u221e' : String(maxKeep);
-      const unratedDefault = document.querySelector('input[name="unratedDefault"]:checked')?.value || 'reject';
       const summary = el('#autoCatSummary');
       if (summary) summary.textContent =
-        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene \u00b7 Unrated → ${unratedDefault}`;
+        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene`;
     }
 
     function applyAutoCategorize(preserveManual = true) {
       const { cutoff, minKeep, maxKeep } = getSliderValues();
-      const unratedDefault = document.querySelector('input[name="unratedDefault"]:checked')?.value || 'reject';
       if (!preserveManual) manuallyMoved.clear();
       for (const scene of scenes) {
         // Sort by rating desc, then quality score desc
@@ -1416,13 +1375,9 @@
           return rb !== ra ? rb - ra : parseNumber(b.quality) - parseNumber(a.quality);
         });
 
-        // Phase 1: quality cutoff — accept images at/above cutoff; handle unrated based on setting
+        // Phase 1: quality cutoff — accept images at/above cutoff; unrated (0) also accepted
         const qualityAcceptSet = new Set(
-          sorted.filter(r => {
-            const rt = getRating(r);
-            if (rt === 0) return unratedDefault === 'accept'; // unrated: use setting
-            return rt >= cutoff; // rated: check against cutoff
-          })
+          sorted.filter(r => { const rt = getRating(r); return rt === 0 || rt >= cutoff; })
                 .map(r => r.filename)
         );
 
@@ -1514,27 +1469,6 @@
       debouncedSave();
     }
 
-    // ---- Mark unrated images as reviewed ----
-    function markSceneUnratedAsReviewed(sceneId) {
-      const scene = scenes.find(s => s.id === String(sceneId));
-      if (!scene) return;
-      
-      for (const row of scene.images) {
-        const rating = getRating(row);
-        if (rating === 0) { // only unrated images
-          const side = cullingState.get(row.filename) || 'accept';
-          // Set rating: 5 for accept, 1 for reject (to make yellow go away but preserve categorization)
-          const ratingValue = side === 'accept' ? 5 : 1;
-          setRating(row, ratingValue, 'manual');
-        }
-      }
-      // Recompute scene aggregates and fully re-render scene rows so badges/colors update
-      scenes = aggregateScenes();
-      renderAllScenes();
-      updateStats();
-      debouncedSave();
-    }
-
     // ---- Build an image card ----
     function buildImageCard(row) {
       const rating = getRating(row);
@@ -1622,23 +1556,10 @@
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
           (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
         
-        // Add bulk action buttons (Mark Reviewed first, then Accept/Reject)
+        // Add bulk action buttons
         const bulkActionsDiv = document.createElement('div');
         bulkActionsDiv.className = 'scene-bulk-actions';
-
-        // Add "Mark as Reviewed" button if there are unrated images (place it first)
-        if (scene.hasAnyUnrated) {
-          const markReviewedBtn = document.createElement('button');
-          markReviewedBtn.className = 'btn secondary';
-          markReviewedBtn.textContent = '✓ Mark as Reviewed';
-          markReviewedBtn.title = 'Mark all unrated images in this scene as reviewed (no longer yellow)';
-          markReviewedBtn.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            markSceneUnratedAsReviewed(scene.id);
-          });
-          bulkActionsDiv.appendChild(markReviewedBtn);
-        }
-
+        
         const acceptAllBtn = document.createElement('button');
         acceptAllBtn.className = 'btn primary';
         acceptAllBtn.textContent = '✓ Accept All';
@@ -1647,7 +1568,7 @@
           ev.stopPropagation();
           acceptAllInScene(scene.id);
         });
-
+        
         const rejectAllBtn = document.createElement('button');
         rejectAllBtn.className = 'btn danger';
         rejectAllBtn.textContent = '✗ Reject All';
@@ -1656,10 +1577,9 @@
           ev.stopPropagation();
           rejectAllInScene(scene.id);
         });
-
+        
         bulkActionsDiv.appendChild(acceptAllBtn);
         bulkActionsDiv.appendChild(rejectAllBtn);
-
         label.appendChild(bulkActionsDiv);
         row.appendChild(label);
 
@@ -2197,26 +2117,16 @@
     // ---- Preview zoom on click-drag ----
     let zoomActive = false;
     let zoomRow = null;
-    let zoomThumbEl = null;
-    let zoomLastX = 0, zoomLastY = 0;
-    let rawCache = new Map();   // unique row key -> blob URL
+    let rawCache = new Map();   // filename -> base64 data URL
     let rawLoading = new Set(); // filename currently loading
 
     function getRawPreviewKey(row) {
-      return [
-        rootPath || '',
-        row.filename || '',
-        row.export_path || '',
-        row.crop_path || ''
-      ].join('|');
+      return row.filename || '';
     }
 
     function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
       zoomActive = true;
       zoomRow = row;
-      zoomThumbEl = thumbEl;
-      zoomLastX = mouseEv.clientX;
-      zoomLastY = mouseEv.clientY;
       thumbDragPixels = 0;
 
       const exportBox = el('#previewExport');
@@ -2238,12 +2148,6 @@
           img = document.createElement('img');
           img.src = cachedRaw;
           img.dataset.isRaw = '1';
-          img.style.imageRendering = 'crisp-edges';
-          img.onload = () => {
-            if (zoomActive && zoomRow === row && zoomThumbEl === thumbEl) {
-              applyZoomTransform(img, thumbEl, zoomLastX, zoomLastY, getScale());
-            }
-          };
           exportBox.appendChild(img);
           exportBox.classList.add('raw-loaded');
         } else if (!img) {
@@ -2254,12 +2158,6 @@
             exportBox.innerHTML = '';
             img = document.createElement('img');
             img.src = url;
-            img.style.imageRendering = 'crisp-edges';
-            img.onload = () => {
-              if (zoomActive && zoomRow === row && zoomThumbEl === thumbEl) {
-                applyZoomTransform(img, thumbEl, zoomLastX, zoomLastY, getScale());
-              }
-            };
             exportBox.appendChild(img);
           }
         }
@@ -2280,8 +2178,6 @@
       const startX = mouseEv.clientX, startY = mouseEv.clientY;
       const onMove = (ev) => {
         if (!zoomActive) return;
-        zoomLastX = ev.clientX;
-        zoomLastY = ev.clientY;
         thumbDragPixels = Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY);
         const s = getScale();
         const curImg = el('#previewExport')?.querySelector('img');
@@ -2291,17 +2187,13 @@
       const onUp = () => {
         zoomActive = false;
         zoomRow = null;
-        zoomThumbEl = null;
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         const box = el('#previewExport');
         box.classList.remove('zoom-active');
         box.classList.remove('raw-loaded');
-        const canvas = box.querySelector('canvas.zoom-canvas');
-        if (canvas) canvas.remove();
         const curImg = box.querySelector('img');
         if (curImg) {
-          curImg.style.visibility = '';
           curImg.style.transform = '';
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
@@ -2313,52 +2205,11 @@
     }
 
     function applyZoomTransform(img, thumbEl, clientX, clientY, scale) {
-      if (!img || !thumbEl) return;
-      const box = el('#previewExport');
-      if (!box) return;
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-      if (!iw || !ih) return;
-
       const rect = thumbEl.getBoundingClientRect();
-      const xNorm = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const yNorm = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-
-      const z = Math.max(1, Number(scale) || 1);
-      let cropW = Math.max(1, iw / z);
-      let cropH = Math.max(1, ih / z);
-
-      const dpr = window.devicePixelRatio || 1;
-      const targetW = Math.max(1, Math.round(box.clientWidth * dpr));
-      const targetH = Math.max(1, Math.round(box.clientHeight * dpr));
-      const boxAspect = targetW / targetH;
-      if (cropW / cropH > boxAspect) cropW = cropH * boxAspect;
-      else cropH = cropW / boxAspect;
-
-      let sx = xNorm * iw - cropW * 0.5;
-      let sy = yNorm * ih - cropH * 0.5;
-      sx = Math.max(0, Math.min(iw - cropW, sx));
-      sy = Math.max(0, Math.min(ih - cropH, sy));
-
-      let canvas = box.querySelector('canvas.zoom-canvas');
-      if (!canvas) {
-        canvas = document.createElement('canvas');
-        canvas.className = 'zoom-canvas';
-        box.appendChild(canvas);
-      }
-
-      if (canvas.width !== targetW || canvas.height !== targetH) {
-        canvas.width = targetW;
-        canvas.height = targetH;
-      }
-
-      const ctx = canvas.getContext('2d', { alpha: false });
-      if (!ctx) return;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
-      img.style.visibility = 'hidden';
+      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
+      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
+      img.style.transform = `scale(${scale})`;
+      img.style.transformOrigin = `${xPct}% ${yPct}%`;
     }
 
     async function loadRawAsync(row) {
@@ -2367,11 +2218,8 @@
       rawLoading.add(cacheKey);
       try {
         const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
-        if (res && res.debug) {
-          console.info('[raw-debug][culling]', row.filename, res.debug);
-        }
         if (res && res.success && res.data) {
-          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
+          const url = `data:image/jpeg;base64,${res.data}`;
           rawCache.set(cacheKey, url);
           // If still zooming on this row, swap to the high-res source
           if (zoomActive && zoomRow === row) {
@@ -2379,16 +2227,8 @@
             if (img) {
               img.src = url;
               img.dataset.isRaw = '1';
-              img.onload = () => {
-                if (zoomActive && zoomRow === row && zoomThumbEl) {
-                  applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, parseInt(el('#previewZoomSlider')?.value || '5', 10));
-                }
-              };
               img.title = 'RAW (full resolution)';
               el('#previewExport')?.classList.add('raw-loaded');
-              if (zoomThumbEl) {
-                applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, parseInt(el('#previewZoomSlider')?.value || '5', 10));
-              }
             }
           }
         }
@@ -2408,8 +2248,10 @@
         if (label) label.textContent = slider.value + '\u00d7';
         if (zoomActive) {
           const img = el('#previewExport')?.querySelector('img');
-          const scale = parseInt(slider.value, 10);
-          if (img && zoomThumbEl) applyZoomTransform(img, zoomThumbEl, zoomLastX, zoomLastY, scale);
+          if (img) {
+            const scale = parseInt(slider.value, 10);
+            img.style.transform = `scale(${scale})`;
+          }
         }
       });
     })();
@@ -2752,16 +2594,6 @@
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {
       const sl = el('#' + id);
       if (sl) sl.addEventListener('input', () => { updateSliderLabels(); saveCullingSettings(); });
-    });
-    // Unrated image default radio buttons
-    document.querySelectorAll('input[name="unratedDefault"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        applyAutoCategorize(true);
-        renderAllScenes();
-        updateStats();
-        updateAutoCatSummary();
-        saveCullingSettings();
-      });
     });
     el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
     el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
