@@ -245,19 +245,163 @@
         .catch(() => {
           versionBadge.textContent = 'Version: unknown';
         });
-      // Also check remote service version and warn if it differs from the expected value
-      (async function checkRemoteVersion() {
-        try {
-          const resp = await fetch('https://api.projectkestrel.org/version', { cache: 'no-store' });
-          if (!resp.ok) return;
-          const remote = (await resp.text()).trim();
-          if (remote && remote !== 'Swamp Sparrow') {
-            showToast('There is a new update available! Please download the latest version from www.projectkestrel.org', 15000);
-          }
-        } catch (e) {
-          // ignore network errors — offline use is fine
+      // Check for new versions from remote JSON endpoint but we need pywebview to be ready, 
+      // so listen for the event or execute immediately if already mounted
+      if (window.pywebview?.api) {
+        checkRemoteVersion();
+      } else {
+        window.addEventListener('pywebviewready', checkRemoteVersion);
+      }
+    }
+
+    // Check if running as Windows Store app
+    async function isWindowsStoreApp() {
+      try {
+        if (!window.pywebview?.api?.is_windows_store_app) return false;
+        const result = await window.pywebview.api.is_windows_store_app();
+        return result?.is_store ?? false;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Get platform info
+    async function getPlatformInfo() {
+      try {
+        if (!window.pywebview?.api?.get_platform_info) {
+          // Fallback to client-side detection
+          if (navigator.platform.includes('Mac')) return 'macos';
+          if (navigator.platform.includes('Win')) return 'windows';
+          return 'windows'; // default
         }
-      })();
+        const result = await window.pywebview.api.get_platform_info();
+        return result?.platform ?? 'windows';
+      } catch (e) {
+        return 'windows';
+      }
+    }
+
+    // Check remote version from JSON endpoint
+    async function checkRemoteVersion() {
+      try {
+        // Read current app version from VERSION.txt
+        let currentVer = _appVersion;
+        if (!currentVer) {
+          try {
+            const versionResp = await fetch('VERSION.txt', { cache: 'no-store' });
+            if (versionResp.ok) {
+              const text = await versionResp.text();
+              const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+              if (lines.length > 0) {
+                // Extract just the version part (e.g., "v(Swamp Sparrow)" from "Version: v(Swamp Sparrow)")
+                const line = lines[0];
+                currentVer = line.toLowerCase().startsWith('version') 
+                  ? line.replace(/^version:\s*/i, '').trim()
+                  : line;
+              }
+            }
+          } catch (e) { /* ignore */ }
+        }
+        
+        let versionList;
+        if (window.pywebview?.api?.fetch_remote_version) {
+          const res = await window.pywebview.api.fetch_remote_version();
+          if (res && res.success && res.data) {
+            versionList = res.data;
+          }
+        }
+        
+        if (!versionList) {
+          const resp = await fetch('https://projectkestrel.org/version.json', { cache: 'no-store' });
+          if (!resp.ok) return;
+          versionList = await resp.json();
+        }
+        
+        if (!Array.isArray(versionList) || versionList.length === 0) return;
+        
+        const latestVersion = versionList[0]; // first entry is latest
+        
+        // Compare versions: check if latest name differs from current
+        if (!latestVersion.name) return;
+        const normalizedLocal = (currentVer || '').replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        const normalizedRemote = latestVersion.name.replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
+        
+        if (normalizedRemote === normalizedLocal) return;
+        
+        // Show update notification
+        showVersionUpdateNotification(latestVersion);
+      } catch (e) {
+        // Network error, offline mode - ignore
+      }
+    }
+
+    // Display the version update notification as a toast
+    async function showVersionUpdateNotification(versionInfo) {
+      console.log('[DEBUG] Showing version update notification for version:', versionInfo);
+      const toast = document.getElementById('versionUpdateToast');
+      if (!toast) return;
+      
+      const platform = await getPlatformInfo();
+      const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
+      
+      // Priority symbol
+      const priorityEl = document.getElementById('versionUpdatePriority');
+      if (priorityEl) priorityEl.textContent = versionInfo.highPriority ? '⭐' : '•';
+      
+      // Title
+      const titleEl = document.getElementById('versionUpdateTitle');
+      if (titleEl) titleEl.textContent = versionInfo.name;
+      
+      // Changelog notes (show first 3)
+      const notesEl = document.getElementById('versionUpdateNotes');
+      if (notesEl && versionInfo.notes && Array.isArray(versionInfo.notes)) {
+        notesEl.innerHTML = '';
+        versionInfo.notes.slice(0, 3).forEach(note => {
+          const li = document.createElement('li');
+          li.textContent = note;
+          notesEl.appendChild(li);
+        });
+      }
+      
+      // Windows-specific note (only show for Windows users)
+      const windowsNoteEl = document.getElementById('versionUpdateWindowsNote');
+      if (windowsNoteEl) {
+        if (platform === 'windows') {
+          windowsNoteEl.innerHTML = 'Windows users: Check for updates in the Microsoft Store within 1-3 days. If you used the traditional installer to install Kestrel, visit <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> to manually update.';
+          windowsNoteEl.style.display = 'block';
+        } else {
+          windowsNoteEl.style.display = 'none';
+        }
+      }
+      
+      // Download button
+      const downloadBtn = document.getElementById('versionUpdateDownloadBtn');
+      if (downloadBtn) {
+        downloadBtn.href = `https://projectkestrel.org/download?platform=${platform}`;
+        downloadBtn.textContent = platform === 'macos' ? '↓ Download for macOS' : '↓ Download for Windows';
+        downloadBtn.onclick = (e) => {
+          e.preventDefault();
+          window.open(`https://projectkestrel.org/download?platform=${platform}`, '_blank');
+        };
+      }
+      
+      // Close button
+      const closeBtn = document.getElementById('versionUpdateClose');
+      if (closeBtn) {
+        closeBtn.onclick = () => {
+          toast.style.display = 'none';
+        };
+      }
+      
+      // Show the toast
+      toast.style.display = 'block';
+      
+      // Auto-hide after 10 seconds
+      setTimeout(() => {
+        if (toast.style.display === 'block') {
+          toast.style.display = 'none';
+        }
+      }, 10000);
     }
 
     // Tooltip layer so tips can render over the main image area
@@ -450,6 +594,16 @@
     function parseNumber(v) {
       const n = parseFloat(v);
       return Number.isFinite(n) ? n : -1;
+    }
+
+    function parseCaptureTimeMs(v) {
+      if (v == null) return Number.NaN;
+      const raw = String(v).trim();
+      if (!raw) return Number.NaN;
+      let d = new Date(raw);
+      if (isNaN(d)) d = new Date(raw.replace(' ', 'T'));
+      const ms = d.getTime();
+      return Number.isFinite(ms) ? ms : Number.NaN;
     }
 
     // Parse secondary species columns.
@@ -700,6 +854,8 @@
         }
 
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
+        const captureMsList = arr.map(a => parseCaptureTimeMs(a.capture_time)).filter(Number.isFinite);
+        const captureTimeMs = captureMsList.length ? Math.min(...captureMsList) : Number.POSITIVE_INFINITY;
         const rowRp = arr[0]?.__rootPath || rootPath || '';
         const rowSc = arr[0] ? String(arr[0].scene_count) : '';
         const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
@@ -719,6 +875,7 @@
           imageCount: arr.length,
           species,
           maxQuality: maxQ,
+          captureTimeMs,
           sceneName,
           isApproved
         });
@@ -730,8 +887,12 @@
 
       // sort
       const sorted = filtered.sort((a, b) => {
+        if (sortBy === 'captureTime') {
+          if (a.captureTimeMs !== b.captureTimeMs) return a.captureTimeMs - b.captureTimeMs;
+          return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
+        }
         if (sortBy === 'imageCount') return b.imageCount - a.imageCount;
-        if (sortBy === 'sceneId') return parseNumber(a.id) - parseNumber(b.id);
+        if (sortBy === 'sceneId') return parseNumber(String(a.id).split(':').pop()) - parseNumber(String(b.id).split(':').pop());
         return b.maxQuality - a.maxQuality;
       });
 
@@ -799,13 +960,14 @@
           st.classList.toggle('filled', filled);
           st.classList.toggle('manual', filled && origin === 'manual');
           st.classList.toggle('auto', filled && origin !== 'manual');
+          st.textContent = filled ? '★' : '☆';
         });
       }
 
       for (let i = 1; i <= 5; i++) {
         const s = document.createElement('span');
         s.className = 'star';
-        s.textContent = '★';
+        s.textContent = '☆';
         s.title = 'Click to set rating';
         // Click only — hover preview is handled by delegated listeners below
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
@@ -937,7 +1099,7 @@
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
         meta.className = 'meta title-badges';
-        meta.innerHTML = `<span class="score">\u2b50 ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+        meta.innerHTML = `<span class="score">★ ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
         chips.className = 'chips';
         if (s.isApproved) {
@@ -1214,21 +1376,68 @@
     // ---- Scene dialog RAW zoom (click-drag on thumbnail → zoom in previewBox) ----
     let sceneZoomActive = false;
     let sceneZoomRow = null;
+    let sceneZoomThumbEl = null;
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
-    const sceneRawCache = new Map();   // (rootPath|filename) -> base64 data URL
+    const sceneRawCache = new Map();   // unique row key -> blob URL
     const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
 
     function getSceneRawCacheKey(row) {
-      return (row.__rootPath || '') + '|' + (row.filename || '');
+      return [
+        row.__rootPath || '',
+        row.filename || '',
+        row.export_path || '',
+        row.crop_path || ''
+      ].join('|');
     }
 
     function applySceneZoomTransform(imgEl, thumbEl, clientX, clientY, scale) {
+      if (!imgEl || !thumbEl) return;
+      const box = imgEl.closest('#previewBox');
+      if (!box) return;
+      const iw = imgEl.naturalWidth || imgEl.width;
+      const ih = imgEl.naturalHeight || imgEl.height;
+      if (!iw || !ih) return;
+
       const rect = thumbEl.getBoundingClientRect();
-      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
-      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
-      imgEl.style.transform = `scale(${scale})`;
-      imgEl.style.transformOrigin = `${xPct}% ${yPct}%`;
+      const xNorm = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const yNorm = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+
+      const z = Math.max(1, Number(scale) || 1);
+      let cropW = Math.max(1, iw / z);
+      let cropH = Math.max(1, ih / z);
+
+      const dpr = window.devicePixelRatio || 1;
+      const targetW = Math.max(1, Math.round(box.clientWidth * dpr));
+      const targetH = Math.max(1, Math.round(box.clientHeight * dpr));
+      const boxAspect = targetW / targetH;
+      if (cropW / cropH > boxAspect) cropW = cropH * boxAspect;
+      else cropH = cropW / boxAspect;
+
+      let sx = xNorm * iw - cropW * 0.5;
+      let sy = yNorm * ih - cropH * 0.5;
+      sx = Math.max(0, Math.min(iw - cropW, sx));
+      sy = Math.max(0, Math.min(ih - cropH, sy));
+
+      let canvas = box.querySelector('canvas.scene-zoom-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.className = 'scene-zoom-canvas';
+        box.appendChild(canvas);
+      }
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+
+      const ctx = canvas.getContext('2d', { alpha: false });
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(imgEl, sx, sy, cropW, cropH, 0, 0, canvas.width, canvas.height);
+      imgEl.style.visibility = 'hidden';
     }
 
     function formatExposureEv(v) {
@@ -1247,8 +1456,11 @@
         const res = await window.pywebview.api.read_raw_full(
           row.filename, row.__rootPath || '', expCorr
         );
+        if (res && res.debug) {
+          console.info('[raw-debug][scene]', row.filename, res.debug);
+        }
         if (res && res.success && res.data) {
-          const url = `data:image/jpeg;base64,${res.data}`;
+          const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           sceneRawCache.set(key, url);
           // Upgrade preview if this row is still the active zoom row
           if (sceneZoomActive && sceneZoomRow === row) {
@@ -1257,8 +1469,16 @@
             if (curImg) {
               curImg.src = url;
               curImg.dataset.isRaw = '1';
+              curImg.onload = () => {
+                if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl) {
+                  applySceneZoomTransform(curImg, sceneZoomThumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+                }
+              };
               if (box) box.dataset.rawLabel = `RAW (${formatExposureEv(expCorr)} EV)`;
               box.classList.add('raw-loaded');
+              if (sceneZoomThumbEl) {
+                applySceneZoomTransform(curImg, sceneZoomThumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+              }
             }
           }
         }
@@ -1272,6 +1492,7 @@
     function startSceneZoomPreview(row, thumbEl, mouseEv) {
       sceneZoomActive = true;
       sceneZoomRow = row;
+      sceneZoomThumbEl = thumbEl;
       const key = getSceneRawCacheKey(row);
       const previewBox = el('#previewBox');
       previewBox.classList.add('zoom-active');
@@ -1285,6 +1506,12 @@
         previewBox.innerHTML = '';
         const stub = document.createElement('img');
         stub.src = thumbImgSrc;
+        stub.style.imageRendering = 'crisp-edges';
+        stub.onload = () => {
+          if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+            applySceneZoomTransform(stub, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+          }
+        };
         previewBox.appendChild(stub);
         applySceneZoomTransform(stub, thumbEl, mouseEv.clientX, mouseEv.clientY, sceneZoomScale);
       }
@@ -1298,6 +1525,12 @@
           const imgEl = document.createElement('img');
           imgEl.src = cachedRaw;
           imgEl.dataset.isRaw = '1';
+          imgEl.style.imageRendering = 'crisp-edges';
+          imgEl.onload = () => {
+            if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+              applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+            }
+          };
           previewBox.appendChild(imgEl);
           previewBox.classList.add('raw-loaded');
           applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
@@ -1308,6 +1541,12 @@
             previewBox.innerHTML = '';
             const imgEl = document.createElement('img');
             imgEl.src = url;
+            imgEl.style.imageRendering = 'crisp-edges';
+            imgEl.onload = () => {
+              if (sceneZoomActive && sceneZoomRow === row && sceneZoomThumbEl === thumbEl) {
+                applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
+              }
+            };
             previewBox.appendChild(imgEl);
             applySceneZoomTransform(imgEl, thumbEl, zoomLastX, zoomLastY, sceneZoomScale);
           }
@@ -1352,13 +1591,17 @@
       const onUp = () => {
         sceneZoomActive = false;
         sceneZoomRow = null;
+        sceneZoomThumbEl = null;
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         window.removeEventListener('wheel', onWheel);
         const box = el('#previewBox');
         box.classList.remove('zoom-active', 'raw-loaded');
+        const canvas = box?.querySelector('canvas.scene-zoom-canvas');
+        if (canvas) canvas.remove();
         const curImg = box?.querySelector('img');
         if (curImg) {
+          curImg.style.visibility = '';
           curImg.style.transform = '';
           curImg.style.transformOrigin = '';
           delete curImg.dataset.isRaw;
@@ -1507,7 +1750,9 @@
       let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
       if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
       html += `</div>`;
-      html += `<div class="muted">${scene.imageCount} images • max quality ${fmt3(scene.maxQuality)}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
+      const rating = _rawQualityToRating(scene.maxQuality);
+      const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
+      html += `<div class="muted">${scene.imageCount} images • ${starDisplay}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
 
       // Species chips
       html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
@@ -2225,13 +2470,25 @@
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
       // Rating normalization
       const normSelect = document.getElementById('ratingNormalization');
-      if (normSelect) normSelect.value = getSetting('rating_normalization', 'per_folder');
+      if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
+      // Rating distribution thresholds
+      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 12);
+      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 15);
+      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 20);
+      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 30);
+      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 23);
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
       // Scene grouping time threshold
       const sttEl = document.getElementById('sceneTimeThreshold');
       if (sttEl) sttEl.value = getSetting('scene_time_threshold', 1.0);
+      // Mask threshold
+      const maskThEl = document.getElementById('maskThreshold');
+      if (maskThEl) maskThEl.value = getSetting('mask_threshold', 0.5);
+      // RAW preview cache
+      const rawCacheCb = document.getElementById('rawPreviewCacheEnabled');
+      if (rawCacheCb) rawCacheCb.checked = getSetting('raw_preview_cache_enabled', true);
       const optedIn = getSetting('analytics_opted_in', null);
       const consentShown = getSetting('analytics_consent_shown', false);
       const cb = document.getElementById('settingsAnalyticsOptIn');
@@ -2261,26 +2518,50 @@
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       const normalizationEl = document.getElementById('ratingNormalization');
-      const ratingNormalization = normalizationEl ? normalizationEl.value : 'per_folder';
+      const ratingNormalization = normalizationEl ? normalizationEl.value : 'none';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
       const sceneTimeThreshold = sttEl2 ? Math.max(0, parseFloat(sttEl2.value) || 1.0) : 1.0;
+      const maskThEl2 = document.getElementById('maskThreshold');
+      const maskThreshold = maskThEl2 ? Math.max(0.5, Math.min(0.95, parseFloat(maskThEl2.value) || 0.5)) : 0.5;
+      const rawCacheCb2 = document.getElementById('rawPreviewCacheEnabled');
+      const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
+      // Rating distribution thresholds
+      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 12));
+      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 15));
+      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 20));
+      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 30));
+      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 23));
       
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
-      const prevNormalization = existing.rating_normalization || 'per_folder';
+      const prevNormalization = existing.rating_normalization || 'none';
+      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 12;
+      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 15;
+      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 20;
+      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 30;
+      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 23;
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
         rating_normalization: ratingNormalization,
+        rating_threshold_5: t5,
+        rating_threshold_4: t4,
+        rating_threshold_3: t3,
+        rating_threshold_2: t2,
+        rating_threshold_1: t1,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
+        mask_threshold: maskThreshold,
+        raw_preview_cache_enabled: rawPreviewCacheEnabled,
         auto_save_enabled: autoSaveEnabled,
       };
       _autoSaveEnabled = autoSaveEnabled;
+      // Persist settings to localStorage immediately
+      saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
@@ -2294,8 +2575,14 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If normalization mode changed and folders are loaded, reapply immediately
-      if (ratingNormalization !== prevNormalization && rows.length > 0) {
+      // If normalization mode or thresholds changed and folders are loaded, reapply immediately
+      const thresholdsChanged =
+        t5 !== prevT5 ||
+        t4 !== prevT4 ||
+        t3 !== prevT3 ||
+        t2 !== prevT2 ||
+        t1 !== prevT1;
+      if ((ratingNormalization !== prevNormalization || thresholdsChanged) && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }
@@ -2845,11 +3132,16 @@
         return false;
       }
 
-      const effectiveHasKestrel = subtreeHasKestrel(node);
+      const norm = p => (p || '').replace(/\\/g, '/');
+      const normPath = norm(node.path);
+      const isInProgress = _inProgressFolderPaths.has(normPath);
+      
+      const effectiveHasKestrel = subtreeHasKestrel(node) || isInProgress; // Show checkbox for in-progress too
       const outdated = isVersionOutdated(node);
-      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '');
+      row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '') + (isInProgress ? ' in-progress' : '');
       if (node.path === treeActivePath) row.classList.add('active');
-      if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
+      if (isInProgress) row.title = 'Currently analyzing...';
+      else if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
 
       // Arrow toggle
       const arrow = document.createElement('span');
@@ -2863,18 +3155,19 @@
         arrow.textContent = '▶';
       }
 
-      // Checkbox for loading ANALYZED folders (blue accent)
+      // Checkbox for loading ANALYZED folders OR in-progress folders (blue accent)
       let loadCheckbox = null;
-      if (node.has_kestrel) {
+      if (node.has_kestrel || isInProgress) {
         loadCheckbox = document.createElement('input');
         loadCheckbox.type = 'checkbox';
         loadCheckbox.className = 'tree-cb';
-        loadCheckbox.title = 'Include in multi-folder view';
+        loadCheckbox.title = isInProgress ? 'Include in multi-folder view (analyzing now)' : 'Include in multi-folder view';
         loadCheckbox.checked = checkedFolderPaths.has(node.path);
         loadCheckbox.addEventListener('change', (e) => {
           e.stopPropagation();
           if (loadCheckbox.checked) checkedFolderPaths.add(node.path);
           else checkedFolderPaths.delete(node.path);
+          _updateAutoRefreshTimers(); // Update auto-refresh for in-progress
           debouncedAutoLoad();
         });
       }
@@ -3484,6 +3777,26 @@
       }
       // Seed the dialog's selected set from any previously-queued paths
       _dlgSelected = new Set(queuedFolderPaths);
+      
+      // Try to restore last queue state if available
+      const savedQueue = getSetting('lastQueueState', null);
+      if (savedQueue && Array.isArray(savedQueue) && savedQueue.length > 0) {
+        const restoreBtn = document.getElementById('analyzeDlgRestoreQueue');
+        if (restoreBtn) {
+          restoreBtn.style.display = '';
+          restoreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            _dlgSelected = new Set(savedQueue);
+            // Restore queue in settings so it looks restored
+            const s = loadSettings();
+            delete s.lastQueueState;
+            saveSettings(s);
+            restoreBtn.style.display = 'none';
+            refreshDlg();
+          }, { once: true }); // only trigger once per dialog open
+        }
+      }
+      
       _dlgExpandedPaths = new Set([folderTreeRootNode.path]);
       _dlgReanalyze = new Set();
 
@@ -3513,6 +3826,13 @@
     let _tempKestrelPaths = new Set(); // transiently-marked paths to prevent flicker
     let _analyticsConsentPending = false; // guard against showing consent dialog multiple times
     let _queueCountsTimer = null; // interval for updating folder counts from queue
+    
+    // In-progress folder tracking and auto-refresh for live updates
+    let _inProgressFolderPaths = new Set(); // folders with pending/running status
+    let _autoRefreshTimers = new Map(); // path -> intervalId for auto-refresh listeners
+    let _inProgressFoldersCheckedCount = 0; // count of in-progress folders that are checked
+    let _isFirstQueueStart = true; // used to detect Case 1 vs Case 2 for auto-load
+    
     // Session state for ETA calculations: track baseline state from folder inspection
     let _queueSessionStartState = new Map(); // path -> { initialProcessed: int, totalImages: int, toAnalyze: int }
     let _queueFolderInspections = new Map(); // path -> full inspection data from inspect_folder/inspect_folders
@@ -3808,26 +4128,56 @@
       }
       _queueLastDoneSet = nowDone;
 
-      // Detect newly-running items and schedule a targeted main-folder-tree update
+      // Update in-progress folder tracking and UI (pending + running folders)
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
+        const inProgressNow = new Set();
+        for (const item of items) {
+          if (item.status === 'pending' || item.status === 'running') {
+            inProgressNow.add(norm(item.path));
+          }
+        }
+        
+        // Detect newly-running items (first time moving from pending to running)
         const runningNow = new Set(items.filter(i => i.status === 'running').map(i => norm(i.path)));
         for (const p of runningNow) {
           if (!_queueLastRunningSet.has(p)) {
-            // Newly started — update the main folder tree for this path after 500ms
+            // Move out of pending and into running — implement Case 1 logic
+            _handleFirstFolderAnalysisStart(p);
+          }
+        }
+        const prevRunningSet = _queueLastRunningSet;
+        _queueLastRunningSet = runningNow;
+        
+        // Update in-progress set and refresh tree styling
+        _inProgressFolderPaths = inProgressNow;
+        updateInProgressFoldersInTree();
+        _updateAutoRefreshTimers();
+        
+        // Newly-starting items: update the main folder tree after 500ms delay
+        for (const p of inProgressNow) {
+          if (!prevRunningSet.has(p)) {
             setTimeout(() => {
               try {
-                // Only touch the main folder tree when it's visible
                 if (!folderTreeRootNode) return;
-                const rootNorm = norm(folderTreeRootNode.path || '');
-                if (!p.startsWith(rootNorm)) return; // outside current tree
                 updateFolderTreeNode(p);
               } catch (e) { /* ignore */ }
             }, 500);
           }
         }
-        _queueLastRunningSet = runningNow;
-      } catch (e) { /* ignore */ }
+      } catch (e) { console.warn('[queue] in-progress tracking error:', e); }
+
+      // Remove auto-refresh timers for finished folders
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        const nowDone = new Set(items.filter(i => i.status === 'done').map(i => norm(i.path)));
+        for (const p of nowDone) {
+          if (_autoRefreshTimers.has(p)) {
+            clearInterval(_autoRefreshTimers.get(p));
+            _autoRefreshTimers.delete(p);
+          }
+        }
+      } catch (e) { console.warn('[timer] cleanup error:', e); }
 
       // Update live dialog if open
       if (_liveAnalysisDlgOpen) {
@@ -3886,6 +4236,8 @@
         try {
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
+          // Update auto-refresh timers based on pause state
+          _updateAutoRefreshTimers();
 
           // When new items appear, inspect and capture their baseline state
           if (status && status.items) {
@@ -3929,6 +4281,12 @@
     function stopPollingQueue() {
       if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
       stopAutoRefresh();
+      // Cleanup auto-refresh timers for in-progress folders
+      for (const timerId of _autoRefreshTimers.values()) {
+        clearInterval(timerId);
+      }
+      _autoRefreshTimers.clear();
+      _inProgressFolderPaths.clear();
       // Cleanup session state
       _queueSessionStartState.clear();
       _queueFolderInspections.clear();
@@ -4261,6 +4619,118 @@
       } catch (_) { }
     }
 
+    /** Update UI to reflect in-progress folders with special styling and always-present checkboxes. */
+    function updateInProgressFoldersInTree() {
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        for (const inProgPath of _inProgressFolderPaths) {
+          const normPath = norm(inProgPath);
+          const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
+          for (const row of rows) {
+            const rp = norm(row.dataset.path || '');
+            if (rp !== normPath) continue;
+            
+            // Mark as in-progress with purple styling
+            row.classList.add('in-progress');
+            _tempKestrelPaths.add(normPath); // prevent checkbox removal on next rescan
+            
+            // Ensure checkbox exists (even if .kestrel doesn't)
+            if (!row.querySelector('.tree-cb')) {
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.className = 'tree-cb';
+              cb.title = 'Include in multi-folder view (analyzing now)';
+              cb.checked = checkedFolderPaths.has(row.dataset.path);
+              cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                if (cb.checked) checkedFolderPaths.add(row.dataset.path);
+                else checkedFolderPaths.delete(row.dataset.path);
+                _updateAutoRefreshTimers();
+                debouncedAutoLoad();
+              });
+              // Find icon and insert before it
+              const icon = row.querySelector('.tree-icon');
+              if (icon && icon.parentNode) icon.parentNode.insertBefore(cb, icon);
+              else row.insertBefore(cb, row.firstChild);
+            }
+          }
+        }
+      } catch (e) { console.warn('[tree] updateInProgressFoldersInTree error:', e); }
+    }
+
+    /** Start or stop auto-refresh timers for checked in-progress folders. */
+    function _updateAutoRefreshTimers() {
+      try {
+        const norm = p => (p || '').replace(/\\/g, '/');
+        const queueStatus = window._lastQueueStatus;
+        const isPaused = queueStatus && queueStatus.paused;
+        
+        // Stop all timers if queue is paused — no need to refresh when nothing is running
+        if (isPaused) {
+          for (const timerId of _autoRefreshTimers.values()) {
+            clearInterval(timerId);
+          }
+          _autoRefreshTimers.clear();
+          return;
+        }
+        
+        // Stop timers for folders that are no longer checked or in-progress
+        for (const [path, timerId] of _autoRefreshTimers.entries()) {
+          const isStillInProgress = _inProgressFolderPaths.has(path);
+          const isStillChecked = checkedFolderPaths.has(path);
+          if (!isStillInProgress || !isStillChecked) {
+            clearInterval(timerId);
+            _autoRefreshTimers.delete(path);
+          }
+        }
+        
+        // Start timers for newly-checked in-progress folders (only if queue is running, not paused)
+        for (const inProgPath of _inProgressFolderPaths) {
+          if (checkedFolderPaths.has(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
+            // Auto-refresh every 10 seconds while folder is in progress and checked
+            const timerId = setInterval(async () => {
+              try {
+                // Reload the data for this folder (debounced to avoid thrashing)
+                debouncedAutoLoad();
+              } catch (e) { console.warn('[refresh] auto-refresh error:', e); }
+            }, 10000);
+            _autoRefreshTimers.set(inProgPath, timerId);
+          }
+        }
+      } catch (e) { console.warn('[timer] _updateAutoRefreshTimers error:', e); }
+    }
+
+    /** Count how many analyzed (non-in-progress) folders exist in the tree. */
+    function countAnalyzedFolders() {
+      try {
+        let count = 0;
+        function traverse(n) {
+          if (!n) return;
+          if (n.has_kestrel && !_inProgressFolderPaths.has(n.path)) count++;
+          (n.children || []).forEach(c => traverse(c));
+        }
+        traverse(folderTreeRootNode);
+        return count;
+      } catch (e) { return 0; }
+    }
+
+    /** Implement Case 1 logic: if first folder starts analysis and no other analyzed folders exist, auto-load it. */
+    async function _handleFirstFolderAnalysisStart(folderPath) {
+      try {
+        if (!_isFirstQueueStart) return; // only on first start
+        _isFirstQueueStart = false;
+        
+        const analyzedCount = countAnalyzedFolders();
+        if (analyzedCount === 0) {
+          // Case 1: Auto-check and auto-load the in-progress folder
+          checkedFolderPaths.add(folderPath);
+          renderFolderTree();
+          await debouncedAutoLoad();
+          setStatus('Auto-loaded in-progress folder (Case 1: no other analyzed folders)');
+        }
+      } catch (e) { console.warn('[case1] error:', e); }
+    }
+
     // ── End Analysis Queue ────────────────────────────────────────────────────────
 
     // Helper function to load folder using native path (for pywebview API)
@@ -4289,17 +4759,14 @@
 
     function checkAllTreeFolders() {
       const all = collectKestrelPaths(folderTreeRootNode);
-      const btn = document.getElementById('treeCheckAll');
-      // If all are already checked, uncheck all; otherwise check all
-      const allChecked = all.length > 0 && all.every(p => checkedFolderPaths.has(p));
-      if (allChecked) {
-        checkedFolderPaths.clear();
-        if (btn) btn.textContent = 'Check all';
-      } else {
-        all.forEach(p => checkedFolderPaths.add(p));
-        if (btn) btn.textContent = 'Check none';
-      }
-      renderFolderTree(); // re-render so checkbox DOM matches state
+      all.forEach(p => checkedFolderPaths.add(p));
+      renderFolderTree();
+      debouncedAutoLoad();
+    }
+
+    function checkNoneTreeFolders() {
+      checkedFolderPaths.clear();
+      renderFolderTree();
       debouncedAutoLoad();
     }
 
@@ -4453,7 +4920,10 @@
 
         // Update active selection in tree if tree is open
         if (folderTreeData) {
-          treeActivePath = result.root || folderPath;
+          const loadedPath = result.root || folderPath;
+          treeActivePath = loadedPath;
+          checkedFolderPaths.clear();
+          checkedFolderPaths.add(loadedPath);
           renderFolderTree();
         }
       } catch (e) {
@@ -4487,8 +4957,6 @@
       // folders from a previous root selection.
       try {
         checkedFolderPaths.clear();
-        const treeCheckAllBtn = document.getElementById('treeCheckAll');
-        if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
         renderFolderTree();
       } catch (e) { /* ignore */ }
 
@@ -4601,7 +5069,18 @@
     el('#saveCsv').addEventListener('click', saveCsv);
     el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
     el('#speciesConf').addEventListener('change', () => renderScenes());
-    el('#sortBy').addEventListener('change', () => renderScenes());
+    el('#sortBy').addEventListener('change', () => {
+      const s = loadSettings();
+      s.sortBy = el('#sortBy').value;
+      saveSettings(s);
+      renderScenes();
+    });
+
+    (function initSortBy() {
+      const sortSel = document.getElementById('sortBy');
+      if (!sortSel) return;
+      try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
+    })();
 
     // Group-by-folder toggle
     (function initGroupByFolder() {
@@ -4838,8 +5317,6 @@
         if (folderPath) {
           treeExpandedPaths.clear();
           checkedFolderPaths.clear();
-          const treeCheckAllBtn = document.getElementById('treeCheckAll');
-          if (treeCheckAllBtn) treeCheckAllBtn.textContent = 'Check all';
           const treeScanned = await scanFolderTree(folderPath);
           if (treeScanned && !folderTreeRootHasKestrel) {
             setStatus('Select a folder from the tree below to load its scenes');
@@ -4852,9 +5329,11 @@
       });
     }
 
-    // Wire "Check all / Check none" button
+    // Wire "Check all / Check none" buttons
     const treeCheckAllBtn = document.getElementById('treeCheckAll');
     if (treeCheckAllBtn) treeCheckAllBtn.addEventListener('click', checkAllTreeFolders);
+    const treeCheckNoneBtn = document.getElementById('treeCheckNone');
+    if (treeCheckNoneBtn) treeCheckNoneBtn.addEventListener('click', checkNoneTreeFolders);
 
     // Wire "Load checked" button (removed from HTML; kept as no-op guard)
     const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');
@@ -4877,6 +5356,12 @@
     const analyzeDlgCancel = document.getElementById('analyzeDlgCancel');
     if (analyzeDlgCancel) {
       analyzeDlgCancel.addEventListener('click', () => {
+        // Save the current selection so user can restore it on next dialog open
+        if (_dlgSelected && _dlgSelected.size > 0) {
+          const s = loadSettings();
+          s.lastQueueState = Array.from(_dlgSelected);
+          saveSettings(s);
+        }
         document.getElementById('analyzeQueueDlg').close();
       });
     }
@@ -4953,6 +5438,11 @@
           if (result && result.success) {
             queuedFolderPaths.clear();
             _dlgSelected.clear();
+            _isFirstQueueStart = true; // reset for Case 1 logic on next queue start
+            // Clear saved queue state since we're starting a new queue
+            const s = loadSettings();
+            delete s.lastQueueState;
+            saveSettings(s);
             // Clear session state for new queue start, so ETA calculations use fresh folder inspections
             _queueSessionStartState.clear();
             _queueFolderInspections.clear();

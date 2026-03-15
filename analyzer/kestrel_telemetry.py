@@ -58,9 +58,9 @@ def _read_version() -> str:
         ]:
             if os.path.isfile(candidate):
                 with open(candidate, 'r', encoding='utf-8') as f:
-                    content = f.read().strip()
-                    if content:
-                        return content
+                    for line in f:
+                        if line.strip().lower().startswith('version:'):
+                            return line.strip().split(':', 1)[1].strip()
         return 'unknown'
     except Exception:
         return 'unknown'

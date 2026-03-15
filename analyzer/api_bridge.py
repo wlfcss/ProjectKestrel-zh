@@ -299,6 +299,55 @@ class Api:
             except Exception:
                 return {'success': True, 'version': 'unknown'}
 
+    def fetch_remote_version(self):
+        """Fetch version.json from projectkestrel.org to bypass CORS in JS."""
+        try:
+            import urllib.request
+            import urllib.error
+            import json
+            import ssl
+            import certifi
+            
+            url = "https://projectkestrel.org/version.json"
+            ctx = ssl.create_default_context(cafile=certifi.where())
+            
+            req = urllib.request.Request(
+                url,
+                headers={'User-Agent': 'ProjectKestrel/1.0'},
+                method='GET'
+            )
+            
+            with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                return {'success': True, 'data': data}
+        except Exception as e:
+            print(f"[API] fetch_remote_version() -> Error: {e}", flush=True)
+            return {'success': False, 'error': str(e)}
+
+    def get_platform_info(self):
+        """Return platform information (windows, macos, linux)."""
+        import sys
+        if sys.platform == 'darwin':
+            return {'success': True, 'platform': 'macos'}
+        elif sys.platform == 'win32':
+            return {'success': True, 'platform': 'windows'}
+        else:
+            return {'success': True, 'platform': 'linux'}
+
+    def is_windows_store_app(self):
+        """Check if running as a Windows Store app."""
+        try:
+            import sys
+            if sys.platform != 'win32':
+                return {'success': True, 'is_store': False}
+            # Check if running from Program Files\WindowsApps (typical Store app location)
+            import os
+            app_path = os.path.dirname(sys.executable)
+            is_store = 'WindowsApps' in app_path or os.environ.get('APPX_PACKAGE_ROOT') is not None
+            return {'success': True, 'is_store': is_store}
+        except Exception:
+            return {'success': True, 'is_store': False}
+
     def inspect_folder(self, folder_path: str):
         """Return lightweight folder summary (total images, processed count)."""
         try:
@@ -550,7 +599,7 @@ class Api:
 
             settings = load_persisted_settings()
             if mode is None:
-                mode = settings.get('rating_normalization', 'per_folder')
+                mode = settings.get('rating_normalization', 'none')
 
             df = pd.read_csv(csv_path)
             if df.empty:
@@ -580,10 +629,34 @@ class Api:
                 pass
 
             # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
+            
+            # Convert percentage settings to percentile thresholds (0.0-1.0)
+            pct_5 = settings.get('rating_threshold_5', 12) / 100.0
+            pct_4 = settings.get('rating_threshold_4', 15) / 100.0
+            pct_3 = settings.get('rating_threshold_3', 20) / 100.0
+            pct_2 = settings.get('rating_threshold_2', 30) / 100.0
+            # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
+            
+            # Convert percentages to cumulative percentiles from the top
+            # pct_5 is top 12% → threshold 0.88 (top 1 - 0.12)
+            # pct_4 is next 15% → threshold 0.73 (top 1 - 0.12 - 0.15)
+            # etc.
+            threshold_5 = 1.0 - pct_5
+            threshold_4 = threshold_5 - pct_4
+            threshold_3 = threshold_4 - pct_3
+            threshold_2 = threshold_3 - pct_2
+            
+            thresholds = {
+                'five': threshold_5,
+                'four': threshold_4,
+                'three': threshold_3,
+                'two': threshold_2,
+            }
+            
             if mode == 'none':
                 def _get_norm(q_val):
                     try:
-                        return quality_to_rating(float(q_val))
+                        return quality_to_rating(float(q_val), thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -597,16 +670,16 @@ class Api:
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
-            else:  # per_folder (default)
+            else:  # per_folder
                 _dist = folder_dist
 
                 def _get_norm(q_val):
                     try:
-                        return compute_normalized_rating(float(q_val), _dist)
+                        return compute_normalized_rating(float(q_val), _dist, thresholds)
                     except (TypeError, ValueError):
                         return 0
 
@@ -966,10 +1039,13 @@ class Api:
             detection_threshold = max(0.1, min(0.99, detection_threshold))
             scene_time_threshold = float(sett.get('scene_time_threshold', 1.0))
             scene_time_threshold = max(0.0, scene_time_threshold)
+            mask_threshold = float(sett.get('mask_threshold', 0.5))
+            mask_threshold = max(0.5, min(0.95, mask_threshold))
             return _queue_manager.enqueue(paths, use_gpu=bool(use_gpu),
                                           wildlife_enabled=bool(wildlife_enabled),
                                           detection_threshold=detection_threshold,
-                                          scene_time_threshold=scene_time_threshold)
+                                          scene_time_threshold=scene_time_threshold,
+                                          mask_threshold=mask_threshold)
         except Exception as e:
             print(f'[API] start_analysis_queue() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
@@ -1177,7 +1253,10 @@ class Api:
         from io import BytesIO
 
         try:
+            # Normalize separators from CSV/JS so macOS/Linux don't treat '\\' as a literal char.
+            filename = str(filename or '').replace('\\', '/')
             full_path = os.path.join(root_path, filename)
+            full_path = os.path.normpath(full_path)
             full_path_real = os.path.realpath(full_path)
             root_path_real = os.path.realpath(root_path)
             # Ensure the requested file is inside root_path (or exactly root_path).
@@ -1201,6 +1280,7 @@ class Api:
 
             settings = load_persisted_settings()
             use_cache = bool(settings.get('raw_preview_cache_enabled', True))
+            debug_logging_enabled = bool(settings.get('raw_preview_debug_logging_enabled', True))
 
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
             # Cache key includes relative path + extension + file identity.
@@ -1214,46 +1294,108 @@ class Api:
             cache_name = f'{base}_{cache_token}_preview.jpg'
             cache_path = os.path.join(cache_dir, cache_name)
 
+            debug_meta = {
+                'filename': filename,
+                'full_path': full_path,
+                'platform': sys.platform,
+                'exp_correction': round(float(exp_correction), 4),
+                'use_cache': bool(use_cache),
+                'cache_dir': cache_dir,
+                'cache_name': cache_name,
+                'cache_path': cache_path,
+                'key_material': key_material,
+                'cache_token': cache_token,
+            }
+
             if use_cache and os.path.exists(cache_path):
                 log(f'read_raw_full: Cache hit for {filename} (exp={exp_correction:+.3f})')
                 with open(cache_path, 'rb') as f:
-                    b64 = base64.b64encode(f.read()).decode('ascii')
-                return {'success': True, 'data': b64}
+                    cache_bytes = f.read()
+                cache_stat = os.stat(cache_path)
+                debug_meta.update({
+                    'cache_hit': True,
+                    'cache_file_bytes': int(len(cache_bytes)),
+                    'cache_file_mtime_ns': int(cache_stat.st_mtime_ns),
+                    'storage_preview_path': cache_path,
+                })
+                if debug_logging_enabled:
+                    log(f'read_raw_full debug: {json.dumps(debug_meta, sort_keys=True)}')
+                b64 = base64.b64encode(cache_bytes).decode('ascii')
+                return {'success': True, 'data': b64, 'mime': 'image/jpeg', 'debug': debug_meta}
 
             import rawpy
             from PIL import Image
 
             log(f'read_raw_full: Processing RAW file {filename} (exp={exp_correction:+.3f}, cache={use_cache})')
             with rawpy.imread(full_path) as raw:
-                linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
-                preserve = 0.8 if exp_correction > 0 else 0.0
-                rgb = raw.postprocess(
-                    use_camera_wb=True,
-                    no_auto_bright=True,
-                    output_bps=8,
-                    exp_shift=linear_scale,
-                    exp_preserve_highlights=preserve,
-                    fbdd_noise_reduction=rawpy.FBDDNoiseReductionMode.Off,
-                )
+                try:
+                    sizes = raw.sizes
+                    raw_sizes = {
+                        'width': int(getattr(sizes, 'width', 0) or 0),
+                        'height': int(getattr(sizes, 'height', 0) or 0),
+                        'raw_width': int(getattr(sizes, 'raw_width', 0) or 0),
+                        'raw_height': int(getattr(sizes, 'raw_height', 0) or 0),
+                        'iwidth': int(getattr(sizes, 'iwidth', 0) or 0),
+                        'iheight': int(getattr(sizes, 'iheight', 0) or 0),
+                        'flip': int(getattr(sizes, 'flip', 0) or 0),
+                    }
+                except Exception:
+                    raw_sizes = {}
+                
+                # Match pipeline postprocess flow: first call with defaults, then expose-shift if needed
+                rgb = raw.postprocess()
+                
+                if exp_correction != 0.0:
+                    linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
+                    preserve = 0.8 if exp_correction > 0 else 0.0
+                    rgb = raw.postprocess(
+                        no_auto_bright=True,
+                        exp_shift=linear_scale,
+                        exp_preserve_highlights=preserve,
+                    )
 
             img = Image.fromarray(rgb)
 
             buf = BytesIO()
-            img.save(buf, format='JPEG', quality=100, subsampling=0, optimize=False, progressive=False)
+            img.save(buf, format='JPEG', quality=90, subsampling=0, optimize=False, progressive=False)
             jpg_bytes = buf.getvalue()
+            wrote_cache = False
             if use_cache:
                 os.makedirs(cache_dir, exist_ok=True)
                 with open(cache_path, 'wb') as f:
                     f.write(jpg_bytes)
+                wrote_cache = True
+
+            storage_preview_path = cache_path
+            if not wrote_cache:
+                # Even when cache is disabled, persist one debug copy for inspection.
+                os.makedirs(cache_dir, exist_ok=True)
+                debug_name = f'{base}_{cache_token}_preview_debug.jpg'
+                storage_preview_path = os.path.join(cache_dir, debug_name)
+                with open(storage_preview_path, 'wb') as f:
+                    f.write(jpg_bytes)
 
             b64 = base64.b64encode(jpg_bytes).decode('ascii')
+            debug_meta.update({
+                'cache_hit': False,
+                'cache_written': bool(wrote_cache),
+                'storage_preview_path': storage_preview_path,
+                'raw_sizes': raw_sizes,
+                'postprocess_rgb_shape': list(rgb.shape) if hasattr(rgb, 'shape') else [],
+                'postprocess_rgb_dtype': str(getattr(rgb, 'dtype', '')),
+                'jpeg_bytes': int(len(jpg_bytes)),
+                'jpeg_kb': round(len(jpg_bytes) / 1024.0, 2),
+                'jpeg_dimensions': {'width': int(img.width), 'height': int(img.height)},
+            })
+            if debug_logging_enabled:
+                log(f'read_raw_full debug: {json.dumps(debug_meta, sort_keys=True)}')
             if use_cache:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cached as {cache_name}')
             else:
                 log(f'read_raw_full: Done, {len(jpg_bytes)//1024}KB JPEG ({img.width}x{img.height}), cache disabled')
-            return {'success': True, 'data': b64}
+            return {'success': True, 'data': b64, 'mime': 'image/jpeg', 'debug': debug_meta}
         except Exception as e:
-            log(f'read_raw_full error: {e}')
+            log(f'read_raw_full error: {e} (filename={filename}, root_path={root_path})')
             return {'success': False, 'error': str(e)}
 
     def cleanup_culling_cache(self, root_path: str):
