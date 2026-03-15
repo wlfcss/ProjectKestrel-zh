@@ -21,3 +21,4 @@ analyzer/models/fullfull_ep3.keras
 analyzer/models/old_quality.keras
 analyzer/models/quality_fullfull_1.keras
 analyzer/models/quality_test1.keras
+analyzer/models/quality_set1_ep5.keras
