@@ -350,7 +350,7 @@
       
       // Title
       const titleEl = document.getElementById('versionUpdateTitle');
-      if (titleEl) titleEl.textContent = versionInfo.name;
+      if (titleEl) titleEl.textContent = `Update Available: ${versionInfo.name}`;
       
       // Changelog notes (show first 3)
       const notesEl = document.getElementById('versionUpdateNotes');
@@ -378,7 +378,7 @@
       const downloadBtn = document.getElementById('versionUpdateDownloadBtn');
       if (downloadBtn) {
         downloadBtn.href = `https://projectkestrel.org/download?platform=${platform}`;
-        downloadBtn.textContent = platform === 'macos' ? '↓ Download for macOS' : '↓ Download for Windows';
+        downloadBtn.textContent = platform === 'macos' ? 'Go to MacOS Download' : 'Go to Windows Download';
         downloadBtn.onclick = (e) => {
           e.preventDefault();
           window.open(`https://projectkestrel.org/download?platform=${platform}`, '_blank');
@@ -401,7 +401,7 @@
         if (toast.style.display === 'block') {
           toast.style.display = 'none';
         }
-      }, 10000);
+      }, 60000);
     }
 
     // Tooltip layer so tips can render over the main image area
