@@ -2513,6 +2513,8 @@
         auto_save_enabled: autoSaveEnabled,
       };
       _autoSaveEnabled = autoSaveEnabled;
+      // Persist settings to localStorage immediately
+      saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
