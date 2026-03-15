@@ -1,15 +1,39 @@
-def quality_to_rating(q: float) -> int:
-    if q == -1:
+def quality_to_rating(q: float, thresholds: dict = None) -> int:
+    """Map a percentile-normalized quality score (0.0-1.0) to 1-5 stars.
+
+    Thresholds use cumulative percentile cutoffs from the top, matching the
+    format used by compute_normalized_rating():
+      {'five': 0.88, 'four': 0.73, 'three': 0.53, 'two': 0.23}
+    """
+    try:
+        q_f = float(q)
+    except (TypeError, ValueError):
         return 0
-    if q < 0.15:
-        return 1
-    if q < 0.3:
-        return 2
-    if q < 0.6:
-        return 3
-    if q < 0.9:
+    if q_f < 0:
+        return 0
+
+    if thresholds is None:
+        thresholds = {
+            'five': 0.88,   # top 12%
+            'four': 0.73,   # 12-27%
+            'three': 0.53,  # 27-47%
+            'two': 0.23,    # 47-77%
+        }
+
+    t5 = float(thresholds.get('five', 0.88))
+    t4 = float(thresholds.get('four', 0.73))
+    t3 = float(thresholds.get('three', 0.53))
+    t2 = float(thresholds.get('two', 0.23))
+
+    if q_f >= t5:
+        return 5
+    if q_f >= t4:
         return 4
-    return 5
+    if q_f >= t3:
+        return 3
+    if q_f >= t2:
+        return 2
+    return 1
 
 
 def compute_quality_distribution(quality_scores) -> list:
@@ -66,7 +90,7 @@ def compute_normalized_rating(
     
     total = sum(distribution)
     if total == 0:
-        return quality_to_rating(quality)
+        return quality_to_rating(quality, thresholds)
     bucket = min(int(quality * 100), 99)
     below = sum(distribution[:bucket])
     within = distribution[bucket]
