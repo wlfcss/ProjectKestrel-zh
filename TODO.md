@@ -72,6 +72,7 @@ Whats working
     - Fixed bugs with inconsistent application of exposure correction algorithm
     - Fixed bugs preventing the user interface from updating to reflect newly analyzed images while analysis is in progress.
     - Fixed bugs in user interface related to the new split scene and scene tag modification system
+    - Fixed a bug where the ETA calculation would not update when resuming analysis of a folder that has previously been started
     - Improved UI by reorganizing settings menu and providing several options to customize analysis parameters.
     - Improved UI to show max star rating rather than max Quality
     - Improved UI to implement auto-save functionality by default.
