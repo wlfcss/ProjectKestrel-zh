@@ -1,6 +1,6 @@
 [
   {
-    "timestamp_utc": "2026-02-27T16:49:48.160121Z",
+    "timestamp_utc": "2026-03-16T00:12:27.458333Z",
     "level": "info",
     "event": "analysis_start",
     "analyzer": "visualizer-queue",
@@ -8,7 +8,7 @@
     "file_count": 43
   },
   {
-    "timestamp_utc": "2026-02-27T16:49:49.668011Z",
+    "timestamp_utc": "2026-03-16T00:12:28.744880Z",
     "level": "warning",
     "stage": "load_models",
     "context": {
@@ -17,11 +17,11 @@
     },
     "message": "Specified provider 'DmlExecutionProvider' is not in available provider names.Available providers: 'AzureExecutionProvider, CPUExecutionProvider'",
     "category": "UserWarning",
-    "filename": "onnxruntime\\capi\\onnxruntime_inference_collection.py",
+    "filename": "C:\\Data\\Code\\Project Kestrel\\ProjectKestrel\\.venv-macos\\Lib\\site-packages\\onnxruntime\\capi\\onnxruntime_inference_collection.py",
     "lineno": 123
   },
   {
-    "timestamp_utc": "2026-02-27T16:50:04.460748Z",
+    "timestamp_utc": "2026-03-16T00:12:48.883096Z",
     "level": "warning",
     "stage": "save_database",
     "context": {
@@ -30,7 +30,14 @@
     },
     "message": "The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.",
     "category": "FutureWarning",
-    "filename": "pandas\\core\\internals\\concat.py",
-    "lineno": 491
+    "filename": "C:\\Data\\Code\\Project Kestrel\\ProjectKestrel\\analyzer\\kestrel_analyzer\\pipeline.py",
+    "lineno": 748
+  },
+  {
+    "timestamp_utc": "2026-03-16T00:21:12.598864Z",
+    "level": "info",
+    "event": "analysis_complete",
+    "folder": "C:/Data/Code/Project Kestrel/Demo Sets\\backyard_birds",
+    "total_files": 43
   }
 ]
