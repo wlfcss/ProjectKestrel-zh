@@ -253,10 +253,10 @@ class AnalysisPipeline:
         if callable(load_persisted_settings):
             try:
                 sett = load_persisted_settings() or {}
-                pct_5 = float(sett.get('rating_threshold_5', 12)) / 100.0
-                pct_4 = float(sett.get('rating_threshold_4', 15)) / 100.0
-                pct_3 = float(sett.get('rating_threshold_3', 20)) / 100.0
-                pct_2 = float(sett.get('rating_threshold_2', 30)) / 100.0
+                pct_5 = float(sett.get('rating_threshold_5', 10)) / 100.0
+                pct_4 = float(sett.get('rating_threshold_4', 20)) / 100.0
+                pct_3 = float(sett.get('rating_threshold_3', 30)) / 100.0
+                pct_2 = float(sett.get('rating_threshold_2', 25)) / 100.0
                 threshold_5 = 1.0 - pct_5
                 threshold_4 = threshold_5 - pct_4
                 threshold_3 = threshold_4 - pct_3

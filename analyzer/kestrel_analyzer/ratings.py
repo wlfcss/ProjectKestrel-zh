@@ -3,7 +3,7 @@ def quality_to_rating(q: float, thresholds: dict = None) -> int:
 
     Thresholds use cumulative percentile cutoffs from the top, matching the
     format used by compute_normalized_rating():
-      {'five': 0.88, 'four': 0.73, 'three': 0.53, 'two': 0.23}
+    {'five': 0.90, 'four': 0.70, 'three': 0.40, 'two': 0.15}
     """
     try:
         q_f = float(q)
@@ -14,16 +14,16 @@ def quality_to_rating(q: float, thresholds: dict = None) -> int:
 
     if thresholds is None:
         thresholds = {
-            'five': 0.88,   # top 12%
-            'four': 0.73,   # 12-27%
-            'three': 0.53,  # 27-47%
-            'two': 0.23,    # 47-77%
+            'five': 0.90,   # top 10%
+            'four': 0.70,   # 10-30%
+            'three': 0.40,  # 30-60%
+            'two': 0.15,    # 60-85%
         }
 
-    t5 = float(thresholds.get('five', 0.88))
-    t4 = float(thresholds.get('four', 0.73))
-    t3 = float(thresholds.get('three', 0.53))
-    t2 = float(thresholds.get('two', 0.23))
+    t5 = float(thresholds.get('five', 0.90))
+    t4 = float(thresholds.get('four', 0.70))
+    t3 = float(thresholds.get('three', 0.40))
+    t2 = float(thresholds.get('two', 0.15))
 
     if q_f >= t5:
         return 5
@@ -74,18 +74,18 @@ def compute_normalized_rating(
         Star rating 0-5 (0 = no detection / unprocessed).
 
     Example thresholds (as percentiles 0.0-1.0):
-        {'five': 0.88, 'four': 0.73, 'three': 0.53, 'two': 0.23}
+        {'five': 0.90, 'four': 0.70, 'three': 0.40, 'two': 0.15}
     """
     if quality < 0:
         return 0
     
-    # Default thresholds: 12%, 15%, 20%, 30%, 23%
+    # Default thresholds: 10%, 20%, 30%, 25%, 15%
     if thresholds is None:
         thresholds = {
-            'five': 0.88,   # top 12%
-            'four': 0.73,   # 12-27%
-            'three': 0.53,  # 27-47%
-            'two': 0.23,    # 47-77%
+            'five': 0.90,   # top 10%
+            'four': 0.70,   # 10-30%
+            'three': 0.40,  # 30-60%
+            'two': 0.15,    # 60-85%
         }
     
     total = sum(distribution)
@@ -96,13 +96,13 @@ def compute_normalized_rating(
     within = distribution[bucket]
     # fraction_rank: 0.0 = worst quality, 1.0 = best quality
     fraction_rank = (below + within * 0.5) / total
-    if fraction_rank >= thresholds.get('five', 0.88):
+    if fraction_rank >= thresholds.get('five', 0.90):
         return 5
-    if fraction_rank >= thresholds.get('four', 0.73):
+    if fraction_rank >= thresholds.get('four', 0.70):
         return 4
-    if fraction_rank >= thresholds.get('three', 0.53):
+    if fraction_rank >= thresholds.get('three', 0.40):
         return 3
-    if fraction_rank >= thresholds.get('two', 0.23):
+    if fraction_rank >= thresholds.get('two', 0.15):
         return 2
     return 1
 

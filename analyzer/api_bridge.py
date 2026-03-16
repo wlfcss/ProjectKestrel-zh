@@ -631,15 +631,15 @@ class Api:
             # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
             
             # Convert percentage settings to percentile thresholds (0.0-1.0)
-            pct_5 = settings.get('rating_threshold_5', 12) / 100.0
-            pct_4 = settings.get('rating_threshold_4', 15) / 100.0
-            pct_3 = settings.get('rating_threshold_3', 20) / 100.0
-            pct_2 = settings.get('rating_threshold_2', 30) / 100.0
+            pct_5 = settings.get('rating_threshold_5', 10) / 100.0
+            pct_4 = settings.get('rating_threshold_4', 20) / 100.0
+            pct_3 = settings.get('rating_threshold_3', 30) / 100.0
+            pct_2 = settings.get('rating_threshold_2', 25) / 100.0
             # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
             
             # Convert percentages to cumulative percentiles from the top
-            # pct_5 is top 12% → threshold 0.88 (top 1 - 0.12)
-            # pct_4 is next 15% → threshold 0.73 (top 1 - 0.12 - 0.15)
+            # pct_5 is top 10% → threshold 0.90 (top 1 - 0.10)
+            # pct_4 is next 20% → threshold 0.70 (top 1 - 0.10 - 0.20)
             # etc.
             threshold_5 = 1.0 - pct_5
             threshold_4 = threshold_5 - pct_4

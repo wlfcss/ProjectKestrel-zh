@@ -2472,11 +2472,11 @@
       const normSelect = document.getElementById('ratingNormalization');
       if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
       // Rating distribution thresholds
-      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 12);
-      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 15);
-      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 20);
-      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 30);
-      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 23);
+      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 10);
+      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 20);
+      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 30);
+      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 25);
+      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 15);
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
@@ -2530,20 +2530,20 @@
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
       // Rating distribution thresholds
-      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 12));
-      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 15));
-      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 20));
-      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 30));
-      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 23));
+      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 10));
+      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 20));
+      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 30));
+      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 25));
+      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 15));
       
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
       const prevNormalization = existing.rating_normalization || 'none';
-      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 12;
-      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 15;
-      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 20;
-      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 30;
-      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 23;
+      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 10;
+      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 20;
+      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 30;
+      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 25;
+      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 15;
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
