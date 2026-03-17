@@ -1268,23 +1268,23 @@
           actions.appendChild(explorerBtn);
 
           const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'action-btn';
+          cullingBtn.className = 'action-btn culling-assistant-btn';
           cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
           cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
           cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
           actions.appendChild(cullingBtn);
 
           const writeMetaBtn = document.createElement('button');
-          writeMetaBtn.className = 'action-btn';
-          writeMetaBtn.innerHTML = '<i>📝</i> Write XMP Metadata';
-          writeMetaBtn.title = 'Write ratings and tags to XMP sidecar files for use in Lightroom/Bridge';
+          writeMetaBtn.className = 'action-btn write-metadata-btn';
+          writeMetaBtn.innerHTML = '<i>📝</i> Write Photo Metadata';
+          writeMetaBtn.title = 'Write XMP sidecar files alongside your photos — carries star ratings, Accept/Reject decisions, and species tags. Readable by Lightroom, Capture One, darktable, and other editors.';
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
           actions.appendChild(writeMetaBtn);
 
           const folderOptionsBtn = document.createElement('button');
           folderOptionsBtn.className = 'action-btn';
-          folderOptionsBtn.innerHTML = '<i>⚙</i> Folder options...';
-          folderOptionsBtn.title = 'Reset culling state for this folder';
+          folderOptionsBtn.innerHTML = '<i>↺</i> Reset Culling Decisions';
+          folderOptionsBtn.title = 'Reset Accept/Reject culling decisions for this folder';
           folderOptionsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); showFolderOptionsDialog(fd.folderPath); });
           actions.appendChild(folderOptionsBtn);
 
@@ -6407,18 +6407,18 @@
     const TUTORIAL_PART1 = [
       {
         title: 'Welcome to Project Kestrel!',
-        body: "Let\u2019s take a quick guided tour of Kestrel. You can <b>interact with the UI at any time</b> while this tour is open.<br><br>Click <b>Next \u2192</b> or press the right-arrow key to continue.",
+        body: 'Project Kestrel uses machine learning to organize your photos, helping you review them more efficiently, search through your library, and quickly decide which ones to edit and share.<br><br>This guided tutorial will walk you through the core features of Kestrel.',
         target: null,
       },
       {
-        title: 'Analyze Your Photos',
-        body: 'Click <b>Analyze Folders\u2026</b> to select folders of bird photos. Kestrel scans them, detects birds using AI, identifies species, and scores quality automatically.',
+        title: 'First, Analyze Your Photos',
+        body: 'Click <b>Analyze Folders\u2026</b> to select folders that contain your bird photos. Kestrel groups them by scene, detects birds using AI, guesses the bird species and family, and scores quality automatically.',
         target: '#analyzeQueueBtn',
         position: 'bottom',
       },
       {
-        title: 'Open an Existing Folder',
-        body: 'Already analyzed a folder? Click <b>Open Folder\u2026</b> to browse it. Kestrel reads the <code>.kestrel</code> database and displays all your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
+        title: 'Open an Analyzed Folder',
+        body: 'Once you\u2019ve analyzed a folder with Kestrel, click <b>Open Folder\u2026</b> to browse it. Kestrel loads your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
         target: '#pickFolder',
         position: 'bottom',
       },
@@ -6427,69 +6427,87 @@
     const TUTORIAL_PART2 = [
       {
         title: 'Your Photos, Organized by Scene',
-        body: 'The <b>Scene Grid</b> shows your photos grouped by when they were taken. Each card shows the best photo, species detected, and the AI quality rating.',
-        nudge: 'Click the highlighted scene card to open it!',
-        target: '#sceneGrid .card',  // highlights the first card
+        body: 'Kestrel organizes your photos into <b>scenes</b> \u2014 groups of similar images captured in the same burst. The scene grid shows these scenes in the order they were taken.',
+        nudge: 'Click on a scene to open it!',
+        target: '#sceneGrid .card',
         position: 'right',
-        waitFor: 'clickScene',   // hide Next; require user to click a scene card
+        waitFor: 'clickScene',
       },
       {
-        title: 'Scene Detail View',
-        body: 'Inside a scene, photos are <b>sorted by quality</b> \u2014 the sharpest, best-composed shots appear first. Hover over a photo to preview it on the right.<br><br>When you analyze your own photos, you can <b>double-click</b> any photo to open it in your photo editor.',
-        target: '#sceneDlg',
-        highlightFirst: '#sceneDlg .card:first-child',
+        title: 'Explore Your Scene',
+        body: 'Within each scene, your photos are automatically <b>sorted by quality</b> \u2014 from sharpest to blurriest. You can immediately focus your attention on the best shots!<br><br>Click on a photo in the filmstrip to view its details.',
+        nudge: 'Click a photo in the filmstrip below!',
+        target: '#imageGrid',
         position: 'left',
-        inDialog: true,          // position relative to the dialog
-      },
-      {
-        title: 'Star Ratings',
-        body: 'Click the <b>\u2605 stars</b> on any photo to set your own rating. <span style="color:#6aa0ff">Blue stars</span> = AI rating. <span style="color:#f5c542">Gold stars</span> = your manual override.',
-        nudge: 'Try clicking a star on one of the photos!',
-        target: '#sceneDlg .card:first-child .stars',
-        position: 'right',
         inDialog: true,
-        waitFor: 'clickStar',    // wait for user to click a star
+        waitFor: 'clickFilmstrip',
       },
       {
-        title: 'Search & Filter',
-        body: 'Type a species or family name in the <b>Search</b> box. The grid filters instantly as you type.',
-        target: '#search',
-        position: 'right',
+        title: 'Ratings and Culling Decisions',
+        body: 'Kestrel computes <b>star ratings</b> based on each image\u2019s quality score. Click the stars to set your own. <span style="color:#6aa0ff">Blue stars</span> = AI rating \u00b7 <span style="color:#f5c542">Gold stars</span> = your manual override.<br><br>Use the <b>Accept \u00b7 Undecided \u00b7 Reject</b> buttons to make a culling decision for each photo. These will come in handy with the Culling Assistant later!',
+        nudge: 'Mark a photo as Accepted or Rejected to continue!',
+        target: '#sceneInfoBar',
+        position: 'left',
+        inDialog: true,
+        waitFor: 'clickCullToggle',
       },
       {
-        title: 'Sorting & Grouping',
-        body: 'Sort scenes by <b>Scene ID</b>, <b>Max Quality</b>, or <b>Image Count</b>. Toggle <b>Group by folder</b> to organize multi-folder libraries.',
-        target: '#sortBy',
+        title: 'Keyboard Shortcuts',
+        body: 'Kestrel has keyboard shortcuts to make reviewing photos faster. Try some out before continuing!<br><br><kbd>\u2190</kbd><kbd>\u2192</kbd> Navigate \u00b7 <kbd>C</kbd> Accept \u00b7 <kbd>X</kbd> Undecided \u00b7 <kbd>Z</kbd> Reject<br><kbd>1</kbd>\u2013<kbd>5</kbd> Rate \u00b7 <kbd>Space</kbd> Open in editor \u00b7 <kbd>Esc</kbd> Close',
+        target: '#sceneShortcutLegend',
+        position: 'left',
+        inDialog: true,
+        setupAction: 'expandShortcuts',
+      },
+      {
+        title: 'Other Scene Features',
+        body: 'A few more things you can do inside a scene:<br><br>\u2022 <b>Click and drag</b> on the full image to load the RAW file and zoom in<br>\u2022 Edit the <b>scene name</b> and <b>tags</b> at the top<br>\u2022 Press <kbd>Space</kbd> to open the photo in your preferred photo editor<br>\u2022 Use <b>\u2702 Split Scene</b> if Kestrel accidentally merged two different scenes<br><br>Click <b>Close</b> to continue to the next step!',
+        nudge: 'Close the scene dialog to continue.',
+        target: '#closeDlg',
+        position: 'left',
+        inDialog: true,
+        waitFor: 'closeDialog',
+      },
+      {
+        title: 'Filtering Options',
+        body: '\u2022 <b>Search</b> for any bird species or family \u2014 the grid filters instantly as you type.<br>\u2022 Don\u2019t see scenes after searching? Lower the <b>Confidence Threshold</b> to see more results.<br>\u2022 Enable <b>Multi-subject mode</b> if your scenes contain multiple bird species.<br>\u2022 <b>Sort</b> by Quality, Image Count, or Capture Time.',
+        target: '.filter-panel',
         position: 'right',
       },
       {
         title: 'Merging Scenes',
-        body: 'Did Kestrel split a burst into two scene cards? Hold <kbd>Ctrl</kbd> and click to <b>select multiple scenes</b>, then hit <b>Merge selected scenes</b> to combine them into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
+        body: 'Did Kestrel split a burst into two scene cards? Hold <kbd>Ctrl</kbd> and click to <b>select multiple scenes</b>, then click <b>Merge selected scenes</b> to combine them into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
         target: '#sceneGrid',
         position: 'left',
       },
       {
-        title: 'Culling Assistant',
-        body: 'When you\u2019re ready to select your best shots, click <b>Open Culling Assistant</b> in any folder\u2019s header bar. It opens a dedicated accept/reject workspace.',
-        target: '.culling-btn',
-        position: 'bottom',
-      },
-      {
-        title: 'Write XMP Metadata',
-        body: 'Click <b>Write Metadata</b> to write XMP sidecar files alongside your photos. These <code>.xmp</code> files carry Kestrel\u2019s star ratings, species ID, and quality scores in a format that <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors understand natively.<br><br>\u26a0\ufe0f <b>Write XMP files <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
+        title: 'Write Photo Metadata',
+        body: 'Click <b>Write Photo Metadata</b> to export Kestrel\u2019s star ratings and Accept/Reject decisions into XMP sidecar files alongside your photos. These <code>.xmp</code> files are understood natively by <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors.<br><br>\u26a0\ufe0f <b>Write photo metadata <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
         target: '.write-metadata-btn',
         position: 'bottom',
       },
       {
-        title: 'Settings',
-        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Darktable, Lightroom, or system default). Double-clicking a photo will open it there.',
+        title: 'Culling Assistant',
+        body: 'The <b>Culling Assistant</b> helps you automatically assign photos as Accepted or Rejected based on star ratings \u2014 and can even move rejected photos into a dedicated folder.<br><br>Click <b>Open Culling Assistant</b> to open a dedicated Accept/Reject workspace for the folder.',
+        target: '.culling-assistant-btn',
+        position: 'bottom',
+      },
+      {
+        title: 'Options',
+        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Lightroom, Darktable, or system default). Opening a photo with <kbd>Space</kbd> will launch it there. You can also tweak several other options.',
         target: '#openSettings',
         position: 'bottom',
       },
       {
         title: 'You\u2019re All Set!',
-        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br>\u2022 <b>Write Metadata</b> to export ratings &amp; species to Lightroom or darktable<br><br>Click the <b>?</b> button anytime to replay this tour. Happy birding!',
+        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view &amp; rate photos<br>\u2022 <b>Culling Assistant</b> for bulk Accept/Reject workflow<br>\u2022 <b>Write Photo Metadata</b> to export to Lightroom, darktable, etc.<br><br>\u26a0\ufe0f <b>Remember:</b> Write photo metadata <em>before</em> importing into Lightroom or Capture One for best results!<br><br>Click the <b>\uD83D\uDCD6 Tutorial</b> button anytime to replay this tour. Happy birding!',
         target: null,
+      },
+      {
+        title: 'Please Send Feedback!',
+        body: 'I (the person who made Project Kestrel) would really love to hear from you! Please tell me if you found the app useful, or if you find any bugs or have suggestions for improvements.<br><br>Thank you for trying Kestrel!',
+        target: '#openFeedback',
+        position: 'top',
       },
     ];
 
@@ -6565,6 +6583,15 @@
       var card    = _tutEl('#tutorialCard');
       var nudge   = _tutEl('#tutorialNudge');
       var nextBtn = _tutEl('#tutorialNext');
+
+      // Pre-step setup actions (run before target positioning)
+      if (step.setupAction === 'expandShortcuts') {
+        var legend = document.getElementById('sceneShortcutLegend');
+        if (legend && legend.classList.contains('hidden')) {
+          var shortcutToggleBtn = document.getElementById('sceneShortcutBtn');
+          if (shortcutToggleBtn) shortcutToggleBtn.click();
+        }
+      }
 
       // Text
       _tutEl('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + _tutSteps.length;
@@ -6697,6 +6724,44 @@
         document.addEventListener('click', onStarClick, true);
         _tutCleanupFn = function() { document.removeEventListener('click', onStarClick, true); };
       }
+      else if (hasWaitFor && step.waitFor === 'clickFilmstrip') {
+        // User must click a photo in the filmstrip
+        var filmstripEl = document.getElementById('imageGrid');
+        if (filmstripEl) {
+          var onFilmstripClick = function(ev) {
+            var cardEl = ev.target.closest('.filmstrip-card, .card');
+            if (cardEl) {
+              setTimeout(function() { _tutAdvance(); }, 350);
+            }
+          };
+          filmstripEl.addEventListener('click', onFilmstripClick, true);
+          _tutCleanupFn = function() { filmstripEl.removeEventListener('click', onFilmstripClick, true); };
+        }
+      }
+      else if (hasWaitFor && step.waitFor === 'clickCullToggle') {
+        // User must click the Accept or Reject button (not Undecided)
+        var onCullClick = function(ev) {
+          var cullBtn = ev.target.closest('.cull-btn[data-cull="accept"], .cull-btn[data-cull="reject"]');
+          if (cullBtn) {
+            setTimeout(function() { _tutAdvance(); }, 400);
+          }
+        };
+        document.addEventListener('click', onCullClick, true);
+        _tutCleanupFn = function() { document.removeEventListener('click', onCullClick, true); };
+      }
+      else if (hasWaitFor && step.waitFor === 'closeDialog') {
+        // User must close the scene dialog
+        var sceneDlgEl = document.getElementById('sceneDlg');
+        if (sceneDlgEl) {
+          var onDlgClose = function() {
+            sceneDlgEl.removeEventListener('close', onDlgClose);
+            _tutCleanupFn = null;
+            setTimeout(function() { _tutAdvance(); }, 250);
+          };
+          sceneDlgEl.addEventListener('close', onDlgClose);
+          _tutCleanupFn = function() { sceneDlgEl.removeEventListener('close', onDlgClose); };
+        }
+      }
     }
 
     function _tutAdvance() {
@@ -6781,19 +6846,12 @@
       }
     });
 
-    // Keyboard navigation
+    // Keyboard: only Escape closes the tutorial (arrow keys intentionally removed —
+    // users navigate via Next/Back buttons or by completing the waitFor action)
     document.addEventListener('keydown', function(ev) {
       if (!_tutEl('#tutorialOverlay').classList.contains('active')) return;
       if (_tutPart === 0) return;
-      var step = _tutSteps[_tutStep];
-      var hasWaitFor = step && step.waitFor;
-      if (ev.key === 'ArrowRight' || ev.key === 'Enter') {
-        ev.preventDefault();
-        // Don't advance with keyboard if a waitFor is active
-        if (!hasWaitFor) _tutAdvance();
-      }
-      else if (ev.key === 'ArrowLeft') { ev.preventDefault(); _tutGoBack(); }
-      else if (ev.key === 'Escape') { _closeMainTutorial(); }
+      if (ev.key === 'Escape') { _closeMainTutorial(); }
     });
 
     // Also wire welcome panel tutorial link to start inline tutorial

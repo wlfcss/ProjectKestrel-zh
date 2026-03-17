@@ -1,7 +1,9 @@
 # Project Kestrel To-Do and Changelog
 * Investigate GPU support from recent pull request #14
-* Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
+
+* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed. 
+* Fix rating system.
 
 Bugs
 
@@ -99,6 +101,9 @@ Whats working
 * new scene view + changes to accept/reject workflow
 * fixed bugs with grouping algo
 * fixed bugs with quality algo
+* brand new filmstrip view for scene
+* changes to how accepting and rejecting images is handled by kestrel in parity with ratings
+* several UI improvements and bug fixes
 
 -todo: make quality algo still more generous by default
 -more keyboard shortcuts
