@@ -27,15 +27,18 @@
       </h1>
       <div class="toolbar">
         <div class="toolbar-row actions">
-          <button id="pickFolder" class="primary">Open Folder…
-            <span class="help-tip"
-              data-tip="Open the folder that contains your bird photos after the folder is analyzed with Kestrel."
-              aria-label="Folder selection help"
-              title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
-          </button>
-          <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">Analyze Folders…</button>
-          <button id="openSettings">Settings</button>
-          <div style="display:flex;gap:6px">
+          <div class="actions-main-row">
+            <button id="pickFolder" class="primary" title="Open a folder you've already analyzed with Kestrel">
+              📂 Open Folder
+              <span class="help-tip"
+                data-tip="Open the folder that contains your bird photos after the folder is analyzed with Kestrel."
+                aria-label="Folder selection help"
+                title="Open the folder that contains your bird photos after the folder with Kestrel.">?</span>
+            </button>
+            <button id="analyzeQueueBtn" title="Select folders to add to the analysis queue">🔬 Analyze…</button>
+            <button id="openSettings" title="Open Kestrel settings">⚙ Settings</button>
+          </div>
+          <div id="saveRevertWrap" style="display:flex;gap:6px">
             <button id="revertCsv" disabled title="Discard all unsaved changes" style="flex:1">Revert Changes</button>
             <button id="saveCsv" disabled style="flex:1">Save Changes</button>
           </div>
@@ -57,16 +60,27 @@
           <div id="folderTree"></div>
         </div>
         <div class="toolbar-row filters">
-          <div class="filter-panel" aria-label="Filtering options">
-            <div class="filter-title">Filtering Options</div>
+          <div class="filter-panel" aria-label="Filter and sort options">
+            <div class="filter-title">Filter &amp; Sort Options</div>
             <input id="search" type="search" placeholder="Search by species or family" />
             <label class="inline">
               <span class="muted">Confidence Threshold</span>
               <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:120px" />
             </label>
+            <div class="filter-divider"></div>
+            <div class="filter-sort-row">
+              <span class="muted filter-sort-label">Sort by</span>
+              <select id="sortBy">
+                <option value="captureTime" selected>Capture Time</option>
+                <option value="sceneId">Scene ID</option>
+                <option value="maxQuality">Max Quality</option>
+                <option value="imageCount">Image Count</option>
+              </select>
+            </div>
+            <div class="filter-divider"></div>
             <label class="inline" title="Only show scenes with photos that you've manually assigned ratings to.">
               <input id="filterScenesManualRated" type="checkbox" />
-              <span class="muted">Only show manually-rated scenes</span>
+              <span class="muted">Only manually-rated scenes</span>
             </label>
             <label class="inline">
               <input id="includeSecondarySpecies" type="checkbox" />
@@ -85,15 +99,6 @@
               <span class="muted">Group by folder</span>
             </label>
           </div>
-          <div class="inline" aria-label="Sort order">
-            <span class="muted">Sort by:</span>
-            <select id="sortBy">
-              <option value="captureTime" selected>Capture Time</option>
-              <option value="sceneId">Scene ID</option>
-              <option value="maxQuality">Max Quality</option>
-              <option value="imageCount">Image Count</option>
-            </select>
-          </div>
         </div>
       </div>
       <div class="spacer"></div>
@@ -109,6 +114,7 @@
       </div>
     </div>
   </header>
+  <div id="sidebarResizer" class="sidebar-resizer" title="Drag to resize sidebar"></div>
 
   <main>
     <div id="mainZoom">
@@ -343,10 +349,10 @@
 
   <!-- Settings dialog -->
   <dialog id="settingsDlg" class="dlg-settings">
-    <div class="settings">
+    <div class="settings-body">
       <h3 style="margin:0">Settings</h3>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">UI & Editor</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">UI &amp; Editor</h4>
 
       <div class="row">
         <label for="editorChoice">Preferred Editor</label>
@@ -436,7 +442,7 @@
         segmentation (0.50–0.95). Higher values produce tighter masks around birds, lower values are more
         inclusive. Requires re-analysis to take effect.</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Data & Preview</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Data &amp; Preview</h4>
 
       <div class="row">
         <label for="rawPreviewCacheEnabled" style="flex:1">Cache RAW Preview Images</label>
@@ -466,7 +472,7 @@
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Automatically save ratings, tags, and scene changes. When disabled, you'll see a Save/Revert workflow.</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analytics & Privacy</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analytics &amp; Privacy</h4>
 
       <div class="row">
         <label style="flex:1">Kestrel's Impact</label>
@@ -485,11 +491,10 @@
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Helps improve Kestrel. No filenames,
         paths, or images are ever shared. You can change this at any time.</div>
-
-      <div class="row" style="justify-content:flex-end; margin-top: 12px; gap:8px;">
-        <button id="settingsCancel">Cancel</button>
-        <button id="settingsSave" class="primary">Save</button>
-      </div>
+    </div>
+    <div class="settings-footer">
+      <button id="settingsCancel">Cancel</button>
+      <button id="settingsSave" class="primary">Save</button>
     </div>
   </dialog>
 
