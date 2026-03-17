@@ -1108,11 +1108,7 @@
         chips.className = 'chips';
         if (s.isApproved) {
           card.classList.add('scene-approved');
-          chips.classList.add('chips-approved');
-          const approvedBadge = document.createElement('span');
-          approvedBadge.className = 'chip manual-approved scene-approved-badge';
-          approvedBadge.textContent = 'Reviewed';
-          meta.appendChild(approvedBadge);
+          chips.classList.add('reviewed-tags');
         }
         for (const sp of s.species.slice(0, 3)) {
           const c = document.createElement('span'); c.className = s.isApproved ? 'chip manual-approved' : 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
@@ -1252,17 +1248,31 @@
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
           hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} scene${allScenesInFolder.length === 1 ? '' : 's'}</span>`;
 
+          const actions = document.createElement('div');
+          actions.className = 'folder-group-actions';
+
+          const explorerBtn = document.createElement('button');
+          explorerBtn.className = 'action-btn';
+          explorerBtn.innerHTML = '<i>📂</i> Open in Explorer';
+          explorerBtn.title = 'Open this folder in File Explorer';
+          explorerBtn.addEventListener('click', (ev) => { ev.stopPropagation(); window.pywebview.api.open_file_explorer(fd.folderPath); });
+          actions.appendChild(explorerBtn);
+
           const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'culling-btn';
-          cullingBtn.textContent = 'Open Culling Assistant';
+          cullingBtn.className = 'action-btn';
+          cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
+          cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
           cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
-          hdr.appendChild(cullingBtn);
+          actions.appendChild(cullingBtn);
 
           const writeMetaBtn = document.createElement('button');
-          writeMetaBtn.className = 'write-metadata-btn';
-          writeMetaBtn.textContent = 'Write Metadata';
+          writeMetaBtn.className = 'action-btn';
+          writeMetaBtn.innerHTML = '<i>📝</i> Write XMP Metadata';
+          writeMetaBtn.title = 'Write ratings and tags to XMP sidecar files for use in Lightroom/Bridge';
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
-          hdr.appendChild(writeMetaBtn);
+          actions.appendChild(writeMetaBtn);
+
+          hdr.appendChild(actions);
 
           bodyEl = document.createElement('div');
           bodyEl.className = 'folder-group-body' + (collapsed ? ' hidden' : '');
@@ -1890,6 +1900,9 @@
       return { ...computed, approved: false };
     }
 
+    let _activeTagInputType = null; // 'species' or 'family'
+    let _activeTagInputSceneId = null;
+
     function renderTopbarTags(scene) {
       const tagsEl = el('#sceneTopbarTags');
       if (!tagsEl) return;
@@ -1906,7 +1919,11 @@
       } else {
         html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `<button class="scene-chip-add" data-add-type="species" title="Add species tag">+</button>`;
+      if (_activeTagInputType === 'species' && _activeTagInputSceneId === String(scene.id)) {
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Species..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+      } else {
+        html += `<button class="scene-chip-add" data-add-type="species" title="Add species tag">+</button>`;
+      }
 
       html += '<span class="scene-tag-sep"></span>';
 
@@ -1919,7 +1936,11 @@
       } else {
         html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `<button class="scene-chip-add" data-add-type="family" title="Add family tag">+</button>`;
+      if (_activeTagInputType === 'family' && _activeTagInputSceneId === String(scene.id)) {
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Family..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+      } else {
+        html += `<button class="scene-chip-add" data-add-type="family" title="Add family tag">+</button>`;
+      }
 
       if (approved) {
         html += '<span class="scene-tag-sep"></span><span class="approval-note" style="font-size:11px">✓ Reviewed</span>';
@@ -1960,17 +1981,58 @@
       // Wire (+) add buttons
       tagsEl.querySelectorAll('.scene-chip-add').forEach(btn => {
         btn.onclick = () => {
-          const type = btn.dataset.addType;
-          const panel = el('#editPanel');
-          if (panel) {
-            panel.classList.toggle('hidden');
-            if (!panel.classList.contains('hidden')) {
-              const input = type === 'species' ? el('#editAddSpecies') : el('#editAddFamily');
-              if (input) input.focus();
-            }
-          }
+          _activeTagInputType = btn.dataset.addType;
+          _activeTagInputSceneId = String(scene.id);
+          renderTopbarTags(scene);
+          const inp = el('#inlineTagInput');
+          if (inp) inp.focus();
         };
       });
+
+      // Wire inline input
+      const inp = el('#inlineTagInput');
+      if (inp) {
+        const commit = () => {
+          const val = inp.value.trim();
+          if (val) {
+            if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+            _sceneEditMode = true;
+            if (_activeTagInputType === 'species') {
+              _sceneEditDraft.species = Array.from(new Set([..._sceneEditDraft.species, val])).sort();
+            } else {
+              _sceneEditDraft.families = Array.from(new Set([..._sceneEditDraft.families, val])).sort();
+            }
+            _finalizeSceneReview(scene.id);
+            _sceneEditMode = false;
+            _sceneEditDraft = null;
+            showToast(`Added ${_activeTagInputType} "${val}"`, 2000);
+          }
+          _activeTagInputType = null;
+          _activeTagInputSceneId = null;
+          const updated = reloadScene(scene.id) || scene;
+          renderTopbarTags(updated);
+          renderScenes();
+        };
+
+        inp.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            _activeTagInputType = null;
+            _activeTagInputSceneId = null;
+            renderTopbarTags(scene);
+          }
+        };
+        inp.onblur = (e) => {
+          // Small delay to allow clicking the commit button if it exists
+          setTimeout(() => {
+            if (document.activeElement === tagsEl.querySelector('.chip-commit-btn')) return;
+            if (_activeTagInputType) commit(); 
+          }, 150);
+        };
+        const commitBtn = tagsEl.querySelector('.chip-commit-btn');
+        if (commitBtn) commitBtn.onclick = commit;
+      }
     }
 
     // Keep renderSceneMetaChips as an alias for compatibility
@@ -1978,7 +2040,7 @@
       renderTopbarTags(scene);
     }
 
-    async function openSceneDialog(sceneId) {
+    async function openSceneDialog(sceneId, startIndex = 0) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
       currentSceneId = scene.id;
@@ -1986,7 +2048,7 @@
       _splitMode = false;
       _sceneEditMode = false;
       _sceneEditDraft = null;
-      currentImageIndex = 0;
+      currentImageIndex = startIndex;
 
       // ── Top bar: title ──
       const localNum = String(scene.id).split(':').pop();
@@ -2094,7 +2156,7 @@
     }
 
     // Navigate to prev/next scene
-    function navigateToScene(direction) {
+    function navigateToScene(direction, startIndex = 0) {
       if (!_currentScene) return;
       const idx = scenes.indexOf(_currentScene);
       if (idx < 0) return;
@@ -2106,12 +2168,12 @@
       _sceneEditMode = false;
       document.removeEventListener('keydown', _sceneKeyHandler);
       sceneDlg.close();
-      openSceneDialog(nextScene.id);
+      openSceneDialog(nextScene.id, startIndex);
     }
 
     // Keyboard handler for scene dialog
     function _sceneKeyHandler(e) {
-      // Skip if focused in input/textarea
+      // Skip if focused in input/textarea (but allow our inline tag input to handle its own Esc/Enter)
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (!_currentScene) return;
@@ -2119,23 +2181,51 @@
       const images = _currentScene.images;
       const len = images.length;
 
+      // Tab skips to next scene; Ctrl+Tab skips to previous
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        navigateToScene(e.ctrlKey ? -1 : 1, 0);
+        return;
+      }
+
       switch (e.key) {
         case 'ArrowRight':
           e.preventDefault();
-          if (currentImageIndex < len - 1) {
-            selectFilmstripImage(currentImageIndex + 1, _currentScene);
+          if (e.ctrlKey) {
+            // Jump to end of scene, or next scene's start if already at end
+            if (currentImageIndex < len - 1) {
+              selectFilmstripImage(len - 1, _currentScene);
+            } else {
+              navigateToScene(1, 0);
+            }
           } else {
-            // At last image — jump to next scene
-            navigateToScene(1);
+            if (currentImageIndex < len - 1) {
+              selectFilmstripImage(currentImageIndex + 1, _currentScene);
+            } else {
+              navigateToScene(1, 0);
+            }
           }
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          if (currentImageIndex > 0) {
-            selectFilmstripImage(currentImageIndex - 1, _currentScene);
+          if (e.ctrlKey) {
+            // Jump to start of scene, or prev scene's start if already at start
+            if (currentImageIndex > 0) {
+              selectFilmstripImage(0, _currentScene);
+            } else {
+              navigateToScene(-1, 0);
+            }
           } else {
-            // At first image — jump to previous scene
-            navigateToScene(-1);
+            if (currentImageIndex > 0) {
+              selectFilmstripImage(currentImageIndex - 1, _currentScene);
+            } else {
+              // At first image — jump to previous scene's LAST image
+              const prevIdx = scenes.indexOf(_currentScene) - 1;
+              if (prevIdx >= 0) {
+                const prevScene = scenes[prevIdx];
+                navigateToScene(-1, prevScene.images.length - 1);
+              }
+            }
           }
           break;
         case 'z':

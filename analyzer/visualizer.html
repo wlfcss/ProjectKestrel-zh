@@ -239,8 +239,8 @@
           <!-- Species/Family chips + inline (+) add rendered by JS -->
         </div>
         <div class="scene-topbar-right">
-          <button id="splitSceneBtn" title="Split this scene into multiple scenes">✂ Split</button>
-          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="Keyboard shortcuts">⌨</button>
+          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="Show keyboard shortcuts">⌨ Show keyboard shortcuts</button>
+          <button id="splitSceneBtn" title="Split this scene into multiple scenes">✂ Split Scene</button>
           <button id="closeDlg" title="Close (Escape)">✕ Close</button>
         </div>
       </div>
@@ -256,27 +256,17 @@
         <span><kbd>Esc</kbd> Close</span>
       </div>
 
-      <!-- Scene rename row (hidden inline input for species/family adding) -->
-      <div id="editPanel" class="scene-edit-panel hidden">
-        <div class="scene-edit-section">
-          <label>Add Species</label>
-          <div class="inline">
-            <input id="editAddSpecies" type="text" placeholder="Species name…" style="flex:1" />
-            <button id="editAddSpeciesBtn" title="Add species tag">+ Add</button>
-          </div>
-        </div>
-        <div class="scene-edit-section">
-          <label>Add Family</label>
-          <div class="inline">
-            <input id="editAddFamily" type="text" placeholder="Family name…" style="flex:1" />
-            <button id="editAddFamilyBtn" title="Add family tag">+ Add</button>
-          </div>
-        </div>
-      </div>
+
 
       <!-- ═══ CENTER: Dual preview panels ═══ -->
       <div class="scene-main">
         <div class="scene-previews">
+          <div class="scene-preview-panel" id="scenePreviewCrop">
+            <div class="scene-preview-label">Bird Crop</div>
+            <div class="scene-preview-img" id="previewCropBox">
+              <span class="muted">Select an image…</span>
+            </div>
+          </div>
           <div class="scene-preview-panel" id="scenePreviewExport">
             <div class="scene-preview-label">Full Image</div>
             <div class="scene-preview-img" id="previewBox" data-raw-label="RAW">
@@ -286,12 +276,6 @@
               <span class="muted" style="font-size:11px">RAW Zoom</span>
               <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:90px">
             </label>
-          </div>
-          <div class="scene-preview-panel" id="scenePreviewCrop">
-            <div class="scene-preview-label">Bird Crop</div>
-            <div class="scene-preview-img" id="previewCropBox">
-              <span class="muted">Select an image…</span>
-            </div>
           </div>
         </div>
         <!-- Info bar between previews and filmstrip -->

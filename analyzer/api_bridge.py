@@ -140,6 +140,7 @@ class Api:
                 from tkinter import filedialog
                 root = tk.Tk()
                 root.withdraw()
+                root.attributes('-topmost', True)
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
                 if folder:
@@ -152,7 +153,28 @@ class Api:
             print(f"[API] choose_directory() -> Error: {e}", flush=True)
             log(f"Error in choose_directory: {e}")
             return None
-    
+
+    def open_file_explorer(self, folder_path):
+        """Open a folder in the native file explorer."""
+        if not folder_path:
+            return
+        
+        try:
+            abs_path = os.path.abspath(folder_path)
+            if not os.path.exists(abs_path):
+                print(f"[API] open_file_explorer: Path does not exist {abs_path}", flush=True)
+                return
+                
+            if sys.platform.startswith('win'):
+                os.startfile(abs_path)
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', abs_path], check=False)
+            else:
+                subprocess.run(['xdg-open', abs_path], check=False)
+        except Exception as e:
+            print(f"[API] open_file_explorer error: {e}", flush=True)
+            return
+
     def choose_application(self):
         """Open native file picker for choosing an application executable.
         Returns: absolute path to selected file, or None if cancelled.

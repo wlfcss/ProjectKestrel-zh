@@ -94,3 +94,12 @@ Whats working
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 * refresh behavior keeps refreshing when paused.
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024) - fixed
+
+# Next version changelog
+* new scene view + changes to accept/reject workflow
+* fixed bugs with grouping algo
+* fixed bugs with quality algo
+
+-todo: make quality algo still more generous by default
+-more keyboard shortcuts
+-patch tutorial to include latest workflow. 

@@ -530,13 +530,56 @@
     }
     .edit-chip .chip-x {
       cursor: pointer;
-      color: #8a6060;
+      color: #e06060;
       font-weight: bold;
       font-size: 13px;
       margin-left: 2px;
       line-height: 1;
     }
-    .edit-chip .chip-x:hover { color: #e06060; }
+    .edit-chip .chip-x:hover { color: #ff8080; }
+
+    /* Inline chip input */
+    .chip-input-wrap {
+      display: inline-flex;
+      align-items: center;
+      background: #1a2a44;
+      border: 1px solid var(--brand);
+      border-radius: 999px;
+      padding: 1px 4px 1px 8px;
+      margin-left: 4px;
+    }
+    .chip-input {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+      width: 100px;
+    }
+    .chip-commit-btn {
+      background: var(--brand);
+      border: none;
+      color: #fff;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+      margin-left: 4px;
+    }
+    .chip-commit-btn:hover { background: #56afff; }
+
+    /* Reviewed tags golden styling */
+    .reviewed-tags .chip {
+      background: rgba(245, 197, 66, 0.15);
+      border-color: rgba(245, 197, 66, 0.4);
+      color: #f5c542;
+    }
+    .reviewed-tags .chip .chip-x { color: #f5c542; opacity: 0.7; }
+    .reviewed-tags .chip .chip-x:hover { color: #e06060; opacity: 1; }
     .chip-add-btn {
       cursor: pointer;
       background: transparent;
@@ -1043,26 +1086,7 @@
       margin: 0 2px;
     }
 
-    /* ── Edit panel (species/family add) ── */
-    .scene-edit-panel {
-      display: flex;
-      gap: 14px;
-      padding: 8px 14px;
-      background: #10131a;
-      border-bottom: 1px solid #1f2533;
-      flex-shrink: 0;
-      align-items: flex-end;
-    }
-    .scene-edit-section {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-    .scene-edit-section label {
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }
+
 
     /* ── CENTER: Dual previews ── */
     .scene-main {
@@ -1074,11 +1098,19 @@
     }
     .scene-previews {
       flex: 1 1 auto;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      display: flex;
+      gap: 12px;
       padding: 8px 14px 4px;
       min-height: 0;
+    }
+    #scenePreviewCrop {
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      flex: 0 0 auto;
+    }
+    #scenePreviewExport {
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .scene-preview-panel {
       display: flex;
@@ -1545,13 +1577,43 @@
       color: #6aa0ff;
     }
 
-    .star.filled.manual {
-      color: #f5c542;
+    .stars .star.manual.filled { color: #f5c542; }
+    .stars .star.auto.filled { color: #6aa0ff; }
+
+    /* Timeline action buttons styling */
+    .timeline-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1a202e;
+      border: 1px solid #2a344d;
+      color: #cbd2dc;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .action-btn:hover {
+      background: #252d40;
+      border-color: #3a4a6d;
+      color: #fff;
+    }
+    .action-btn i {
+      font-style: normal;
+      font-size: 14px;
     }
 
-    .star:hover {
-      color: #8fb6ff;
+    .action-btn i {
+      font-style: normal;
+      font-size: 14px;
     }
+
 
     /* Thumbnail badges (quality & image count) */
     .thumb .badge {
