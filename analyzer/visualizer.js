@@ -6242,7 +6242,7 @@
         </div>
 
         <div style="padding:14px 22px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">Reset Cull Categories</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">Reset Culling Decisions</div>
 
           <div class="folder-opt-card" id="folderOptCardVerified" style="
             display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
@@ -6250,8 +6250,8 @@
             cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s;">
             <div style="margin-top:2px;font-size:16px;line-height:1;">↺</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Reset Confirmed Categories</div>
-              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">Clears only categorizations that were <em>Confirmed</em> via the Culling Assistant's finalize step. Manual (user-assigned) categorizations are kept.</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Reset Confirmed Decisions</div>
+              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">Clears only Accept/Reject decisions that were <em>Confirmed</em> via the Culling Assistant's finalize step. Manual (user-assigned) decisions are kept.</div>
             </div>
           </div>
 
@@ -6261,8 +6261,8 @@
             cursor:pointer;margin-bottom:0;transition:border-color 0.15s,background 0.15s;">
             <div style="margin-top:2px;font-size:16px;line-height:1;color:#ff8888;">⊘</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">Reset All Categories</div>
-              <div style="font-size:12px;color:#b07878;line-height:1.45;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed categorizations for this folder, returning every image to Undecided. Auto-categorized categories are unaffected.</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">Reset All Decisions</div>
+              <div style="font-size:12px;color:#b07878;line-height:1.45;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed Accept/Reject decisions for this folder, returning every image to Undecided. Auto-categorized decisions are unaffected.</div>
             </div>
           </div>
         </div>
@@ -6285,7 +6285,7 @@
       cardVerified.addEventListener('mouseleave', () => { cardVerified.style.borderColor = '#263045'; cardVerified.style.background = '#1a2235'; });
       cardVerified.addEventListener('click', () => {
         const changed = resetFolderCullState(folderPath, 'verified');
-        showToast(changed > 0 ? `Reset ${changed} confirmed categorization${changed === 1 ? '' : 's'}` : 'No confirmed categorizations to reset', 3000);
+        showToast(changed > 0 ? `Reset ${changed} confirmed decision${changed === 1 ? '' : 's'}` : 'No confirmed decisions to reset', 3000);
         closeAndRemove();
       });
 
@@ -6293,10 +6293,10 @@
       cardAll.addEventListener('mouseenter', () => { cardAll.style.borderColor = '#7f3f3f'; cardAll.style.background = '#361818'; });
       cardAll.addEventListener('mouseleave', () => { cardAll.style.borderColor = '#3f2020'; cardAll.style.background = '#2a1a1a'; });
       cardAll.addEventListener('click', () => {
-        const ok = confirm(`Reset ALL manual and confirmed cull categorizations for "${folderName}"?\n\nThis cannot be undone.`);
+        const ok = confirm(`Reset ALL manual and confirmed culling decisions for "${folderName}"?\n\nThis cannot be undone.`);
         if (!ok) return;
         const changed = resetFolderCullState(folderPath, 'all');
-        showToast(changed > 0 ? `Reset ${changed} manual/confirmed categorization${changed === 1 ? '' : 's'}` : 'No manual or confirmed categorizations to reset', 3000);
+        showToast(changed > 0 ? `Reset ${changed} manual/confirmed decision${changed === 1 ? '' : 's'}` : 'No manual or confirmed decisions to reset', 3000);
         closeAndRemove();
       });
 
