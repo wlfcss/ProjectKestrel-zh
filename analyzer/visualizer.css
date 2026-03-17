@@ -777,12 +777,25 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
-      flex: 1 1 auto;
+      flex: 0 1 auto; /* shrinks if needed, does not grow — spacer div handles remaining space */
+      max-width: 320px;
     }
 
     .folder-group-count {
       flex-shrink: 0;
       font-size: 12px;
+    }
+
+    .folder-group-left-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .folder-group-right-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
     }
 
     .culling-btn {

@@ -1257,38 +1257,50 @@
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
           hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} scene${allScenesInFolder.length === 1 ? '' : 's'}</span>`;
 
-          const actions = document.createElement('div');
-          actions.className = 'folder-group-actions';
+          // Left-aligned secondary actions
+          const leftActions = document.createElement('div');
+          leftActions.className = 'folder-group-left-actions';
 
           const explorerBtn = document.createElement('button');
           explorerBtn.className = 'action-btn';
-          explorerBtn.innerHTML = '<i>📂</i> Open in Explorer';
+          explorerBtn.innerHTML = '<i>📂</i> Open';
           explorerBtn.title = 'Open this folder in File Explorer';
           explorerBtn.addEventListener('click', (ev) => { ev.stopPropagation(); window.pywebview.api.open_file_explorer(fd.folderPath); });
-          actions.appendChild(explorerBtn);
-
-          const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'action-btn culling-assistant-btn';
-          cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
-          cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
-          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
-          actions.appendChild(cullingBtn);
-
-          const writeMetaBtn = document.createElement('button');
-          writeMetaBtn.className = 'action-btn write-metadata-btn';
-          writeMetaBtn.innerHTML = '<i>📝</i> Write Photo Metadata';
-          writeMetaBtn.title = 'Write XMP sidecar files alongside your photos — carries star ratings, Accept/Reject decisions, and species tags. Readable by Lightroom, Capture One, darktable, and other editors.';
-          writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
-          actions.appendChild(writeMetaBtn);
+          leftActions.appendChild(explorerBtn);
 
           const folderOptionsBtn = document.createElement('button');
           folderOptionsBtn.className = 'action-btn';
           folderOptionsBtn.innerHTML = '<i>↺</i> Reset Culling Decisions';
           folderOptionsBtn.title = 'Reset Accept/Reject culling decisions for this folder';
           folderOptionsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); showFolderOptionsDialog(fd.folderPath); });
-          actions.appendChild(folderOptionsBtn);
+          leftActions.appendChild(folderOptionsBtn);
 
-          hdr.appendChild(actions);
+          hdr.appendChild(leftActions);
+
+          // Spacer pushes right actions to the far right
+          const spacer = document.createElement('div');
+          spacer.style.flex = '1';
+          hdr.appendChild(spacer);
+
+          // Right-aligned primary actions
+          const rightActions = document.createElement('div');
+          rightActions.className = 'folder-group-right-actions';
+
+          const writeMetaBtn = document.createElement('button');
+          writeMetaBtn.className = 'action-btn write-metadata-btn';
+          writeMetaBtn.innerHTML = '<i>📝</i> Write Photo Metadata';
+          writeMetaBtn.title = 'Write XMP sidecar files alongside your photos — carries star ratings, Accept/Reject decisions, and species tags. Readable by Lightroom, Capture One, darktable, and other editors.';
+          writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
+          rightActions.appendChild(writeMetaBtn);
+
+          const cullingBtn = document.createElement('button');
+          cullingBtn.className = 'action-btn culling-assistant-btn';
+          cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
+          cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
+          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
+          rightActions.appendChild(cullingBtn);
+
+          hdr.appendChild(rightActions);
 
           bodyEl = document.createElement('div');
           bodyEl.className = 'folder-group-body' + (collapsed ? ' hidden' : '');
@@ -6310,50 +6322,175 @@
         showToast('Write Metadata requires desktop mode', 4000);
         return;
       }
-      try {
-        const folderRows = rows.filter(r => r.__rootPath === rootPath);
-        if (!folderRows.length) {
-          showToast('No images found for this folder', 3000);
-          return;
-        }
-        const payload = folderRows.map(r => ({
-          filename: r.filename,
-          rating: getRating(r),
-          culled: getRawCullStatus(r),
-          culled_origin: normalizeCullOrigin(r),
-          species: r.species || '',
-          family: r.family || '',
-          quality: r.quality != null ? r.quality : null,
-        }));
-
-        showToast('Writing XMP metadata\u2026', 2000);
-        const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false, false);
-        if (!res.success) {
-          showToast('Write Metadata failed: ' + (res.error || 'Unknown error'), 5000);
-          return;
-        }
-        if (res.skipped_conflicts && res.skipped_conflicts.length > 0) {
-          const n = res.skipped_conflicts.length;
-          const ok = confirm(
-            `${n} existing XMP file${n === 1 ? '' : 's'} in this folder were created by another application (e.g. Lightroom or darktable).\n\nOverwrite them with Kestrel metadata?`
-          );
-          if (ok) {
-            const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true, false);
-            if (!res2.success) {
-              showToast('Write Metadata failed: ' + (res2.error || 'Unknown error'), 5000);
-              return;
-            }
-            showToast(`Metadata written: ${res2.written} file${res2.written === 1 ? '' : 's'}`, 4000);
-          } else {
-            showToast(`Metadata written: ${res.written || 0} written, ${n} skipped`, 4000);
-          }
-        } else {
-          showToast(`Metadata written: ${res.written} file${res.written === 1 ? '' : 's'}`, 4000);
-        }
-      } catch (e) {
-        console.error('writeMetadataForFolder error', e);
-        showToast('Error writing metadata', 4000);
+      const folderRows = rows.filter(r => r.__rootPath === rootPath);
+      if (!folderRows.length) {
+        showToast('No images found for this folder', 3000);
+        return;
       }
+
+      const folderName = folderBaseName(rootPath) || rootPath;
+      const imageCount = folderRows.length;
+
+      const dlg = document.createElement('dialog');
+      dlg.style.cssText = [
+        'border:1px solid #303a52', 'border-radius:12px', 'background:#141a24',
+        'color:#e8f0f8', 'padding:0', 'min-width:440px', 'max-width:560px',
+        'width:90vw', 'max-height:80vh', 'overflow-y:auto',
+        'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+      ].join(';');
+
+      dlg.innerHTML = `
+        <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Write Photo Metadata</div>
+          <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(rootPath)}">${escapeHtml(folderName)} &middot; ${imageCount} image${imageCount === 1 ? '' : 's'}</div>
+        </div>
+
+        <div id="wmOptView" style="padding:16px 22px;">
+          <div style="background:#1a2235;border:1px solid #263045;border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;">
+            <div style="font-size:18px;margin-top:2px;">📝</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">XMP Sidecar Files</div>
+              <div style="font-size:12px;color:#7a90b8;line-height:1.5;">Writes a <code style="background:#1c2438;padding:1px 4px;border-radius:3px;">.xmp</code> sidecar file next to each original. Embeds star ratings, Accept/Reject decisions, and species tags in a format readable by Lightroom, Capture One, darktable, and other editors.</div>
+            </div>
+          </div>
+          <div style="background:#1a1f10;border:1px solid #3a4020;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#b0c070;line-height:1.5;">
+            &#9888; <b>Write metadata before importing into your photo editor.</b> Most catalogues ignore new sidecar files once a photo is already imported. Write first, then import, for best results.<br>Kestrel will not overwrite XMP files generated by other software without your permission.
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="wmCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>
+            <button id="wmOk" style="padding:8px 16px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Write Metadata &#10003;</button>
+          </div>
+        </div>
+
+        <div id="wmProgressView" style="display:none;padding:16px 22px;">
+          <ul id="wmStepsList" style="list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px;"></ul>
+          <div id="wmProgressActions" style="display:none;justify-content:flex-end;">
+            <button id="wmDone" style="padding:8px 16px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Done</button>
+          </div>
+        </div>
+
+        <div id="wmConflictView" style="display:none;padding:16px 22px;">
+          <p id="wmConflictDesc" style="font-size:13px;line-height:1.5;margin:0 0 10px;color:#9fb0cc;"></p>
+          <ul id="wmConflictList" style="max-height:160px;overflow-y:auto;list-style:none;padding:0;margin:0 0 16px;font-size:12px;color:#7a90b8;border:1px solid #222e45;border-radius:6px;"></ul>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="wmSkip" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Skip these files</button>
+            <button id="wmOverwrite" style="padding:8px 12px;border:1px solid #7f3f3f;background:#5c2a2a;color:#ffdede;border-radius:6px;cursor:pointer;font-size:13px;">Overwrite Anyway</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(dlg);
+
+      const closeAndRemove = () => {
+        try { dlg.close(); } catch (_) {}
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+      };
+
+      const showView = (id) => {
+        ['wmOptView', 'wmProgressView', 'wmConflictView'].forEach(v => {
+          const el = dlg.querySelector('#' + v);
+          if (el) el.style.display = (v === id) ? 'block' : 'none';
+        });
+      };
+
+      const addStep = (id, label, state) => {
+        const icons  = { pending:'○', running:'⟳', done:'✓', failed:'✗', skipped:'–' };
+        const colors = { pending:'#7a90b8', running:'#6aa0ff', done:'#50c878', failed:'#ff6b6b', skipped:'#555' };
+        const li = document.createElement('li');
+        li.id = 'wm-step-' + id;
+        li.style.cssText = 'display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid #1a2235;';
+        li.innerHTML =
+          `<span id="wm-step-icon-${id}" style="font-size:15px;width:18px;text-align:center;flex-shrink:0;color:${colors[state]}">${icons[state]}</span>` +
+          `<span style="flex:1;color:#e8f0f8;">${label}</span>` +
+          `<span id="wm-step-detail-${id}" style="font-size:11px;color:#7a90b8;"></span>`;
+        dlg.querySelector('#wmStepsList').appendChild(li);
+      };
+
+      const setStep = (id, state, detail = '') => {
+        const icons  = { pending:'○', running:'⟳', done:'✓', failed:'✗', skipped:'–' };
+        const colors = { pending:'#7a90b8', running:'#6aa0ff', done:'#50c878', failed:'#ff6b6b', skipped:'#555' };
+        const iconEl   = dlg.querySelector('#wm-step-icon-' + id);
+        const detailEl = dlg.querySelector('#wm-step-detail-' + id);
+        if (iconEl)   { iconEl.textContent = icons[state]; iconEl.style.color = colors[state]; }
+        if (detailEl && detail) detailEl.textContent = detail;
+      };
+
+      const payload = folderRows.map(r => ({
+        filename: r.filename,
+        rating: getRating(r),
+        culled: getRawCullStatus(r),
+        culled_origin: normalizeCullOrigin(r),
+        species: r.species || '',
+        family: r.family || '',
+        quality: r.quality != null ? r.quality : null,
+      }));
+
+      dlg.querySelector('#wmCancel').addEventListener('click', closeAndRemove);
+
+      dlg.querySelector('#wmOk').addEventListener('click', async () => {
+        showView('wmProgressView');
+        addStep('write', 'Writing XMP sidecar files', 'running');
+        try {
+          const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false, false);
+          if (!res.success) {
+            setStep('write', 'failed', res.error || 'Unknown error');
+            dlg.querySelector('#wmProgressActions').style.display = 'flex';
+            return;
+          }
+          if (res.skipped_conflicts && res.skipped_conflicts.length > 0) {
+            const n = res.skipped_conflicts.length;
+            setStep('write', 'done', `${res.written} written, ${n} conflict${n === 1 ? '' : 's'}`);
+            dlg.querySelector('#wmConflictDesc').textContent =
+              `${n} existing XMP file${n === 1 ? '' : 's'} appear to have been created by another application (such as Lightroom or darktable). Overwriting them may interfere with metadata managed by that software.`;
+            const conflictList = dlg.querySelector('#wmConflictList');
+            res.skipped_conflicts.slice(0, 10).forEach(f => {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding:5px 8px;border-bottom:1px solid #1a2235;';
+              li.textContent = f;
+              conflictList.appendChild(li);
+            });
+            if (res.skipped_conflicts.length > 10) {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding:5px 8px;color:#7a90b8;';
+              li.textContent = `\u2026and ${res.skipped_conflicts.length - 10} more`;
+              conflictList.appendChild(li);
+            }
+            showView('wmConflictView');
+
+            dlg.querySelector('#wmSkip').addEventListener('click', () => {
+              showToast(`Metadata written: ${res.written} written, ${n} skipped`, 4000);
+              closeAndRemove();
+            });
+            dlg.querySelector('#wmOverwrite').addEventListener('click', async () => {
+              showView('wmProgressView');
+              addStep('overwrite', 'Overwriting conflicting XMP files', 'running');
+              try {
+                const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true, false);
+                if (!res2.success) {
+                  setStep('overwrite', 'failed', res2.error || 'Unknown error');
+                } else {
+                  setStep('overwrite', 'done', `${res2.written} file${res2.written === 1 ? '' : 's'} written`);
+                  showToast(`Metadata written: ${res2.written} file${res2.written === 1 ? '' : 's'}`, 4000);
+                }
+              } catch (e) {
+                setStep('overwrite', 'failed', 'Error overwriting');
+              }
+              dlg.querySelector('#wmProgressActions').style.display = 'flex';
+            });
+          } else {
+            setStep('write', 'done', `${res.written} file${res.written === 1 ? '' : 's'} written`);
+            showToast(`Metadata written: ${res.written} file${res.written === 1 ? '' : 's'}`, 4000);
+            dlg.querySelector('#wmProgressActions').style.display = 'flex';
+          }
+        } catch (e) {
+          console.error('writeMetadataForFolder error', e);
+          setStep('write', 'failed', 'Unexpected error');
+          dlg.querySelector('#wmProgressActions').style.display = 'flex';
+        }
+      });
+
+      dlg.querySelector('#wmDone').addEventListener('click', closeAndRemove);
+      dlg.addEventListener('close', () => { if (dlg.parentNode) dlg.parentNode.removeChild(dlg); });
+      dlg.showModal();
     }
 
     // Reload current folders (called from Python via evaluate_js after culling completes)
@@ -6438,7 +6575,7 @@
         body: 'Within each scene, your photos are automatically <b>sorted by quality</b> \u2014 from sharpest to blurriest. You can immediately focus your attention on the best shots!<br><br>Click on a photo in the filmstrip to view its details.',
         nudge: 'Click a photo in the filmstrip below!',
         target: '#imageGrid',
-        position: 'left',
+        position: 'top',
         inDialog: true,
         waitFor: 'clickFilmstrip',
       },
@@ -6447,24 +6584,24 @@
         body: 'Kestrel computes <b>star ratings</b> based on each image\u2019s quality score. Click the stars to set your own. <span style="color:#6aa0ff">Blue stars</span> = AI rating \u00b7 <span style="color:#f5c542">Gold stars</span> = your manual override.<br><br>Use the <b>Accept \u00b7 Undecided \u00b7 Reject</b> buttons to make a culling decision for each photo. These will come in handy with the Culling Assistant later!',
         nudge: 'Mark a photo as Accepted or Rejected to continue!',
         target: '#sceneInfoBar',
-        position: 'left',
+        position: 'top-left',
         inDialog: true,
         waitFor: 'clickCullToggle',
       },
       {
         title: 'Keyboard Shortcuts',
-        body: 'Kestrel has keyboard shortcuts to make reviewing photos faster. Try some out before continuing!<br><br><kbd>\u2190</kbd><kbd>\u2192</kbd> Navigate \u00b7 <kbd>C</kbd> Accept \u00b7 <kbd>X</kbd> Undecided \u00b7 <kbd>Z</kbd> Reject<br><kbd>1</kbd>\u2013<kbd>5</kbd> Rate \u00b7 <kbd>Space</kbd> Open in editor \u00b7 <kbd>Esc</kbd> Close',
+        body: 'Kestrel has keyboard shortcuts to make reviewing photos faster. The shortcuts are listed above \u2014 try some out before continuing!',
         target: '#sceneShortcutLegend',
-        position: 'left',
+        position: 'bottom',
         inDialog: true,
         setupAction: 'expandShortcuts',
       },
       {
         title: 'Other Scene Features',
-        body: 'A few more things you can do inside a scene:<br><br>\u2022 <b>Click and drag</b> on the full image to load the RAW file and zoom in<br>\u2022 Edit the <b>scene name</b> and <b>tags</b> at the top<br>\u2022 Press <kbd>Space</kbd> to open the photo in your preferred photo editor<br>\u2022 Use <b>\u2702 Split Scene</b> if Kestrel accidentally merged two different scenes<br><br>Click <b>Close</b> to continue to the next step!',
+        body: 'A few more things you can do once you\u2019re browsing your <b>own photos</b> (these won\u2019t work on the sample images):<br><br>\u2022 <b>Click and drag</b> on the full image to load the RAW file and zoom in<br>\u2022 Edit the <b>scene name</b> and <b>tags</b> at the top<br>\u2022 Press <kbd>Space</kbd> to open the photo in your preferred photo editor<br>\u2022 Use <b>\u2702 Split Scene</b> if Kestrel accidentally merged two different scenes<br><br>Click <b>Close</b> to continue!',
         nudge: 'Close the scene dialog to continue.',
         target: '#closeDlg',
-        position: 'left',
+        position: 'bottom',
         inDialog: true,
         waitFor: 'closeDialog',
       },
@@ -6476,9 +6613,10 @@
       },
       {
         title: 'Merging Scenes',
-        body: 'Did Kestrel split a burst into two scene cards? Hold <kbd>Ctrl</kbd> and click to <b>select multiple scenes</b>, then click <b>Merge selected scenes</b> to combine them into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
-        target: '#sceneGrid',
-        position: 'left',
+        body: 'The two highlighted scenes above were actually one continuous burst that Kestrel split in two. Hold <kbd>Ctrl</kbd> and click both cards to select them, then click <b>Merge selected scenes</b> to combine them back into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
+        target: '#sceneGrid .card:nth-child(4)',
+        highlightFirst: '#sceneGrid .card:nth-child(3)',
+        position: 'bottom',
       },
       {
         title: 'Write Photo Metadata',
@@ -6687,9 +6825,10 @@
         var ch     = card.offsetHeight || 220;
         var top, left;
         if (pos === 'right')       { left = r.right + margin;                 top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'left')   { left = r.left - cw - margin;             top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'bottom') { left = r.left + r.width / 2 - cw / 2;   top = r.bottom + margin; }
-        else                       { left = r.left + r.width / 2 - cw / 2;   top = r.top - ch - margin; }
+        else if (pos === 'left')     { left = r.left - cw - margin;             top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'bottom')   { left = r.left + r.width / 2 - cw / 2;   top = r.bottom + margin; }
+        else if (pos === 'top-left') { left = r.left;                           top = r.top - ch - margin; }
+        else                         { left = r.left + r.width / 2 - cw / 2;   top = r.top - ch - margin; } // 'top'
         left = Math.max(margin, Math.min(left, vw - cw - margin));
         top  = Math.max(margin, Math.min(top,  vh - ch - margin));
         card.style.left = left + 'px';
