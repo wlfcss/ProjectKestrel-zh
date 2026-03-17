@@ -1033,8 +1033,8 @@
           <input type="checkbox" id="doPromoteVerifiedCheck" />
           <span class="dlg-option-icon">&#x2705;</span>
           <div class="dlg-option-body">
-            <b>Treat current auto categories as verified</b>
-            <span>Promotes current auto accept/reject outcomes to a verified state before finalizing. Verified categories appear in filmstrip and main scene view.</span>
+            <b>Confirm auto-categorizations</b>
+            <span>Marks all auto-categorized accepts/rejects as <em>Confirmed</em>. Confirmed images are shown in the filmstrip and scene view just like manually assigned ones, but can still be reset via Folder Options.</span>
           </div>
         </label>
       </div>
@@ -1505,7 +1505,7 @@
           }
         }
 
-        // Write results (manual/verified categories are preserved by default)
+        // Write results (manual/confirmed categories are preserved by default)
         for (const r of scene.images) {
           if (preserveManual && isProtectedCull(r)) continue;
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
@@ -1583,7 +1583,8 @@
     // ---- Build an image card ----
     function buildImageCard(row) {
       const rating = getRating(row);
-      const isUnrated = rating === 0;
+      // Only show yellow unrated style if unrated AND not already manually/confirmed culled
+      const isUnrated = rating === 0 && !isProtectedCull(row);
       const side = cullingState.get(row.filename) || 'accept';
       const card = document.createElement('div');
       card.className = isUnrated ? 'cull-card unrated-card' : `cull-card ${side}-card`;
@@ -1682,8 +1683,8 @@
 
         const verifyBtn = document.createElement('button');
         verifyBtn.className = `btn verify scene-verify-btn${scene.hasAnyUnrated ? '' : ' hidden'}`;
-        verifyBtn.textContent = '✦ Verify Unrated';
-        verifyBtn.title = 'Confirm the current auto-categorization for all unrated images, marking them as user-assigned and dismissing the unrated warning';
+        verifyBtn.textContent = '✦ Confirm Unrated';
+        verifyBtn.title = 'Manually confirm the current placement of all unrated images, dismissing the unrated warning and locking their accept/reject status';
         verifyBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           verifyUnratedInScene(scene.id);
@@ -1874,15 +1875,14 @@
     }
 
     function _updateExecuteBtn() {
-      const any = el('#doXmpCheck')?.checked || el('#doMoveCheck')?.checked;
+      const xmpChecked = !!el('#doXmpCheck')?.checked;
+      const any = xmpChecked || el('#doMoveCheck')?.checked || !!el('#doPromoteVerifiedCheck')?.checked;
       const btn = el('#confirmOk');
       if (btn) btn.disabled = !any;
-      const xmpChecked = !!el('#doXmpCheck')?.checked;
       const autoLabel = el('#doAutoLabelCheck');
-      const promote = el('#doPromoteVerifiedCheck');
       const autoLabelCard = el('#xmpAutoLabelCard');
+      // Auto-label sub-option only makes sense when writing XMP; Confirm is independent
       if (autoLabel) autoLabel.disabled = !xmpChecked;
-      if (promote) promote.disabled = !xmpChecked;
       if (autoLabelCard) autoLabelCard.classList.toggle('hidden', !xmpChecked);
     }
 
@@ -1903,8 +1903,8 @@
       const doXmp  = el('#doXmpCheck')?.checked  || false;
       const doMove = el('#doMoveCheck')?.checked || false;
       const doAutoLabels = doXmp && (el('#doAutoLabelCheck')?.checked ?? true);
-      const doPromoteVerified = doXmp && !!el('#doPromoteVerifiedCheck')?.checked;
-      if (!doXmp && !doMove) return;
+      const doPromoteVerified = !!el('#doPromoteVerifiedCheck')?.checked;
+      if (!doXmp && !doMove && !doPromoteVerified) return;
 
       // Switch to progress view
       el('#dlgOptions').classList.add('hidden');
@@ -1915,7 +1915,7 @@
 
       // Build ordered step list
       const stepDefs = [
-        { id: 'promote', label: 'Promoting auto categories to verified', cond: doPromoteVerified },
+        { id: 'promote', label: 'Confirming auto-categorizations',       cond: doPromoteVerified },
         { id: 'save',   label: 'Saving database',                    always: true },
         { id: 'backup', label: 'Backing up kestrel_database.csv',    cond: doMove },
         { id: 'xmp',    label: 'Writing XMP sidecar files',          cond: doXmp  },
@@ -1948,11 +1948,11 @@
 
       let anyFailed = false;
       try {
-        // 1. Optional promote verified
+        // 1. Optional confirm auto-categorizations
         if (doPromoteVerified) {
           setStep('promote', 'running');
           const promoted = promoteAutoToVerified();
-          setStep('promote', 'done', `${promoted} image${promoted === 1 ? '' : 's'} promoted`);
+          setStep('promote', 'done', `${promoted} image${promoted === 1 ? '' : 's'} confirmed`);
         }
 
         // 2. Save
@@ -2743,7 +2743,7 @@
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize re-applied \u2014 manual/verified assignments preserved', 3000);
+      showToast('Auto-categorize re-applied \u2014 manual and confirmed assignments preserved', 3000);
     });
     el('#resetAutoBtn').addEventListener('click', () => {
       // Show confirmation dialog with override count
