@@ -1227,16 +1227,44 @@
       font-size: 12px;
       flex-shrink: 0;
     }
-    .scene-info-status {
-      font-size: 12px;
+    .scene-cull-toggle {
+      display: flex;
+      background: #1a1e26;
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+      border: 1px solid #2a3040;
+    }
+    .cull-btn {
+      background: transparent;
+      border: none;
+      color: #6a768c;
+      font-size: 11px;
       font-weight: 600;
-      flex-shrink: 0;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
     }
-    .scene-info-status.accepted {
-      color: #2ecc71;
+    .cull-btn:hover {
+      color: #cbd2dc;
+      background: #252d40;
     }
-    .scene-info-status.rejected {
-      color: #e74c3c;
+    .cull-btn.active.reject {
+      background: #e74c3c;
+      color: #fff;
+    }
+    .cull-btn.active.unrated {
+      background: #34495e;
+      color: #fff;
+    }
+    .cull-btn.active.accept {
+      background: #2ecc71;
+      color: #fff;
+    }
+    .cull-btn:not(.active) {
+      opacity: 0.6;
     }
     .scene-info-meta {
       color: var(--muted);

@@ -1098,7 +1098,7 @@
         const _titleHtml = (_folderName && !showFolderHeaders)
           ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
           : `<b>#${_localNum}</b>`;
-        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${escapeHtml(s.sceneName)}</span>` : '');
+        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${decodeEntities(escapeHtml(s.sceneName))}</span>` : '');
         title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
@@ -1397,11 +1397,13 @@
     const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
 
     function getSceneRawCacheKey(row) {
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
       return [
         row.__rootPath || '',
         row.filename || '',
         row.export_path || '',
-        row.crop_path || ''
+        row.crop_path || '',
+        disabled ? 'noexp' : 'exp'
       ].join('|');
     }
 
@@ -1463,7 +1465,8 @@
     }
 
     async function loadSceneRawAsync(row) {
-      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
+      const expCorr = disabled ? 0.0 : (parseFloat(row.exposure_correction) || 0);
       const key = getSceneRawCacheKey(row);
       sceneRawLoading.add(key);
       try {
@@ -1509,8 +1512,10 @@
       sceneZoomThumbEl = thumbEl;
       const key = getSceneRawCacheKey(row);
       const previewBox = el('#previewBox');
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
+      const expCorr = disabled ? 0.0 : (parseFloat(row.exposure_correction) || 0);
       previewBox.classList.add('zoom-active');
-      previewBox.dataset.rawLabel = `RAW (${formatExposureEv(row.exposure_correction)} EV)`;
+      previewBox.dataset.rawLabel = `RAW Zoom (${formatExposureEv(expCorr)} EV) (Scroll to zoom in/out)`;
       zoomLastX = mouseEv.clientX;
       zoomLastY = mouseEv.clientY;
 
@@ -1819,12 +1824,21 @@
       const qEl = el('#sceneInfoQuality');
       if (qEl) qEl.textContent = `Quality: ${fmt3(r.quality)}`;
 
-      const statusEl = el('#sceneInfoStatus');
-      if (statusEl) {
-        statusEl.className = 'scene-info-status';
-        if (cull === 'accept') { statusEl.textContent = '✓ Accepted'; statusEl.classList.add('accepted'); }
-        else if (cull === 'reject') { statusEl.textContent = '✗ Rejected'; statusEl.classList.add('rejected'); }
-        else { statusEl.textContent = ''; }
+      const cullToggle = el('#sceneCullToggle');
+      if (cullToggle) {
+        cullToggle.querySelectorAll('.cull-btn').forEach(btn => {
+          const btnCull = btn.dataset.cull;
+          btn.classList.toggle('active', btnCull === cull || (btnCull === 'none' && !cull));
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            const newCull = btnCull === 'none' ? null : btnCull;
+            if (getCullStatus(r) !== newCull) {
+              toggleCullStatus(r, newCull);
+              selectFilmstripImage(idx, scene); // refresh
+              renderScenes(); // refresh timeline
+            }
+          };
+        });
       }
 
       const metaEl = el('#sceneInfoMeta');
@@ -2105,6 +2119,17 @@
 
       // ── Filmstrip ──
       renderFilmstrip(scene);
+
+      // Wire horizontal scrolling via mouse wheel for filmstrip
+      const grid = el('#imageGrid');
+      if (grid) {
+        grid.onwheel = (ev) => {
+          if (ev.deltaY !== 0) {
+            grid.scrollLeft += ev.deltaY;
+            ev.preventDefault();
+          }
+        };
+      }
 
       // ── RAW zoom on export preview (mousedown on the export preview box) ──
       const exportImgBox = el('#previewBox');
@@ -2942,6 +2967,9 @@
       // Auto-Save setting
       const autoSaveCb = document.getElementById('settingsAutoSave');
       if (autoSaveCb) autoSaveCb.checked = getSetting('auto_save_enabled', true);
+
+      const rawExpDisableCb = document.getElementById('rawExposureCorrectionDisabled');
+      if (rawExpDisableCb) rawExpDisableCb.checked = getSetting('raw_exposure_correction_disabled', false);
       
       dlg.showModal();
     }
@@ -2992,6 +3020,7 @@
         mask_threshold: maskThreshold,
         raw_preview_cache_enabled: rawPreviewCacheEnabled,
         auto_save_enabled: autoSaveEnabled,
+        raw_exposure_correction_disabled: document.getElementById('rawExposureCorrectionDisabled').checked,
       };
       _autoSaveEnabled = autoSaveEnabled;
       // Persist settings to localStorage immediately
