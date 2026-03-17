@@ -196,6 +196,7 @@
     .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
     .cull-card.moved-card { opacity: 0.85; }
+    .cull-card.assigned-card::after,
     .cull-card.moved-card::after {
       content: 'User moved';
       position: absolute;
@@ -209,6 +210,10 @@
       border-radius: 4px;
       pointer-events: none;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .cull-card.assigned-card::after {
+      content: 'User assigned';
+      background: #6b6f7b;
     }
     .cull-card .cull-thumb {
       width: 100%;
@@ -905,7 +910,7 @@
         </div>
         <div class="panel-actions">
           <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current slider values; your manual Shift+Click decisions are preserved">↻ Re-apply</button>
-          <button class="btn danger" id="resetAutoBtn" title="Clear all manual overrides and re-apply from scratch">⚠ Reset All</button>
+          <button class="btn danger" id="resetAutoBtn" title="Clear all manual assignments and re-apply from scratch">⚠ Reset Manual Assignments</button>
         </div>
       </div>
       <!-- Column headers -->
@@ -981,6 +986,26 @@
           </div>
         </label>
       </div>
+      <div class="dlg-option-card" id="xmpAutoLabelCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doAutoLabelCheck" checked />
+          <span class="dlg-option-icon">&#x1F3F7;&#xFE0F;</span>
+          <div class="dlg-option-body">
+            <b>Write color labels for auto-categorized images</b>
+            <span>When enabled, accepted/rejected images categorized by auto rules also receive Green/Red XMP labels.</span>
+          </div>
+        </label>
+      </div>
+      <div class="dlg-option-card" id="xmpPromoteVerifiedCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doPromoteVerifiedCheck" />
+          <span class="dlg-option-icon">&#x2705;</span>
+          <div class="dlg-option-body">
+            <b>Treat current auto categories as verified</b>
+            <span>Promotes current auto accept/reject outcomes to a verified state before finalizing. Verified categories appear in filmstrip and main scene view.</span>
+          </div>
+        </label>
+      </div>
       <!-- XMP early-access note (shown when checked) -->
       <div class="dlg-xmp-note" id="xmpNote">
         &#x26A0; <b>Write XMP files <em>before</em> importing into your photo editor.</b> Once a program like Lightroom or Capture One has imported a photo, it typically ignores new sidecar files and manages metadata in its own catalogue instead. Write XMP first, then import, for best results.
@@ -1046,23 +1071,23 @@
 
   </dialog>
 
-  <!-- Reset All confirmation dialog -->
+  <!-- Reset Manual Assignments confirmation dialog -->
   <dialog id="resetConfirmDlg">
     <div class="dlg-header">
       <span class="dlg-icon">&#x26A0;&#xFE0F;</span>
       <div>
-        <h2>Reset All Categorizations?</h2>
+        <h2>Reset Manual Assignments?</h2>
         <p class="dlg-subtitle">This cannot be undone.</p>
       </div>
     </div>
     <div class="dlg-divider"></div>
     <p style="padding:12px 22px 4px;font-size:13px;line-height:1.6">
-      This will clear all <b id="resetOverrideCount">your</b> manual Shift+Click overrides and re-categorize
+      This will clear all <b id="resetOverrideCount">your</b> manual accept/reject assignments and re-categorize
       every image from scratch using the current slider settings.
     </p>
     <div class="actions">
       <button class="btn" id="resetConfirmCancel">Cancel</button>
-      <button class="btn danger" id="resetConfirmOk">Reset All</button>
+      <button class="btn danger" id="resetConfirmOk">Reset Manual Assignments</button>
     </div>
   </dialog>
 
@@ -1242,6 +1267,33 @@
     function isAccept(row) {
       return cullingState.get(row.filename) === 'accept';
     }
+    function normalizeCullOrigin(row) {
+      const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
+      const raw = String(row?.culled_origin || '').toLowerCase();
+      if (raw === 'manual' || raw === 'auto' || raw === 'verified') return raw;
+      // Compatibility: legacy rows with cull status but no origin should be treated as user assignments.
+      if (status) return 'manual';
+      return '';
+    }
+    function getCullOrigin(row) {
+      return normalizeCullOrigin(row);
+    }
+    function hasManualRating(row) {
+      return getOrigin(row) === 'manual' && getRating(row) > 0;
+    }
+    function isProtectedCull(row) {
+      const origin = getCullOrigin(row);
+      return origin === 'manual' || origin === 'verified';
+    }
+    function setCullState(row, state, origin, markMoved = false) {
+      const nextState = state === 'accept' || state === 'reject' ? state : '';
+      const nextOrigin = nextState ? (origin || '') : '';
+      cullingState.set(row.filename, nextState);
+      row.culled = nextState;
+      row.culled_origin = nextOrigin;
+      if (markMoved && nextState) manuallyMoved.add(row.filename);
+      if (!markMoved) manuallyMoved.delete(row.filename);
+    }
 
     // Interactive star bar (DOM-based, matching visualizer.html pattern)
     function createStarBar(row) {
@@ -1305,6 +1357,7 @@
       for (const r of rows) {
         if (r.culled === undefined) r.culled = '';
         if (r.culled_origin === undefined) r.culled_origin = '';
+        r.culled_origin = normalizeCullOrigin(r);
         if (r.exposure_correction === undefined) r.exposure_correction = '0';
         if (r.detection_scores === undefined) r.detection_scores = '';
       }
@@ -1372,7 +1425,6 @@
 
     function applyAutoCategorize(preserveManual = true) {
       const { cutoff, minKeep, maxKeep } = getSliderValues();
-      if (!preserveManual) manuallyMoved.clear();
       for (const scene of scenes) {
         // Sort by rating desc, then quality score desc
         const sorted = scene.images.slice().sort((a, b) => {
@@ -1411,13 +1463,11 @@
           }
         }
 
-        // Write results (skip manually moved images when preserveManual is true)
+        // Write results (manual/verified categories are preserved by default)
         for (const r of scene.images) {
-          if (preserveManual && manuallyMoved.has(r.filename)) continue;
+          if (preserveManual && isProtectedCull(r)) continue;
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
-          cullingState.set(r.filename, state);
-          r.culled = state;
-          r.culled_origin = 'auto';
+          setCullState(r, state, 'auto', false);
         }
       }
     }
@@ -1429,8 +1479,9 @@
       const anyPreset = rows.some(r => r.culled === 'accept' || r.culled === 'reject');
       if (anyPreset) {
         for (const r of rows) {
-          cullingState.set(r.filename, r.culled === 'reject' ? 'reject' : 'accept');
-          if (r.culled_origin === 'manual') manuallyMoved.add(r.filename);
+          const origin = normalizeCullOrigin(r);
+          const state = r.culled === 'reject' ? 'reject' : (r.culled === 'accept' ? 'accept' : '');
+          setCullState(r, state, origin, false);
         }
       } else {
         // First time: run auto-categorize with current slider values
@@ -1440,11 +1491,9 @@
 
     // ---- Swap image between accept/reject ----
     function swapImage(row) {
+      const current = cullingState.get(row.filename) || 'accept';
       const newState = current === 'accept' ? 'reject' : 'accept';
-      cullingState.set(row.filename, newState);
-      row.culled = newState;
-      row.culled_origin = 'manual';
-      manuallyMoved.add(row.filename);
+      setCullState(row, newState, 'manual', true);
     }
 
     // ---- Accept all images in a scene ----
@@ -1452,10 +1501,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        cullingState.set(row.filename, 'accept');
-        row.culled = 'accept';
-        row.culled_origin = 'manual';
-        manuallyMoved.add(row.filename);
+        setCullState(row, 'accept', 'manual', true);
       }
       renderScene(sceneId);
       updateStats();
@@ -1467,10 +1513,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        cullingState.set(row.filename, 'reject');
-        row.culled = 'reject';
-        row.culled_origin = 'manual';
-        manuallyMoved.add(row.filename);
+        setCullState(row, 'reject', 'manual', true);
       }
       renderScene(sceneId);
       updateStats();
@@ -1485,6 +1528,7 @@
       const card = document.createElement('div');
       card.className = isUnrated ? 'cull-card unrated-card' : `cull-card ${side}-card`;
       if (manuallyMoved.has(row.filename)) card.classList.add('moved-card');
+      else if (getCullOrigin(row) === 'manual' || hasManualRating(row)) card.classList.add('assigned-card');
       card.style.position = 'relative'; // for ::after badge
 
       const thumb = document.createElement('div');
@@ -1755,12 +1799,31 @@
       const any = el('#doXmpCheck')?.checked || el('#doMoveCheck')?.checked;
       const btn = el('#confirmOk');
       if (btn) btn.disabled = !any;
+      const xmpChecked = !!el('#doXmpCheck')?.checked;
+      const autoLabel = el('#doAutoLabelCheck');
+      const promote = el('#doPromoteVerifiedCheck');
+      if (autoLabel) autoLabel.disabled = !xmpChecked;
+      if (promote) promote.disabled = !xmpChecked;
+    }
+
+    function promoteAutoToVerified() {
+      let promoted = 0;
+      for (const r of rows) {
+        const state = cullingState.get(r.filename);
+        if (state !== 'accept' && state !== 'reject') continue;
+        if (getCullOrigin(r) !== 'auto') continue;
+        setCullState(r, state, 'verified', false);
+        promoted++;
+      }
+      return promoted;
     }
 
     // ---- Execute selected actions ----
     async function executeActions() {
       const doXmp  = el('#doXmpCheck')?.checked  || false;
       const doMove = el('#doMoveCheck')?.checked || false;
+      const doAutoLabels = doXmp && (el('#doAutoLabelCheck')?.checked ?? true);
+      const doPromoteVerified = doXmp && !!el('#doPromoteVerifiedCheck')?.checked;
       if (!doXmp && !doMove) return;
 
       // Switch to progress view
@@ -1772,6 +1835,7 @@
 
       // Build ordered step list
       const stepDefs = [
+        { id: 'promote', label: 'Promoting auto categories to verified', cond: doPromoteVerified },
         { id: 'save',   label: 'Saving database',                    always: true },
         { id: 'backup', label: 'Backing up kestrel_database.csv',    cond: doMove },
         { id: 'xmp',    label: 'Writing XMP sidecar files',          cond: doXmp  },
@@ -1804,12 +1868,19 @@
 
       let anyFailed = false;
       try {
-        // 1. Save
+        // 1. Optional promote verified
+        if (doPromoteVerified) {
+          setStep('promote', 'running');
+          const promoted = promoteAutoToVerified();
+          setStep('promote', 'done', `${promoted} image${promoted === 1 ? '' : 's'} promoted`);
+        }
+
+        // 2. Save
         setStep('save', 'running');
         await saveCullingState();
         setStep('save', 'done');
 
-        // 2. Backup (only if moving)
+        // 3. Backup (only if moving)
         if (doMove) {
           setStep('backup', 'running');
           const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
@@ -1820,20 +1891,21 @@
           setStep('backup', 'done');
         }
 
-        // 3. XMP
+        // 4. XMP
         if (doXmp) {
           setStep('xmp', 'running');
           const xmpPayload = rows.map(r => ({
             filename: r.filename,
             rating: getRating(r),
+            culled: cullingState.get(r.filename) || r.culled || '',
             species: r.species || '',
             family: r.family || '',
             quality: r.quality != null ? r.quality : null,
-            culled_origin: r.culled_origin || '',
+            culled_origin: getCullOrigin(r),
           }));
 
           // First pass: detect conflicts (existing non-Kestrel XMPs)
-          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false, true);
+          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false, doAutoLabels);
           if (!firstXmpRes.success) {
             setStep('xmp', 'failed', firstXmpRes.error || '');
             anyFailed = true;
@@ -1847,7 +1919,7 @@
             setStep('xmp', 'running');
             if (overwriteExternal) {
               // Second pass: overwrite the conflicting files too
-              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true, true);
+              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true, doAutoLabels);
               if (!secondXmpRes.success) {
                 setStep('xmp', 'failed', secondXmpRes.error || '');
                 anyFailed = true;
@@ -1865,7 +1937,7 @@
           }
         }
 
-        // 4. Move
+        // 5. Move
         let moveRes = null;
         if (doMove) {
           setStep('move', 'running');
@@ -2564,6 +2636,8 @@
       el('#xmpNote').classList.toggle('visible', el('#doXmpCheck').checked);
       _updateExecuteBtn();
     });
+    el('#doAutoLabelCheck').addEventListener('change', _updateExecuteBtn);
+    el('#doPromoteVerifiedCheck').addEventListener('change', _updateExecuteBtn);
     el('#doMoveCheck').addEventListener('change', _updateExecuteBtn);
 
     // Auto-categorize panel controls
@@ -2577,26 +2651,33 @@
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize re-applied \u2014 manual overrides preserved', 3000);
+      showToast('Auto-categorize re-applied \u2014 manual/verified assignments preserved', 3000);
     });
     el('#resetAutoBtn').addEventListener('click', () => {
       // Show confirmation dialog with override count
-      const overrideCount = manuallyMoved.size;
+      const overrideCount = rows.filter(r => getCullOrigin(r) === 'manual').length;
       const countEl = el('#resetOverrideCount');
       if (countEl) countEl.textContent = overrideCount > 0
-        ? `${overrideCount} manual override${overrideCount === 1 ? '' : 's'}`
+        ? `${overrideCount} manual assignment${overrideCount === 1 ? '' : 's'}`
         : 'any manual';
       el('#resetConfirmDlg').showModal();
     });
     el('#resetConfirmCancel').addEventListener('click', () => el('#resetConfirmDlg').close());
     el('#resetConfirmOk').addEventListener('click', () => {
       el('#resetConfirmDlg').close();
-      manuallyMoved.clear();
+      for (const r of rows) {
+        if (getCullOrigin(r) === 'manual') {
+          r.culled = '';
+          r.culled_origin = '';
+          cullingState.delete(r.filename);
+          manuallyMoved.delete(r.filename);
+        }
+      }
       applyAutoCategorize(false);
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize reset \u2014 all manual overrides cleared', 3000);
+      showToast('Auto-categorize reset \u2014 manual assignments cleared', 3000);
     });
     // Slider live label updates
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {

@@ -142,7 +142,7 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
         filename       – bare filename (e.g. "IMG_0001.jpg")
         rating         – integer 0-5
         culled         – "accept" or "reject"
-        culled_origin  – "auto" or "manual" (optional)
+        culled_origin  – "auto", "manual", or "verified" (optional)
         species        – detected species name (optional)
         family         – detected family name (optional)
         quality        – raw quality score float 0.0–1.0 (optional)
@@ -166,8 +166,8 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
         root_path: Path to images.
         image_data: List of dicts.
         overwrite_external: Whether to overwrite non-Kestrel XMPs.
-        use_auto_labels: If True, write Red/Green color labels even for AI-generated ('auto') culls.
-                         If False, only write color labels for user-verified ('manual') culls.
+        use_auto_labels: If True, write Red/Green color labels for AI-generated ('auto') culls.
+                         Labels are always written for user culls ('manual' and 'verified').
 
     Returns:
         { success, written, skipped_conflicts: [filenames], errors }
@@ -191,10 +191,10 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                 rating = max(0, min(5, rating))
 
                 cull_status = str(entry.get('culled', '')).lower()
-                origin = str(entry.get('culled_origin', 'manual')).lower()
+                origin = str(entry.get('culled_origin', '')).lower()
                 
                 label = ''
-                if use_auto_labels or origin == 'manual':
+                if use_auto_labels or origin in ('manual', 'verified'):
                     if cull_status == 'accept':
                         label = 'Green'
                     elif cull_status == 'reject':

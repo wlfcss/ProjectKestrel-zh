@@ -726,7 +726,16 @@
         if (!('detection_scores' in r)) r.detection_scores = '';
         if (!('culled' in r)) r.culled = '';
         if (!('culled_origin' in r)) r.culled_origin = '';
+        r.culled_origin = normalizeCullOrigin(r);
       }
+    }
+
+    function normalizeCullOrigin(row) {
+      const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
+      const raw = String(row?.culled_origin || '').toLowerCase();
+      if (raw === 'manual' || raw === 'auto' || raw === 'verified') return raw;
+      if (status) return 'manual';
+      return '';
     }
 
     /** Get (or lazily initialise) the scenedata object for a rootPath. */
@@ -1272,6 +1281,13 @@
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
           actions.appendChild(writeMetaBtn);
 
+          const folderOptionsBtn = document.createElement('button');
+          folderOptionsBtn.className = 'action-btn';
+          folderOptionsBtn.innerHTML = '<i>⚙</i> Folder options...';
+          folderOptionsBtn.title = 'Reset culling state for this folder';
+          folderOptionsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); showFolderOptionsDialog(fd.folderPath); });
+          actions.appendChild(folderOptionsBtn);
+
           hdr.appendChild(actions);
 
           bodyEl = document.createElement('div');
@@ -1644,12 +1660,21 @@
     }
 
     function getCullStatus(row) {
+      const raw = (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
+      if (!raw) return '';
+      const origin = normalizeCullOrigin(row);
+      // Auto culls are non-authoritative in filmstrip/main scene view.
+      if (origin === 'auto') return '';
+      return raw;
+    }
+
+    function getRawCullStatus(row) {
       return (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
     }
 
     function setCullStatus(row, status) {
       ensureRatingColumns();
-      row.culled = status; // 'accept', 'reject', or ''
+      row.culled = status || ''; // 'accept', 'reject', or ''
       row.culled_origin = status ? 'manual' : '';
       markDirty();
     }
@@ -1666,10 +1691,11 @@
         card.className = 'filmstrip-card';
         card.dataset.idx = idx;
         const cull = getCullStatus(r);
-        const cullOrigin = r.culled_origin || '';
+        const cullOrigin = normalizeCullOrigin(r);
         if (cull === 'accept') card.classList.add('accepted');
         if (cull === 'reject') card.classList.add('rejected');
         if (cullOrigin === 'manual') card.classList.add('manual-cull');
+        if (cullOrigin === 'verified') card.classList.add('verified-cull');
         if (cullOrigin === 'auto') card.classList.add('auto-cull');
         if (idx === currentImageIndex) card.classList.add('active');
 
@@ -1833,7 +1859,10 @@
           btn.onclick = (ev) => {
             ev.stopPropagation();
             const newCull = btnCull === 'none' ? null : btnCull;
-            if (getCullStatus(r) !== newCull) {
+            const currentRaw = getRawCullStatus(r);
+            const currentNormalized = currentRaw || null;
+            const forceClearAuto = newCull === null && normalizeCullOrigin(r) === 'auto' && currentRaw;
+            if (currentNormalized !== newCull || forceClearAuto) {
               setCullStatus(r, newCull);
               selectFilmstripImage(idx, scene); // refresh
               renderScenes(); // refresh timeline
@@ -6144,6 +6173,71 @@
       });
     }
 
+    function resetFolderCullState(rootPath, mode) {
+      let changed = 0;
+      for (const r of rows) {
+        if (r.__rootPath !== rootPath) continue;
+        const origin = normalizeCullOrigin(r);
+        const isResetAll = mode === 'all' && (origin === 'manual' || origin === 'verified');
+        const isResetVerified = mode === 'verified' && origin === 'verified';
+        if (!isResetAll && !isResetVerified) continue;
+        if (r.culled || r.culled_origin) {
+          r.culled = '';
+          r.culled_origin = '';
+          changed++;
+        }
+      }
+      if (changed > 0) {
+        markDirty();
+        renderScenes();
+        if (currentSceneId != null && _currentScene) {
+          const refreshed = reloadScene(currentSceneId);
+          if (refreshed) {
+            _currentScene = refreshed;
+            renderFilmstrip(refreshed);
+            selectFilmstripImage(Math.min(currentImageIndex, Math.max(0, refreshed.images.length - 1)), refreshed);
+          }
+        }
+      }
+      return changed;
+    }
+
+    function showFolderOptionsDialog(folderPath) {
+      const folderName = folderBaseName(folderPath) || folderPath || 'folder';
+      const dlg = document.createElement('dialog');
+      dlg.style.cssText = 'border:1px solid #303a52;border-radius:12px;background:#141a24;color:#e8f0f8;padding:0;min-width:420px;max-width:520px;';
+      dlg.innerHTML = `
+        <div style="padding:18px 18px 0;font-size:18px;font-weight:700;">Folder options: ${escapeHtml(folderName)}</div>
+        <div style="padding:12px 18px 0;color:#9fb0cc;font-size:13px;line-height:1.5;">Choose a reset action for cull categories in this folder.</div>
+        <div style="padding:16px 18px 18px;display:flex;gap:10px;justify-content:flex-end;">
+          <button id="folderOptCancel" style="padding:8px 12px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;">Cancel</button>
+          <button id="folderOptResetVerified" style="padding:8px 12px;border:1px solid #3a465f;background:#2a3348;color:#e8f0f8;border-radius:6px;cursor:pointer;">Reset Verified</button>
+          <button id="folderOptResetAll" style="padding:8px 12px;border:1px solid #7f3f3f;background:#5c2a2a;color:#ffdede;border-radius:6px;cursor:pointer;">Reset All</button>
+        </div>
+      `;
+      document.body.appendChild(dlg);
+
+      const closeAndRemove = () => {
+        dlg.close();
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+      };
+      dlg.querySelector('#folderOptCancel').addEventListener('click', closeAndRemove);
+      dlg.querySelector('#folderOptResetVerified').addEventListener('click', () => {
+        const changed = resetFolderCullState(folderPath, 'verified');
+        showToast(changed > 0 ? `Reset ${changed} verified categorization${changed === 1 ? '' : 's'}` : 'No verified categorizations to reset', 3000);
+        closeAndRemove();
+      });
+      dlg.querySelector('#folderOptResetAll').addEventListener('click', () => {
+        const ok = confirm('Reset all manual and verified cull categorizations for this folder?');
+        if (!ok) return;
+        const changed = resetFolderCullState(folderPath, 'all');
+        showToast(changed > 0 ? `Reset ${changed} manual/verified categorization${changed === 1 ? '' : 's'}` : 'No manual or verified categorizations to reset', 3000);
+        closeAndRemove();
+      });
+      dlg.addEventListener('close', () => { if (dlg.parentNode) dlg.parentNode.removeChild(dlg); });
+      dlg.showModal();
+    }
+
     // ---- Write Metadata launcher ----
     async function writeMetadataForFolder(rootPath) {
       if (!window.pywebview?.api) {
@@ -6159,8 +6253,8 @@
         const payload = folderRows.map(r => ({
           filename: r.filename,
           rating: getRating(r),
-          culled: r.culled || 'accept',
-          culled_origin: r.culled_origin || '',
+          culled: getRawCullStatus(r),
+          culled_origin: normalizeCullOrigin(r),
           species: r.species || '',
           family: r.family || '',
           quality: r.quality != null ? r.quality : null,
@@ -6178,7 +6272,7 @@
             `${n} existing XMP file${n === 1 ? '' : 's'} in this folder were created by another application (e.g. Lightroom or darktable).\n\nOverwrite them with Kestrel metadata?`
           );
           if (ok) {
-            const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true);
+            const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true, false);
             if (!res2.success) {
               showToast('Write Metadata failed: ' + (res2.error || 'Unknown error'), 5000);
               return;

@@ -1355,10 +1355,12 @@
       box-shadow: 0 0 10px rgba(74,163,255,0.3);
     }
     
-    .filmstrip-card.accepted.manual-cull .filmstrip-thumb {
+    .filmstrip-card.accepted.manual-cull .filmstrip-thumb,
+    .filmstrip-card.accepted.verified-cull .filmstrip-thumb {
       border: 2px solid #2ecc71;
     }
-    .filmstrip-card.rejected.manual-cull .filmstrip-thumb {
+    .filmstrip-card.rejected.manual-cull .filmstrip-thumb,
+    .filmstrip-card.rejected.verified-cull .filmstrip-thumb {
       border: 2px solid #e74c3c;
     }
 
