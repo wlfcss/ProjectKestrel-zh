@@ -1669,6 +1669,7 @@
         const cullOrigin = r.culled_origin || '';
         if (cull === 'accept') card.classList.add('accepted');
         if (cull === 'reject') card.classList.add('rejected');
+        if (cullOrigin === 'manual') card.classList.add('manual-cull');
         if (cullOrigin === 'auto') card.classList.add('auto-cull');
         if (idx === currentImageIndex) card.classList.add('active');
 
@@ -1833,7 +1834,7 @@
             ev.stopPropagation();
             const newCull = btnCull === 'none' ? null : btnCull;
             if (getCullStatus(r) !== newCull) {
-              toggleCullStatus(r, newCull);
+              setCullStatus(r, newCull);
               selectFilmstripImage(idx, scene); // refresh
               renderScenes(); // refresh timeline
             }
