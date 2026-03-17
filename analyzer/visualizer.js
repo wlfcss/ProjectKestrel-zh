@@ -2963,6 +2963,7 @@
         if (data && data.settings && typeof data.settings === 'object') {
           saveSettings(data.settings);
           _autoSaveEnabled = data.settings.auto_save_enabled !== false;
+          _updateSaveRevertVisibility();
         }
       } catch (_) { }
     }
@@ -3072,6 +3073,7 @@
         raw_exposure_correction_disabled: document.getElementById('rawExposureCorrectionDisabled').checked,
       };
       _autoSaveEnabled = autoSaveEnabled;
+      _updateSaveRevertVisibility();
       // Persist settings to localStorage immediately
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
@@ -3117,9 +3119,74 @@
       await renderScenes();
     }
 
+    /** Show or hide the Save/Revert wrap based on whether auto-save is active. */
+    function _updateSaveRevertVisibility() {
+      const wrap = document.getElementById('saveRevertWrap');
+      if (!wrap) return;
+      if (_autoSaveEnabled) {
+        wrap.classList.add('hidden');
+      } else {
+        wrap.classList.remove('hidden');
+      }
+    }
+
+    /** Mark settings Save button dirty (yellow) or clean. */
+    function _setSettingsDirty(dirty) {
+      const btn = document.getElementById('settingsSave');
+      if (!btn) return;
+      if (dirty) btn.classList.add('dirty'); else btn.classList.remove('dirty');
+    }
+
+    // Track changes inside the settings dialog to highlight the Save button
+    document.getElementById('settingsDlg').addEventListener('change', () => _setSettingsDirty(true));
+    document.getElementById('settingsDlg').addEventListener('input', () => _setSettingsDirty(true));
+
     document.getElementById('openSettings').addEventListener('click', showSettings);
-    document.getElementById('settingsSave').addEventListener('click', applySettings);
-    document.getElementById('settingsCancel').addEventListener('click', () => document.getElementById('settingsDlg').close());
+    document.getElementById('settingsSave').addEventListener('click', async () => {
+      await applySettings();
+      _setSettingsDirty(false);
+    });
+    document.getElementById('settingsCancel').addEventListener('click', () => {
+      document.getElementById('settingsDlg').close();
+      _setSettingsDirty(false);
+    });
+
+    // ── Sidebar resize ────────────────────────────────────────────────────────
+    (function initSidebarResize() {
+      const resizer = document.getElementById('sidebarResizer');
+      const sidebar = document.querySelector('header');
+      if (!resizer || !sidebar) return;
+
+      let dragging = false;
+      let startX = 0;
+      let startW = 0;
+
+      resizer.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        startW = sidebar.getBoundingClientRect().width;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const delta = e.clientX - startX;
+        const newW = Math.max(260, Math.min(600, startW + delta));
+        sidebar.style.width = newW + 'px';
+        sidebar.style.flex = '0 0 ' + newW + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      });
+    })();
 
     // ─── Telemetry helpers ────────────────────────────────────────────────────
     /** Merge a single key into persisted settings (localStorage + pywebview). */
@@ -5588,6 +5655,12 @@
       try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
     })();
 
+    // Apply initial auto-save visibility from cached localStorage settings
+    (function initAutoSaveVisibility() {
+      _autoSaveEnabled = getSetting('auto_save_enabled', true) !== false;
+      _updateSaveRevertVisibility();
+    })();
+
     // Group-by-folder toggle
     (function initGroupByFolder() {
       const t = document.getElementById('groupByFolder');
@@ -6224,48 +6297,46 @@
         'background:#141a24',
         'color:#e8f0f8',
         'padding:0',
-        'min-width:440px',
-        'max-width:540px',
+        'min-width:380px',
+        'max-width:500px',
         'width:90vw',
-        'max-height:80vh',
+        'max-height:48vh',
         'overflow-y:auto',
         'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
       ].join(';');
 
       dlg.innerHTML = `
-        <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
-          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Folder Options</div>
-          <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(folderPath)}">${escapeHtml(folderName)}</div>
+        <div style="padding:12px 16px 10px;border-bottom:1px solid #222e45;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:2px;">Reset Culling Decisions</div>
+          <div style="color:#7a90b8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(folderPath)}">${escapeHtml(folderName)}</div>
         </div>
 
-        <div style="padding:14px 22px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">Reset Culling Decisions</div>
-
+        <div style="padding:10px 16px;">
           <div class="folder-opt-card" id="folderOptCardVerified" style="
-            display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+            display:flex;align-items:center;gap:10px;padding:9px 12px;
             border:1px solid #263045;border-radius:8px;background:#1a2235;
-            cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s;">
-            <div style="margin-top:2px;font-size:16px;line-height:1;">↺</div>
+            cursor:pointer;margin-bottom:6px;transition:border-color 0.15s,background 0.15s;">
+            <div style="font-size:16px;line-height:1;flex-shrink:0;">↺</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Reset Confirmed Decisions</div>
-              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">Clears only Accept/Reject decisions that were <em>Confirmed</em> via the Culling Assistant's finalize step. Manual (user-assigned) decisions are kept.</div>
+              <div style="font-size:13px;font-weight:600;">Reset Confirmed Decisions</div>
+              <div style="font-size:11px;color:#7a90b8;margin-top:1px;">Clears only decisions confirmed via the Culling Assistant. Manual decisions are kept.</div>
             </div>
           </div>
 
           <div class="folder-opt-card" id="folderOptCardAll" style="
-            display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+            display:flex;align-items:center;gap:10px;padding:9px 12px;
             border:1px solid #3f2020;border-radius:8px;background:#2a1a1a;
-            cursor:pointer;margin-bottom:0;transition:border-color 0.15s,background 0.15s;">
-            <div style="margin-top:2px;font-size:16px;line-height:1;color:#ff8888;">⊘</div>
+            cursor:pointer;transition:border-color 0.15s,background 0.15s;">
+            <div style="font-size:16px;line-height:1;color:#ff8888;flex-shrink:0;">⊘</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">Reset All Decisions</div>
-              <div style="font-size:12px;color:#b07878;line-height:1.45;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed Accept/Reject decisions for this folder, returning every image to Undecided. Auto-categorized decisions are unaffected.</div>
+              <div style="font-size:13px;font-weight:600;color:#ffc8c8;">Reset All Decisions</div>
+              <div style="font-size:11px;color:#b07878;margin-top:1px;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed decisions, returning every image to Undecided.</div>
             </div>
           </div>
         </div>
 
-        <div style="padding:10px 22px 18px;display:flex;justify-content:flex-end;border-top:1px solid #1a2235;margin-top:4px;">
-          <button id="folderOptCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Close</button>
+        <div style="padding:8px 16px 12px;display:flex;justify-content:flex-end;border-top:1px solid #1a2235;">
+          <button id="folderOptCancel" style="padding:6px 14px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Close</button>
         </div>
       `;
       document.body.appendChild(dlg);
@@ -6319,31 +6390,31 @@
       const dlg = document.createElement('dialog');
       dlg.style.cssText = [
         'border:1px solid #303a52', 'border-radius:12px', 'background:#141a24',
-        'color:#e8f0f8', 'padding:0', 'min-width:440px', 'max-width:560px',
-        'width:90vw', 'max-height:80vh', 'overflow-y:auto',
+        'color:#e8f0f8', 'padding:0', 'min-width:380px', 'max-width:520px',
+        'width:90vw', 'max-height:48vh', 'overflow-y:auto',
         'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
       ].join(';');
 
       dlg.innerHTML = `
-        <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
-          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Write Photo Metadata</div>
-          <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(rootPath)}">${escapeHtml(folderName)} &middot; ${imageCount} image${imageCount === 1 ? '' : 's'}</div>
+        <div style="padding:12px 16px 10px;border-bottom:1px solid #222e45;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:2px;">Write Photo Metadata</div>
+          <div style="color:#7a90b8;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(rootPath)}">${escapeHtml(folderName)} &middot; ${imageCount} image${imageCount === 1 ? '' : 's'}</div>
         </div>
 
-        <div id="wmOptView" style="padding:16px 22px;">
-          <div style="background:#1a2235;border:1px solid #263045;border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;">
-            <div style="font-size:18px;margin-top:2px;">📝</div>
+        <div id="wmOptView" style="padding:10px 16px;">
+          <div style="background:#1a2235;border:1px solid #263045;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:center;">
+            <div style="font-size:18px;flex-shrink:0;">📝</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">XMP Sidecar Files</div>
-              <div style="font-size:12px;color:#7a90b8;line-height:1.5;">Writes a <code style="background:#1c2438;padding:1px 4px;border-radius:3px;">.xmp</code> sidecar file next to each original. Embeds star ratings, Accept/Reject decisions, and species tags in a format readable by Lightroom, Capture One, darktable, and other editors.</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:2px;">XMP Sidecar Files</div>
+              <div style="font-size:11px;color:#7a90b8;line-height:1.4;">Writes a <code style="background:#1c2438;padding:1px 4px;border-radius:3px;">.xmp</code> file next to each original with star ratings, Accept/Reject decisions, and species tags — readable by Lightroom, Capture One, darktable, and more.</div>
             </div>
           </div>
-          <div style="background:#1a1f10;border:1px solid #3a4020;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#b0c070;line-height:1.5;">
-            &#9888; <b>Write metadata before importing into your photo editor.</b> Most catalogues ignore new sidecar files once a photo is already imported. Write first, then import, for best results.<br>Kestrel will not overwrite XMP files generated by other software without your permission.
+          <div style="background:#1a1f10;border:1px solid #3a4020;border-radius:6px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:#b0c070;line-height:1.4;">
+            &#9888; <b>Write metadata before importing into your editor.</b> Most catalogues ignore new sidecars once a photo is already imported. Kestrel will not overwrite XMP files from other software without your permission.
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button id="wmCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>
-            <button id="wmOk" style="padding:8px 16px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Write Metadata &#10003;</button>
+            <button id="wmCancel" style="padding:6px 14px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>
+            <button id="wmOk" style="padding:6px 14px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Write Metadata &#10003;</button>
           </div>
         </div>
 
