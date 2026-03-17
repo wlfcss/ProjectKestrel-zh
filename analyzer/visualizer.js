@@ -2794,7 +2794,7 @@
         return;
       }
 
-      // Pywebview desktop mode: save scenedata (CSV is read-only; user edits go to JSON)
+      // Pywebview desktop mode: save both CSV row state and scenedata JSON.
       if (window.pywebview?.api) {
         const groups = new Map();
         for (const r of rows) {
@@ -2803,18 +2803,34 @@
           groups.get(rp).push(r);
         }
         let saved = 0, failed = 0;
+        const exportCols = allCols.filter(c => !String(c).startsWith('__'));
         for (const [rp, groupRows] of groups) {
           if (!rp) { failed++; continue; }
-          const sd = _normalizeScenedataForSave(rp, groupRows);
           try {
+            // Persist cull/rating columns to CSV so culling assistant and reloads see authoritative state.
+            if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
+              const content = rowsToCsvString(exportCols, groupRows);
+              const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
+              if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write kestrel_database.csv');
+            }
+
+            const sd = _normalizeScenedataForSave(rp, groupRows);
             const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
             if (res.success) saved++;
             else { failed++; console.warn('[save scenedata] Failed for', rp, res.error); }
-          } catch (e) { failed++; console.warn('[save scenedata] Error for', rp, e); }
+          } catch (e) {
+            failed++;
+            console.warn('[save pywebview] Error for', rp, e);
+          }
         }
-        dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
-        takeSnapshot();
-        setStatus(failed > 0 ? `Saved ${saved} folder(s), ${failed} failed` : `Saved changes to ${saved} folder(s)`);
+        if (failed > 0) {
+          dirty = true; _notifyDirty(true); el('#saveCsv').disabled = false;
+          setStatus(`Saved ${saved} folder(s), ${failed} failed`);
+        } else {
+          dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
+          takeSnapshot();
+          setStatus(`Saved changes to ${saved} folder(s)`);
+        }
         return;
       }
 
