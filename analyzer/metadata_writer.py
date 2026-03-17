@@ -182,8 +182,13 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                 rating = int(entry.get('rating', 0) or 0)
                 rating = max(0, min(5, rating))
 
-                cull_status = str(entry.get('culled', 'accept')).lower()
-                label = 'Green' if cull_status == 'accept' else 'Red'
+                cull_status = str(entry.get('culled', '')).lower()
+                if cull_status == 'accept':
+                    label = 'Green'
+                elif cull_status == 'reject':
+                    label = 'Red'
+                else:
+                    label = ''
 
                 species = str(entry.get('species', '') or '').strip()
                 family = str(entry.get('family', '') or '').strip()

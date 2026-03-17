@@ -875,6 +875,13 @@
       overflow-y: auto;
     }
 
+    dialog#sceneDlg {
+      width: calc(100% - 60px);
+      height: calc(100% - 60px);
+      max-width: none;
+      max-height: none;
+    }
+
     /* ═══ Filmstrip Scene View Layout ═══ */
     .scene-filmstrip-layout {
       display: flex;
@@ -982,6 +989,13 @@
       white-space: nowrap;
     }
     .scene-chip-add:hover { background: #1a2a44; }
+    .scene-topbar-tags .chip-x {
+      margin-left: 5px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color .15s;
+    }
+    .scene-topbar-tags .chip-x:hover { color: var(--danger, #ff4d4f); }
     .scene-topbar-right {
       display: flex;
       align-items: center;

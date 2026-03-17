@@ -1699,6 +1699,16 @@
           selectFilmstripImage(idx, scene);
         });
 
+        // Hover to temporarily preview
+        card.addEventListener('mouseenter', () => {
+          if (_splitMode) return;
+          selectFilmstripImage(idx, scene, true);
+        });
+        card.addEventListener('mouseleave', () => {
+          if (_splitMode) return;
+          selectFilmstripImage(currentImageIndex, scene, true);
+        });
+
         // Double-click to open in editor
         card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
 
@@ -1734,21 +1744,21 @@
       grid.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
     }
 
-    async function selectFilmstripImage(idx, scene) {
+    async function selectFilmstripImage(idx, scene, isHover = false) {
       if (!scene || !scene.images || idx < 0 || idx >= scene.images.length) return;
-      currentImageIndex = idx;
+      if (!isHover) {
+        currentImageIndex = idx;
+      }
       const r = scene.images[idx];
 
-      // Update filmstrip card active state
+      // Update filmstrip card active state and center if not just hovering
       const grid = el('#imageGrid');
-      if (grid) {
+      if (grid && !isHover) {
         grid.querySelectorAll('.filmstrip-card').forEach((c, i) => {
           c.classList.toggle('active', i === idx);
         });
+        scrollFilmstripToCenter(idx);
       }
-
-      // Center the card in the filmstrip
-      scrollFilmstripToCenter(idx);
 
       // Load export preview
       const exportBox = el('#previewBox');
@@ -2126,7 +2136,6 @@
           e.preventDefault();
           if (images[currentImageIndex]) {
             setCullStatus(images[currentImageIndex], 'reject');
-            setRating(images[currentImageIndex], 1, 'manual');
             _refreshCurrentFilmstripCard();
           }
           break;
@@ -2135,7 +2144,6 @@
           e.preventDefault();
           if (images[currentImageIndex]) {
             setCullStatus(images[currentImageIndex], '');
-            setRating(images[currentImageIndex], 0, 'manual');
             _refreshCurrentFilmstripCard();
           }
           break;
@@ -2144,7 +2152,6 @@
           e.preventDefault();
           if (images[currentImageIndex]) {
             setCullStatus(images[currentImageIndex], 'accept');
-            setRating(images[currentImageIndex], 5, 'manual');
             _refreshCurrentFilmstripCard();
           }
           break;
@@ -2257,36 +2264,58 @@
       const input = el('#editAddSpecies');
       const name = (input.value || '').trim();
       if (!name) return;
-      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      
+      const wasEdit = _sceneEditMode;
+      if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+      _sceneEditMode = true;
+      
       const before = _sceneEditDraft.species.length;
       _sceneEditDraft.species = Array.from(new Set([..._sceneEditDraft.species, name])).sort();
       const changed = _sceneEditDraft.species.length !== before;
+      
       if (changed) {
+        _finalizeSceneReview(scene.id);
         input.value = '';
-        const updatedScene = reloadScene(scene.id);
-        if (updatedScene) {
-          renderSceneMetaChips(updatedScene, _sceneEditMode);
-        }
+        const updatedScene = reloadScene(scene.id) || scene;
+        renderTopbarTags(updatedScene);
+        renderScenes();
         showToast(`Added species "${name}" to reviewed scene tags`, 2000);
       }
+      
+      if (!wasEdit) {
+        _sceneEditMode = false;
+        _sceneEditDraft = null;
+      }
+      el('#editPanel')?.classList.add('hidden');
     }
 
     function addFamilyToScene(scene) {
       const input = el('#editAddFamily');
       const name = (input.value || '').trim();
       if (!name) return;
-      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      
+      const wasEdit = _sceneEditMode;
+      if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+      _sceneEditMode = true;
+      
       const before = _sceneEditDraft.families.length;
       _sceneEditDraft.families = Array.from(new Set([..._sceneEditDraft.families, name])).sort();
       const changed = _sceneEditDraft.families.length !== before;
+      
       if (changed) {
+        _finalizeSceneReview(scene.id);
         input.value = '';
-        const updatedScene = reloadScene(scene.id);
-        if (updatedScene) {
-          renderSceneMetaChips(updatedScene, _sceneEditMode);
-        }
+        const updatedScene = reloadScene(scene.id) || scene;
+        renderTopbarTags(updatedScene);
+        renderScenes();
         showToast(`Added family "${name}" to reviewed scene tags`, 2000);
       }
+      
+      if (!wasEdit) {
+        _sceneEditMode = false;
+        _sceneEditDraft = null;
+      }
+      el('#editPanel')?.classList.add('hidden');
     }
 
     function reloadScene(sceneId) {
@@ -2331,14 +2360,19 @@
       if (infoBox) infoBox.textContent = '—';
       const grid = el('#imageGrid');
       grid.innerHTML = '';
-      const images = scene.images;
+      
+      // Temporarily sort images by filename for splitting
+      const images = scene.images.slice().sort((a, b) => {
+        return (a.filename || '').localeCompare(b.filename || '');
+      });
       const frag = document.createDocumentFragment();
 
-      for (let idx = 0; idx < images.length; idx++) {
-        const r = images[idx];
+      for (let i = 0; i < images.length; i++) {
+        const r = images[i];
+        const origIdx = scene.images.indexOf(r);
         const card = document.createElement('div');
         card.className = 'filmstrip-card split-mode';
-        card.dataset.idx = idx;
+        card.dataset.idx = origIdx;
         const key = r.filename || r.export_path || '';
 
         // Checkbox for split selection
@@ -2384,8 +2418,8 @@
           cb.checked = !cb.checked;
           cb.onchange();
           
-          // Also set as active and update preview
-          selectFilmstripImage(idx, scene);
+          // Also set as active and update preview using original index
+          selectFilmstripImage(origIdx, scene);
         });
 
         // Tooltip with detailed metadata
