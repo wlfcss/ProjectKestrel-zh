@@ -224,23 +224,37 @@
 
     function loadVersionBadge() {
       if (!versionBadge) return;
-      fetch('VERSION.txt', { cache: 'no-store' })
-        .then((resp) => (resp.ok ? resp.text() : ''))
-        .then((text) => {
+      Promise.all([
+        fetch('VERSION.txt', { cache: 'no-store' })
+          .then((resp) => (resp.ok ? resp.text() : ''))
+          .catch(() => ''),
+        window.pywebview?.api?.get_app_version?.() || Promise.resolve({ version: 'unknown' })
+      ])
+        .then(([text, appVersionResult]) => {
+          const appVersionObj = typeof appVersionResult === 'object' ? appVersionResult : { version: 'unknown' };
+          const appVersion = appVersionObj.version || 'unknown';
+          
           const lines = String(text || '')
             .split(/\r?\n/)
             .map((line) => line.trim())
             .filter(Boolean);
-          if (lines.length === 0) {
-            versionBadge.textContent = 'Version: unknown';
-            return;
+          
+          let displayVersion = 'Version: unknown';
+          if (lines.length > 0) {
+            const firstLine = lines[0];
+            if (firstLine.toLowerCase().startsWith('version')) {
+              displayVersion = firstLine;
+            } else {
+              displayVersion = `Version: ${firstLine}`;
+            }
           }
-          if (lines.length === 1) {
-            const line = lines[0];
-            versionBadge.textContent = line.toLowerCase().startsWith('version') ? line : `Version: ${line}`;
-            return;
+          
+          // Add Analysis Algorithm Version if available
+          if (appVersion !== 'unknown') {
+            displayVersion += ` | Analysis Algorithm: ${appVersion}`;
           }
-          versionBadge.textContent = lines.join(' | ');
+          
+          versionBadge.textContent = displayVersion;
         })
         .catch(() => {
           versionBadge.textContent = 'Version: unknown';
