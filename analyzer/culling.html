@@ -1285,6 +1285,16 @@
       const origin = getCullOrigin(row);
       return origin === 'manual' || origin === 'verified';
     }
+    function hasAnyCull(row) {
+      const state = cullingState.get(row.filename) || row?.culled || '';
+      return state === 'accept' || state === 'reject';
+    }
+    function needsRatingAttention(row) {
+      // Unrated images that are already user-assigned are considered handled.
+      if (getRating(row) > 0) return false;
+      if (isProtectedCull(row) && hasAnyCull(row)) return false;
+      return true;
+    }
     function setCullState(row, state, origin, markMoved = false) {
       const nextState = state === 'accept' || state === 'reject' ? state : '';
       const nextOrigin = nextState ? (origin || '') : '';
@@ -1293,6 +1303,15 @@
       row.culled_origin = nextOrigin;
       if (markMoved && nextState) manuallyMoved.add(row.filename);
       if (!markMoved) manuallyMoved.delete(row.filename);
+    }
+    function updateSceneDerivedFlags(scene) {
+      if (!scene?.images?.length) {
+        scene.allUnrated = false;
+        scene.hasAnyUnrated = false;
+        return;
+      }
+      scene.allUnrated = scene.images.every(r => needsRatingAttention(r));
+      scene.hasAnyUnrated = scene.images.some(r => needsRatingAttention(r));
     }
 
     // Interactive star bar (DOM-based, matching visualizer.html pattern)
@@ -1322,6 +1341,7 @@
           ev.stopPropagation();
           setRating(row, i, 'manual');
           render();
+          renderScene(row.scene_count);
           debouncedSave();
         });
         wrap.appendChild(s);
@@ -1381,8 +1401,8 @@
           if (r.species && r.species !== 'No Bird' && r.species !== 'Unknown') speciesSet.add(r.species);
         }
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
-        const allUnrated = arr.every(r => getRating(r) === 0);
-        const hasAnyUnrated = arr.some(r => getRating(r) === 0);
+        const allUnrated = arr.length > 0 && arr.every(r => needsRatingAttention(r));
+        const hasAnyUnrated = arr.some(r => needsRatingAttention(r));
         const hasDetections = arr.some(r => r.species && r.species !== 'No Bird' && r.species !== 'Unknown' && r.species !== '');
         list.push({
           id: sceneId,
@@ -1476,17 +1496,17 @@
     function initCullingState() {
       cullingState.clear();
       manuallyMoved.clear();
-      const anyPreset = rows.some(r => r.culled === 'accept' || r.culled === 'reject');
-      if (anyPreset) {
-        for (const r of rows) {
-          const origin = normalizeCullOrigin(r);
-          const state = r.culled === 'reject' ? 'reject' : (r.culled === 'accept' ? 'accept' : '');
+      for (const r of rows) {
+        const origin = normalizeCullOrigin(r);
+        const state = r.culled === 'reject' ? 'reject' : (r.culled === 'accept' ? 'accept' : '');
+        if (state) {
           setCullState(r, state, origin, false);
+        } else {
+          cullingState.delete(r.filename);
         }
-      } else {
-        // First time: run auto-categorize with current slider values
-        applyAutoCategorize(false);
       }
+      // Always backfill non-protected images so assistant columns include untouched rows too.
+      applyAutoCategorize(true);
     }
 
     // ---- Swap image between accept/reject ----
@@ -1576,8 +1596,13 @@
     function renderScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
+      updateSceneDerivedFlags(scene);
       const el = document.getElementById(`scene-row-${sceneId}`);
       if (!el) return;
+      el.classList.toggle('unrated', !!scene.allUnrated);
+
+      const badge = el.querySelector('.scene-unrated-badge');
+      if (badge) badge.classList.toggle('hidden', !scene.hasAnyUnrated);
 
       const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
       const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
@@ -1594,6 +1619,7 @@
       container.innerHTML = '';
 
       for (const scene of scenes) {
+        updateSceneDerivedFlags(scene);
         const row = document.createElement('div');
         row.className = 'scene-row';
         row.id = `scene-row-${scene.id}`;
@@ -1606,7 +1632,7 @@
         label.innerHTML = `<b>Scene #${escapeHtml(scene.id)}</b>` +
           (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
-          (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
+          `<span class="unrated-badge scene-unrated-badge ${scene.hasAnyUnrated ? '' : 'hidden'}">⚠ Contains unrated photos</span>`;
         
         // Add bulk action buttons
         const bulkActionsDiv = document.createElement('div');
