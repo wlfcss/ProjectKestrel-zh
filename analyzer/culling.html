@@ -195,10 +195,8 @@
     .cull-card.accept-card { border-left: 3px solid var(--accept-border); }
     .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
-    .cull-card.moved-card { opacity: 0.85; }
-    .cull-card.assigned-card::after,
-    .cull-card.moved-card::after {
-      content: 'User moved';
+    .cull-card.assigned-card::after {
+      content: 'User assigned';
       position: absolute;
       top: 4px;
       right: 4px;
@@ -210,9 +208,6 @@
       border-radius: 4px;
       pointer-events: none;
       box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    .cull-card.assigned-card::after {
-      content: 'User assigned';
       background: #6b6f7b;
     }
     .cull-card .cull-thumb {
@@ -844,16 +839,26 @@
       white-space: nowrap;
     }
 
-    /* Scene bulk actions (Accept/Reject All) */
+    /* Scene bulk actions (Verify / Accept All / Reject All) */
     .scene-bulk-actions {
       display: flex;
       gap: 6px;
       margin-left: auto;
+      align-items: center;
     }
     .scene-bulk-actions .btn {
       font-size: 11px;
       padding: 4px 10px;
       white-space: nowrap;
+    }
+    .btn.verify {
+      background: #1a4a7a;
+      border-color: #2d6fa8;
+      color: #9dd0ff;
+    }
+    .btn.verify:hover {
+      background: #1e5a90;
+      border-color: #4d8fcc;
     }
   </style>
 </head>
@@ -906,6 +911,16 @@
           <div class="slider-row">
             <input type="range" id="maxPerSceneSlider" min="0" max="20" value="0" step="1" />
             <span class="slider-val" id="maxPerSceneVal">∞</span>
+          </div>
+        </div>
+        <div class="slider-group">
+          <label for="unratedDefaultSelect">Unrated images (0★) default to</label>
+          <div class="slider-row">
+            <select id="unratedDefaultSelect" class="btn" style="height:28px; padding:2px 8px;">
+              <option value="reject" selected>Reject</option>
+              <option value="accept">Accept</option>
+            </select>
+            <span class="slider-val" id="unratedDefaultVal">Reject</span>
           </div>
         </div>
         <div class="panel-actions">
@@ -980,29 +995,19 @@
           <input type="checkbox" id="doXmpCheck" />
           <span class="dlg-option-icon">&#x1F4DD;</span>
           <div class="dlg-option-body">
-            <b>Write XMP Metadata Files</b>
+            <b>Write XMP Sidecar Files</b>
             <span>Writes a <code>.xmp</code> sidecar file next to each original. Embeds your star rating and Accept / Reject label so you can import directly into Lightroom, Capture One, or any XMP-aware application.<br>
             <a class="dlg-help-link" id="xmpHelpLink">&#x2753; Issues reading metadata in your photo editor?</a></span>
           </div>
         </label>
       </div>
-      <div class="dlg-option-card" id="xmpAutoLabelCard">
+      <div class="dlg-option-card hidden" id="xmpAutoLabelCard">
         <label class="dlg-option-label">
           <input type="checkbox" id="doAutoLabelCheck" checked />
           <span class="dlg-option-icon">&#x1F3F7;&#xFE0F;</span>
           <div class="dlg-option-body">
-            <b>Write color labels for auto-categorized images</b>
+            <b>Write auto-categorized categories to XMP labels</b>
             <span>When enabled, accepted/rejected images categorized by auto rules also receive Green/Red XMP labels.</span>
-          </div>
-        </label>
-      </div>
-      <div class="dlg-option-card" id="xmpPromoteVerifiedCard">
-        <label class="dlg-option-label">
-          <input type="checkbox" id="doPromoteVerifiedCheck" />
-          <span class="dlg-option-icon">&#x2705;</span>
-          <div class="dlg-option-body">
-            <b>Treat current auto categories as verified</b>
-            <span>Promotes current auto accept/reject outcomes to a verified state before finalizing. Verified categories appear in filmstrip and main scene view.</span>
           </div>
         </label>
       </div>
@@ -1020,6 +1025,16 @@
           <div class="dlg-option-body">
             <b>Move Rejects to Folder</b>
             <span id="moveCardDesc">Moves rejected files into <code>_KESTREL_Rejects/</code>. A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.</span>
+          </div>
+        </label>
+      </div>
+      <div class="dlg-option-card" id="xmpPromoteVerifiedCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doPromoteVerifiedCheck" />
+          <span class="dlg-option-icon">&#x2705;</span>
+          <div class="dlg-option-body">
+            <b>Treat current auto categories as verified</b>
+            <span>Promotes current auto accept/reject outcomes to a verified state before finalizing. Verified categories appear in filmstrip and main scene view.</span>
           </div>
         </label>
       </div>
@@ -1137,10 +1152,10 @@
     let header = [];
     let scenes = [];            // [{id, images[], species, ...}]
     let cullingState = new Map(); // filename -> 'accept' | 'reject'
-    let manuallyMoved = new Set(); // filenames the user has shift-clicked
     let blobUrlCache = new Map();
     let _normalizedRatings = {};   // filename -> auto rating from apply_normalization()
     let _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
+    let _needsLegacyCullOriginUpgrade = false;
     let rejectFilenames = [];    // for undo after move
     let moveCompleted = false;
     let thumbDragPixels = 0;  // how many px the mouse moved during last thumb mousedown
@@ -1264,9 +1279,6 @@
       else delete _scenedata.image_ratings[fn];
     }
 
-    function isAccept(row) {
-      return cullingState.get(row.filename) === 'accept';
-    }
     function normalizeCullOrigin(row) {
       const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
       const raw = String(row?.culled_origin || '').toLowerCase();
@@ -1295,14 +1307,12 @@
       if (isProtectedCull(row) && hasAnyCull(row)) return false;
       return true;
     }
-    function setCullState(row, state, origin, markMoved = false) {
+    function setCullState(row, state, origin) {
       const nextState = state === 'accept' || state === 'reject' ? state : '';
       const nextOrigin = nextState ? (origin || '') : '';
       cullingState.set(row.filename, nextState);
       row.culled = nextState;
       row.culled_origin = nextOrigin;
-      if (markMoved && nextState) manuallyMoved.add(row.filename);
-      if (!markMoved) manuallyMoved.delete(row.filename);
     }
     function updateSceneDerivedFlags(scene) {
       if (!scene?.images?.length) {
@@ -1369,6 +1379,7 @@
 
     // ---- Ensure columns ----
     function ensureColumns() {
+      _needsLegacyCullOriginUpgrade = false;
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
       if (!header.includes('culled_origin')) header.push('culled_origin');
@@ -1377,7 +1388,11 @@
       for (const r of rows) {
         if (r.culled === undefined) r.culled = '';
         if (r.culled_origin === undefined) r.culled_origin = '';
+        const prevOrigin = String(r.culled_origin || '').toLowerCase();
         r.culled_origin = normalizeCullOrigin(r);
+        if (!prevOrigin && r.culled_origin === 'manual' && (r.culled === 'accept' || r.culled === 'reject')) {
+          _needsLegacyCullOriginUpgrade = true;
+        }
         if (r.exposure_correction === undefined) r.exposure_correction = '0';
         if (r.detection_scores === undefined) r.detection_scores = '';
       }
@@ -1427,24 +1442,27 @@
       const minKeep = parseInt(el('#minPerSceneSlider')?.value  ?? '0', 10);
       const maxRaw  = parseInt(el('#maxPerSceneSlider')?.value  ?? '0', 10);
       const maxKeep = maxRaw === 0 ? Infinity : maxRaw;
-      return { cutoff, minKeep, maxKeep };
+      const unratedDefault = (el('#unratedDefaultSelect')?.value === 'accept') ? 'accept' : 'reject';
+      return { cutoff, minKeep, maxKeep, unratedDefault };
     }
 
     function updateSliderLabels() {
-      const { cutoff, minKeep, maxKeep } = getSliderValues();
+      const { cutoff, minKeep, maxKeep, unratedDefault } = getSliderValues();
       const qEl   = el('#qualityCutoffVal');
       const minEl = el('#minPerSceneVal');
       const maxEl = el('#maxPerSceneVal');
+      const unratedEl = el('#unratedDefaultVal');
       if (qEl)   qEl.textContent   = '\u2605' + cutoff;
       if (minEl) minEl.textContent = String(minKeep);
       if (maxEl) maxEl.textContent = maxKeep === Infinity ? '\u221e' : String(maxKeep);
+      if (unratedEl) unratedEl.textContent = unratedDefault === 'accept' ? 'Accept' : 'Reject';
       const summary = el('#autoCatSummary');
       if (summary) summary.textContent =
-        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene`;
+        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene \u00b7 Unrated \u2192 ${unratedDefault}`;
     }
 
     function applyAutoCategorize(preserveManual = true) {
-      const { cutoff, minKeep, maxKeep } = getSliderValues();
+      const { cutoff, minKeep, maxKeep, unratedDefault } = getSliderValues();
       for (const scene of scenes) {
         // Sort by rating desc, then quality score desc
         const sorted = scene.images.slice().sort((a, b) => {
@@ -1452,9 +1470,13 @@
           return rb !== ra ? rb - ra : parseNumber(b.quality) - parseNumber(a.quality);
         });
 
-        // Phase 1: quality cutoff — accept images at/above cutoff; unrated (0) also accepted
+        // Phase 1: quality cutoff — unrated images follow explicit default setting.
         const qualityAcceptSet = new Set(
-          sorted.filter(r => { const rt = getRating(r); return rt === 0 || rt >= cutoff; })
+          sorted.filter(r => {
+            const rt = getRating(r);
+            if (rt === 0) return unratedDefault === 'accept';
+            return rt >= cutoff;
+          })
                 .map(r => r.filename)
         );
 
@@ -1487,7 +1509,7 @@
         for (const r of scene.images) {
           if (preserveManual && isProtectedCull(r)) continue;
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
-          setCullState(r, state, 'auto', false);
+          setCullState(r, state, 'auto');
         }
       }
     }
@@ -1495,12 +1517,11 @@
     // ---- Initialize culling state ----
     function initCullingState() {
       cullingState.clear();
-      manuallyMoved.clear();
       for (const r of rows) {
         const origin = normalizeCullOrigin(r);
         const state = r.culled === 'reject' ? 'reject' : (r.culled === 'accept' ? 'accept' : '');
         if (state) {
-          setCullState(r, state, origin, false);
+          setCullState(r, state, origin);
         } else {
           cullingState.delete(r.filename);
         }
@@ -1513,7 +1534,26 @@
     function swapImage(row) {
       const current = cullingState.get(row.filename) || 'accept';
       const newState = current === 'accept' ? 'reject' : 'accept';
-      setCullState(row, newState, 'manual', true);
+      setCullState(row, newState, 'manual');
+    }
+
+    // ---- Verify all unrated images in a scene (promote current auto state to manual) ----
+    function verifyUnratedInScene(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      let verified = 0;
+      for (const row of scene.images) {
+        if (!needsRatingAttention(row)) continue;
+        const current = cullingState.get(row.filename) || 'accept';
+        setCullState(row, current, 'manual');
+        verified++;
+      }
+      if (verified > 0) {
+        renderScene(sceneId);
+        updateStats();
+        debouncedSave();
+      }
+      return verified;
     }
 
     // ---- Accept all images in a scene ----
@@ -1521,7 +1561,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        setCullState(row, 'accept', 'manual', true);
+        setCullState(row, 'accept', 'manual');
       }
       renderScene(sceneId);
       updateStats();
@@ -1533,7 +1573,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        setCullState(row, 'reject', 'manual', true);
+        setCullState(row, 'reject', 'manual');
       }
       renderScene(sceneId);
       updateStats();
@@ -1547,8 +1587,7 @@
       const side = cullingState.get(row.filename) || 'accept';
       const card = document.createElement('div');
       card.className = isUnrated ? 'cull-card unrated-card' : `cull-card ${side}-card`;
-      if (manuallyMoved.has(row.filename)) card.classList.add('moved-card');
-      else if (getCullOrigin(row) === 'manual' || hasManualRating(row)) card.classList.add('assigned-card');
+      if (getCullOrigin(row) === 'manual' || hasManualRating(row)) card.classList.add('assigned-card');
       card.style.position = 'relative'; // for ::after badge
 
       const thumb = document.createElement('div');
@@ -1604,6 +1643,9 @@
       const badge = el.querySelector('.scene-unrated-badge');
       if (badge) badge.classList.toggle('hidden', !scene.hasAnyUnrated);
 
+      const verifyBtn = el.querySelector('.scene-verify-btn');
+      if (verifyBtn) verifyBtn.classList.toggle('hidden', !scene.hasAnyUnrated);
+
       const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
       const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
 
@@ -1637,6 +1679,15 @@
         // Add bulk action buttons
         const bulkActionsDiv = document.createElement('div');
         bulkActionsDiv.className = 'scene-bulk-actions';
+
+        const verifyBtn = document.createElement('button');
+        verifyBtn.className = `btn verify scene-verify-btn${scene.hasAnyUnrated ? '' : ' hidden'}`;
+        verifyBtn.textContent = '✦ Verify Unrated';
+        verifyBtn.title = 'Confirm the current auto-categorization for all unrated images, marking them as user-assigned and dismissing the unrated warning';
+        verifyBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          verifyUnratedInScene(scene.id);
+        });
         
         const acceptAllBtn = document.createElement('button');
         acceptAllBtn.className = 'btn primary';
@@ -1655,7 +1706,8 @@
           ev.stopPropagation();
           rejectAllInScene(scene.id);
         });
-        
+
+        bulkActionsDiv.appendChild(verifyBtn);
         bulkActionsDiv.appendChild(acceptAllBtn);
         bulkActionsDiv.appendChild(rejectAllBtn);
         label.appendChild(bulkActionsDiv);
@@ -1828,8 +1880,10 @@
       const xmpChecked = !!el('#doXmpCheck')?.checked;
       const autoLabel = el('#doAutoLabelCheck');
       const promote = el('#doPromoteVerifiedCheck');
+      const autoLabelCard = el('#xmpAutoLabelCard');
       if (autoLabel) autoLabel.disabled = !xmpChecked;
       if (promote) promote.disabled = !xmpChecked;
+      if (autoLabelCard) autoLabelCard.classList.toggle('hidden', !xmpChecked);
     }
 
     function promoteAutoToVerified() {
@@ -1838,7 +1892,7 @@
         const state = cullingState.get(r.filename);
         if (state !== 'accept' && state !== 'reject') continue;
         if (getCullOrigin(r) !== 'auto') continue;
-        setCullState(r, state, 'verified', false);
+        setCullState(r, state, 'verified');
         promoted++;
       }
       return promoted;
@@ -2119,6 +2173,14 @@
       initCullingState();
       renderAllScenes();
       updateStats();
+      if (_needsLegacyCullOriginUpgrade) {
+        try {
+          await saveCullingState();
+          showToast('Upgraded legacy cull origin metadata for compatibility.', 2500);
+        } catch (e) {
+          console.warn('Legacy cull origin upgrade save failed', e);
+        }
+      }
     }
 
     // ====================================================================
@@ -2146,9 +2208,12 @@
         const qCutoff = parseInt(s.culling_quality_cutoff, 10);
         const minPS   = parseInt(s.culling_min_per_scene,  10);
         const maxPS   = parseInt(s.culling_max_per_scene,  10);
+        const unratedDefault = String(s.culling_unrated_default || 'reject').toLowerCase();
         if (qCutoff >= 1 && qCutoff <= 5)  { const sl = el('#qualityCutoffSlider'); if (sl) sl.value = qCutoff; }
         if (minPS   >= 0 && minPS   <= 5)  { const sl = el('#minPerSceneSlider');   if (sl) sl.value = minPS; }
         if (maxPS   >= 0 && maxPS   <= 20) { const sl = el('#maxPerSceneSlider');   if (sl) sl.value = maxPS; }
+        const unratedSel = el('#unratedDefaultSelect');
+        if (unratedSel) unratedSel.value = unratedDefault === 'accept' ? 'accept' : 'reject';
         updateSliderLabels();
       } catch (e) { console.warn('loadCullingSettings:', e); }
     }
@@ -2164,6 +2229,7 @@
           s.culling_quality_cutoff  = parseInt(el('#qualityCutoffSlider')?.value, 10) || 4;
           s.culling_min_per_scene   = parseInt(el('#minPerSceneSlider')?.value,   10) || 0;
           s.culling_max_per_scene   = parseInt(el('#maxPerSceneSlider')?.value,   10) || 0;
+          s.culling_unrated_default = (el('#unratedDefaultSelect')?.value === 'accept') ? 'accept' : 'reject';
           await window.pywebview.api.save_settings_data(s);
         } catch (e) { console.warn('saveCullingSettings:', e); }
       }, 1200);
@@ -2696,7 +2762,6 @@
           r.culled = '';
           r.culled_origin = '';
           cullingState.delete(r.filename);
-          manuallyMoved.delete(r.filename);
         }
       }
       applyAutoCategorize(false);
@@ -2705,11 +2770,13 @@
       debouncedSave();
       showToast('Auto-categorize reset \u2014 manual assignments cleared', 3000);
     });
-    // Slider live label updates
+    // Slider/select live label updates
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {
       const sl = el('#' + id);
       if (sl) sl.addEventListener('input', () => { updateSliderLabels(); saveCullingSettings(); });
     });
+    const unratedSel = el('#unratedDefaultSelect');
+    if (unratedSel) unratedSel.addEventListener('change', () => { updateSliderLabels(); saveCullingSettings(); });
     el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
     el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
     el('#tutorialSkip').addEventListener('click', _closeTutorial);
