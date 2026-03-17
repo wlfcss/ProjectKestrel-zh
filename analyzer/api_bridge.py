@@ -582,20 +582,23 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     def apply_normalization(self, folder_path: str, mode: str = None) -> dict:
-        """Compute normalized ratings for all rows in a folder's database.
+        """Compute star ratings for all rows in a folder's database using the active rating profile.
 
-        Reads the current ``rating_normalization`` setting (or uses *mode* if provided),
-        builds or retrieves the quality-score distribution, applies the chosen normalization,
-        and returns the computed map WITHOUT writing to the CSV file.
+        Reads the ``rating_profile`` setting, looks up its quality-score thresholds, and maps
+        each image's raw quality score to a 1–5 star rating without any rank-based normalization.
+        Returns the computed map WITHOUT writing to the CSV file.
 
-        Also caches the folder's quality distribution in settings.json and
-        kestrel_metadata.json so it is available for global normalization.
+        Also caches the folder's quality distribution in kestrel_metadata.json for potential
+        future use (e.g. histogram display).
+
+        The ``mode`` parameter is accepted for API compatibility but is ignored; profile
+        thresholds always apply.
 
         Returns:
             {
               'success': bool,
               'normalized_ratings': {filename: int, ...},  # 0-5 for every row
-              'mode_used': str,
+              'mode_used': str,  # the active profile name
               'error': str
             }
         """
@@ -605,13 +608,13 @@ class Api:
             try:
                 from kestrel_analyzer.ratings import (
                     compute_quality_distribution,
-                    compute_normalized_rating,
+                    get_profile_thresholds,
                     quality_to_rating,
                 )
             except ImportError:
                 from analyzer.kestrel_analyzer.ratings import (
                     compute_quality_distribution,
-                    compute_normalized_rating,
+                    get_profile_thresholds,
                     quality_to_rating,
                 )
 
@@ -624,23 +627,17 @@ class Api:
                 return {'success': False, 'error': 'No database found', 'normalized_ratings': {}, 'mode_used': ''}
 
             settings = load_persisted_settings()
-            if mode is None:
-                mode = settings.get('rating_normalization', 'none')
+            profile = settings.get('rating_profile', 'balanced')
+            thresholds = get_profile_thresholds(profile)
 
             df = pd.read_csv(csv_path)
             if df.empty:
-                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': profile, 'error': ''}
 
-            # --- Build / retrieve per-folder distribution ---
+            # --- Cache per-folder quality distribution (for potential histogram display) ---
             quality_scores = df['quality'].tolist() if 'quality' in df.columns else []
             folder_dist = compute_quality_distribution(quality_scores)
 
-            # Cache in settings.json (overwrite with fresh computation each time)
-            dist_store = settings.setdefault('quality_scores_distribution', {})
-            dist_store[folder_path] = folder_dist
-            save_persisted_settings(settings)
-
-            # Cache in kestrel_metadata.json
             try:
                 _meta = {}
                 if os.path.exists(metadata_path):
@@ -657,73 +654,25 @@ class Api:
             except Exception:
                 pass
 
-            # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
-            
-            # Convert percentage settings to percentile thresholds (0.0-1.0)
-            pct_5 = settings.get('rating_threshold_5', 10) / 100.0
-            pct_4 = settings.get('rating_threshold_4', 20) / 100.0
-            pct_3 = settings.get('rating_threshold_3', 30) / 100.0
-            pct_2 = settings.get('rating_threshold_2', 25) / 100.0
-            # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
-            
-            # Convert percentages to cumulative percentiles from the top
-            # pct_5 is top 10% → threshold 0.90 (top 1 - 0.10)
-            # pct_4 is next 20% → threshold 0.70 (top 1 - 0.10 - 0.20)
-            # etc.
-            threshold_5 = 1.0 - pct_5
-            threshold_4 = threshold_5 - pct_4
-            threshold_3 = threshold_4 - pct_3
-            threshold_2 = threshold_3 - pct_2
-            
-            thresholds = {
-                'five': threshold_5,
-                'four': threshold_4,
-                'three': threshold_3,
-                'two': threshold_2,
-            }
-            
-            if mode == 'none':
-                def _get_norm(q_val):
-                    try:
-                        return quality_to_rating(float(q_val), thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
-            elif mode == 'global':
-                global_dist = [0] * 100
-                for dist in settings.get('quality_scores_distribution', {}).values():
-                    if isinstance(dist, list) and len(dist) == 100:
-                        for i, v in enumerate(dist):
-                            global_dist[i] += int(v)
-                _dist = global_dist
-
-                def _get_norm(q_val):
-                    try:
-                        return compute_normalized_rating(float(q_val), _dist, thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
-            else:  # per_folder
-                _dist = folder_dist
-
-                def _get_norm(q_val):
-                    try:
-                        return compute_normalized_rating(float(q_val), _dist, thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
+            # --- Map quality scores to star ratings (in memory only — no CSV write) ---
             if 'filename' not in df.columns or 'quality' not in df.columns:
-                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': profile, 'error': ''}
+
+            def _get_rating(q_val):
+                try:
+                    return quality_to_rating(float(q_val), thresholds)
+                except (TypeError, ValueError):
+                    return 0
 
             normalized_map = {
-                str(row['filename']): _get_norm(row['quality'])
+                str(row['filename']): _get_rating(row['quality'])
                 for _, row in df.iterrows()
             }
-            print(f'[API] apply_normalization({folder_path!r}, mode={mode!r}) -> {len(normalized_map)} ratings computed (no CSV write)', flush=True)
+            print(f'[API] apply_normalization({folder_path!r}, profile={profile!r}) -> {len(normalized_map)} ratings computed (no CSV write)', flush=True)
             return {
                 'success': True,
                 'normalized_ratings': normalized_map,
-                'mode_used': mode,
+                'mode_used': profile,
                 'error': '',
             }
         except Exception as e:

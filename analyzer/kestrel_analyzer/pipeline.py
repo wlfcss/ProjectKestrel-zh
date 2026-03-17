@@ -32,7 +32,7 @@ from .database import (
 print("Importing read_image from image_utils...")
 from .image_utils import read_image, read_image_for_pipeline
 print("read_image imported successfully.")
-from .ratings import quality_to_rating
+from .ratings import quality_to_rating, get_profile_thresholds
 print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
 from .raw_exif import get_capture_time
@@ -253,20 +253,8 @@ class AnalysisPipeline:
         if callable(load_persisted_settings):
             try:
                 sett = load_persisted_settings() or {}
-                pct_5 = float(sett.get('rating_threshold_5', 10)) / 100.0
-                pct_4 = float(sett.get('rating_threshold_4', 20)) / 100.0
-                pct_3 = float(sett.get('rating_threshold_3', 30)) / 100.0
-                pct_2 = float(sett.get('rating_threshold_2', 25)) / 100.0
-                threshold_5 = 1.0 - pct_5
-                threshold_4 = threshold_5 - pct_4
-                threshold_3 = threshold_4 - pct_3
-                threshold_2 = threshold_3 - pct_2
-                rating_thresholds = {
-                    'five': threshold_5,
-                    'four': threshold_4,
-                    'three': threshold_3,
-                    'two': threshold_2,
-                }
+                profile = sett.get('rating_profile', 'balanced')
+                rating_thresholds = get_profile_thresholds(profile)
             except Exception:
                 rating_thresholds = None
 

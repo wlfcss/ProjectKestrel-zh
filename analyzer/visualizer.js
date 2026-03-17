@@ -2985,15 +2985,9 @@
         }
       };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
-      // Rating normalization
-      const normSelect = document.getElementById('ratingNormalization');
-      if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
-      // Rating distribution thresholds
-      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 10);
-      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 20);
-      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 30);
-      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 25);
-      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 15);
+      // Rating profile
+      const profileSelect = document.getElementById('ratingProfile');
+      if (profileSelect) profileSelect.value = getSetting('rating_profile', 'balanced');
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
@@ -3037,8 +3031,8 @@
       const customEditorPath = document.getElementById('customEditorPath').value.trim();
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
-      const normalizationEl = document.getElementById('ratingNormalization');
-      const ratingNormalization = normalizationEl ? normalizationEl.value : 'none';
+      const profileEl = document.getElementById('ratingProfile');
+      const ratingProfile = profileEl ? profileEl.value : 'balanced';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
@@ -3049,30 +3043,13 @@
       const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
-      // Rating distribution thresholds
-      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 10));
-      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 20));
-      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 30));
-      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 25));
-      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 15));
-      
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
-      const prevNormalization = existing.rating_normalization || 'none';
-      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 10;
-      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 20;
-      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 30;
-      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 25;
-      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 15;
+      const prevProfile = existing.rating_profile || 'balanced';
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
-        rating_normalization: ratingNormalization,
-        rating_threshold_5: t5,
-        rating_threshold_4: t4,
-        rating_threshold_3: t3,
-        rating_threshold_2: t2,
-        rating_threshold_1: t1,
+        rating_profile: ratingProfile,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
         mask_threshold: maskThreshold,
@@ -3096,14 +3073,8 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If normalization mode or thresholds changed and folders are loaded, reapply immediately
-      const thresholdsChanged =
-        t5 !== prevT5 ||
-        t4 !== prevT4 ||
-        t3 !== prevT3 ||
-        t2 !== prevT2 ||
-        t1 !== prevT1;
-      if ((ratingNormalization !== prevNormalization || thresholdsChanged) && rows.length > 0) {
+      // If rating profile changed and folders are loaded, reapply immediately
+      if (ratingProfile !== prevProfile && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }

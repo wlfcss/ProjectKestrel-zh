@@ -392,45 +392,18 @@
       <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Star Rating System</h4>
 
       <div class="row">
-        <label for="ratingNormalization">Normalization Mode</label>
-        <select id="ratingNormalization">
-          <option value="none" selected>Default &mdash; use quality thresholds optimized to the Kestrel model</option>
-          <option value="per_folder">Per folder &mdash; normalize within each analyzed folder</option>
-          <option value="global">Global &mdash; normalize across all analyzed photos</option>
+        <label for="ratingProfile">Rating Profile</label>
+        <select id="ratingProfile">
+          <option value="very_strict">Very Strict &mdash; only the sharpest images reach 4&ndash;5 stars</option>
+          <option value="strict">Strict</option>
+          <option value="balanced" selected>Balanced &mdash; recommended for most photographers</option>
+          <option value="lenient">Lenient</option>
+          <option value="very_lenient">Very Lenient &mdash; most rewarding; lowest bar for 4&ndash;5 stars</option>
         </select>
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality scores are
-        converted to star ratings. <b>Default</b> uses Kestrel-optimized threshold cutoffs on percentile-normalized
-        quality values. <b>Per folder</b> ensures each folder has a spread of 1–5 stars regardless of
-        overall quality. <b>Global</b> ranks photos against all folders you have analyzed.</div>
-
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
-      <div style="margin-bottom:12px">
-        <label style="display:block;margin-bottom:6px">Star Rating Distribution (Percentile Thresholds)</label>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px">
-          <div>
-            <label for="ratingThreshold5" style="font-size:11px;display:block;margin-bottom:2px">5⭐ (top %)</label>
-            <input id="ratingThreshold5" type="number" min="1" max="50" step="1" value="10" style="width:100%;box-sizing:border-box" title="Percentage of images at the top for 5-star rating" />
-          </div>
-          <div>
-            <label for="ratingThreshold4" style="font-size:11px;display:block;margin-bottom:2px">4⭐ (next %)</label>
-            <input id="ratingThreshold4" type="number" min="1" max="50" step="1" value="20" style="width:100%;box-sizing:border-box" title="Percentage of images for 4-star rating" />
-          </div>
-          <div>
-            <label for="ratingThreshold3" style="font-size:11px;display:block;margin-bottom:2px">3⭐ (next %)</label>
-            <input id="ratingThreshold3" type="number" min="1" max="50" step="1" value="30" style="width:100%;box-sizing:border-box" title="Percentage of images for 3-star rating" />
-          </div>
-          <div>
-            <label for="ratingThreshold2" style="font-size:11px;display:block;margin-bottom:2px">2⭐ (next %)</label>
-            <input id="ratingThreshold2" type="number" min="1" max="50" step="1" value="25" style="width:100%;box-sizing:border-box" title="Percentage of images for 2-star rating" />
-          </div>
-          <div>
-            <label for="ratingThreshold1" style="font-size:11px;display:block;margin-bottom:2px">1⭐ (bottom %)</label>
-            <input id="ratingThreshold1" type="number" min="1" max="50" step="1" value="15" style="width:100%;box-sizing:border-box" title="Percentage of images for 1-star rating (bottom)" />
-          </div>
-        </div>
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">Controls how quality percentiles are mapped across star ratings. Percentages should sum to 100%. Changes take effect immediately when re-applying ratings.</div>
+        converted to star ratings. Each profile uses fixed quality-score thresholds — stricter profiles require
+        a higher score to earn 4 or 5 stars. Changes take effect immediately for loaded folders.</div>
 
       <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">Analysis Settings</h4>
 
