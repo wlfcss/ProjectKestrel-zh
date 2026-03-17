@@ -182,7 +182,7 @@ Direct questions or comments to [support@projectkestrel.org](mailto:support@proj
 
 ## 📄 License
 
-This project is licensed under the GPL v3 License - see the LICENSE file for details.
+This project is licensed under the GPL v3 License with a Commons Clause License Condition v1.0 - see the LICENSE file for details. Commercial use is prohibited without explicit permission from the author.
 
 ## 🙏 Acknowledgments
 
