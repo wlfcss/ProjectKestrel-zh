@@ -103,9 +103,9 @@ class AnalysisPipeline:
         negative pulls it down.
         """
         EPS = 1e-3
-        TARGET_MID = 0.42
-        TARGET_HI_P90 = 0.90
-        TARGET_HI_P98 = 0.975
+        TARGET_MID = 0.48
+        TARGET_HI_P90 = 0.92
+        TARGET_HI_P98 = 0.985
         TARGET_HI_P95_HOT = 0.88
         SHADOW_FLOOR_P10 = 0.06
         CLIP_THRESH = 0.985
