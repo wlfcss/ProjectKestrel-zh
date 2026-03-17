@@ -2063,7 +2063,6 @@
       // ── Rename setup ──
       el('#sceneName').value = scene.sceneName || '';
       el('#sceneRenameInline').classList.add('hidden');
-      el('#editPanel').classList.add('hidden');
 
       // ── Pencil rename button ──
       el('#scenePencilBtn').onclick = () => {
@@ -2099,12 +2098,6 @@
         el('#sceneShortcutLegend').classList.toggle('hidden');
       };
       el('#sceneShortcutLegend').classList.add('hidden');
-
-      // ── Species/Family add buttons ──
-      el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
-      el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
-      el('#editAddFamilyBtn').onclick = () => addFamilyToScene(scene);
-      el('#editAddFamily').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addFamilyToScene(scene); } };
 
       // ── Filmstrip ──
       renderFilmstrip(scene);
