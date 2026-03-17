@@ -1829,7 +1829,11 @@
 
       const metaEl = el('#sceneInfoMeta');
       if (metaEl) {
-        metaEl.textContent = `${escapeHtml(r.species || 'Unknown')} · Image ${idx + 1} of ${scene.images.length}`;
+        const sp = decodeEntities(r.species || 'Unknown');
+        const spConf = fmt3(r.species_confidence);
+        const fam = decodeEntities(r.family || 'Unknown');
+        const famConf = fmt3(r.family_confidence);
+        metaEl.textContent = `${sp} (${spConf}) | ${fam} (${famConf}) · Image ${idx + 1} of ${scene.images.length}`;
       }
 
       // Render star bar in info bar
@@ -2143,9 +2147,9 @@
       document.removeEventListener('keydown', _sceneKeyHandler);
       document.addEventListener('keydown', _sceneKeyHandler);
 
-      // ── Show dialog and select first image ──
+      // ── Show dialog and select start image ──
       sceneDlg.showModal();
-      await selectFilmstripImage(0, scene);
+      await selectFilmstripImage(startIndex, scene);
     }
 
     // Navigate to prev/next scene
@@ -2604,6 +2608,13 @@
     }
 
     function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
+
+    function decodeEntities(s) {
+      if (!s || typeof s !== 'string') return s;
+      const txt = document.createElement('textarea');
+      txt.innerHTML = s;
+      return txt.value;
+    }
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c])); }
     function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 

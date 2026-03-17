@@ -166,7 +166,11 @@ class Api:
                 return
                 
             if sys.platform.startswith('win'):
-                os.startfile(abs_path)
+                if hasattr(os, 'startfile'):
+                    os.startfile(abs_path)
+                else:
+                    # Fallback for Windows if startfile is somehow missing (e.g. specialized python builds)
+                    subprocess.run(['explorer', abs_path], check=False)
             elif sys.platform == 'darwin':
                 subprocess.run(['open', abs_path], check=False)
             else:
@@ -638,11 +642,14 @@ class Api:
 
             # Cache in kestrel_metadata.json
             try:
+                _meta = {}
                 if os.path.exists(metadata_path):
                     with open(metadata_path, 'r', encoding='utf-8') as mf:
-                        _meta = json.load(mf)
-                else:
-                    _meta = {}
+                        content = mf.read().strip()
+                        if content:
+                            loaded = json.loads(content)
+                            if isinstance(loaded, dict):
+                                _meta = loaded
                 _meta['quality_distribution'] = folder_dist
                 _meta['quality_distribution_stored'] = True
                 with open(metadata_path, 'w', encoding='utf-8') as mf:
