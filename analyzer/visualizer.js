@@ -1876,7 +1876,7 @@
             const forceClearAuto = newCull === null && normalizeCullOrigin(r) === 'auto' && currentRaw;
             if (currentNormalized !== newCull || forceClearAuto) {
               setCullStatus(r, newCull);
-              selectFilmstripImage(idx, scene); // refresh
+              _refreshCurrentFilmstripCard(); // re-renders card classes (borders) + info bar
               renderScenes(); // refresh timeline
             }
           };
