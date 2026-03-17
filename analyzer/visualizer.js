@@ -174,7 +174,7 @@
     // Concurrency-limited to avoid flooding the Python IPC bridge with dozens of
     // simultaneous read_image_file calls when a large section of the grid scrolls
     // into view.  Excess loads are queued and drained as earlier ones finish.
-    const _imgLoadThrottle = { active: 0, max: 30, queue: [] };
+    const _imgLoadThrottle = { active: 0, max: 100, queue: [] };
     function _scheduleLoad(fn) {
       if (_imgLoadThrottle.active < _imgLoadThrottle.max) {
         _imgLoadThrottle.active++;
