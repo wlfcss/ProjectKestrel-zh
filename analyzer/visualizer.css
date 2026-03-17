@@ -1301,6 +1301,10 @@
       border-color: rgba(231,76,60,0.6);
       box-shadow: 0 0 8px rgba(231,76,60,0.2);
     }
+    .filmstrip-card.auto-cull {
+      border-color: rgba(58,132,230,0.6);
+      box-shadow: 0 0 8px rgba(58,132,230,0.2);
+    }
     .filmstrip-card.active.accepted {
       border-color: #2ecc71;
       box-shadow: 0 0 12px rgba(46,204,113,0.35);
@@ -1308,6 +1312,10 @@
     .filmstrip-card.active.rejected {
       border-color: #e74c3c;
       box-shadow: 0 0 12px rgba(231,76,60,0.35);
+    }
+    .filmstrip-card.active.auto-cull {
+      border-color: #3a84e6;
+      box-shadow: 0 0 12px rgba(58,132,230,0.4);
     }
     .filmstrip-card .filmstrip-thumb {
       width: 100%;

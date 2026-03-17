@@ -716,12 +716,16 @@
       if (!header.includes('normalized_rating')) header.push('normalized_rating');
       if (!header.includes('exposure_correction')) header.push('exposure_correction');
       if (!header.includes('detection_scores')) header.push('detection_scores');
+      if (!header.includes('culled')) header.push('culled');
+      if (!header.includes('culled_origin')) header.push('culled_origin');
       for (const r of rows) {
         if (!('rating' in r)) r.rating = '';
         if (!('rating_origin' in r)) r.rating_origin = '';
         if (!('normalized_rating' in r)) r.normalized_rating = '';
         if (!('exposure_correction' in r)) r.exposure_correction = '0';
         if (!('detection_scores' in r)) r.detection_scores = '';
+        if (!('culled' in r)) r.culled = '';
+        if (!('culled_origin' in r)) r.culled_origin = '';
       }
     }
 
@@ -1629,8 +1633,9 @@
     }
 
     function setCullStatus(row, status) {
-      ensureCulledColumn();
+      ensureRatingColumns();
       row.culled = status; // 'accept', 'reject', or ''
+      row.culled_origin = status ? 'manual' : '';
       markDirty();
     }
 
@@ -1646,8 +1651,10 @@
         card.className = 'filmstrip-card';
         card.dataset.idx = idx;
         const cull = getCullStatus(r);
+        const cullOrigin = r.culled_origin || '';
         if (cull === 'accept') card.classList.add('accepted');
         if (cull === 'reject') card.classList.add('rejected');
+        if (cullOrigin === 'auto') card.classList.add('auto-cull');
         if (idx === currentImageIndex) card.classList.add('active');
 
         // Thumbnail
@@ -6028,14 +6035,15 @@
         const payload = folderRows.map(r => ({
           filename: r.filename,
           rating: getRating(r),
-          culled: 'accept',
+          culled: r.culled || 'accept',
+          culled_origin: r.culled_origin || '',
           species: r.species || '',
           family: r.family || '',
           quality: r.quality != null ? r.quality : null,
         }));
 
         showToast('Writing XMP metadata\u2026', 2000);
-        const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false);
+        const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false, false);
         if (!res.success) {
           showToast('Write Metadata failed: ' + (res.error || 'Unknown error'), 5000);
           return;

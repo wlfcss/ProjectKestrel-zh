@@ -1158,11 +1158,11 @@ class Api:
             log(f'move_rejects_to_folder error: {e}')
             return {'success': False, 'error': str(e)}
 
-    def write_xmp_metadata(self, root_path: str, image_data, overwrite_external: bool = False):
+    def write_xmp_metadata(self, root_path: str, image_data, overwrite_external: bool = False, use_auto_labels: bool = False):
         """Write XMP sidecar files for each image, embedding star rating and culling label."""
         if _write_xmp_metadata is None:
             return {'success': False, 'error': 'metadata_writer module not available'}
-        return _write_xmp_metadata(root_path, image_data, overwrite_external)
+        return _write_xmp_metadata(root_path, image_data, overwrite_external, use_auto_labels)
 
     def undo_reject_move(self, root_path: str, filenames):
         """Move files back from _KESTREL_Rejects to the root folder."""

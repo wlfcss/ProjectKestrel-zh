@@ -1299,10 +1299,12 @@
     function ensureColumns() {
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
+      if (!header.includes('culled_origin')) header.push('culled_origin');
       if (!header.includes('exposure_correction')) header.push('exposure_correction');
       if (!header.includes('detection_scores')) header.push('detection_scores');
       for (const r of rows) {
         if (r.culled === undefined) r.culled = '';
+        if (r.culled_origin === undefined) r.culled_origin = '';
         if (r.exposure_correction === undefined) r.exposure_correction = '0';
         if (r.detection_scores === undefined) r.detection_scores = '';
       }
@@ -1415,6 +1417,7 @@
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
           cullingState.set(r.filename, state);
           r.culled = state;
+          r.culled_origin = 'auto';
         }
       }
     }
@@ -1423,11 +1426,11 @@
     function initCullingState() {
       cullingState.clear();
       manuallyMoved.clear();
-      // If any rows already have a saved culled status, restore from that
       const anyPreset = rows.some(r => r.culled === 'accept' || r.culled === 'reject');
       if (anyPreset) {
         for (const r of rows) {
           cullingState.set(r.filename, r.culled === 'reject' ? 'reject' : 'accept');
+          if (r.culled_origin === 'manual') manuallyMoved.add(r.filename);
         }
       } else {
         // First time: run auto-categorize with current slider values
@@ -1437,10 +1440,10 @@
 
     // ---- Swap image between accept/reject ----
     function swapImage(row) {
-      const current = cullingState.get(row.filename);
       const newState = current === 'accept' ? 'reject' : 'accept';
       cullingState.set(row.filename, newState);
       row.culled = newState;
+      row.culled_origin = 'manual';
       manuallyMoved.add(row.filename);
     }
 
@@ -1451,6 +1454,7 @@
       for (const row of scene.images) {
         cullingState.set(row.filename, 'accept');
         row.culled = 'accept';
+        row.culled_origin = 'manual';
         manuallyMoved.add(row.filename);
       }
       renderScene(sceneId);
@@ -1465,6 +1469,7 @@
       for (const row of scene.images) {
         cullingState.set(row.filename, 'reject');
         row.culled = 'reject';
+        row.culled_origin = 'manual';
         manuallyMoved.add(row.filename);
       }
       renderScene(sceneId);
@@ -1821,14 +1826,14 @@
           const xmpPayload = rows.map(r => ({
             filename: r.filename,
             rating: getRating(r),
-            culled: cullingState.get(r.filename) || 'accept',
             species: r.species || '',
             family: r.family || '',
             quality: r.quality != null ? r.quality : null,
+            culled_origin: r.culled_origin || '',
           }));
 
           // First pass: detect conflicts (existing non-Kestrel XMPs)
-          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false);
+          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false, true);
           if (!firstXmpRes.success) {
             setStep('xmp', 'failed', firstXmpRes.error || '');
             anyFailed = true;
@@ -1842,7 +1847,7 @@
             setStep('xmp', 'running');
             if (overwriteExternal) {
               // Second pass: overwrite the conflicting files too
-              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true);
+              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true, true);
               if (!secondXmpRes.success) {
                 setStep('xmp', 'failed', secondXmpRes.error || '');
                 anyFailed = true;
