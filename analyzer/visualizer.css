@@ -128,6 +128,7 @@
       flex-direction: column;
       align-items: stretch;
       flex: 0 0 auto;
+      /* Filters panel is outside .toolbar so it stays pinned regardless of tree visibility */
     }
 
     .toolbar-row.status {
@@ -168,6 +169,12 @@
       height: 1px;
       background: #1d2230;
       margin: 2px 0;
+    }
+
+    /* Centre the confidence threshold row horizontally in the panel */
+    .filter-conf-row {
+      width: 100%;
+      justify-content: center;
     }
 
     .filter-sort-row {
@@ -1835,6 +1842,21 @@
       flex: 1 1 auto;
       min-height: 0;
       overflow: hidden;
+    }
+
+    /* Empty state: tree visible but greyed out before any folder is opened */
+    .folder-tree-wrap.folder-tree-empty {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .folder-tree-wrap.folder-tree-empty #folderTree::before {
+      content: 'Open a folder to see the tree';
+      display: block;
+      padding: 12px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      font-style: italic;
     }
 
     .folder-tree-header {

@@ -43,13 +43,13 @@
             <button id="saveCsv" disabled style="flex:1">Save Changes</button>
           </div>
         </div>
-        <!-- Folder tree panel (populated after scanning a root folder) -->
-        <div id="folderTreeWrap" class="folder-tree-wrap hidden">
+        <!-- Folder tree panel: always visible, greyed out until a folder is opened -->
+        <div id="folderTreeWrap" class="folder-tree-wrap folder-tree-empty">
           <div class="folder-tree-header">
             <span class="tree-title">Folder Tree</span>
-            <button id="treeCheckAll" title="Check all folders">Check All</button>
-            <button id="treeCheckNone" title="Uncheck all folders">Check None</button>
-            <button id="treeChangeRoot" title="Pick a different root folder to scan">Change root…</button>
+            <button id="treeCheckAll" title="Check all folders" disabled>Check All</button>
+            <button id="treeCheckNone" title="Uncheck all folders" disabled>Check None</button>
+            <button id="treeChangeRoot" title="Pick a different root folder to scan" disabled>Change root…</button>
           </div>
           <div id="folderScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
             <div class="load-progress-label" id="folderScanLabel">Scanning folders…</div>
@@ -59,46 +59,47 @@
           </div>
           <div id="folderTree"></div>
         </div>
-        <div class="toolbar-row filters">
-          <div class="filter-panel" aria-label="Filter and sort options">
-            <div class="filter-title">Filter &amp; Sort Options</div>
-            <input id="search" type="search" placeholder="Search by species or family" />
-            <label class="inline">
-              <span class="muted">Confidence Threshold</span>
-              <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:120px" />
-            </label>
-            <div class="filter-divider"></div>
-            <div class="filter-sort-row">
-              <span class="muted filter-sort-label">Sort by</span>
-              <select id="sortBy">
-                <option value="captureTime" selected>Capture Time</option>
-                <option value="sceneId">Scene ID</option>
-                <option value="maxQuality">Max Quality</option>
-                <option value="imageCount">Image Count</option>
-              </select>
-            </div>
-            <div class="filter-divider"></div>
-            <label class="inline" title="Only show scenes with photos that you've manually assigned ratings to.">
-              <input id="filterScenesManualRated" type="checkbox" />
-              <span class="muted">Only manually-rated scenes</span>
-            </label>
-            <label class="inline">
-              <input id="includeSecondarySpecies" type="checkbox" />
-              <span class="muted">Multi-subject mode</span>
-              <span class="help-tip"
-                data-tip="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability."
-                aria-label="Multi-subject mode help"
-                title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
-            </label>
-            <label class="inline">
-              <input id="groupByTime" type="checkbox" />
-              <span class="muted">Group by capture time</span>
-            </label>
-            <label class="inline" style="flex-basis:100%">
-              <input id="groupByFolder" type="checkbox" checked />
-              <span class="muted">Group by folder</span>
-            </label>
+      </div>
+      <!-- Filter panel pinned at the bottom of the sidebar, above the footer -->
+      <div class="toolbar-row filters">
+        <div class="filter-panel" aria-label="Filter and sort options">
+          <div class="filter-title">Filter &amp; Sort Options</div>
+          <input id="search" type="search" placeholder="Search by species or family" />
+          <label class="inline filter-conf-row">
+            <span class="muted">Confidence</span>
+            <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:100px" />
+          </label>
+          <div class="filter-divider"></div>
+          <div class="filter-sort-row">
+            <span class="muted filter-sort-label">Sort by</span>
+            <select id="sortBy">
+              <option value="captureTime" selected>Capture Time</option>
+              <option value="sceneId">Scene ID</option>
+              <option value="maxQuality">Max Quality</option>
+              <option value="imageCount">Image Count</option>
+            </select>
           </div>
+          <div class="filter-divider"></div>
+          <label class="inline" title="Only show scenes with photos that you've manually assigned ratings to.">
+            <input id="filterScenesManualRated" type="checkbox" />
+            <span class="muted">Only manually-rated scenes</span>
+          </label>
+          <label class="inline">
+            <input id="includeSecondarySpecies" type="checkbox" />
+            <span class="muted">Multi-subject mode</span>
+            <span class="help-tip"
+              data-tip="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability."
+              aria-label="Multi-subject mode help"
+              title="If your photos have multiple subjects (eg. multiple birds in one photo), this option will improve searchability.">?</span>
+          </label>
+          <label class="inline">
+            <input id="groupByTime" type="checkbox" />
+            <span class="muted">Group by capture time</span>
+          </label>
+          <label class="inline" style="flex-basis:100%">
+            <input id="groupByFolder" type="checkbox" checked />
+            <span class="muted">Group by folder</span>
+          </label>
         </div>
       </div>
       <div class="spacer"></div>
