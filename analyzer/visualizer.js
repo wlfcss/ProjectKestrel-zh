@@ -1,4 +1,4 @@
-﻿    // State
+    // State
     // NOTE: Two modes for file access:
     // 1. Python API mode (desktop app): Uses rootPath + Python backend API calls
     // 2. File System Access API mode (browser): Uses rootDirHandle for direct file access
@@ -1615,76 +1615,209 @@
     }
     // ---- End scene dialog RAW zoom ----
 
-    function renderSceneImages(scene) {
-      const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
-      imageGrid.innerHTML = '';
+    // ── Filmstrip scene view state ──
+    let currentImageIndex = 0;
+    let _currentScene = null; // reference to the scene object currently shown
+
+    function ensureCulledColumn() {
+      if (!header.includes('culled')) header.push('culled');
+      for (const r of rows) { if (r.culled === undefined) r.culled = ''; }
+    }
+
+    function getCullStatus(row) {
+      return (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
+    }
+
+    function setCullStatus(row, status) {
+      ensureCulledColumn();
+      row.culled = status; // 'accept', 'reject', or ''
+      markDirty();
+    }
+
+    function renderFilmstrip(scene) {
+      const grid = el('#imageGrid');
+      grid.innerHTML = '';
       const images = scene.images;
+      const frag = document.createDocumentFragment();
 
-      const batch = 48;
-      for (let i = 0; i < images.length; i += batch) {
-        const slice = images.slice(i, i + batch);
-        const frag = document.createDocumentFragment();
-        // Append synchronously in order; load preview images asynchronously
-        for (const r of slice) {
-          const card = document.createElement('article'); card.className = 'card';
-          const th = document.createElement('div'); th.className = 'thumb';
-          const img = document.createElement('img'); img.alt = r.filename || ''; img.loading = 'lazy';
-          lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
-          th.appendChild(img); card.appendChild(th);
-          const body = document.createElement('div'); body.className = 'body';
-          body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename || '')}"><b>${escapeHtml(r.filename || '')}</b></div>
-          <div class="meta"><span class="truncate" title="${escapeHtml(r.species || 'Unknown')}">${escapeHtml(r.species || 'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
-          const stars = createStarBar(r);
-          body.appendChild(stars);
-          card.appendChild(body);
+      for (let idx = 0; idx < images.length; idx++) {
+        const r = images[idx];
+        const card = document.createElement('div');
+        card.className = 'filmstrip-card';
+        card.dataset.idx = idx;
+        const cull = getCullStatus(r);
+        if (cull === 'accept') card.classList.add('accepted');
+        if (cull === 'reject') card.classList.add('rejected');
+        if (idx === currentImageIndex) card.classList.add('active');
 
-          card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
+        // Thumbnail
+        const th = document.createElement('div');
+        th.className = 'filmstrip-thumb';
+        const img = document.createElement('img');
+        img.alt = r.filename || '';
+        img.loading = 'lazy';
+        lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
+        th.appendChild(img);
+        card.appendChild(th);
 
-          // Click-drag on thumbnail → zoom preview with RAW upgrade
-          card.addEventListener('mousedown', (ev) => {
-            if (ev.button !== 0) return;  // left button only
-            ev.preventDefault();
-            startSceneZoomPreview(r, th, ev);
-          });
-
-          card.addEventListener('mouseenter', async () => {
-            if (sceneZoomActive) return;  // don't interfere with drag zoom
-            const pv = el('#previewBox'); pv.innerHTML = '';
-            const pimg = document.createElement('img');
-            const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
-            if (purl) { pimg.src = purl; pv.appendChild(pimg); }
-            else { pv.innerHTML = '<span class="muted">No preview</span>'; }
-            const info = el('#previewInfo');
-            if (info) {
-              const rn = getRating(r);
-              const ro = getOrigin(r);
-              const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
-              info.innerHTML = `
-              <div><b>${escapeHtml(r.filename || '')}</b></div>
-              <div class="meta"><span title="Species confidence">${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
-              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5 - rn)} ${originTxt ? `(${originTxt})` : ''}</span></div>
-            `;
-            }
-          });
-
-          card.title = [
-            `File: ${r.filename}`,
-            `Species: ${r.species} (${fmt3(r.species_confidence)})`,
-            `Quality: ${fmt3(r.quality)}`
-          ].join('\n');
-
-          frag.appendChild(card);
+        // Info
+        const info = document.createElement('div');
+        info.className = 'filmstrip-info';
+        const fn = document.createElement('div');
+        fn.className = 'filmstrip-filename';
+        fn.textContent = r.filename || '';
+        info.appendChild(fn);
+        const meta = document.createElement('div');
+        meta.className = 'filmstrip-meta';
+        const rating = getRating(r);
+        const origin = getOrigin(r);
+        let starHtml = '';
+        for (let s = 1; s <= 5; s++) {
+          const filled = s <= rating;
+          const cls = filled ? (origin === 'manual' ? 'filled manual' : 'filled auto') : '';
+          starHtml += `<span class="${cls}">${filled ? '★' : '☆'}</span>`;
         }
-        imageGrid.appendChild(frag);
+        meta.innerHTML = `<span class="filmstrip-stars">${starHtml}</span><span>Q ${fmt3(r.quality)}</span>`;
+        info.appendChild(meta);
+        card.appendChild(info);
+
+        // Tooltip with detailed metadata
+        const tip = document.createElement('div');
+        tip.className = 'filmstrip-tooltip';
+        tip.innerHTML = [
+          `<b>${escapeHtml(r.filename || '')}</b>`,
+          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
+          `Quality: ${fmt3(r.quality)}`,
+          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} ${origin ? `(${origin})` : ''}`,
+          cull ? `Status: ${cull === 'accept' ? '✓ Accepted' : '✗ Rejected'}` : '',
+        ].filter(Boolean).join('<br>');
+        card.appendChild(tip);
+
+        // Click to select
+        card.addEventListener('click', () => {
+          if (_splitMode) return; // handled by split mode
+          selectFilmstripImage(idx, scene);
+        });
+
+        // Double-click to open in editor
+        card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
+
+        frag.appendChild(card);
+      }
+      grid.appendChild(frag);
+
+      // Update scene navigation hints
+      updateFilmstripHints(scene);
+    }
+
+    function updateFilmstripHints(scene) {
+      const sceneIdx = scenes.indexOf(scene);
+      const hintL = el('#filmstripHintLeft');
+      const hintR = el('#filmstripHintRight');
+      if (hintL) {
+        if (sceneIdx > 0) { hintL.classList.remove('hidden'); }
+        else { hintL.classList.add('hidden'); }
+      }
+      if (hintR) {
+        if (sceneIdx >= 0 && sceneIdx < scenes.length - 1) { hintR.classList.remove('hidden'); }
+        else { hintR.classList.add('hidden'); }
+      }
+    }
+
+    function scrollFilmstripToCenter(idx) {
+      const grid = el('#imageGrid');
+      const card = grid?.children[idx];
+      if (!card || !grid) return;
+      const gridRect = grid.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const targetScrollLeft = card.offsetLeft - grid.offsetWidth / 2 + card.offsetWidth / 2;
+      grid.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+    }
+
+    async function selectFilmstripImage(idx, scene) {
+      if (!scene || !scene.images || idx < 0 || idx >= scene.images.length) return;
+      currentImageIndex = idx;
+      const r = scene.images[idx];
+
+      // Update filmstrip card active state
+      const grid = el('#imageGrid');
+      if (grid) {
+        grid.querySelectorAll('.filmstrip-card').forEach((c, i) => {
+          c.classList.toggle('active', i === idx);
+        });
+      }
+
+      // Center the card in the filmstrip
+      scrollFilmstripToCenter(idx);
+
+      // Load export preview
+      const exportBox = el('#previewBox');
+      if (exportBox) {
+        exportBox.innerHTML = '';
+        const eurl = await getBlobUrlForPath(r.export_path, r.__rootPath);
+        if (eurl) {
+          const eimg = document.createElement('img');
+          eimg.src = eurl;
+          exportBox.appendChild(eimg);
+        } else { exportBox.innerHTML = '<span class="muted">No export preview</span>'; }
+      }
+
+      // Load crop preview
+      const cropBox = el('#previewCropBox');
+      if (cropBox) {
+        cropBox.innerHTML = '';
+        const curl = await getBlobUrlForPath(r.crop_path, r.__rootPath);
+        if (curl) {
+          const cimg = document.createElement('img');
+          cimg.src = curl;
+          cropBox.appendChild(cimg);
+        } else { cropBox.innerHTML = '<span class="muted">No crop preview</span>'; }
+      }
+
+      // Update preview panel accept/reject glow
+      const exportPanel = el('#scenePreviewExport');
+      const cropPanel = el('#scenePreviewCrop');
+      const cull = getCullStatus(r);
+      [exportPanel, cropPanel].forEach(p => {
+        if (!p) return;
+        p.classList.remove('scene-accepted', 'scene-rejected');
+        if (cull === 'accept') p.classList.add('scene-accepted');
+        if (cull === 'reject') p.classList.add('scene-rejected');
+      });
+
+      // Update info bar
+      const fnEl = el('#sceneInfoFilename');
+      if (fnEl) { fnEl.textContent = r.filename || '—'; fnEl.title = r.filename || ''; }
+
+      const qEl = el('#sceneInfoQuality');
+      if (qEl) qEl.textContent = `Quality: ${fmt3(r.quality)}`;
+
+      const statusEl = el('#sceneInfoStatus');
+      if (statusEl) {
+        statusEl.className = 'scene-info-status';
+        if (cull === 'accept') { statusEl.textContent = '✓ Accepted'; statusEl.classList.add('accepted'); }
+        else if (cull === 'reject') { statusEl.textContent = '✗ Rejected'; statusEl.classList.add('rejected'); }
+        else { statusEl.textContent = ''; }
+      }
+
+      const metaEl = el('#sceneInfoMeta');
+      if (metaEl) {
+        metaEl.textContent = `${escapeHtml(r.species || 'Unknown')} · Image ${idx + 1} of ${scene.images.length}`;
+      }
+
+      // Render star bar in info bar
+      const starsEl = el('#sceneInfoStars');
+      if (starsEl) {
+        starsEl.innerHTML = '';
+        starsEl.appendChild(createStarBar(r));
       }
     }
 
     // Allow other code to refresh the scene images when filter or ratings change
     window.refreshSceneFilter = function () {
-      const chk = el('#filterManualRated');
-      if (chk && chk.checked && currentSceneId != null) {
-        const sc = scenes.find(s => String(s.id) === String(currentSceneId));
-        if (sc) renderSceneImages(sc);
+      if (currentSceneId != null && _currentScene) {
+        renderFilmstrip(_currentScene);
+        selectFilmstripImage(currentImageIndex, _currentScene);
       }
     };
 
@@ -1740,157 +1873,186 @@
       return { ...computed, approved: false };
     }
 
-    function renderSceneMetaChips(scene, editable) {
-      const _sceneLocalNum = String(scene.id).split(':').pop();
-      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
+    function renderTopbarTags(scene) {
+      const tagsEl = el('#sceneTopbarTags');
+      if (!tagsEl) return;
       const { species, families, approved } = collectSceneSpecies(scene.id);
       const chipClass = approved ? 'chip manual-approved' : 'chip';
-      const editChipClass = approved ? 'edit-chip manual-approved' : 'edit-chip';
 
-      let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
-      if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
-      html += `</div>`;
-      const rating = _rawQualityToRating(scene.maxQuality);
-      const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
-      html += `<div class="muted">${scene.imageCount} images • ${starDisplay}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
-
-      // Species chips
-      html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
+      let html = '';
+      // Species
+      html += '<span class="scene-tag-label">Species:</span> ';
       if (species.length) {
-        html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const sp of species) {
-          if (editable) {
-            html += `<span class="${editChipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">&times;</span></span>`;
-          } else {
-            html += `<span class="${chipClass}">${escapeHtml(sp)}</span>`;
-          }
+          html += `<span class="${chipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">×</span></span>`;
         }
-        html += `</span>`;
       } else {
-        html += `<span class="muted">—</span>`;
+        html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `</div>`;
+      html += `<button class="scene-chip-add" data-add-type="species" title="Add species tag">+</button>`;
 
-      // Family chips
-      html += `<div style="margin-top:4px"><span class="muted" style="font-size:12px">Family:</span> `;
+      html += '<span class="scene-tag-sep"></span>';
+
+      // Families
+      html += '<span class="scene-tag-label">Family:</span> ';
       if (families.length) {
-        html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const fm of families) {
-          if (editable) {
-            html += `<span class="${editChipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">&times;</span></span>`;
-          } else {
-            html += `<span class="${chipClass}">${escapeHtml(fm)}</span>`;
-          }
+          html += `<span class="${chipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">×</span></span>`;
         }
-        html += `</span>`;
       } else {
-        html += `<span class="muted">—</span>`;
+        html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `</div>`;
+      html += `<button class="scene-chip-add" data-add-type="family" title="Add family tag">+</button>`;
 
-      el('#sceneMeta').innerHTML = html;
-
-      // Wire up remove buttons if editable
-      if (editable) {
-        el('#sceneMeta').querySelectorAll('[data-remove-species]').forEach(btn => {
-          btn.onclick = () => removeSpeciesFromScene(scene, btn.dataset.removeSpecies);
-        });
-        el('#sceneMeta').querySelectorAll('[data-remove-family]').forEach(btn => {
-          btn.onclick = () => removeFamilyFromScene(scene, btn.dataset.removeFamily);
-        });
+      if (approved) {
+        html += '<span class="scene-tag-sep"></span><span class="approval-note" style="font-size:11px">✓ Reviewed</span>';
       }
+
+      tagsEl.innerHTML = html;
+
+      // Wire remove buttons
+      tagsEl.querySelectorAll('[data-remove-species]').forEach(btn => {
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+          if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+          _sceneEditMode = true;
+          removeSpeciesFromScene(scene, btn.dataset.removeSpecies);
+          _finalizeSceneReview(scene.id);
+          _sceneEditMode = false;
+          _sceneEditDraft = null;
+          const updatedScene = reloadScene(scene.id) || scene;
+          renderTopbarTags(updatedScene);
+          renderScenes();
+        };
+      });
+      tagsEl.querySelectorAll('[data-remove-family]').forEach(btn => {
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+          if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+          _sceneEditMode = true;
+          removeFamilyFromScene(scene, btn.dataset.removeFamily);
+          _finalizeSceneReview(scene.id);
+          _sceneEditMode = false;
+          _sceneEditDraft = null;
+          const updatedScene = reloadScene(scene.id) || scene;
+          renderTopbarTags(updatedScene);
+          renderScenes();
+        };
+      });
+
+      // Wire (+) add buttons
+      tagsEl.querySelectorAll('.scene-chip-add').forEach(btn => {
+        btn.onclick = () => {
+          const type = btn.dataset.addType;
+          const panel = el('#editPanel');
+          if (panel) {
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) {
+              const input = type === 'species' ? el('#editAddSpecies') : el('#editAddFamily');
+              if (input) input.focus();
+            }
+          }
+        };
+      });
+    }
+
+    // Keep renderSceneMetaChips as an alias for compatibility
+    function renderSceneMetaChips(scene, editable) {
+      renderTopbarTags(scene);
     }
 
     async function openSceneDialog(sceneId) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
       currentSceneId = scene.id;
+      _currentScene = scene;
       _splitMode = false;
       _sceneEditMode = false;
       _sceneEditDraft = null;
+      currentImageIndex = 0;
 
+      // ── Top bar: title ──
+      const localNum = String(scene.id).split(':').pop();
+      const folderName = folderBaseName(scene.representative?.__rootPath || '');
+      let titleText = folderName || ('Scene ' + scene.id);
+      titleText += ' — #' + localNum;
+      if (scene.sceneName) titleText += ' — ' + scene.sceneName;
+      titleText += ` (${scene.images.length} images)`;
+      const titleEl = el('#sceneTopbarTitle');
+      if (titleEl) titleEl.textContent = titleText;
+
+      // ── Rename setup ──
       el('#sceneName').value = scene.sceneName || '';
-
-      // Reset to non-edit mode
-      el('#sceneRenameRow').classList.add('hidden');
+      el('#sceneRenameInline').classList.add('hidden');
       el('#editPanel').classList.add('hidden');
-      el('#editToggleBtn').textContent = 'Edit Species & Tags\u2026';
-      el('#splitSceneBtn').textContent = 'Split Scene\u2026';
 
-      // Render meta with non-editable chips
-      renderSceneMetaChips(scene, false);
-
-      // Populate folder path and wire double-click to open in system file browser
-      const folderPathEl = el('#sceneFolderPath');
-      if (folderPathEl) {
-        const fp = scene.representative?.__rootPath || '';
-        folderPathEl.textContent = fp || '—';
-        folderPathEl.title = fp ? 'Double-click to open folder in file explorer' : '';
-        if (fp) {
-          folderPathEl.ondblclick = async (ev) => {
-            try {
-              ev?.preventDefault(); ev?.stopPropagation();
-              if (window.pywebview?.api && window.pywebview.api.open_folder) {
-                const res = await window.pywebview.api.open_folder(fp);
-                if (res && typeof res === 'object' && res.success === false) {
-                  showToast('Failed to open folder: ' + (res.error || 'Unknown'), 5000, () => showSettings());
-                }
-              } else {
-                showToast('Open folder not supported in this mode', 4000);
-              }
-            } catch (e) {
-              console.error('open_folder failed', e);
-              showToast('Error opening folder', 5000);
-            }
-          };
+      // ── Pencil rename button ──
+      el('#scenePencilBtn').onclick = () => {
+        const renameRow = el('#sceneRenameInline');
+        const isShown = !renameRow.classList.contains('hidden');
+        if (isShown) {
+          // Apply rename
+          applySceneName(scene.id, el('#sceneName').value);
+          renameRow.classList.add('hidden');
+          // Update title
+          const updScene = reloadScene(scene.id) || scene;
+          const nm = updScene.sceneName || '';
+          let t = folderName || ('Scene ' + scene.id);
+          t += ' — #' + localNum;
+          if (nm) t += ' — ' + nm;
+          t += ` (${scene.images.length} images)`;
+          titleEl.textContent = t;
+          renderScenes();
         } else {
-          folderPathEl.ondblclick = null;
+          renameRow.classList.remove('hidden');
+          el('#sceneName').focus();
         }
+      };
+      el('#sceneRenameOk').onclick = () => { el('#scenePencilBtn').click(); };
+      el('#sceneRenameCancel').onclick = () => { el('#sceneRenameInline').classList.add('hidden'); };
+      el('#sceneName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el('#scenePencilBtn').click(); } };
+
+      // ── Tags ──
+      renderTopbarTags(scene);
+
+      // ── Shortcut legend toggle ──
+      el('#sceneShortcutBtn').onclick = () => {
+        el('#sceneShortcutLegend').classList.toggle('hidden');
+      };
+      el('#sceneShortcutLegend').classList.add('hidden');
+
+      // ── Species/Family add buttons ──
+      el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
+      el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
+      el('#editAddFamilyBtn').onclick = () => addFamilyToScene(scene);
+      el('#editAddFamily').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addFamilyToScene(scene); } };
+
+      // ── Filmstrip ──
+      renderFilmstrip(scene);
+
+      // ── RAW zoom on export preview (mousedown on the export preview box) ──
+      const exportImgBox = el('#previewBox');
+      if (exportImgBox) {
+        exportImgBox.onmousedown = (ev) => {
+          if (ev.button !== 0) return;
+          const r = scene.images[currentImageIndex];
+          if (!r) return;
+          ev.preventDefault();
+          startSceneZoomPreview(r, exportImgBox, ev);
+        };
       }
 
-      renderSceneImages(scene);
-
-      // Hook up actions
+      // ── Close ──
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
         _sceneEditDraft = null;
         _sceneEditMode = false;
+        _currentScene = null;
+        document.removeEventListener('keydown', _sceneKeyHandler);
         sceneDlg.close();
       };
 
-      // Edit Species & Tags toggle
-      el('#editToggleBtn').onclick = () => {
-        const nextEditMode = !_sceneEditMode;
-        if (nextEditMode) {
-          _beginSceneEditDraft(scene.id);
-        }
-        _sceneEditMode = nextEditMode;
-        el('#editPanel').classList.toggle('hidden', !_sceneEditMode);
-        el('#sceneRenameRow').classList.toggle('hidden', !_sceneEditMode);
-        el('#previewBox').classList.toggle('hidden', _sceneEditMode);
-        el('#previewInfo').classList.toggle('hidden', _sceneEditMode);
-        el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags…';
-        // On exit: apply rename and finalize the exact tags visible in edit mode.
-        if (!_sceneEditMode) {
-          applySceneName(scene.id, el('#sceneName').value);
-          _finalizeSceneReview(scene.id);
-          _sceneEditDraft = null;
-        }
-        // Re-render meta chips (editable or not)
-        const updatedScene = reloadScene(scene.id) || scene;
-        renderSceneMetaChips(updatedScene, _sceneEditMode);
-        if (!_sceneEditMode) renderScenes();
-      };
-
-      // Add species via button or Enter key
-      el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
-      el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
-
-      // Add family via button or Enter key
-      el('#editAddFamilyBtn').onclick = () => addFamilyToScene(scene);
-      el('#editAddFamily').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addFamilyToScene(scene); } };
-
-      // Split Scene toggle
+      // ── Split Scene ──
       el('#splitSceneBtn').onclick = () => {
         if (_splitMode) {
           applySplitScene(scene);
@@ -1899,7 +2061,118 @@
         }
       };
 
+      // ── Scene navigation hints ──
+      const hintL = el('#filmstripHintLeft');
+      const hintR = el('#filmstripHintRight');
+      if (hintL) hintL.onclick = () => navigateToScene(-1);
+      if (hintR) hintR.onclick = () => navigateToScene(1);
+
+      // ── Keyboard handler ──
+      document.removeEventListener('keydown', _sceneKeyHandler);
+      document.addEventListener('keydown', _sceneKeyHandler);
+
+      // ── Show dialog and select first image ──
       sceneDlg.showModal();
+      await selectFilmstripImage(0, scene);
+    }
+
+    // Navigate to prev/next scene
+    function navigateToScene(direction) {
+      if (!_currentScene) return;
+      const idx = scenes.indexOf(_currentScene);
+      if (idx < 0) return;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= scenes.length) return;
+      const nextScene = scenes[newIdx];
+      // Close current and open next
+      _sceneEditDraft = null;
+      _sceneEditMode = false;
+      document.removeEventListener('keydown', _sceneKeyHandler);
+      sceneDlg.close();
+      openSceneDialog(nextScene.id);
+    }
+
+    // Keyboard handler for scene dialog
+    function _sceneKeyHandler(e) {
+      // Skip if focused in input/textarea
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (!_currentScene) return;
+
+      const images = _currentScene.images;
+      const len = images.length;
+
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          if (currentImageIndex < len - 1) {
+            selectFilmstripImage(currentImageIndex + 1, _currentScene);
+          } else {
+            // At last image — jump to next scene
+            navigateToScene(1);
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (currentImageIndex > 0) {
+            selectFilmstripImage(currentImageIndex - 1, _currentScene);
+          } else {
+            // At first image — jump to previous scene
+            navigateToScene(-1);
+          }
+          break;
+        case 'z':
+        case 'Z':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], 'reject');
+            setRating(images[currentImageIndex], 1, 'manual');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case 'x':
+        case 'X':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], '');
+            setRating(images[currentImageIndex], 0, 'manual');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], 'accept');
+            setRating(images[currentImageIndex], 5, 'manual');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case '1': case '2': case '3': case '4': case '5':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setRating(images[currentImageIndex], parseInt(e.key, 10), 'manual');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case ' ':
+          e.preventDefault();
+          if (images[currentImageIndex]) openInEditor(images[currentImageIndex]);
+          break;
+        case 'Escape':
+          e.preventDefault();
+          el('#closeDlg')?.click();
+          break;
+      }
+    }
+
+    // Refresh the current filmstrip card + info bar after a status/rating change
+    function _refreshCurrentFilmstripCard() {
+      if (!_currentScene) return;
+      // Re-render the filmstrip to update card classes
+      renderFilmstrip(_currentScene);
+      // Re-select the current image to update previews and info bar
+      selectFilmstripImage(currentImageIndex, _currentScene);
     }
 
     function applySceneName(sceneId, name) {
@@ -2047,17 +2320,25 @@
       el('#splitSceneBtn').textContent = 'Split Scene\u2026';
       // Re-render images without checkboxes
       const scene = scenes.find(s => String(s.id) === String(currentSceneId));
-      if (scene) renderSceneImages(scene);
+      if (scene) {
+        renderFilmstrip(scene);
+        selectFilmstripImage(currentImageIndex, scene);
+      }
     }
 
     function renderSceneImagesWithSplit(scene) {
-      const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
-      imageGrid.innerHTML = '';
+      const infoBox = el('#previewInfo');
+      if (infoBox) infoBox.textContent = '—';
+      const grid = el('#imageGrid');
+      grid.innerHTML = '';
       const images = scene.images;
+      const frag = document.createDocumentFragment();
 
-      for (const r of images) {
-        const card = document.createElement('article');
-        card.className = 'card split-mode';
+      for (let idx = 0; idx < images.length; idx++) {
+        const r = images[idx];
+        const card = document.createElement('div');
+        card.className = 'filmstrip-card split-mode';
+        card.dataset.idx = idx;
         const key = r.filename || r.export_path || '';
 
         // Checkbox for split selection
@@ -2065,50 +2346,67 @@
         cb.type = 'checkbox';
         cb.className = 'split-check';
         cb.checked = _splitSelected.has(key);
+        if (cb.checked) card.classList.add('split-selected');
+        
         cb.onchange = () => {
           if (cb.checked) { _splitSelected.add(key); card.classList.add('split-selected'); }
           else { _splitSelected.delete(key); card.classList.remove('split-selected'); }
         };
         card.appendChild(cb);
 
-        const th = document.createElement('div'); th.className = 'thumb';
-        const img = document.createElement('img'); img.alt = r.filename || ''; img.loading = 'lazy';
+        // Thumbnail
+        const th = document.createElement('div');
+        th.className = 'filmstrip-thumb';
+        const img = document.createElement('img');
+        img.alt = r.filename || '';
+        img.loading = 'lazy';
         lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
-        th.appendChild(img); card.appendChild(th);
-        const body = document.createElement('div'); body.className = 'body';
-        body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename || '')}"><b>${escapeHtml(r.filename || '')}</b></div>
-          <div class="meta"><span class="truncate" title="${escapeHtml(r.species || 'Unknown')}">${escapeHtml(r.species || 'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
-        const stars = createStarBar(r);
-        body.appendChild(stars);
-        card.appendChild(body);
+        th.appendChild(img);
+        card.appendChild(th);
+
+        // Info
+        const info = document.createElement('div');
+        info.className = 'filmstrip-info';
+        const fn = document.createElement('div');
+        fn.className = 'filmstrip-filename';
+        fn.textContent = r.filename || '';
+        info.appendChild(fn);
+        const meta = document.createElement('div');
+        meta.className = 'filmstrip-meta';
+        const rating = getRating(r);
+        meta.innerHTML = `<span class="filmstrip-stars">${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}</span><span>Q ${fmt3(r.quality)}</span>`;
+        info.appendChild(meta);
+        card.appendChild(info);
 
         // Click card to toggle selection
         card.addEventListener('click', (ev) => {
           if (ev.target === cb) return; // checkbox handles itself
           cb.checked = !cb.checked;
           cb.onchange();
+          
+          // Also set as active and update preview
+          selectFilmstripImage(idx, scene);
         });
 
-        card.addEventListener('mouseenter', async () => {
-          const pv = el('#previewBox'); pv.innerHTML = '';
-          const pimg = document.createElement('img');
-          const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
-          if (purl) { pimg.src = purl; pv.appendChild(pimg); }
-          else { pv.innerHTML = '<span class="muted">No preview</span>'; }
-          const info = el('#previewInfo');
-          if (info) {
-            const rn = getRating(r);
-            const ro = getOrigin(r);
-            const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
-            info.innerHTML = `
-              <div><b>${escapeHtml(r.filename || '')}</b></div>
-              <div class="meta"><span title="Species confidence">${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
-              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5 - rn)} ${originTxt ? `(${originTxt})` : ''}</span></div>
-            `;
-          }
-        });
+        // Tooltip with detailed metadata
+        const tip = document.createElement('div');
+        tip.className = 'filmstrip-tooltip';
+        tip.innerHTML = [
+          `<b>${escapeHtml(r.filename || '')}</b>`,
+          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
+          `Quality: ${fmt3(r.quality)}`,
+          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}`,
+        ].filter(Boolean).join('<br>');
+        card.appendChild(tip);
 
-        imageGrid.appendChild(card);
+        frag.appendChild(card);
+      }
+      grid.appendChild(frag);
+      updateFilmstripHints(scene);
+      
+      // Select the first one or current one by default to show preview
+      if (images.length > 0) {
+        selectFilmstripImage(currentImageIndex < images.length ? currentImageIndex : 0, scene);
       }
     }
 
@@ -2173,7 +2471,8 @@
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           refreshSceneMeta(updatedScene);
-          renderSceneImages(updatedScene);
+          renderFilmstrip(updatedScene);
+          selectFilmstripImage(0, updatedScene);
           el('#sceneName').value = updatedScene.sceneName || '';
         }
         showToast(`Split ${moved} image(s) into new scene #${newSceneCount}`, 3000);

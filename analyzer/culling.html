@@ -197,15 +197,18 @@
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
     .cull-card.moved-card { opacity: 0.85; }
     .cull-card.moved-card::after {
-      content: '↔ moved';
+      content: 'User moved';
       position: absolute;
-      top: 2px;
-      right: 3px;
+      top: 4px;
+      right: 4px;
       font-size: 9px;
-      background: rgba(0,0,0,0.7);
-      color: #aaa;
-      padding: 1px 4px;
-      border-radius: 3px;
+      font-weight: 700;
+      background: var(--brand);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .cull-card .cull-thumb {
       width: 100%;

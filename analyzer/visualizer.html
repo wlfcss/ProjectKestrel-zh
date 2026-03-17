@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -223,49 +223,97 @@
   </footer>
 
   <dialog id="sceneDlg">
-    <div class="modal">
-      <div class="left">
-        <div id="imageGrid" class="grid"></div>
+    <div class="scene-filmstrip-layout">
+      <!-- ═══ TOP BAR: Scene info + tags + actions ═══ -->
+      <div class="scene-topbar">
+        <div class="scene-topbar-left">
+          <span class="scene-topbar-title" id="sceneTopbarTitle">—</span>
+          <button class="scene-pencil-btn" id="scenePencilBtn" title="Rename this scene">✏️</button>
+          <div class="scene-rename-inline hidden" id="sceneRenameInline">
+            <input id="sceneName" type="text" placeholder="Scene name…" />
+            <button id="sceneRenameOk" title="Apply">✓</button>
+            <button id="sceneRenameCancel" title="Cancel">✗</button>
+          </div>
+        </div>
+        <div class="scene-topbar-tags" id="sceneTopbarTags">
+          <!-- Species/Family chips + inline (+) add rendered by JS -->
+        </div>
+        <div class="scene-topbar-right">
+          <button id="splitSceneBtn" title="Split this scene into multiple scenes">✂ Split</button>
+          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="Keyboard shortcuts">⌨</button>
+          <button id="closeDlg" title="Close (Escape)">✕ Close</button>
+        </div>
       </div>
-      <!-- New draggable divider -->
-      <div class="divider" id="colDivider" title="Drag to resize"></div>
-      <div class="right">
-        <!-- Rename row: only visible in edit mode -->
-        <div class="inline hidden" id="sceneRenameRow">
-          <input id="sceneName" type="text" placeholder="Rename this scene…" />
-        </div>
-        <!-- Scene info + tag chips (always visible, chips become editable in edit mode) -->
-        <div class="detail" id="sceneMeta">—</div>
-        <div class="detail" id="sceneFolderPath"
-          style="cursor:default;user-select:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="">—
-        </div>
-        <!-- Edit-only: add inputs for species and family -->
-        <div id="editPanel" class="edit-panel hidden">
-          <div class="edit-section">
-            <label>Add Species</label>
-            <div class="inline">
-              <input id="editAddSpecies" type="text" placeholder="Type a species name…" style="flex:1" />
-              <button id="editAddSpeciesBtn" title="Add species tag to all images">+ Add</button>
-            </div>
-          </div>
-          <div class="edit-section">
-            <label>Add Family</label>
-            <div class="inline">
-              <input id="editAddFamily" type="text" placeholder="Type a family name…" style="flex:1" />
-              <button id="editAddFamilyBtn" title="Add family tag to all images">+ Add</button>
-            </div>
+
+      <!-- Keyboard shortcut legend (toggle visibility) -->
+      <div class="scene-shortcut-legend hidden" id="sceneShortcutLegend">
+        <span><kbd>←</kbd><kbd>→</kbd> Navigate images</span>
+        <span><kbd>Z</kbd> Reject</span>
+        <span><kbd>X</kbd> Reset</span>
+        <span><kbd>C</kbd> Accept</span>
+        <span><kbd>1</kbd>–<kbd>5</kbd> Rate</span>
+        <span><kbd>Space</kbd> Open in editor</span>
+        <span><kbd>Esc</kbd> Close</span>
+      </div>
+
+      <!-- Scene rename row (hidden inline input for species/family adding) -->
+      <div id="editPanel" class="scene-edit-panel hidden">
+        <div class="scene-edit-section">
+          <label>Add Species</label>
+          <div class="inline">
+            <input id="editAddSpecies" type="text" placeholder="Species name…" style="flex:1" />
+            <button id="editAddSpeciesBtn" title="Add species tag">+ Add</button>
           </div>
         </div>
-        <label class="scene-zoom-topbar" id="sceneZoomWrap" title="Raw Zoom Level (press and hold for RAW preview)">
-          <span class="muted">Raw Zoom Level (press and hold for RAW preview)</span>
-          <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:100px">
-        </label>
-        <div class="preview" id="previewBox" data-raw-label="RAW"><span class="muted">Hover a thumbnail…</span></div>
-        <div class="detail" id="previewInfo">—</div>
-        <div class="footer">
-          <button id="editToggleBtn">Edit Species &amp; Tags…</button>
-          <button id="splitSceneBtn">Split Scene…</button>
-          <button id="closeDlg">Close</button>
+        <div class="scene-edit-section">
+          <label>Add Family</label>
+          <div class="inline">
+            <input id="editAddFamily" type="text" placeholder="Family name…" style="flex:1" />
+            <button id="editAddFamilyBtn" title="Add family tag">+ Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CENTER: Dual preview panels ═══ -->
+      <div class="scene-main">
+        <div class="scene-previews">
+          <div class="scene-preview-panel" id="scenePreviewExport">
+            <div class="scene-preview-label">Full Image</div>
+            <div class="scene-preview-img" id="previewBox" data-raw-label="RAW">
+              <span class="muted">Select an image…</span>
+            </div>
+            <label class="scene-zoom-bar" id="sceneZoomWrap" title="RAW Zoom — click and hold on the full image to zoom">
+              <span class="muted" style="font-size:11px">RAW Zoom</span>
+              <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:90px">
+            </label>
+          </div>
+          <div class="scene-preview-panel" id="scenePreviewCrop">
+            <div class="scene-preview-label">Bird Crop</div>
+            <div class="scene-preview-img" id="previewCropBox">
+              <span class="muted">Select an image…</span>
+            </div>
+          </div>
+        </div>
+        <!-- Info bar between previews and filmstrip -->
+        <div class="scene-info-bar" id="sceneInfoBar">
+          <div class="scene-info-filename" id="sceneInfoFilename">—</div>
+          <div class="scene-info-stars" id="sceneInfoStars"></div>
+          <div class="scene-info-quality" id="sceneInfoQuality">—</div>
+          <div class="scene-info-status" id="sceneInfoStatus"></div>
+          <div class="scene-info-meta" id="sceneInfoMeta"></div>
+        </div>
+      </div>
+
+      <!-- ═══ BOTTOM: Filmstrip ═══ -->
+      <div class="scene-filmstrip-wrap">
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-left hidden" id="filmstripHintLeft">
+          ◂ Prev Scene
+        </div>
+        <div class="scene-filmstrip" id="imageGrid">
+          <!-- Filmstrip cards rendered by JS -->
+        </div>
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-right hidden" id="filmstripHintRight">
+          Next Scene ▸
         </div>
       </div>
     </div>
