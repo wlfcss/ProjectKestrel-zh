@@ -102,6 +102,9 @@ Whats working
     - New keyboard shortcuts let you rapidly flick through a scene and seamless advance to previous/next scenes.
     - New accept/reject tagging system lets you make culling decisions from the scene visualizer
     - Streamlined user interface maintains all functionality: rename the scene, edit tags, split the scene into multiple scenes, and view RAW previews.
+* Improvements to Kestrel Culling Assistant and handling of culling decisions
+    - New streamlined user interface allows you to drag and drop images in addition to using Shift+Click
+    - New buttons to reset Culling Decisions allow you to reset Accept/Reject Ratings
 * Significant improvements to Kestrel's analysis pipeline
     - New configurable rating system lets you customize how Kestrel assigns star ratings to your scenes.
     - New exposure compensation algorithm improves analysis options
@@ -112,3 +115,5 @@ Whats working
     - Improvements to how Kestrel writes metadata to align more consistently with visuals.
     - Tweaks to simplify language around metadata and culling categories.
     - Improved handling of auto-generated ratings and auto-generated culling decisions to enhance consistency and decouple the two features.
+    - Show pipeline version in addition to standard version control.
+* Substantial number of bug fixes, particularly around the user interface, settings menu, and culling assistant.
