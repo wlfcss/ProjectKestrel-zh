@@ -1,41 +1,17 @@
 # Project Kestrel To-Do and Changelog
 * Investigate GPU support from recent pull request #14
-* Investigate refinements to image quality thresholding from recent pull request #14. 
-
-* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed. 
-* Fix rating system.
 
 Bugs
+* known issue that skipping to next scene works inconsistently, and the background view should scroll to match the current scene opened in the film strip.
+* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed. 
 
-* Rating normalization --> I think we need to shift this a bit so that maybe the majority are 1-2 stars? And the minority are 3-5 stars? Or just turn off normalization by default? Not super sure here...
---> New quality algorithm should be trained on the new pipeline if possible, maybe combining a few orthogonal metrics.
-    - will fix this to utilize the model's individual weights as a default probably.
-
-* Change number of stars to always have blank stars at least
-* Add scene time to the header when you click into a scene
-* Make the check/uncheck system more robust, particularly when you change what is checked while it is loading. - this might be fine, it adds teh scene to the very end.
-
-
-    
-
-Whats working
-* Filtering out the duplicates seems to be working
-* Burst detection seems to be working
-* Seems like species accuracy is indeed improved a bit.
-* Some issues with whether a particular folder appears as checkable or not
-
-# Priority Issues
-* Slightly longer load time in latest version of Kestrel, potentially due to added imports or longer files.
-
-## Known Issues
-- Kestrel's data structure (csv database) is a bit messay and incomplete. Potentially need to switch to a JSON file structure while maintaining backward-compatibility or upgradeability in the visualizer.
-
-## Features under consideration
+Features under consideration
 - Build debug platform that runs Kestrel analysis, but saves the full output at every step for detailed troubleshooting and root-cause analysis. (Under Consideration, likely requires simple modification of CLI)
     - e.g. save all masks, all bird species probabilities, all quality scores, etc. and visualize everything for easy detection.
     - This may be either a python notebook or a script, unsure.
-- Implement improvements to Visualizer, such as modifying group species tags. (Under Consideration)
-- Improve quality estimation model to be more robust (Shelved)
+
+
+
 
 # Version Yellow Warbler Changelog
 * Massive improvement to Kestrel group detection methodology particularly for birds in flight
