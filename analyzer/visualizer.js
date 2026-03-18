@@ -21,6 +21,7 @@
     let collapsedFolders = new Set(); // rootPaths of collapsed folder groups
     let _lastSelectedIdx = -1;        // Shift-click range: last clicked index in _visibleSceneOrder
     let _visibleSceneOrder = [];       // Flat ordered list of visible scene IDs after last render
+    let _focusedCardId = null;         // Scene ID of the keyboard-focused card in the grid
     // Track which scene dialog is open for refreshing filters
     let currentSceneId = null;
 
@@ -1052,6 +1053,14 @@
       const includeFamilies = true;
       scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
+      // Re-resolve _currentScene so the open scene dialog keeps working
+      // after the scenes array is regenerated with new objects.
+      if (_currentScene) {
+        const openId = String(_currentScene.id);
+        const refreshed = scenes.find(s => String(s.id) === openId);
+        if (refreshed) _currentScene = refreshed;
+      }
+
       // Apply scene-level manual-rated filter without mutating global scenes
       const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
 
@@ -1163,8 +1172,8 @@
 
         card.addEventListener('click', (ev) => {
           const sid = String(s.id);
+          _focusGridCard(sid);
           if (ev.shiftKey && _lastSelectedIdx >= 0) {
-            // Range-select from last clicked to this
             const idx = _visibleSceneOrder.indexOf(sid);
             if (idx >= 0) {
               const lo = Math.min(_lastSelectedIdx, idx);
@@ -1175,14 +1184,12 @@
             ev.preventDefault(); return;
           }
           if (ev.ctrlKey || ev.metaKey) {
-            // Toggle individual
             if (selectedSceneIds.has(sid)) selectedSceneIds.delete(sid); else selectedSceneIds.add(sid);
             _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
             updateSelectionUI();
             ev.preventDefault(); return;
           }
           if (selectedSceneIds.size > 0) {
-            // In selection mode: plain click also toggles
             if (selectedSceneIds.has(sid)) selectedSceneIds.delete(sid); else selectedSceneIds.add(sid);
             _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
             updateSelectionUI();
@@ -1381,6 +1388,80 @@
         bar.classList.add('hidden');
       }
     }
+
+    // Scroll to a scene card in the grid and give it keyboard focus
+    function _focusGridCard(sceneId) {
+      _focusedCardId = String(sceneId);
+      document.querySelectorAll('.card.focused').forEach(c => c.classList.remove('focused'));
+      const card = sceneGrid.querySelector(`.card[data-scene-id="${CSS.escape(_focusedCardId)}"]`);
+      if (card) {
+        card.classList.add('focused');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    // Clear the focused-card highlight
+    function _clearGridFocus() {
+      _focusedCardId = null;
+      document.querySelectorAll('.card.focused').forEach(c => c.classList.remove('focused'));
+    }
+
+    // Get all visible card elements in DOM order
+    function _getVisibleCards() {
+      return Array.from(sceneGrid.querySelectorAll('.card[data-scene-id]'));
+    }
+
+    // Grid keyboard navigation: arrow keys move focus, Enter opens scene dialog
+    function _gridKeyHandler(e) {
+      if (document.querySelector('dialog[open]')) return;
+      if (selectedSceneIds.size > 0) return;
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      const isArrow = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+      const isEnter = e.key === 'Enter';
+      if (!isArrow && !isEnter) return;
+      if (!_focusedCardId) return;
+
+      e.preventDefault();
+
+      if (isEnter) {
+        openSceneDialog(_focusedCardId);
+        return;
+      }
+
+      const cards = _getVisibleCards();
+      if (cards.length === 0) return;
+      const curIdx = cards.findIndex(c => c.dataset.sceneId === _focusedCardId);
+      if (curIdx < 0) return;
+      const curCard = cards[curIdx];
+
+      let nextIdx = -1;
+      if (e.key === 'ArrowLeft') {
+        nextIdx = curIdx - 1;
+      } else if (e.key === 'ArrowRight') {
+        nextIdx = curIdx + 1;
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        const curRect = curCard.getBoundingClientRect();
+        const curCenterX = curRect.left + curRect.width / 2;
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        let bestIdx = -1, bestDist = Infinity;
+        for (let i = 0; i < cards.length; i++) {
+          if (i === curIdx) continue;
+          const r = cards[i].getBoundingClientRect();
+          const rowDiff = dir > 0 ? r.top - curRect.top : curRect.top - r.top;
+          if (rowDiff < 10) continue;
+          const dist = Math.abs(r.left + r.width / 2 - curCenterX) + rowDiff * 2;
+          if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+        }
+        nextIdx = bestIdx;
+      }
+
+      if (nextIdx >= 0 && nextIdx < cards.length) {
+        _focusGridCard(cards[nextIdx].dataset.sceneId);
+      }
+    }
+    document.addEventListener('keydown', _gridKeyHandler);
 
     // Merge all currently selected scenes (must all be in same folder)
     async function executeSelectionMerge() {
@@ -2217,11 +2298,13 @@
       // ── Close ──
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
+        const closingId = _currentScene ? String(_currentScene.id) : null;
         _sceneEditDraft = null;
         _sceneEditMode = false;
         _currentScene = null;
         document.removeEventListener('keydown', _sceneKeyHandler);
         sceneDlg.close();
+        if (closingId) _focusGridCard(closingId);
       };
 
       // ── Split Scene ──
@@ -2248,15 +2331,16 @@
       await selectFilmstripImage(startIndex, scene);
     }
 
-    // Navigate to prev/next scene
+    // Navigate to prev/next scene — uses ID-based lookup so it survives
+    // the scenes array being regenerated by auto-refresh / renderScenes.
     function navigateToScene(direction, startIndex = 0) {
       if (!_currentScene) return;
-      const idx = scenes.indexOf(_currentScene);
+      const curId = String(_currentScene.id);
+      const idx = scenes.findIndex(s => String(s.id) === curId);
       if (idx < 0) return;
       const newIdx = idx + direction;
       if (newIdx < 0 || newIdx >= scenes.length) return;
       const nextScene = scenes[newIdx];
-      // Close current and open next
       _sceneEditDraft = null;
       _sceneEditMode = false;
       document.removeEventListener('keydown', _sceneKeyHandler);
@@ -5129,10 +5213,11 @@
     /** Silently reload CSV data for any paths in _autoRefreshPendingPaths that are checked. */
     async function silentRefreshPending() {
       if (_autoRefreshPendingPaths.size === 0) return;
-      const toRefresh = Array.from(_autoRefreshPendingPaths).filter(p => checkedFolderPaths.has(p));
+      const toRefresh = Array.from(_autoRefreshPendingPaths).filter(p => _isPathChecked(p));
       _autoRefreshPendingPaths.clear();
       if (toRefresh.length === 0) return;
 
+      const normPath = p => (p || '').replace(/\\/g, '/');
       let changed = false;
       for (const p of toRefresh) {
         try {
@@ -5143,23 +5228,19 @@
           const newRows = parsed.data || [];
           const newFields = parsed.meta.fields || [];
           const root = result.root || p;
-          // Merge header fields
+          const rootN = normPath(root);
           for (const f of newFields) if (!header.includes(f)) header.push(f);
-          // Find existing slot or create new one
-          const sample = rows.find(r => r.__rootPath === root);
+          const sample = rows.find(r => normPath(r.__rootPath) === rootN);
           const slot = sample ? sample.__folderSlot : rows.length;
-          // Replace rows for this root path
-          rows = rows.filter(r => r.__rootPath !== root);
+          rows = rows.filter(r => normPath(r.__rootPath) !== rootN);
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = slot; }
           rows = rows.concat(newRows);
-          // Reload scenedata for this root
           if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
             try {
               const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
               if (sdRes?.success) _scenedata[root] = sdRes.data;
             } catch (_) {}
           }
-          // Apply normalization for newly-loaded rows
           if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
             try {
               const normRes = await window.pywebview.api.apply_normalization(root);
@@ -5249,14 +5330,21 @@
       } catch (e) { console.warn('[tree] updateInProgressFoldersInTree error:', e); }
     }
 
+    // Path-insensitive check: does checkedFolderPaths contain a path matching p?
+    function _isPathChecked(p) {
+      const n = (p || '').replace(/\\/g, '/');
+      for (const cp of checkedFolderPaths) {
+        if (cp.replace(/\\/g, '/') === n) return true;
+      }
+      return false;
+    }
+
     /** Start or stop auto-refresh timers for checked in-progress folders. */
     function _updateAutoRefreshTimers() {
       try {
-        const norm = p => (p || '').replace(/\\/g, '/');
         const queueStatus = window._lastQueueStatus;
         const isPaused = queueStatus && queueStatus.paused;
         
-        // Stop all timers if queue is paused — no need to refresh when nothing is running
         if (isPaused) {
           for (const timerId of _autoRefreshTimers.values()) {
             clearInterval(timerId);
@@ -5265,24 +5353,22 @@
           return;
         }
         
-        // Stop timers for folders that are no longer checked or in-progress
         for (const [path, timerId] of _autoRefreshTimers.entries()) {
           const isStillInProgress = _inProgressFolderPaths.has(path);
-          const isStillChecked = checkedFolderPaths.has(path);
+          const isStillChecked = _isPathChecked(path);
           if (!isStillInProgress || !isStillChecked) {
             clearInterval(timerId);
             _autoRefreshTimers.delete(path);
           }
         }
         
-        // Start timers for newly-checked in-progress folders (only if queue is running, not paused)
         for (const inProgPath of _inProgressFolderPaths) {
-          if (checkedFolderPaths.has(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
-            // Auto-refresh every 10 seconds while folder is in progress and checked
+          if (_isPathChecked(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
+            const capturedPath = inProgPath;
             const timerId = setInterval(async () => {
               try {
-                // Reload the data for this folder (debounced to avoid thrashing)
-                debouncedAutoLoad();
+                _autoRefreshPendingPaths.add(capturedPath);
+                silentRefreshPending();
               } catch (e) { console.warn('[refresh] auto-refresh error:', e); }
             }, 10000);
             _autoRefreshTimers.set(inProgPath, timerId);
@@ -5734,7 +5820,7 @@
     if (selectMergeBtn) selectMergeBtn.addEventListener('click', executeSelectionMerge);
     const selectClearBtn = document.getElementById('selectClearBtn');
     if (selectClearBtn) selectClearBtn.addEventListener('click', () => { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); });
-    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && selectedSceneIds.size > 0 && !document.querySelector('dialog[open]')) { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); } });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !document.querySelector('dialog[open]')) { if (selectedSceneIds.size > 0) { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); } _clearGridFocus(); } });
     // Revert button
     const revertBtn = el('#revertCsv');
     if (revertBtn) revertBtn.addEventListener('click', () => {

@@ -834,6 +834,13 @@
       background: #1f2d4e !important;
     }
 
+    /* Keyboard-focused scene card (after closing scene dialog or arrow-key nav) */
+    .card.focused {
+      outline: 2px solid rgba(58, 132, 230, .7);
+      outline-offset: 2px;
+      box-shadow: 0 0 12px rgba(58, 132, 230, .3);
+    }
+
     /* Folder group headers in scene grid */
     .folder-group {
       margin-bottom: 4px;
