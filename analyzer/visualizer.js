@@ -3774,7 +3774,7 @@
             cb.type = 'checkbox';
             cb.className = 'tree-cb';
             cb.title = 'Include in multi-folder view';
-            cb.checked = checkedFolderPaths.has(row.dataset.path);
+            cb.checked = _isPathChecked(row.dataset.path);
             cb.addEventListener('change', (e) => {
               e.stopPropagation();
               if (cb.checked) checkedFolderPaths.add(row.dataset.path);
@@ -3837,12 +3837,12 @@
         loadCheckbox.type = 'checkbox';
         loadCheckbox.className = 'tree-cb';
         loadCheckbox.title = isInProgress ? 'Include in multi-folder view (analyzing now)' : 'Include in multi-folder view';
-        loadCheckbox.checked = checkedFolderPaths.has(node.path);
+        loadCheckbox.checked = _isPathChecked(node.path);
         loadCheckbox.addEventListener('change', (e) => {
           e.stopPropagation();
           if (loadCheckbox.checked) checkedFolderPaths.add(node.path);
           else checkedFolderPaths.delete(node.path);
-          _updateAutoRefreshTimers(); // Update auto-refresh for in-progress
+          _updateAutoRefreshTimers();
           debouncedAutoLoad();
         });
       }
@@ -4815,10 +4815,11 @@
         
         // Detect newly-running items (first time moving from pending to running)
         const runningNow = new Set(items.filter(i => i.status === 'running').map(i => norm(i.path)));
+        const runningRawPaths = {};
+        items.filter(i => i.status === 'running').forEach(i => { runningRawPaths[norm(i.path)] = i.path; });
         for (const p of runningNow) {
           if (!_queueLastRunningSet.has(p)) {
-            // Move out of pending and into running — implement Case 1 logic
-            _handleFirstFolderAnalysisStart(p);
+            _handleFirstFolderAnalysisStart(runningRawPaths[p] || p);
           }
         }
         const prevRunningSet = _queueLastRunningSet;
@@ -5195,6 +5196,7 @@
 
     let _autoRefreshTimer = null;
     let _autoRefreshPendingPaths = new Set(); // paths that need a quiet reload
+    let _silentRefreshRunning = false;        // guard against concurrent silentRefreshPending
 
     /** Queue a silent reload for `path` (called when a queue item becomes done). */
     function scheduleAutoRefresh(path) {
@@ -5213,54 +5215,60 @@
     /** Silently reload CSV data for any paths in _autoRefreshPendingPaths that are checked. */
     async function silentRefreshPending() {
       if (_autoRefreshPendingPaths.size === 0) return;
-      const toRefresh = Array.from(_autoRefreshPendingPaths).filter(p => _isPathChecked(p));
-      _autoRefreshPendingPaths.clear();
-      if (toRefresh.length === 0) return;
+      if (_silentRefreshRunning) return;
+      _silentRefreshRunning = true;
+      try {
+        const toRefresh = Array.from(_autoRefreshPendingPaths).filter(p => _isPathChecked(p));
+        _autoRefreshPendingPaths.clear();
+        if (toRefresh.length === 0) return;
 
-      const normPath = p => (p || '').replace(/\\/g, '/');
-      let changed = false;
-      for (const p of toRefresh) {
-        try {
-          if (!hasPywebviewApi || !window.pywebview?.api?.read_kestrel_csv) continue;
-          const result = await window.pywebview.api.read_kestrel_csv(p);
-          if (!result.success) continue;
-          const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
-          const newRows = parsed.data || [];
-          const newFields = parsed.meta.fields || [];
-          const root = result.root || p;
-          const rootN = normPath(root);
-          for (const f of newFields) if (!header.includes(f)) header.push(f);
-          const sample = rows.find(r => normPath(r.__rootPath) === rootN);
-          const slot = sample ? sample.__folderSlot : rows.length;
-          rows = rows.filter(r => normPath(r.__rootPath) !== rootN);
-          for (const r of newRows) { r.__rootPath = root; r.__folderSlot = slot; }
-          rows = rows.concat(newRows);
-          if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
-            try {
-              const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
-              if (sdRes?.success) _scenedata[root] = sdRes.data;
-            } catch (_) {}
-          }
-          if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
-            try {
-              const normRes = await window.pywebview.api.apply_normalization(root);
-              if (normRes?.success && normRes?.normalized_ratings) {
-                const mapping = normRes.normalized_ratings;
-                for (const r of newRows) {
-                  if (r.filename in mapping) r.__normalized_rating = mapping[r.filename];
+        const normPath = p => (p || '').replace(/\\/g, '/');
+        let changed = false;
+        for (const p of toRefresh) {
+          try {
+            if (!hasPywebviewApi || !window.pywebview?.api?.read_kestrel_csv) continue;
+            const result = await window.pywebview.api.read_kestrel_csv(p);
+            if (!result.success) continue;
+            const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
+            const newRows = parsed.data || [];
+            const newFields = parsed.meta.fields || [];
+            const root = result.root || p;
+            const rootN = normPath(root);
+            for (const f of newFields) if (!header.includes(f)) header.push(f);
+            const sample = rows.find(r => normPath(r.__rootPath) === rootN);
+            const slot = sample ? sample.__folderSlot : rows.length;
+            rows = rows.filter(r => normPath(r.__rootPath) !== rootN);
+            for (const r of newRows) { r.__rootPath = root; r.__folderSlot = slot; }
+            rows = rows.concat(newRows);
+            if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
+              try {
+                const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
+                if (sdRes?.success) _scenedata[root] = sdRes.data;
+              } catch (_) {}
+            }
+            if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
+              try {
+                const normRes = await window.pywebview.api.apply_normalization(root);
+                if (normRes?.success && normRes?.normalized_ratings) {
+                  const mapping = normRes.normalized_ratings;
+                  for (const r of newRows) {
+                    if (r.filename in mapping) r.__normalized_rating = mapping[r.filename];
+                  }
                 }
-              }
-            } catch (_) {}
+              } catch (_) {}
+            }
+            changed = true;
+          } catch (e) {
+            console.warn('[autorefresh]', p, e);
           }
-          changed = true;
-        } catch (e) {
-          console.warn('[autorefresh]', p, e);
         }
-      }
 
-      if (changed) {
-        ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
-        setStatus(`Auto-refreshed ${toRefresh.length} newly-analyzed folder(s)`);
+        if (changed) {
+          ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
+          setStatus(`Auto-refreshed ${toRefresh.length} newly-analyzed folder(s)`);
+        }
+      } finally {
+        _silentRefreshRunning = false;
       }
     }
 
@@ -5312,7 +5320,7 @@
               cb.type = 'checkbox';
               cb.className = 'tree-cb';
               cb.title = 'Include in multi-folder view (analyzing now)';
-              cb.checked = checkedFolderPaths.has(row.dataset.path);
+              cb.checked = _isPathChecked(row.dataset.path);
               cb.addEventListener('change', (e) => {
                 e.stopPropagation();
                 if (cb.checked) checkedFolderPaths.add(row.dataset.path);
@@ -5383,7 +5391,8 @@
         let count = 0;
         function traverse(n) {
           if (!n) return;
-          if (n.has_kestrel && !_inProgressFolderPaths.has(n.path)) count++;
+          const np = (n.path || '').replace(/\\/g, '/');
+          if (n.has_kestrel && !_inProgressFolderPaths.has(np)) count++;
           (n.children || []).forEach(c => traverse(c));
         }
         traverse(folderTreeRootNode);
