@@ -5534,6 +5534,7 @@
       try {
         checkedFolderPaths.clear();
         renderFolderTree();
+        debouncedAutoLoad(); // Unload current folder (same as Check None)
       } catch (e) { /* ignore */ }
 
       try {
