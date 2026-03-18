@@ -6691,8 +6691,8 @@
       {
         title: 'Merging Scenes',
         body: 'The two highlighted scenes above were actually one continuous burst that Kestrel split in two. Hold <kbd>Ctrl</kbd> and click both cards to select them, then click <b>Merge selected scenes</b> to combine them back into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
-        target: '#sceneGrid .card:nth-child(4)',
-        highlightFirst: '#sceneGrid .card:nth-child(3)',
+        target: '#sceneGrid .card:nth-child(2)',
+        highlightFirst: '#sceneGrid .card:nth-child(1)',
         position: 'bottom',
       },
       {
