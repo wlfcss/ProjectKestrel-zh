@@ -108,7 +108,7 @@ class Api:
         print(f"[API] choose_directory() called (platform: {sys.platform})", flush=True)
         try:
             if sys.platform == 'darwin':
-                script = 'POSIX path of (choose folder with prompt "Select folder containing analyzed photos")'
+                script = 'POSIX path of (choose folder with prompt "选择包含已分析照片的文件夹")'
                 result = subprocess.run(
                     ['osascript', '-e', script],
                     capture_output=True,
@@ -127,7 +127,7 @@ class Api:
                 root = tk.Tk()
                 root.withdraw()
                 root.attributes('-topmost', True)
-                folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
+                folder = filedialog.askdirectory(title="选择包含已分析照片的文件夹")
                 root.destroy()
                 if folder:
                     print(f"[API] choose_directory() -> Success: {folder}", flush=True)
@@ -141,7 +141,7 @@ class Api:
                 root = tk.Tk()
                 root.withdraw()
                 root.attributes('-topmost', True)
-                folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
+                folder = filedialog.askdirectory(title="选择包含已分析照片的文件夹")
                 root.destroy()
                 if folder:
                     print(f"[API] choose_directory() -> Success: {folder}", flush=True)
@@ -186,7 +186,7 @@ class Api:
         try:
             if sys.platform == 'darwin':
                 import subprocess as _sp
-                script = 'POSIX path of (choose file of type {"app","APPL"} with prompt "Select an application")'
+                script = 'POSIX path of (choose file of type {"app","APPL"} with prompt "选择应用程序")'
                 result = _sp.run(['osascript', '-e', script], capture_output=True, text=True, timeout=120)
                 if result.returncode == 0 and result.stdout.strip():
                     return result.stdout.strip()
@@ -202,7 +202,7 @@ class Api:
                 else:
                     filetypes = [('All Files', '*.*')]
                 filepath = filedialog.askopenfilename(
-                    title="Select application executable",
+                    title="选择应用程序可执行文件",
                     filetypes=filetypes
                 )
                 root.destroy()

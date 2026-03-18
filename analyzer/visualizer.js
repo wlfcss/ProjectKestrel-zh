@@ -1,31 +1,37 @@
-    // State
-    // NOTE: Two modes for file access:
-    // 1. Python API mode (desktop app): Uses rootPath + Python backend API calls
-    // 2. File System Access API mode (browser): Uses rootDirHandle for direct file access
-    // The getBlobUrlForPath function automatically chooses the best available method
-    let rootDirHandle = null;      // Top-level photo folder (contains .kestrel) - for File System Access API
-    let rootIsKestrel = false;     // True if user selected the .kestrel folder itself
-    let rootPath = '';             // Absolute path to root folder (for Python API)
+    // 状态
+    // 说明：文件访问分为两种模式：
+    // 1. Python API 模式（桌面应用）：使用 rootPath 和 Python 后端 API 调用
+    // 2. File System Access API 模式（浏览器）：使用 rootDirHandle 直接访问文件
+    // getBlobUrlForPath 会自动选择当前最合适的访问方式
+    let rootDirHandle = null;      // 顶层照片文件夹（包含 .kestrel），供 File System Access API 使用
+    let rootIsKestrel = false;     // 当用户直接选择 .kestrel 文件夹时为 true
+    let rootPath = '';             // 根目录绝对路径（供 Python API 使用）
     let csvFileHandle = null;      // .kestrel/kestrel_database.csv
-    let rows = [];                 // CSV rows (objects)
-    let _scenedata = {};           // Map of rootPath → kestrel_scenedata.json contents
-    let header = [];               // CSV header fields
-    let scenes = [];               // Aggregated scene objects
-    let dirty = false;             // Track unsaved edits
-    // Notify Python backend whenever dirty state changes (for close-prompt)
+    let rows = [];                 // CSV 行数据（对象）
+    let _scenedata = {};           // rootPath -> kestrel_scenedata.json 内容映射
+    let header = [];               // CSV 表头字段
+    let scenes = [];               // 聚合后的场景对象
+    let dirty = false;             // 记录是否有未保存改动
+    // 在 dirty 状态变化时通知 Python 后端（用于关闭确认）
     function _notifyDirty(val) {
       try { if (window.pywebview?.api?.notify_dirty) window.pywebview.api.notify_dirty(!!val); } catch (_) {}
     }
-    let _cleanSnapshot = null;      // Snapshot of rows+header at last clean state (load or save)
-    let selectedSceneIds = new Set(); // Multi-select: selected scene IDs ("slot:count")
-    let collapsedFolders = new Set(); // rootPaths of collapsed folder groups
-    let _lastSelectedIdx = -1;        // Shift-click range: last clicked index in _visibleSceneOrder
-    let _visibleSceneOrder = [];       // Flat ordered list of visible scene IDs after last render
-    let _focusedCardId = null;         // Scene ID of the keyboard-focused card in the grid
-    // Track which scene dialog is open for refreshing filters
+    let _cleanSnapshot = null;      // 上一次干净状态（加载或保存后）的 rows+header 快照
+    let selectedSceneIds = new Set(); // 多选：已选中的场景 ID（"slot:count"）
+    let collapsedFolders = new Set(); // 已折叠文件夹分组的 rootPath 集合
+    let _lastSelectedIdx = -1;        // Shift 点击范围：_visibleSceneOrder 中最后点击的索引
+    let _visibleSceneOrder = [];       // 最近一次渲染后可见场景 ID 的扁平顺序列表
+    let _focusedCardId = null;         // 网格中当前键盘焦点所在的场景 ID
+    // 记录当前打开的是哪个场景对话框，便于刷新筛选结果
     let currentSceneId = null;
 
     const el = (sel) => document.querySelector(sel);
+    const t = (key, vars) => window.KestrelI18n?.t ? window.KestrelI18n.t(key, vars) : key;
+    const getSpeciesDisplayName = (name) => window.KestrelTaxonomy?.speciesDisplayName ? window.KestrelTaxonomy.speciesDisplayName(name) : String(name || '');
+    const getFamilyDisplayName = (name) => window.KestrelTaxonomy?.familyDisplayName ? window.KestrelTaxonomy.familyDisplayName(name) : String(name || '');
+    const speciesMatchesQuery = (name, query) => window.KestrelTaxonomy?.speciesMatchesQuery
+      ? window.KestrelTaxonomy.speciesMatchesQuery(name, query)
+      : String(name || '').toLowerCase().includes(String(query || '').toLowerCase());
     const sceneGrid = el('#sceneGrid');
     const imageGrid = el('#imageGrid');
     const statusEl = el('#status');
@@ -35,7 +41,7 @@
     const supportsFS = 'showDirectoryPicker' in window;
     let hasPywebviewApi = typeof window.pywebview !== 'undefined';
 
-    // Debug: Log what APIs are available (initial check)
+    // 调试：记录当前可用的 API（首次检查）
     console.log('[DEBUG] Initial API Detection:');
     console.log('  - File System Access API (showDirectoryPicker):', supportsFS);
     console.log('  - Pywebview API (window.pywebview):', hasPywebviewApi);
@@ -47,12 +53,12 @@
       }
     }
 
-    // Pywebview API might load asynchronously, so wait for it
+    // pywebview API 可能异步注入，因此需要等待
     async function waitForPywebview() {
       if (typeof window.pywebview !== 'undefined' && window.pywebview.api) {
         return true;
       }
-      // Poll for up to 2 seconds
+      // 轮询最多 2 秒
       for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 100));
         if (typeof window.pywebview !== 'undefined' && window.pywebview.api) {
@@ -62,7 +68,7 @@
           console.log('[DEBUG] window.pywebview:', window.pywebview);
           console.log('[DEBUG] window.pywebview.api:', window.pywebview.api);
           console.log('[DEBUG] Available API methods:', Object.keys(window.pywebview.api));
-          // Hide compatibility warning since we now have pywebview
+          // 既然 pywebview 已可用，就隐藏兼容性提示
           el('#compat').classList.add('hidden');
           return true;
         }
@@ -71,36 +77,37 @@
       return false;
     }
 
-    // Start checking for pywebview immediately and update UI when ready
+    // 立即开始检查 pywebview，并在就绪后更新 UI
     (async function() {
+      try { await window.KestrelTaxonomy?.load?.(); } catch (_) {}
       const apiReady = !hasPywebviewApi ? await waitForPywebview() : true;
-      // After API is ready, check legal agreement
+      // API 就绪后检查法律协议状态
       checkLegalAgreement();
-      // Show/hide compatibility warning
+      // 显示或隐藏兼容性提示
       if (!supportsFS && !apiReady) {
         el('#compat').classList.remove('hidden');
       } else if (apiReady) {
         el('#compat').classList.add('hidden');
       }
-      // After API is confirmed ready, wait for settings to be hydrated, then check donation threshold
+      // API 确认可用后，先等待设置同步完成，再检查捐助阈值
       await new Promise(function(r) { setTimeout(r, 500); });
-      // Hydrate settings from server to ensure localStorage has the latest data
+      // 从服务端同步设置，确保 localStorage 中是最新数据
       await hydrateSettingsFromServer();
-      // Then check donation threshold (after settings are loaded into localStorage)
+      // 设置写入 localStorage 后再检查捐助阈值
       checkDonationThresholdOnStartup();
     })();
 
-    // Utilities
+    // 工具函数
     function setStatus(msg) { statusEl.textContent = msg; }
 
-    // Temporary toast notification (clickable) — default 5s
+    // 临时 toast 通知（可点击），默认 5 秒
     function showToast(msg, timeout = 5000, onclick) {
       try {
-        // Determine where to attach the container: prefer the topmost open dialog
+        // 决定把容器挂在哪：优先挂到最上层已打开的对话框
         const openDialogs = Array.from(document.querySelectorAll('dialog[open]'));
         let attachParent = document.body;
         if (openDialogs.length > 0) {
-          // Use the last-opened dialog (assumed topmost) so toast is visible above it
+          // 使用最后打开的对话框（默认视为最上层），让 toast 显示在其上方
           attachParent = openDialogs[openDialogs.length - 1];
         }
 
@@ -108,7 +115,7 @@
         if (!container) {
           container = document.createElement('div');
           container.id = 'toastContainer';
-          // ensure basic layout
+          // 确保具备基础布局样式
           container.style.position = 'fixed';
           container.style.right = '18px';
           container.style.bottom = '18px';
@@ -119,7 +126,7 @@
           container.style.pointerEvents = 'none';
         }
 
-        // If the container isn't in the preferred parent, move it there.
+        // 如果容器不在期望的父元素中，就把它移动过去。
         if (container.parentNode !== attachParent) {
           attachParent.appendChild(container);
         }
@@ -171,10 +178,9 @@
 
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-    // ── Lazy image loader (throttled) ────────────────────────────────────────────
-    // Concurrency-limited to avoid flooding the Python IPC bridge with dozens of
-    // simultaneous read_image_file calls when a large section of the grid scrolls
-    // into view.  Excess loads are queued and drained as earlier ones finish.
+    // ── 懒加载图片（限流） ────────────────────────────────────────────
+    // 通过限制并发，避免当大块网格进入视口时向 Python IPC 桥同时发出
+    // 大量 read_image_file 请求。超出的加载任务会排队，等前面的完成后再执行。
     const _imgLoadThrottle = { active: 0, max: 100, queue: [] };
     function _scheduleLoad(fn) {
       if (_imgLoadThrottle.active < _imgLoadThrottle.max) {
@@ -203,24 +209,24 @@
         const url = await resolverFn();
         if (url) {
           img.src = url;
-          // Let the browser decode the image off the main thread before the
-          // next paint, preventing jank from synchronous decode.
+          // 让浏览器在主线程之外完成图片解码，
+          // 避免同步解码导致下一帧卡顿。
           try { await img.decode(); } catch (_) { /* broken/aborted image */ }
         }
       };
       _lazyObserver.observe(img);
     }
-    // ── End lazy image loader ────────────────────────────────────────────────────
+    // ── 懒加载图片结束 ────────────────────────────────────────────────────
 
-    // Generic debounce helper
+    // 通用防抖辅助函数
     function debounce(fn, ms) {
       let timer;
       return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
     }
 
-    // Version counter so concurrent renderScenes calls can bail out early
+    // 版本计数器，用于让并发的 renderScenes 调用提前退出
     let _renderScenesVersion = 0;
-    // Version counter so loadMultipleFolders can be cancelled mid-flight
+    // 版本计数器，用于让 loadMultipleFolders 在执行中途可被取消
     let _loadFoldersVersion = 0;
 
     function loadVersionBadge() {
@@ -228,7 +234,7 @@
       
       async function updateVersionBadge() {
         try {
-          // Fetch app version from VERSION.txt
+          // 从 VERSION.txt 读取应用版本
           let displayVersion = 'Version: unknown';
           try {
             const resp = await fetch('VERSION.txt', { cache: 'no-store' });
@@ -248,7 +254,7 @@
             console.error('[loadVersionBadge] Failed to fetch VERSION.txt:', e);
           }
           
-          // Fetch pipeline version from config.py via API
+          // 通过 API 从 config.py 获取流水线版本
           if (hasPywebviewApi && window.pywebview?.api?.get_app_version) {
             try {
               const result = await window.pywebview.api.get_app_version();
@@ -264,19 +270,19 @@
           versionBadge.textContent = displayVersion;
         } catch (e) {
           console.error('[loadVersionBadge] Unexpected error:', e);
-          versionBadge.textContent = 'Version: error';
+          versionBadge.textContent = t('status.version_error');
         }
       }
       
-      // If API is not ready yet, wait for it
+      // 如果 API 还没准备好，就先等待
       if (!hasPywebviewApi) {
         waitForPywebview().then(() => updateVersionBadge());
       } else {
         updateVersionBadge();
       }
       
-      // Check for new versions from remote JSON endpoint but we need pywebview to be ready, 
-      // so listen for the event or execute immediately if already mounted
+      // 从远端 JSON 端点检查新版本，但需要先确保 pywebview 已就绪，
+      // 因此监听事件，或在已经挂载时立即执行
       if (window.pywebview?.api) {
         checkRemoteVersion();
       } else {
@@ -284,7 +290,7 @@
       }
     }
 
-    // Check if running as Windows Store app
+    // 检查当前是否以 Windows Store 应用方式运行
     async function isWindowsStoreApp() {
       try {
         if (!window.pywebview?.api?.is_windows_store_app) return false;
@@ -295,11 +301,11 @@
       }
     }
 
-    // Get platform info
+    // 获取平台信息
     async function getPlatformInfo() {
       try {
         if (!window.pywebview?.api?.get_platform_info) {
-          // Fallback to client-side detection
+          // 回退到前端侧平台检测
           if (navigator.platform.includes('Mac')) return 'macos';
           if (navigator.platform.includes('Win')) return 'windows';
           return 'windows'; // default
@@ -311,10 +317,10 @@
       }
     }
 
-    // Check remote version from JSON endpoint
+    // 从 JSON 端点检查远端版本
     async function checkRemoteVersion() {
       try {
-        // Read current app version from VERSION.txt
+        // 从 VERSION.txt 读取当前应用版本
         let currentVer = _appVersion;
         if (!currentVer) {
           try {
@@ -323,7 +329,7 @@
               const text = await versionResp.text();
               const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
               if (lines.length > 0) {
-                // Extract just the version part (e.g., "v(Swamp Sparrow)" from "Version: v(Swamp Sparrow)")
+                // 仅提取版本号部分（例如从 "Version: v(Swamp Sparrow)" 提取 "v(Swamp Sparrow)"）
                 const line = lines[0];
                 currentVer = line.toLowerCase().startsWith('version') 
                   ? line.replace(/^version:\s*/i, '').trim()
@@ -351,21 +357,21 @@
         
         const latestVersion = versionList[0]; // first entry is latest
         
-        // Compare versions: check if latest name differs from current
+        // 比较版本：检查最新版本名称是否与当前不同
         if (!latestVersion.name) return;
         const normalizedLocal = (currentVer || '').replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
         const normalizedRemote = latestVersion.name.replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
         
         if (normalizedRemote === normalizedLocal) return;
         
-        // Show update notification
+        // 显示更新通知
         showVersionUpdateNotification(latestVersion);
       } catch (e) {
-        // Network error, offline mode - ignore
+        // 网络错误或离线模式，忽略即可
       }
     }
 
-    // Display the version update notification as a toast
+    // 以 toast 形式显示版本更新通知
     async function showVersionUpdateNotification(versionInfo) {
       console.log('[DEBUG] Showing version update notification for version:', versionInfo);
       const toast = document.getElementById('versionUpdateToast');
@@ -374,15 +380,15 @@
       const platform = await getPlatformInfo();
       const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
       
-      // Priority symbol
+      // 优先级符号
       const priorityEl = document.getElementById('versionUpdatePriority');
       if (priorityEl) priorityEl.textContent = versionInfo.highPriority ? '⭐' : '•';
       
-      // Title
+      // 标题
       const titleEl = document.getElementById('versionUpdateTitle');
-      if (titleEl) titleEl.textContent = `Update Available: ${versionInfo.name}`;
+      if (titleEl) titleEl.textContent = t('update.available_title', { name: versionInfo.name });
       
-      // Changelog notes (show first 3)
+      // 更新说明（显示前 3 条）
       const notesEl = document.getElementById('versionUpdateNotes');
       if (notesEl && versionInfo.notes && Array.isArray(versionInfo.notes)) {
         notesEl.innerHTML = '';
@@ -393,29 +399,29 @@
         });
       }
       
-      // Windows-specific note (only show for Windows users)
+      // Windows 专属说明（仅对 Windows 用户显示）
       const windowsNoteEl = document.getElementById('versionUpdateWindowsNote');
       if (windowsNoteEl) {
         if (platform === 'windows') {
-          windowsNoteEl.innerHTML = 'Windows users: Check for updates in the Microsoft Store within 1-3 days. If you used the traditional installer to install Kestrel, visit <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> to manually update.';
+          windowsNoteEl.innerHTML = t('update.windows_note');
           windowsNoteEl.style.display = 'block';
         } else {
           windowsNoteEl.style.display = 'none';
         }
       }
       
-      // Download button
+      // 下载按钮
       const downloadBtn = document.getElementById('versionUpdateDownloadBtn');
       if (downloadBtn) {
         downloadBtn.href = `https://projectkestrel.org/download?platform=${platform}`;
-        downloadBtn.textContent = platform === 'macos' ? 'Go to MacOS Download' : 'Go to Windows Download';
+        downloadBtn.textContent = platform === 'macos' ? t('update.download_macos') : t('update.download_windows');
         downloadBtn.onclick = (e) => {
           e.preventDefault();
           window.open(`https://projectkestrel.org/download?platform=${platform}`, '_blank');
         };
       }
       
-      // Close button
+      // 关闭按钮
       const closeBtn = document.getElementById('versionUpdateClose');
       if (closeBtn) {
         closeBtn.onclick = () => {
@@ -423,10 +429,10 @@
         };
       }
       
-      // Show the toast
+      // 显示 toast
       toast.style.display = 'block';
       
-      // Auto-hide after 10 seconds
+      // 10 秒后自动隐藏
       setTimeout(() => {
         if (toast.style.display === 'block') {
           toast.style.display = 'none';
@@ -434,7 +440,7 @@
       }, 60000);
     }
 
-    // Tooltip layer so tips can render over the main image area
+    // 提示层，确保提示信息可以显示在主图区域上方
     (function initTooltips() {
       const tipEl = document.createElement('div');
       tipEl.className = 'tooltip-layer';
@@ -478,22 +484,22 @@
       });
     })();
 
-    // Simple UI zoom controls (Chromium webviews support CSS zoom)
+    // 简单的界面缩放控制（Chromium webview 支持 CSS zoom）
     let uiZoom = 1;
     function applyZoom() {
       const zoomEl = document.getElementById('mainZoom');
       if (!zoomEl) return;
       const z = uiZoom;
-      // Use non-transform zoom so position:sticky on headers continues to work.
-      // Prefer CSS `zoom` when available; fall back to transform-only if not supported.
+      // 优先使用非 transform 的缩放方式，确保标题中的 position: sticky 继续生效。
+      // 能用 CSS `zoom` 时优先使用；否则回退到仅 transform 的方案。
       try {
         zoomEl.style.zoom = z.toFixed(2);
-        // Ensure no transform is set (transform can break sticky behavior)
+        // 确保未设置 transform（transform 可能破坏 sticky 行为）
         zoomEl.style.transform = '';
         zoomEl.style.width = '';
         zoomEl.style.height = '';
       } catch (e) {
-        // Fallback: use transform if browser doesn't support zoom (sticky may be affected)
+        // 回退：若浏览器不支持 zoom，则改用 transform（可能影响 sticky）
         const s = uiZoom.toFixed(2);
         zoomEl.style.transform = `scale(${s})`;
         zoomEl.style.width = `calc(100% / ${s})`;
@@ -503,7 +509,7 @@
 
     function sanitizePath(p) {
       if (!p) return '';
-      // Normalize to forward slashes, trim quotes
+      // 统一为正斜杠，并去掉首尾引号
       return String(p).replace(/^\"|\"$/g, '').replace(/\\/g, '/');
     }
 
@@ -526,7 +532,7 @@
           handle = await handle.getDirectoryHandle(parts[i]);
         } catch (e) {
           if (isLast) {
-            // maybe file
+            // 可能是文件
             try { return await handle.getFileHandle(parts[i]); } catch (_) { throw e; }
           } else {
             throw e;
@@ -536,38 +542,38 @@
       return handle;
     }
 
-    // Try to turn an absolute Windows path into a path relative to the selected root
-    // Also handles paths that are already relative (from new relative roots format)
+    // 尝试把绝对 Windows 路径转换成相对当前根目录的路径
+    // 同时处理本来就是相对路径的新格式
     function toRootRelative(absPath) {
       if (!absPath || !rootDirHandle) return null;
       const p = sanitizePath(absPath);
 
-      // Check if path is ALREADY relative (new format)
-      // Relative paths start with .kestrel/ or kestrel/ and don't have drive letters or leading /
+      // 检查路径是否本来就是相对路径（新格式）
+      // 相对路径以 .kestrel/ 或 kestrel/ 开头，且不带盘符或前导 /
       if (p.toLowerCase().startsWith('.kestrel/') || p.toLowerCase().startsWith('kestrel/')) {
-        // Already relative - return as-is, but strip .kestrel/ prefix if rootIsKestrel
+        // 已经是相对路径，直接返回；若 rootIsKestrel 为真则去掉 .kestrel/ 前缀
         return rootIsKestrel ? p.replace(/^\.?kestrel\//i, '') : p;
       }
 
-      // Check for absolute path with embedded .kestrel folder (old format)
+      // 检查是否为嵌入 .kestrel 文件夹的绝对路径（旧格式）
       const idx = p.toLowerCase().lastIndexOf('/.kestrel/');
       if (idx >= 0) {
         const rel = p.substring(idx + 1); // include .kestrel/…
         return rootIsKestrel ? rel.replace(/^\.kestrel\//i, '') : rel;
       }
 
-      // fallback: if only filename, return that
+      // 回退：如果只有文件名，就直接返回文件名
       const base = p.split('/').pop();
       return base || null;
     }
 
 
-    // Blob URL cache per path
+    // 按路径缓存 Blob URL
     const blobUrlCache = new Map();
 
-    /** Convert a base64 string to a Blob Object URL.  Unlike data: URIs, blob:
-     *  URLs are decoded asynchronously by the browser's image-decode thread,
-     *  keeping the main thread free during scroll. */
+    /** 将 base64 字符串转换为 Blob 对象 URL。
+     *  与 data: URI 不同，blob: URL 会由浏览器的图片解码线程异步处理，
+     *  因此滚动时不会阻塞主线程。 */
     function _base64ToBlobUrl(b64, mime) {
       const bin = atob(b64);
       const buf = new Uint8Array(bin.length);
@@ -579,22 +585,21 @@
       if (!relOrAbsPath) return null;
       const effectiveRoot = rootOverride || rootPath;
 
-      // Normalize separators immediately (cheap, matches culling.html behaviour)
+      // 立即统一路径分隔符（开销很小，并与 culling.html 的行为保持一致）
       const rel = String(relOrAbsPath).replace(/\\/g, '/');
 
-      // Cache check first — avoids ALL further work on already-loaded images
-      // (this is the hot path during scroll-back through cached thumbnails)
+      // 优先检查缓存，避免对已加载图片做任何额外工作
+      // （这是回滚查看已缓存缩略图时的热点路径）
       const cacheKey = `${effectiveRoot}:${rel}`;
       if (blobUrlCache.has(cacheKey)) return blobUrlCache.get(cacheKey);
 
-      // PRIORITY 1: Python API (desktop app - all platforms)
+      // 优先级 1：Python API（桌面应用，全平台）
       if (hasPywebviewApi && window.pywebview?.api?.read_image_file && effectiveRoot) {
         try {
           const result = await window.pywebview.api.read_image_file(rel, effectiveRoot);
           if (result && result.success && result.data) {
-            // Use a blob: URL instead of a data: URL so the browser can decode
-            // the image asynchronously on its decode thread rather than blocking
-            // the main thread with synchronous base64 + JPEG/PNG parsing.
+            // 使用 blob: URL 而不是 data: URL，让浏览器在解码线程中异步处理图片，
+            // 避免主线程被同步 base64 与 JPEG/PNG 解析阻塞。
             const blobUrl = _base64ToBlobUrl(result.data, result.mime);
             blobUrlCache.set(cacheKey, blobUrl);
             return blobUrl;
@@ -605,7 +610,7 @@
         }
       }
 
-      // PRIORITY 2: File System Access API (browser mode only)
+      // 优先级 2：File System Access API（仅浏览器模式）
       if (!rootPath && rootDirHandle) {
         try {
           const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
@@ -636,9 +641,9 @@
       return Number.isFinite(ms) ? ms : Number.NaN;
     }
 
-    // Parse secondary species columns.
-    // New format: JSON array strings e.g. '["Greater Yellowlegs","Vaux\'s Swift"]'.
-    // Legacy format: numpy str() repr e.g. "[\'Greater Yellowlegs\' \"Vaux\'s Swift\"]".
+    // 解析次级物种列。
+    // 新格式：JSON 数组字符串，例如 '["Greater Yellowlegs","Vaux\'s Swift"]'。
+    // 旧格式：numpy str() 的 repr，例如 "[\'Greater Yellowlegs\' \"Vaux\'s Swift\"]"。
     function parseSecondarySpecies(row) {
       if (row.__secondaryCache) return row.__secondaryCache;
       const listRaw = row.secondary_species_list;
@@ -647,7 +652,7 @@
       if (!listRaw || !scoresRaw) { row.__secondaryCache = result; return result; }
       try {
         let species = null, nums = null;
-        // Try JSON first (new format)
+        // 先尝试按 JSON 解析（新格式）
         try {
           const ls = String(listRaw).trim();
           const ss = String(scoresRaw).trim();
@@ -661,7 +666,7 @@
         } catch (_) { species = null; nums = null; }
 
         if (species === null) {
-          // Legacy numpy repr fallback: numpy uses "..." for names with apostrophes
+          // 回退处理旧版 numpy repr：名称里带撇号时 numpy 会使用 "..."
           species = [];
           const listStr = String(listRaw).replace(/\n\s*/g, ' ');
           const dqRe = /"([^"]+)"/g;
@@ -686,7 +691,7 @@
       return result;
     }
 
-    // Parse secondary family columns similar to secondary species.
+    // 次级科名列的解析逻辑与次级物种类似。
     function parseSecondaryFamilies(row) {
       if (row.__secondaryFamilyCache) return row.__secondaryFamilyCache;
       const listRaw = row.secondary_family_list;
@@ -695,7 +700,7 @@
       if (!listRaw || !scoresRaw) { row.__secondaryFamilyCache = result; return result; }
       try {
         let fams = null, nums = null;
-        // Try JSON first
+        // 先尝试按 JSON 解析
         try {
           const ls = String(listRaw).trim();
           const ss = String(scoresRaw).trim();
@@ -709,7 +714,7 @@
         } catch (_) { fams = null; nums = null; }
 
         if (fams === null) {
-          // Legacy numpy repr fallback
+          // 回退处理旧版 numpy repr
           fams = [];
           const listStr = String(listRaw).replace(/\n\s*/g, ' ');
           const dqRe = /"([^"]+)"/g;
@@ -739,7 +744,7 @@
       for (const r of rows) if (!('scene_name' in r)) r.scene_name = '';
     }
 
-    // Ensure rating columns exist and default values are set
+    // 确保评分相关列存在并设置默认值
     function ensureRatingColumns() {
       if (!header.includes('rating')) header.push('rating');
       if (!header.includes('rating_origin')) header.push('rating_origin');
@@ -768,7 +773,7 @@
       return '';
     }
 
-    /** Get (or lazily initialise) the scenedata object for a rootPath. */
+    /** 获取（或延迟初始化）某个 rootPath 对应的 scenedata 对象。 */
     function _initScenedata(rp) {
       if (!_scenedata[rp]) _scenedata[rp] = { version: '2.0', image_ratings: {}, scenes: {} };
       return _scenedata[rp];
@@ -871,13 +876,13 @@
       return sd;
     }
 
-    // Helper: is this image manually rated (>0 stars)?
+    // 辅助判断：这张图片是否为手动评分（大于 0 星）？
     function isManualRated(r) { return getRating(r) > 0 && getOrigin(r) === 'manual'; }
 
     function aggregateScenes(minSpeciesConf, searchTerm, sortBy, includeSecondary, includeFamilies) {
       const groups = new Map();
       for (const r of rows) {
-        // Prefix with folderSlot so scenes from different folders never collide
+        // 给 scene_id 加上 folderSlot 前缀，避免不同文件夹的场景发生冲突
         const id = (r.__folderSlot != null ? r.__folderSlot + ':' : '') + r.scene_count;
         if (!groups.has(id)) groups.set(id, []);
         groups.get(id).push(r);
@@ -885,7 +890,7 @@
 
       const list = [];
       for (const [sceneId, arr] of groups) {
-        // representative by max quality
+        // 选择质量最高的图片作为代表
         let rep = arr[0];
         for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
 
@@ -904,7 +909,7 @@
         const sdScene = rowRp && rowSc ? _scenedata[rowRp]?.scenes?.[rowSc] : null;
         const sceneName = sdScene?.name || (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
         const isApproved = !!sdScene?.user_tags?.finalized;
-        // If this scene has finalized user_tags, use them for species/family display
+        // 如果该场景已有最终确认的 user_tags，则用它们作为物种/科展示内容
         if (isApproved) {
           const utSpecies = (sdScene.user_tags.species || []).slice().sort();
           const utFams = includeFamilies ? (sdScene.user_tags.families || []).slice().sort() : [];
@@ -924,11 +929,19 @@
         });
       }
 
-      // filter by search term
+      // 按搜索词筛选
       const q = (searchTerm || '').trim().toLowerCase();
-      const filtered = q ? list.filter(s => s.species.some(sp => sp.toLowerCase().includes(q))) : list;
+      const filtered = q ? list.filter(s => {
+        if (s.species.some(sp => speciesMatchesQuery(sp, q))) return true;
+        const families = collectSceneSpecies(s.id).families || [];
+        return families.some(fm => {
+          const raw = String(fm || '').toLowerCase();
+          const display = String(getFamilyDisplayName(fm) || '').toLowerCase();
+          return raw.includes(q) || display.includes(q);
+        });
+      }) : list;
 
-      // sort
+      // 排序
       const sorted = filtered.sort((a, b) => {
         if (sortBy === 'captureTime') {
           if (a.captureTimeMs !== b.captureTimeMs) return a.captureTimeMs - b.captureTimeMs;
@@ -945,18 +958,18 @@
     function getRating(row) {
       const rp = row?.__rootPath || rootPath || '';
       const fn = row?.filename || '';
-      // 1. Manual rating stored in scenedata (pywebview desktop mode)
+      // 1. 存在 scenedata 中的手动评分（pywebview 桌面模式）
       const sd = _scenedata[rp];
       if (sd?.image_ratings && fn && fn in sd.image_ratings) {
         const n = parseInt(sd.image_ratings[fn], 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
-      // 2. Legacy row-level manual rating (FSAPI browser mode or pre-migration data)
+      // 2. 旧版逐行手动评分（FSAPI 浏览器模式或迁移前数据）
       if (String(row?.rating_origin).toLowerCase() === 'manual') {
         const n = parseInt(row?.rating, 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
-      // 3. Auto: normalized rating computed by last apply_normalization call
+      // 3. 自动评分：由最近一次 apply_normalization 计算出的标准化评分
       const norm = parseInt(row?.__normalized_rating ?? row?.normalized_rating, 10);
       if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
       return 0;
@@ -976,13 +989,13 @@
       const rp = row?.__rootPath || rootPath || '';
       const fn = row?.filename || '';
       if (hasPywebviewApi && rp && fn) {
-        // pywebview desktop mode: persist rating in scenedata only
+        // pywebview 桌面模式：评分仅持久化到 scenedata
         const sd = _initScenedata(rp);
         const current = sd.image_ratings[fn];
         if (current === v && v !== 0) return; // no change
         if (v === 0) delete sd.image_ratings[fn]; else sd.image_ratings[fn] = v;
       } else {
-        // FSAPI browser mode: legacy row-level storage
+        // FSAPI 浏览器模式：沿用旧版逐行存储
         const vs = String(v);
         if ((row.rating || '') === vs && (row.rating_origin || '') === origin) return;
         row.rating = vs;
@@ -1012,12 +1025,12 @@
         s.className = 'star';
         s.textContent = '☆';
         s.title = 'Click to set rating';
-        // Click only — hover preview is handled by delegated listeners below
+        // 这里只处理点击，悬停预览由下方的委托监听器负责
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
         wrap.appendChild(s);
       }
 
-      // 2 delegated listeners per bar instead of 10 per-star mouseenter/mouseleave
+      // 每个评分条只挂 2 个委托监听器，而不是每颗星各挂 mouseenter/mouseleave
       wrap.addEventListener('mousemove', (ev) => {
         const t = ev.target;
         if (t.classList.contains('star')) {
@@ -1035,11 +1048,12 @@
       const totalImages = sceneList.reduce((acc, s) => acc + s.imageCount, 0);
       const totalScenes = sceneList.length;
       const allScenes = new Set(rows.map(r => r.scene_count)).size;
-      const dirtyMark = dirty ? ' • unsaved changes' : '';
-      setStatus(`Showing ${totalScenes} scenes with ${totalImages} images${totalScenes < allScenes ? ` (filtered from ${allScenes})` : ''}${dirtyMark}`);
+      const dirtyMark = dirty ? t('status.unsaved') : '';
+      const filtered = totalScenes < allScenes ? t('status.filtered_suffix', { all: allScenes }) : '';
+      setStatus(t('status.showing', { scenes: totalScenes, images: totalImages, filtered, dirty: dirtyMark }));
     }
 
-    // Render: Scenes — grouped by folder when multiple folders are loaded
+    // 渲染场景：多文件夹加载时按文件夹分组
     async function renderScenes() {
       const myVer = ++_renderScenesVersion;
       const minC = parseFloat(el('#speciesConf').value) || 0;
@@ -1053,28 +1067,28 @@
       const includeFamilies = true;
       scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
-      // Re-resolve _currentScene so the open scene dialog keeps working
-      // after the scenes array is regenerated with new objects.
+      // 重新解析 _currentScene，确保场景数组重建后
+      // 当前已打开的场景对话框仍能继续工作。
       if (_currentScene) {
         const openId = String(_currentScene.id);
         const refreshed = scenes.find(s => String(s.id) === openId);
         if (refreshed) _currentScene = refreshed;
       }
 
-      // Apply scene-level manual-rated filter without mutating global scenes
+      // 在不修改全局 scenes 的前提下应用“仅显示手动评分场景”过滤
       const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
 
       updateStatusBar(visibleScenes);
       sceneGrid.innerHTML = '';
 
-      // Show welcome panel when no data is loaded; hide it once a folder is open
+      // 没有加载数据时显示欢迎面板，打开文件夹后隐藏
       const _welcomePanel = document.getElementById('welcomePanel');
       if (_welcomePanel) _welcomePanel.classList.toggle('hidden', rows.length > 0);
 
-      // Flat index for shift-click range selection
+      // 用于 Shift 点击范围选择的扁平索引
       _visibleSceneOrder = visibleScenes.map(s => String(s.id));
 
-      // ---- Two-level grouping: folder → time-buckets ----
+      // ---- 两级分组：文件夹 -> 时间桶 ----
       function getTimeBucket(s) {
         const ct = s.representative?.capture_time;
         if (!ct) return '';
@@ -1087,7 +1101,7 @@
       }
       function getBucketDay(bucket) { return bucket ? bucket.split('T')[0] : ''; }
       function formatNodeTime(bucket) {
-        if (!bucket) return 'Unknown time';
+        if (!bucket) return t('status.unknown_time');
         try {
           const d = new Date(bucket + ':00');
           if (isNaN(d)) return bucket;
@@ -1103,7 +1117,7 @@
         } catch (_) { return ''; }
       }
 
-      // Build folderMap: folderKey → { folderPath, buckets: Map<tb, scene[]>, bucketOrder: [] }
+      // 构建 folderMap：folderKey -> { folderPath, buckets: Map<tb, scene[]>, bucketOrder: [] }
       const folderOrder = [];
       const folderMap = new Map();
       for (const s of visibleScenes) {
@@ -1140,15 +1154,15 @@
         title.className = 'title';
         const _localNum = String(s.id).split(':').pop();
         const _folderName = folderBaseName(s.representative?.__rootPath || '');
-        // Show folder name in title only when a single folder is loaded;
-        // in multi-folder mode the folder group header already shows it.
+        // 仅在单文件夹加载时在标题中显示文件夹名；
+        // 多文件夹模式下，分组头部已经会显示文件夹名。
         const _titleHtml = (_folderName && !showFolderHeaders)
           ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
           : `<b>#${_localNum}</b>`;
         title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${decodeEntities(escapeHtml(s.sceneName))}</span>` : '');
         title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
         const meta = document.createElement('div');
-        // Use a dedicated class for title-level badges so other .meta uses are unaffected
+        // 为标题级徽标使用专门的类名，避免影响其它 .meta 的用法
         meta.className = 'meta title-badges';
         meta.innerHTML = `<span class="score">★ ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
         const chips = document.createElement('div');
@@ -1158,10 +1172,20 @@
           chips.classList.add('reviewed-tags');
         }
         for (const sp of s.species.slice(0, 3)) {
-          const c = document.createElement('span'); c.className = s.isApproved ? 'chip manual-approved' : 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
+          const c = document.createElement('span');
+          c.className = s.isApproved ? 'chip manual-approved' : 'chip';
+          c.textContent = getSpeciesDisplayName(sp);
+          c.title = sp;
+          chips.appendChild(c);
         }
-        if (s.species.length > 3) { const more = document.createElement('span'); more.className = 'chip badge'; more.textContent = `+${s.species.length - 3} more`; more.title = s.species.slice(3).join(', '); chips.appendChild(more); }
-        // Put title and badges on the same physical line: left = title, right = badges
+        if (s.species.length > 3) {
+          const more = document.createElement('span');
+          more.className = 'chip badge';
+          more.textContent = `+${s.species.length - 3} 更多`;
+          more.title = s.species.slice(3).map(getSpeciesDisplayName).join(', ');
+          chips.appendChild(more);
+        }
+        // 标题与徽标放在同一行：左侧标题，右侧徽标
         const titleRow = document.createElement('div');
         titleRow.className = 'title-row';
         titleRow.appendChild(title);
@@ -1195,7 +1219,7 @@
             updateSelectionUI();
             return;
           }
-          // Normal: open scene dialog
+          // 常规行为：打开场景对话框
           _lastSelectedIdx = _visibleSceneOrder.indexOf(sid);
           openSceneDialog(sid);
         });
@@ -1204,7 +1228,7 @@
 
       const batch = 24;
 
-      // ---- Timeline builder (used when groupByTime is on) ----
+      // ---- 时间线构建器（在 groupByTime 开启时使用） ----
       function buildTimeline(fd, containerEl) {
         const timelineEl = document.createElement('div');
         timelineEl.className = 'timeline-body';
@@ -1217,7 +1241,7 @@
           const isLast = ni === allBuckets.length - 1;
           const thisDay = getBucketDay(tb);
 
-          // Day banner when the calendar date changes between buckets
+          // 当时间桶跨天时插入日期横幅
           if (thisDay && thisDay !== '__notime__' && thisDay !== prevDay) {
             const banner = document.createElement('div');
             banner.className = 'timeline-day-banner';
@@ -1229,7 +1253,7 @@
           const nodeEl = document.createElement('div');
           nodeEl.className = 'timeline-node';
 
-          // Rail column: dot + connecting line
+          // 轨道列：圆点 + 连接线
           const railCol = document.createElement('div');
           railCol.className = 'timeline-rail-col';
           const dot = document.createElement('div');
@@ -1239,7 +1263,7 @@
           railCol.appendChild(dot);
           railCol.appendChild(line);
 
-          // Content column: time label + scene cards
+          // 内容列：时间标签 + 场景卡片
           const contentCol = document.createElement('div');
           contentCol.className = 'timeline-content-col';
 
@@ -1248,10 +1272,10 @@
             hdr.className = 'timeline-node-header';
             const timeSpan = document.createElement('span');
             timeSpan.className = 'timeline-node-time';
-            timeSpan.textContent = tb === '__notime__' ? 'Unknown time' : formatNodeTime(tb);
+            timeSpan.textContent = tb === '__notime__' ? t('status.unknown_time') : formatNodeTime(tb);
             const countSpan = document.createElement('span');
             countSpan.className = 'timeline-node-count muted';
-            countSpan.textContent = `${tbScenes.length} scene${tbScenes.length === 1 ? '' : 's'}`;
+            countSpan.textContent = `${tbScenes.length} 个场景`;
             hdr.appendChild(timeSpan);
             hdr.appendChild(countSpan);
             contentCol.appendChild(hdr);
@@ -1276,14 +1300,14 @@
         containerEl.appendChild(timelineEl);
       }
 
-      // ---- Main folder rendering loop ----
+      // ---- 主文件夹渲染循环 ----
       for (const fk of folderOrder) {
         const fd = folderMap.get(fk);
         const allScenesInFolder = [...fd.buckets.values()].flat();
         let bodyEl; // receives the timeline or flat grid
 
         if (showFolderHeaders && fd.folderPath) {
-          const folderName = folderBaseName(fd.folderPath) || fd.folderPath || '(unknown folder)';
+          const folderName = folderBaseName(fd.folderPath) || fd.folderPath || t('folder.group_unknown');
           const collapsed = collapsedFolders.has(fk);
 
           const groupEl = document.createElement('div');
@@ -1291,48 +1315,48 @@
 
           const hdr = document.createElement('div');
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
-          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} scene${allScenesInFolder.length === 1 ? '' : 's'}</span>`;
+          hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} 个场景</span>`;
 
-          // Left-aligned secondary actions
+          // 左对齐的次级操作
           const leftActions = document.createElement('div');
           leftActions.className = 'folder-group-left-actions';
 
           const explorerBtn = document.createElement('button');
           explorerBtn.className = 'action-btn';
-          explorerBtn.innerHTML = '<i>📂</i> Open';
-          explorerBtn.title = 'Open this folder in File Explorer';
+          explorerBtn.innerHTML = t('folder.action_open');
+          explorerBtn.title = t('folder.action_open_title');
           explorerBtn.addEventListener('click', (ev) => { ev.stopPropagation(); window.pywebview.api.open_file_explorer(fd.folderPath); });
           leftActions.appendChild(explorerBtn);
 
           const folderOptionsBtn = document.createElement('button');
           folderOptionsBtn.className = 'action-btn';
-          folderOptionsBtn.innerHTML = '<i>↺</i> Reset Culling Decisions';
-          folderOptionsBtn.title = 'Reset Accept/Reject culling decisions for this folder';
+          folderOptionsBtn.innerHTML = t('folder.action_reset');
+          folderOptionsBtn.title = t('folder.action_reset_title');
           folderOptionsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); showFolderOptionsDialog(fd.folderPath); });
           leftActions.appendChild(folderOptionsBtn);
 
           hdr.appendChild(leftActions);
 
-          // Spacer pushes right actions to the far right
+          // 占位元素把右侧操作推到最右边
           const spacer = document.createElement('div');
           spacer.style.flex = '1';
           hdr.appendChild(spacer);
 
-          // Right-aligned primary actions
+          // 右对齐的主操作
           const rightActions = document.createElement('div');
           rightActions.className = 'folder-group-right-actions';
 
           const writeMetaBtn = document.createElement('button');
           writeMetaBtn.className = 'action-btn write-metadata-btn';
-          writeMetaBtn.innerHTML = '<i>📝</i> Write Photo Metadata';
-          writeMetaBtn.title = 'Write XMP sidecar files alongside your photos — carries star ratings, Accept/Reject decisions, and species tags. Readable by Lightroom, Capture One, darktable, and other editors.';
+          writeMetaBtn.innerHTML = t('folder.action_write_metadata');
+          writeMetaBtn.title = t('folder.action_write_metadata_title');
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
           rightActions.appendChild(writeMetaBtn);
 
           const cullingBtn = document.createElement('button');
           cullingBtn.className = 'action-btn culling-assistant-btn';
-          cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
-          cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
+          cullingBtn.innerHTML = t('folder.action_open_culling');
+          cullingBtn.title = t('folder.action_open_culling_title');
           cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
           rightActions.appendChild(cullingBtn);
 
@@ -1372,7 +1396,7 @@
       }
     }
 
-    // Update card highlights and show/hide floating action bar based on current selection
+    // 根据当前选择更新卡片高亮，并显示或隐藏浮动操作栏
     function updateSelectionUI() {
       const n = selectedSceneIds.size;
       document.querySelectorAll('.card[data-scene-id]').forEach(c => {
@@ -1383,13 +1407,13 @@
       if (n >= 2) {
         bar.classList.remove('hidden');
         const lbl = document.getElementById('selectActionLabel');
-        if (lbl) lbl.textContent = `${n} scene${n === 1 ? '' : 's'} selected`;
+        if (lbl) lbl.textContent = t('status.scene_selected', { count: n });
       } else {
         bar.classList.add('hidden');
       }
     }
 
-    // Scroll to a scene card in the grid and give it keyboard focus
+    // 滚动到网格中的场景卡片，并为其设置键盘焦点
     function _focusGridCard(sceneId) {
       _focusedCardId = String(sceneId);
       document.querySelectorAll('.card.focused').forEach(c => c.classList.remove('focused'));
@@ -1400,18 +1424,18 @@
       }
     }
 
-    // Clear the focused-card highlight
+    // 清除焦点卡片高亮
     function _clearGridFocus() {
       _focusedCardId = null;
       document.querySelectorAll('.card.focused').forEach(c => c.classList.remove('focused'));
     }
 
-    // Get all visible card elements in DOM order
+    // 按 DOM 顺序获取所有可见卡片元素
     function _getVisibleCards() {
       return Array.from(sceneGrid.querySelectorAll('.card[data-scene-id]'));
     }
 
-    // Grid keyboard navigation: arrow keys move focus, Enter opens scene dialog
+    // 网格键盘导航：方向键移动焦点，Enter 打开场景对话框
     function _gridKeyHandler(e) {
       if (document.querySelector('dialog[open]')) return;
       if (selectedSceneIds.size > 0) return;
@@ -1463,7 +1487,7 @@
     }
     document.addEventListener('keydown', _gridKeyHandler);
 
-    // Merge all currently selected scenes (must all be in same folder)
+    // 合并当前选中的全部场景（必须来自同一文件夹）
     async function executeSelectionMerge() {
       const ids = Array.from(selectedSceneIds);
       if (ids.length < 2) return;
@@ -1475,7 +1499,7 @@
       });
       const slots = new Set(parsed.map(p => p.slot));
       if (slots.size > 1) {
-        alert('Cannot merge scenes from different folders.\nSelect scenes from the same folder only.');
+        alert(t('merge.cross_folder_alert'));
         return;
       }
       const target = parsed.slice().sort((a, b) => parseNumber(a.count) - parseNumber(b.count))[0];
@@ -1489,7 +1513,7 @@
           r.scene_count = targetCount; changed++;
         }
       }
-      // Update scenedata: move filenames from non-target scenes into target scene
+      // 更新 scenedata：把非目标场景中的文件名移动到目标场景
       if (hasPywebviewApi) {
         const rpForMerge = rows.find(r => (r.__folderSlot ?? 0) === slot)?.__rootPath || rootPath || '';
         if (rpForMerge) {
@@ -1513,19 +1537,19 @@
         dirty = true; _notifyDirty(true);
         el('#saveCsv').disabled = false;
         el('#revertCsv').disabled = false;
-        setStatus(`Merged ${ids.length} scenes into #${targetCount}. ${changed} rows updated.`);
+        setStatus(`已将 ${ids.length} 个场景合并到 #${targetCount}，共更新 ${changed} 行。`);
       }
       selectedSceneIds.clear();
       _lastSelectedIdx = -1;
       updateSelectionUI();
       await renderScenes();
-      // Scroll to the merged scene card; fall back to current scroll position
+      // 滚动到合并后的场景卡片；若失败则保持当前位置
       const mergedCard = document.querySelector(`.card[data-scene-id="${CSS.escape(mergedSceneId)}"]`);
       if (mergedCard) mergedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // Render images inside the scene dialog, honoring the manual-rated filter and stable ordering
-    // ---- Scene dialog RAW zoom (click-drag on thumbnail → zoom in previewBox) ----
+    // 在场景对话框中渲染图片，并遵守手动评分过滤与稳定排序
+    // ---- 场景对话框 RAW 缩放（点击拖拽缩略图 -> 在 previewBox 中缩放） ----
     let sceneZoomActive = false;
     let sceneZoomRow = null;
     let sceneZoomThumbEl = null;
@@ -1617,7 +1641,7 @@
         if (res && res.success && res.data) {
           const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
           sceneRawCache.set(key, url);
-          // Upgrade preview if this row is still the active zoom row
+          // 如果当前行仍是激活中的缩放行，则升级预览图源
           if (sceneZoomActive && sceneZoomRow === row) {
             const box = el('#previewBox');
             const curImg = box?.querySelector('img');
@@ -1657,7 +1681,7 @@
       zoomLastX = mouseEv.clientX;
       zoomLastY = mouseEv.clientY;
 
-      // Step 1: Immediately show the already-loaded thumbnail as a placeholder
+      // 第 1 步：立即显示已加载的缩略图作为占位
       const thumbImgSrc = thumbEl.querySelector('img')?.src;
       if (thumbImgSrc) {
         previewBox.innerHTML = '';
@@ -1673,7 +1697,7 @@
         applySceneZoomTransform(stub, thumbEl, mouseEv.clientX, mouseEv.clientY, sceneZoomScale);
       }
 
-      // Step 2: Async — upgrade to full export or cached RAW
+      // 第 2 步：异步升级到完整导出图或缓存的 RAW
       (async () => {
         if (!sceneZoomActive || sceneZoomRow !== row) return;
         const cachedRaw = sceneRawCache.get(key);
@@ -1710,12 +1734,12 @@
         }
       })();
 
-      // Step 3: Kick off RAW load in background
+      // 第 3 步：在后台启动 RAW 加载
       if (!sceneRawCache.has(key) && !sceneRawLoading.has(key) && hasPywebviewApi) {
         loadSceneRawAsync(row);
       }
 
-      // Show zoom slider
+      // 显示缩放滑块
       const zoomWrap = el('#sceneZoomWrap');
       const slider = el('#sceneZoomSlider');
       if (slider) {
@@ -1770,11 +1794,11 @@
       window.addEventListener('mouseup', onUp);
       window.addEventListener('wheel', onWheel, { passive: false });
     }
-    // ---- End scene dialog RAW zoom ----
+    // ---- 场景对话框 RAW 缩放结束 ----
 
-    // ── Filmstrip scene view state ──
+    // ── 底片栏场景视图状态 ──
     let currentImageIndex = 0;
-    let _currentScene = null; // reference to the scene object currently shown
+    let _currentScene = null; // 当前正在显示的场景对象引用
 
     function ensureCulledColumn() {
       if (!header.includes('culled')) header.push('culled');
@@ -1785,7 +1809,7 @@
       const raw = (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
       if (!raw) return '';
       const origin = normalizeCullOrigin(row);
-      // Auto culls are non-authoritative in filmstrip/main scene view.
+      // 在底片栏/主场景视图中，自动筛片结果不视为最终权威状态。
       if (origin === 'auto') return '';
       return raw;
     }
@@ -1821,7 +1845,7 @@
         if (cullOrigin === 'auto') card.classList.add('auto-cull');
         if (idx === currentImageIndex) card.classList.add('active');
 
-        // Thumbnail
+        // 缩略图
         const th = document.createElement('div');
         th.className = 'filmstrip-thumb';
         const img = document.createElement('img');
@@ -1831,7 +1855,7 @@
         th.appendChild(img);
         card.appendChild(th);
 
-        // Info
+        // 信息
         const info = document.createElement('div');
         info.className = 'filmstrip-info';
         const fn = document.createElement('div');
@@ -1852,25 +1876,25 @@
         info.appendChild(meta);
         card.appendChild(info);
 
-        // Tooltip with detailed metadata
+        // 带详细元数据的提示框
         const tip = document.createElement('div');
         tip.className = 'filmstrip-tooltip';
         tip.innerHTML = [
           `<b>${escapeHtml(r.filename || '')}</b>`,
-          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
+          `物种：${escapeHtml(getSpeciesDisplayName(r.species || 'Unknown'))} (${fmt3(r.species_confidence)})`,
           `Quality: ${fmt3(r.quality)}`,
           `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} ${origin ? `(${origin})` : ''}`,
           cull ? `Status: ${cull === 'accept' ? '✓ Accepted' : '✗ Rejected'}` : '',
         ].filter(Boolean).join('<br>');
         card.appendChild(tip);
 
-        // Click to select
+        // 点击选中
         card.addEventListener('click', () => {
           if (_splitMode) return; // handled by split mode
           selectFilmstripImage(idx, scene);
         });
 
-        // Hover to temporarily preview
+        // 悬停时临时预览
         card.addEventListener('mouseenter', () => {
           if (_splitMode) return;
           selectFilmstripImage(idx, scene, true);
@@ -1880,14 +1904,14 @@
           selectFilmstripImage(currentImageIndex, scene, true);
         });
 
-        // Double-click to open in editor
+        // 双击在编辑器中打开
         card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
 
         frag.appendChild(card);
       }
       grid.appendChild(frag);
 
-      // Update scene navigation hints
+      // 更新场景导航提示
       updateFilmstripHints(scene);
     }
 
@@ -1922,7 +1946,7 @@
       }
       const r = scene.images[idx];
 
-      // Update filmstrip card active state and center if not just hovering
+      // 若不是悬停预览，则更新底片栏卡片激活状态并滚动到中央
       const grid = el('#imageGrid');
       if (grid && !isHover) {
         grid.querySelectorAll('.filmstrip-card').forEach((c, i) => {
@@ -1931,7 +1955,7 @@
         scrollFilmstripToCenter(idx);
       }
 
-      // Load export preview
+      // 加载导出预览
       const exportBox = el('#previewBox');
       if (exportBox) {
         exportBox.innerHTML = '';
@@ -1943,7 +1967,7 @@
         } else { exportBox.innerHTML = '<span class="muted">No export preview</span>'; }
       }
 
-      // Load crop preview
+      // 加载裁切预览
       const cropBox = el('#previewCropBox');
       if (cropBox) {
         cropBox.innerHTML = '';
@@ -1955,7 +1979,7 @@
         } else { cropBox.innerHTML = '<span class="muted">No crop preview</span>'; }
       }
 
-      // Update preview panel accept/reject glow
+      // 更新预览面板的接受/拒绝光晕效果
       const exportPanel = el('#scenePreviewExport');
       const cropPanel = el('#scenePreviewCrop');
       const cull = getCullStatus(r);
@@ -1966,7 +1990,7 @@
         if (cull === 'reject') p.classList.add('scene-rejected');
       });
 
-      // Update info bar
+      // 更新信息栏
       const fnEl = el('#sceneInfoFilename');
       if (fnEl) { fnEl.textContent = r.filename || '—'; fnEl.title = r.filename || ''; }
 
@@ -1995,14 +2019,14 @@
 
       const metaEl = el('#sceneInfoMeta');
       if (metaEl) {
-        const sp = decodeEntities(r.species || 'Unknown');
+        const sp = decodeEntities(getSpeciesDisplayName(r.species || 'Unknown'));
         const spConf = fmt3(r.species_confidence);
-        const fam = decodeEntities(r.family || 'Unknown');
+        const fam = decodeEntities(getFamilyDisplayName(r.family || 'Unknown'));
         const famConf = fmt3(r.family_confidence);
         metaEl.textContent = `${sp} (${spConf}) | ${fam} (${famConf}) · Image ${idx + 1} of ${scene.images.length}`;
       }
 
-      // Render star bar in info bar
+      // 在信息栏中渲染星级条
       const starsEl = el('#sceneInfoStars');
       if (starsEl) {
         starsEl.innerHTML = '';
@@ -2010,7 +2034,7 @@
       }
     }
 
-    // Allow other code to refresh the scene images when filter or ratings change
+    // 允许其它代码在筛选或评分变化时刷新场景图片
     window.refreshSceneFilter = function () {
       if (currentSceneId != null && _currentScene) {
         renderFilmstrip(_currentScene);
@@ -2018,7 +2042,7 @@
       }
     };
 
-    // Render: Scene dialog
+    // 渲染：场景对话框
     let _splitMode = false;
     let _sceneEditMode = false;
     let _sceneEditDraft = null;
@@ -2080,36 +2104,36 @@
       const chipClass = approved ? 'chip manual-approved' : 'chip';
 
       let html = '';
-      // Species
-      html += '<span class="scene-tag-label">Species:</span> ';
+      // 物种
+      html += '<span class="scene-tag-label">物种：</span> ';
       if (species.length) {
         for (const sp of species) {
-          html += `<span class="${chipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">×</span></span>`;
+          html += `<span class="${chipClass}" title="${escapeHtml(sp)}">${escapeHtml(getSpeciesDisplayName(sp))}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">×</span></span>`;
         }
       } else {
         html += '<span class="muted" style="font-size:11px">—</span>';
       }
       if (_activeTagInputType === 'species' && _activeTagInputSceneId === String(scene.id)) {
-        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Species..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="物种..." /><button class="chip-commit-btn" title="保存">✓</button></span>`;
       } else {
-        html += `<button class="scene-chip-add" data-add-type="species" title="Add species tag">+</button>`;
+        html += `<button class="scene-chip-add" data-add-type="species" title="添加物种标签">+</button>`;
       }
 
       html += '<span class="scene-tag-sep"></span>';
 
-      // Families
-      html += '<span class="scene-tag-label">Family:</span> ';
+      // 科
+      html += '<span class="scene-tag-label">科：</span> ';
       if (families.length) {
         for (const fm of families) {
-          html += `<span class="${chipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">×</span></span>`;
+          html += `<span class="${chipClass}" title="${escapeHtml(fm)}">${escapeHtml(getFamilyDisplayName(fm))}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">×</span></span>`;
         }
       } else {
         html += '<span class="muted" style="font-size:11px">—</span>';
       }
       if (_activeTagInputType === 'family' && _activeTagInputSceneId === String(scene.id)) {
-        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Family..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="科..." /><button class="chip-commit-btn" title="保存">✓</button></span>`;
       } else {
-        html += `<button class="scene-chip-add" data-add-type="family" title="Add family tag">+</button>`;
+        html += `<button class="scene-chip-add" data-add-type="family" title="添加科标签">+</button>`;
       }
 
       if (approved) {
@@ -2118,7 +2142,7 @@
 
       tagsEl.innerHTML = html;
 
-      // Wire remove buttons
+      // 绑定删除按钮
       tagsEl.querySelectorAll('[data-remove-species]').forEach(btn => {
         btn.style.cursor = 'pointer';
         btn.onclick = () => {
@@ -2148,7 +2172,7 @@
         };
       });
 
-      // Wire (+) add buttons
+      // 绑定 (+) 添加按钮
       tagsEl.querySelectorAll('.scene-chip-add').forEach(btn => {
         btn.onclick = () => {
           _activeTagInputType = btn.dataset.addType;
@@ -2159,7 +2183,7 @@
         };
       });
 
-      // Wire inline input
+      // 绑定内联输入框
       const inp = el('#inlineTagInput');
       if (inp) {
         const commit = () => {
@@ -2194,7 +2218,7 @@
           }
         };
         inp.onblur = (e) => {
-          // Small delay to allow clicking the commit button if it exists
+          // 略微延迟，避免点击提交按钮时被 blur 提前打断
           setTimeout(() => {
             if (document.activeElement === tagsEl.querySelector('.chip-commit-btn')) return;
             if (_activeTagInputType) commit(); 
@@ -2205,7 +2229,7 @@
       }
     }
 
-    // Keep renderSceneMetaChips as an alias for compatibility
+    // 保留 renderSceneMetaChips 这个别名，以兼容旧调用方
     function renderSceneMetaChips(scene, editable) {
       renderTopbarTags(scene);
     }
@@ -2220,35 +2244,35 @@
       _sceneEditDraft = null;
       currentImageIndex = startIndex;
 
-      // ── Top bar: title ──
+      // ── 顶栏：标题 ──
       const localNum = String(scene.id).split(':').pop();
       const folderName = folderBaseName(scene.representative?.__rootPath || '');
-      let titleText = folderName || ('Scene ' + scene.id);
+      let titleText = folderName || ('场景 ' + scene.id);
       titleText += ' — #' + localNum;
       if (scene.sceneName) titleText += ' — ' + scene.sceneName;
-      titleText += ` (${scene.images.length} images)`;
+      titleText += `（${scene.images.length} 张图片）`;
       const titleEl = el('#sceneTopbarTitle');
       if (titleEl) titleEl.textContent = titleText;
 
-      // ── Rename setup ──
+      // ── 重命名初始化 ──
       el('#sceneName').value = scene.sceneName || '';
       el('#sceneRenameInline').classList.add('hidden');
 
-      // ── Pencil rename button ──
+      // ── 铅笔重命名按钮 ──
       el('#scenePencilBtn').onclick = () => {
         const renameRow = el('#sceneRenameInline');
         const isShown = !renameRow.classList.contains('hidden');
         if (isShown) {
-          // Apply rename
+          // 应用重命名
           applySceneName(scene.id, el('#sceneName').value);
           renameRow.classList.add('hidden');
-          // Update title
+          // 更新标题
           const updScene = reloadScene(scene.id) || scene;
           const nm = updScene.sceneName || '';
-          let t = folderName || ('Scene ' + scene.id);
+          let t = folderName || ('场景 ' + scene.id);
           t += ' — #' + localNum;
           if (nm) t += ' — ' + nm;
-          t += ` (${scene.images.length} images)`;
+          t += `（${scene.images.length} 张图片）`;
           titleEl.textContent = t;
           renderScenes();
         } else {
@@ -2260,19 +2284,19 @@
       el('#sceneRenameCancel').onclick = () => { el('#sceneRenameInline').classList.add('hidden'); };
       el('#sceneName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el('#scenePencilBtn').click(); } };
 
-      // ── Tags ──
+      // ── 标签 ──
       renderTopbarTags(scene);
 
-      // ── Shortcut legend toggle ──
+      // ── 快捷键说明切换 ──
       el('#sceneShortcutBtn').onclick = () => {
         el('#sceneShortcutLegend').classList.toggle('hidden');
       };
       el('#sceneShortcutLegend').classList.add('hidden');
 
-      // ── Filmstrip ──
+      // ── 底片栏 ──
       renderFilmstrip(scene);
 
-      // Wire horizontal scrolling via mouse wheel for filmstrip
+      // 为底片栏接入鼠标滚轮横向滚动
       const grid = el('#imageGrid');
       if (grid) {
         grid.onwheel = (ev) => {
@@ -2283,7 +2307,7 @@
         };
       }
 
-      // ── RAW zoom on export preview (mousedown on the export preview box) ──
+      // ── 导出预览上的 RAW 缩放（在导出预览框内按下鼠标） ──
       const exportImgBox = el('#previewBox');
       if (exportImgBox) {
         exportImgBox.onmousedown = (ev) => {
@@ -2295,7 +2319,7 @@
         };
       }
 
-      // ── Close ──
+      // ── 关闭 ──
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
         const closingId = _currentScene ? String(_currentScene.id) : null;
@@ -2307,7 +2331,7 @@
         if (closingId) _focusGridCard(closingId);
       };
 
-      // ── Split Scene ──
+      // ── 拆分场景 ──
       el('#splitSceneBtn').onclick = () => {
         if (_splitMode) {
           applySplitScene(scene);
@@ -2316,23 +2340,23 @@
         }
       };
 
-      // ── Scene navigation hints ──
+      // ── 场景导航提示 ──
       const hintL = el('#filmstripHintLeft');
       const hintR = el('#filmstripHintRight');
       if (hintL) hintL.onclick = () => navigateToScene(-1);
       if (hintR) hintR.onclick = () => navigateToScene(1);
 
-      // ── Keyboard handler ──
+      // ── 键盘处理逻辑 ──
       document.removeEventListener('keydown', _sceneKeyHandler);
       document.addEventListener('keydown', _sceneKeyHandler);
 
-      // ── Show dialog and select start image ──
+      // ── 显示对话框并选中起始图片 ──
       sceneDlg.showModal();
       await selectFilmstripImage(startIndex, scene);
     }
 
-    // Navigate to prev/next scene — uses ID-based lookup so it survives
-    // the scenes array being regenerated by auto-refresh / renderScenes.
+    // 跳转到上一个/下一个场景，使用基于 ID 的查找，
+    // 因此即使 scenes 被自动刷新或 renderScenes 重建也不会失效。
     function navigateToScene(direction, startIndex = 0) {
       if (!_currentScene) return;
       const curId = String(_currentScene.id);
@@ -2348,9 +2372,10 @@
       openSceneDialog(nextScene.id, startIndex);
     }
 
-    // Keyboard handler for scene dialog
+    // 场景对话框的键盘处理逻辑
     function _sceneKeyHandler(e) {
-      // Skip if focused in input/textarea (but allow our inline tag input to handle its own Esc/Enter)
+      // 若焦点在 input/textarea/select 中则跳过
+      // （内联标签输入框自行处理 Esc/Enter）
       const tag = (e.target.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (!_currentScene) return;
@@ -2358,7 +2383,7 @@
       const images = _currentScene.images;
       const len = images.length;
 
-      // Tab skips to next scene; Ctrl+Tab skips to previous
+      // Tab 跳到下一个场景；Ctrl+Tab 跳到上一个场景
       if (e.key === 'Tab') {
         e.preventDefault();
         navigateToScene(e.ctrlKey ? -1 : 1, 0);
@@ -2369,7 +2394,7 @@
         case 'ArrowRight':
           e.preventDefault();
           if (e.ctrlKey) {
-            // Jump to end of scene, or next scene's start if already at end
+            // 跳到当前场景末尾；若已经在末尾，则跳到下一个场景开头
             if (currentImageIndex < len - 1) {
               selectFilmstripImage(len - 1, _currentScene);
             } else {
@@ -2386,7 +2411,7 @@
         case 'ArrowLeft':
           e.preventDefault();
           if (e.ctrlKey) {
-            // Jump to start of scene, or prev scene's start if already at start
+            // 跳到当前场景开头；若已经在开头，则跳到上一个场景开头
             if (currentImageIndex > 0) {
               selectFilmstripImage(0, _currentScene);
             } else {
@@ -2396,7 +2421,7 @@
             if (currentImageIndex > 0) {
               selectFilmstripImage(currentImageIndex - 1, _currentScene);
             } else {
-              // At first image — jump to previous scene's LAST image
+              // 当前已是第一张图，则跳到上一个场景的最后一张图
               const prevIdx = scenes.indexOf(_currentScene) - 1;
               if (prevIdx >= 0) {
                 const prevScene = scenes[prevIdx];
@@ -2447,12 +2472,12 @@
       }
     }
 
-    // Refresh the current filmstrip card + info bar after a status/rating change
+    // 状态或评分变化后，刷新当前底片栏卡片与信息栏
     function _refreshCurrentFilmstripCard() {
       if (!_currentScene) return;
-      // Re-render the filmstrip to update card classes
+      // 重新渲染底片栏，更新卡片类名
       renderFilmstrip(_currentScene);
-      // Re-select the current image to update previews and info bar
+      // 重新选中当前图片，刷新预览与信息栏
       selectFilmstripImage(currentImageIndex, _currentScene);
     }
 
@@ -2470,7 +2495,7 @@
           if ((r.scene_name || '') !== newName) { r.scene_name = newName; rowChanged++; }
         }
       }
-      // Persist scene name in scenedata (pywebview mode)
+      // 在 scenedata 中持久化场景名称（pywebview 模式）
       let sdChanged = false;
       if (hasPywebviewApi && rp) {
         const sceneEntry = _getSceneScenedataEntry(sceneId, true, sceneRows);
@@ -2487,13 +2512,13 @@
       }
     }
 
-    // --- Species & Family editing helpers ---
+    // --- 物种与科标签编辑辅助函数 ---
     function markDirty() {
       attemptAutoSave();
     }
 
     function _syncSceneUserTags() {
-      // Tag edits stay in the edit-session draft until the user clicks Done Editing.
+      // 标签编辑先停留在当前编辑会话草稿中，直到用户点击完成编辑。
     }
 
     function getSceneRows(sceneId) {
@@ -2605,23 +2630,23 @@
       renderSceneMetaChips(scene, _sceneEditMode);
     }
 
-    // --- Scene split helpers ---
+    // --- 场景拆分辅助函数 ---
     let _splitSelected = new Set();
 
     function enterSplitMode(scene) {
       _splitMode = true;
       _splitSelected.clear();
-      el('#splitSceneBtn').textContent = 'Create New Scene from Selected';
-      showToast('Click images to select them for the new scene, then press "Create New Scene from Selected"', 4000);
-      // Re-render images with checkboxes
+      el('#splitSceneBtn').textContent = '根据所选内容创建新场景';
+      showToast('点击图片以选中它们加入新场景，然后点击“根据所选内容创建新场景”', 4000);
+      // 重新渲染图片，并显示复选框
       renderSceneImagesWithSplit(scene);
     }
 
     function exitSplitMode() {
       _splitMode = false;
       _splitSelected.clear();
-      el('#splitSceneBtn').textContent = 'Split Scene\u2026';
-      // Re-render images without checkboxes
+      el('#splitSceneBtn').textContent = '拆分场景\u2026';
+      // 重新渲染图片，并去掉复选框
       const scene = scenes.find(s => String(s.id) === String(currentSceneId));
       if (scene) {
         renderFilmstrip(scene);
@@ -2635,7 +2660,7 @@
       const grid = el('#imageGrid');
       grid.innerHTML = '';
       
-      // Temporarily sort images by filename for splitting
+      // 为拆分临时按文件名排序图片
       const images = scene.images.slice().sort((a, b) => {
         return (a.filename || '').localeCompare(b.filename || '');
       });
@@ -2649,7 +2674,7 @@
         card.dataset.idx = origIdx;
         const key = r.filename || r.export_path || '';
 
-        // Checkbox for split selection
+        // 拆分选择用复选框
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.className = 'split-check';
@@ -2662,7 +2687,7 @@
         };
         card.appendChild(cb);
 
-        // Thumbnail
+        // 缩略图
         const th = document.createElement('div');
         th.className = 'filmstrip-thumb';
         const img = document.createElement('img');
@@ -2672,7 +2697,7 @@
         th.appendChild(img);
         card.appendChild(th);
 
-        // Info
+        // 信息
         const info = document.createElement('div');
         info.className = 'filmstrip-info';
         const fn = document.createElement('div');
@@ -2686,24 +2711,24 @@
         info.appendChild(meta);
         card.appendChild(info);
 
-        // Click card to toggle selection
+        // 点击卡片切换选中状态
         card.addEventListener('click', (ev) => {
           if (ev.target === cb) return; // checkbox handles itself
           cb.checked = !cb.checked;
           cb.onchange();
           
-          // Also set as active and update preview using original index
+          // 同时设为当前激活项，并按原始索引更新预览
           selectFilmstripImage(origIdx, scene);
         });
 
-        // Tooltip with detailed metadata
+        // 带详细元数据的提示框
         const tip = document.createElement('div');
         tip.className = 'filmstrip-tooltip';
         tip.innerHTML = [
           `<b>${escapeHtml(r.filename || '')}</b>`,
-          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
-          `Quality: ${fmt3(r.quality)}`,
-          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}`,
+          `物种：${escapeHtml(getSpeciesDisplayName(r.species || '未知'))} (${fmt3(r.species_confidence)})`,
+          `质量：${fmt3(r.quality)}`,
+          `评分：${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}`,
         ].filter(Boolean).join('<br>');
         card.appendChild(tip);
 
@@ -2712,7 +2737,7 @@
       grid.appendChild(frag);
       updateFilmstripHints(scene);
       
-      // Select the first one or current one by default to show preview
+      // 默认选中第一张或当前这张，用于显示预览
       if (images.length > 0) {
         selectFilmstripImage(currentImageIndex < images.length ? currentImageIndex : 0, scene);
       }
@@ -2720,14 +2745,14 @@
 
     function applySplitScene(scene) {
       if (_splitSelected.size === 0) {
-        showToast('Select at least one image to split into a new scene', 3000);
+        showToast('至少选择一张图片后才能拆分出新场景', 3000);
         return;
       }
       if (_splitSelected.size === scene.images.length) {
-        showToast('Cannot move all images — at least one must remain in the original scene', 3000);
+        showToast('不能移动全部图片，原始场景中至少要保留一张', 3000);
         return;
       }
-      // Find next available scene_count across the same folder slot
+      // 在同一 folder slot 下找到下一个可用的 scene_count
       const parts = String(scene.id).split(':');
       const slot = parts.length > 1 ? parseInt(parts[0], 10) : null;
       let maxCount = 0;
@@ -2739,7 +2764,7 @@
         }
       }
       const newSceneCount = String(maxCount + 1);
-      // Snapshot scene rows BEFORE mutation so we can build scenedata diff
+      // 在修改前先快照场景行，以便构建 scenedata 差异
       const sceneRowsBefore = getSceneRows(scene.id).slice();
       const rpForSplit = sceneRowsBefore[0]?.__rootPath || rootPath || '';
       let moved = 0;
@@ -2752,7 +2777,7 @@
         }
       }
       if (moved) {
-        // Update scenedata scene membership
+        // 更新 scenedata 中的场景归属关系
         if (hasPywebviewApi && rpForSplit) {
           const parts2 = String(scene.id).split(':');
           const oldSceneCount = parts2.pop();
@@ -2773,9 +2798,9 @@
         markDirty();
         _splitMode = false;
         _splitSelected.clear();
-        el('#splitSceneBtn').textContent = 'Split Scene\u2026';
+        el('#splitSceneBtn').textContent = '拆分场景\u2026';
         renderScenes();
-        // Refresh the scene dialog with the remaining images
+        // 用剩余图片刷新场景对话框
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           refreshSceneMeta(updatedScene);
@@ -2783,7 +2808,7 @@
           selectFilmstripImage(0, updatedScene);
           el('#sceneName').value = updatedScene.sceneName || '';
         }
-        showToast(`Split ${moved} image(s) into new scene #${newSceneCount}`, 3000);
+        showToast(`已将 ${moved} 张图片拆分到新场景 #${newSceneCount}`, 3000);
       }
     }
 
@@ -2798,7 +2823,7 @@
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c])); }
     function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 
-    // Snapshot helpers for revert
+    // 撤销用快照辅助函数
     function takeSnapshot() {
       _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice(), scenedata: JSON.parse(JSON.stringify(_scenedata)) };
       const btn = el('#revertCsv');
@@ -2817,7 +2842,7 @@
       setStatus('Reverted to last saved state.');
     }
 
-    // CSV IO
+    // CSV 读写
     async function loadCsvFromHandle(fileHandle) {
       csvFileHandle = fileHandle;
       const file = await fileHandle.getFile();
@@ -2832,29 +2857,29 @@
       await renderScenes();
     }
 
-    // Try to find .kestrel/kestrel_database.csv in the selected folder (optionally nested)
+    // 在所选文件夹中查找 .kestrel/kestrel_database.csv（可递归到子目录）
     async function findKestrelDatabase(dirHandle, maxDepth = 3, depth = 0) {
-      // If user selected the .kestrel folder itself, read directly
+      // 如果用户直接选择了 .kestrel 文件夹，则直接读取
       if (dirHandle && dirHandle.name === '.kestrel') {
         try {
           const csvHandle = await dirHandle.getFileHandle('kestrel_database.csv');
           return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: true };
         } catch (_) {
-          // fall through to normal search
+          // 继续走常规搜索流程
         }
       }
-      // First, check for a .kestrel folder in this folder
+      // 先检查当前文件夹下是否有 .kestrel 文件夹
       try {
         const kestrelDir = await dirHandle.getDirectoryHandle('.kestrel');
         const csvHandle = await kestrelDir.getFileHandle('kestrel_database.csv');
         return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: false };
       } catch (_) {
-        // Not found at this level; continue
+        // 当前层未找到，继续向下搜索
       }
 
       if (depth >= maxDepth) return null;
 
-      // Search subfolders (limited depth)
+      // 搜索子文件夹（限制深度）
       try {
         for await (const entry of dirHandle.values()) {
           if (entry.kind !== 'directory') continue;
@@ -2863,7 +2888,7 @@
           if (found) return found;
         }
       } catch (_) {
-        // Ignore permission/iteration errors
+        // 忽略权限或遍历错误
       }
       return null;
     }
@@ -2878,10 +2903,10 @@
         const mergeBtn = document.getElementById('openMerge');
         if (mergeBtn) mergeBtn.disabled = false;
         const rootLabel = rootIsKestrel ? '.kestrel (selected folder)' : (rootDirHandle.name || 'selected folder');
-        setStatus(`Loaded .kestrel/kestrel_database.csv (root: ${rootLabel})`);
+        setStatus(`已加载 .kestrel/kestrel_database.csv（根目录：${rootLabel}）`);
       } catch (e) {
-        setStatus('Could not find .kestrel/kestrel_database.csv in this folder (or its subfolders). Use "Open Folder or CSV…" to try a CSV file directly.');
-        alert("Couldn't find Kestrel Analysis files. Make sure you analyze this folder with Kestrel Analyzer.");
+        setStatus('当前文件夹及其子文件夹中未找到 `.kestrel/kestrel_database.csv`。你可以使用“打开文件夹…”或直接尝试打开 CSV。');
+        alert(t('folder.analysis_missing_alert'));
       }
     }
 
@@ -2900,14 +2925,14 @@
       if (!allCols.includes('rating')) allCols.push('rating');
       if (!allCols.includes('rating_origin')) allCols.push('rating_origin');
 
-      // Serialize a list of rows (excluding internal __ keys) to CSV string
+      // 将一组行序列化为 CSV 字符串（排除内部 __ 键）
       function rowsToCsvString(colList, rowList) {
         const lines = [colList.join(',')];
         for (const r of rowList) lines.push(colList.map(k => csvEscape(k in r ? r[k] : '')).join(','));
         return lines.join('\r\n');
       }
 
-      // FSAPI mode (browser): single file handle
+      // FSAPI 模式（浏览器）：单个文件句柄
       if (csvFileHandle) {
         const content = rowsToCsvString(allCols, rows);
         const writable = await csvFileHandle.createWritable();
@@ -2919,7 +2944,7 @@
         return;
       }
 
-      // Pywebview desktop mode: save both CSV row state and scenedata JSON.
+      // pywebview 桌面模式：同时保存 CSV 行状态与 scenedata JSON。
       if (window.pywebview?.api) {
         const groups = new Map();
         for (const r of rows) {
@@ -2932,7 +2957,7 @@
         for (const [rp, groupRows] of groups) {
           if (!rp) { failed++; continue; }
           try {
-            // Persist cull/rating columns to CSV so culling assistant and reloads see authoritative state.
+            // 将筛片/评分列写回 CSV，保证筛片助手和重新加载时读到的是权威状态。
             if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
               const content = rowsToCsvString(exportCols, groupRows);
               const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
@@ -2962,7 +2987,7 @@
       alert('No CSV opened and no save method available.');
     }
 
-    // Warn user on unsaved changes when attempting to close/refresh
+    // 用户尝试关闭或刷新时，对未保存改动进行提示
     window.addEventListener('beforeunload', (e) => {
       const analysisRunning = window.__queueRunning;
       if (dirty || analysisRunning) {
@@ -2975,19 +3000,19 @@
       }
     });
 
-    // Attempt to notify backend to shutdown when the page is fully unloaded
+    // 在页面完全卸载时，尽量通知后端执行关闭
     window.addEventListener('unload', () => {
       try {
         const backendUrl = getSetting('backendUrl', window.location.origin).replace(/\/$/, '');
         const headers = { 'Content-Type': 'application/json' };
         if (window.__BRIDGE_TOKEN) headers['X-Bridge-Token'] = window.__BRIDGE_TOKEN;
         navigator.sendBeacon && navigator.sendBeacon(backendUrl + '/shutdown', new Blob([JSON.stringify({ reason: 'page_unload' })], { type: 'application/json' }));
-        // Fallback (best-effort, may be ignored on some browsers)
+        // 回退方案（尽力而为，某些浏览器可能会忽略）
         fetch(backendUrl + '/shutdown', { method: 'POST', keepalive: true, headers, body: JSON.stringify({ reason: 'page_unload' }) }).catch(() => { });
       } catch (_) { }
     });
 
-    // Add draggable splitter for resizing right preview panel
+    // 添加可拖拽分隔条，用于调整右侧预览面板宽度
     (function setupColumnResizer() {
       const dlg = document.getElementById('sceneDlg');
       const divider = document.getElementById('colDivider');
@@ -2999,8 +3024,8 @@
         if (!modal) return;
         const rect = modal.getBoundingClientRect();
         const onMove = (ev) => {
-          const newW = Math.round(rect.right - ev.clientX); // distance from cursor to right edge
-          const min = 260; // min width of right panel
+          const newW = Math.round(rect.right - ev.clientX); // 鼠标到右边缘的距离
+          const min = 260; // 右侧面板最小宽度
           const max = Math.max(320, Math.floor(rect.width * 0.8));
           const clamped = Math.min(Math.max(newW, min), max);
           modal.style.setProperty('--right-w', clamped + 'px');
@@ -3019,10 +3044,10 @@
       });
     })();
 
-    // Settings storage
+    // 设置存储
     const SETTINGS_KEY = 'kestrel-webviz-settings-v1';
-    let _autoSaveEnabled = true;  // cached value to avoid repeated lookups
-    let _autoSaveTimer = null;     // debounce timer for auto-saves
+    let _autoSaveEnabled = true;  // 缓存值，避免重复读取
+    let _autoSaveTimer = null;     // 自动保存的防抖计时器
     
     function loadSettings() {
       try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; }
@@ -3030,7 +3055,7 @@
     function saveSettings(obj) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj || {})); }
     function getSetting(k, def) { const s = loadSettings(); return (k in s) ? s[k] : def; }
     
-    // Auto-save logic: debounced save when auto-save is enabled
+    // 自动保存逻辑：启用自动保存时进行防抖写入
     async function attemptAutoSave() {
       dirty = true;
       _notifyDirty(true);
@@ -3038,10 +3063,10 @@
       el('#revertCsv').disabled = false;
       
       if (!_autoSaveEnabled) {
-        return;  // Save/Revert workflow; user will click Save button
+        return;  // 使用保存/还原流程，交由用户手动点击保存按钮
       }
       
-      // Debounce to avoid saving on every keystroke/change (save after 2 seconds of inactivity)
+      // 使用防抖，避免每次键入/修改都触发保存（空闲 2 秒后再保存）
       clearTimeout(_autoSaveTimer);
       _autoSaveTimer = setTimeout(async () => {
         try {
@@ -3075,7 +3100,7 @@
       const customHint = document.getElementById('customEditorHint');
       const customPath = document.getElementById('customEditorPath');
       editorSelect.value = editor;
-      // If saved editor isn't in the dropdown options, treat as custom
+      // 如果已保存的编辑器不在下拉选项中，则按自定义处理
       if (editorSelect.value !== editor) {
         editorSelect.value = 'custom';
       }
@@ -3083,13 +3108,13 @@
       const isCustom = editorSelect.value === 'custom';
       customRow.classList.toggle('hidden', !isCustom);
       customHint.classList.toggle('hidden', !isCustom);
-      // Show/hide custom row when selection changes
+      // 选择变化时显示或隐藏自定义路径行
       editorSelect.onchange = () => {
         const c = editorSelect.value === 'custom';
         customRow.classList.toggle('hidden', !c);
         customHint.classList.toggle('hidden', !c);
       };
-      // Browse button
+      // 浏览按钮
       document.getElementById('customEditorBrowse').onclick = async () => {
         if (window.pywebview?.api?.choose_application) {
           const path = await window.pywebview.api.choose_application();
@@ -3099,19 +3124,19 @@
         }
       };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
-      // Rating profile
+      // 评分配置
       const profileSelect = document.getElementById('ratingProfile');
       if (profileSelect) profileSelect.value = getSetting('rating_profile', 'balanced');
-      // Detection confidence threshold
+      // 检测置信度阈值
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
-      // Scene grouping time threshold
+      // 场景分组时间阈值
       const sttEl = document.getElementById('sceneTimeThreshold');
       if (sttEl) sttEl.value = getSetting('scene_time_threshold', 1.0);
-      // Mask threshold
+      // Mask 阈值
       const maskThEl = document.getElementById('maskThreshold');
       if (maskThEl) maskThEl.value = getSetting('mask_threshold', 0.5);
-      // RAW preview cache
+      // RAW 预览缓存
       const rawCacheCb = document.getElementById('rawPreviewCacheEnabled');
       if (rawCacheCb) rawCacheCb.checked = getSetting('raw_preview_cache_enabled', true);
       const optedIn = getSetting('analytics_opted_in', null);
@@ -3123,14 +3148,14 @@
         ? (optedIn === true ? 'Opted in' : 'Not sharing')
         : 'Not yet decided';
       
-      // Display total impact (photos analyzed) - read from localStorage settings
+      // 显示总影响（已分析照片数量），从 localStorage 设置中读取
       const totalPhotos = getSetting('kestrel_impact_total_files', 0);
       const impactEl = document.getElementById('settingsTotalImpact');
       if (impactEl) {
         impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
       }
       
-      // Auto-Save setting
+      // 自动保存设置
       const autoSaveCb = document.getElementById('settingsAutoSave');
       if (autoSaveCb) autoSaveCb.checked = getSetting('auto_save_enabled', true);
 
@@ -3157,7 +3182,7 @@
       const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
-      // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
+      // 合并到现有设置中，保留 machine_id / analytics_consent_shown 等键
       const existing = loadSettings();
       const prevProfile = existing.rating_profile || 'balanced';
       const settings = {
@@ -3173,7 +3198,7 @@
       };
       _autoSaveEnabled = autoSaveEnabled;
       _updateSaveRevertVisibility();
-      // Persist settings to localStorage immediately
+      // 立即把设置写入 localStorage
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { await window.pywebview.api.save_settings_data(settings); } catch (_) { }
@@ -3188,16 +3213,16 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If rating profile changed and folders are loaded, reapply immediately
+      // 如果评分配置已变化且当前已加载文件夹，则立即重新应用
       if (ratingProfile !== prevProfile && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }
 
-    /** Recompute normalized_rating for every currently-loaded folder and refresh the view. */
+    /** 为当前所有已加载文件夹重新计算 normalized_rating，并刷新视图。 */
     async function reapplyNormalizationForLoadedFolders() {
       if (!hasPywebviewApi || !window.pywebview?.api?.apply_normalization) return;
-      // Collect the unique root paths of all loaded rows
+      // 收集所有已加载行的唯一根路径
       const folderPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
       if (folderPaths.length === 0) return;
       for (const p of folderPaths) {
@@ -3218,7 +3243,7 @@
       await renderScenes();
     }
 
-    /** Show or hide the Save/Revert wrap based on whether auto-save is active. */
+    /** 根据是否启用自动保存，显示或隐藏 Save/Revert 区域。 */
     function _updateSaveRevertVisibility() {
       const wrap = document.getElementById('saveRevertWrap');
       if (!wrap) return;
@@ -3229,14 +3254,14 @@
       }
     }
 
-    /** Mark settings Save button dirty (yellow) or clean. */
+    /** 将设置保存按钮标记为脏（黄色）或干净。 */
     function _setSettingsDirty(dirty) {
       const btn = document.getElementById('settingsSave');
       if (!btn) return;
       if (dirty) btn.classList.add('dirty'); else btn.classList.remove('dirty');
     }
 
-    // Track changes inside the settings dialog to highlight the Save button
+    // 追踪设置对话框内的改动，用于高亮保存按钮
     document.getElementById('settingsDlg').addEventListener('change', () => _setSettingsDirty(true));
     document.getElementById('settingsDlg').addEventListener('input', () => _setSettingsDirty(true));
 
@@ -3250,7 +3275,7 @@
       _setSettingsDirty(false);
     });
 
-    // ── Sidebar resize ────────────────────────────────────────────────────────
+    // ── 侧边栏调宽 ────────────────────────────────────────────────────────
     (function initSidebarResize() {
       const resizer = document.getElementById('sidebarResizer');
       const sidebar = document.querySelector('header');
@@ -3287,8 +3312,8 @@
       });
     })();
 
-    // ─── Telemetry helpers ────────────────────────────────────────────────────
-    /** Merge a single key into persisted settings (localStorage + pywebview). */
+    // ─── 统计辅助函数 ────────────────────────────────────────────────────
+    /** 将单个键合并进持久化设置（localStorage + pywebview）。 */
     function mergeSetting(k, v) {
       const s = loadSettings();
       s[k] = v;
@@ -3298,7 +3323,7 @@
       }
     }
 
-    // ─── Feedback dialog ──────────────────────────────────────────────────────
+    // ─── 反馈对话框 ──────────────────────────────────────────────────────
     function openFeedbackDialog() {
       document.getElementById('feedbackDesc').value = '';
       document.getElementById('feedbackContact').value = '';
@@ -3311,12 +3336,12 @@
       document.getElementById('feedbackDlg').showModal();
     }
 
-    // Auto-check logs when Bug Report type is selected
+    // 当反馈类型为缺陷报告时，自动勾选日志
     document.getElementById('feedbackType').addEventListener('change', function () {
       document.getElementById('feedbackIncludeLogs').checked = (this.value === 'bug');
     });
 
-    // Screenshot file-picker wiring
+    // 截图文件选择器绑定逻辑
     document.getElementById('feedbackIncludeScreenshot').addEventListener('change', function () {
       if (this.checked) {
         document.getElementById('feedbackScreenshotFile').click();
@@ -3344,13 +3369,13 @@
     async function submitFeedback() {
       const desc = document.getElementById('feedbackDesc').value.trim();
       if (!desc) {
-        document.getElementById('feedbackStatus').textContent = '⚠ Please enter a description.';
+        document.getElementById('feedbackStatus').textContent = t('feedback.required');
         document.getElementById('feedbackDesc').focus();
         return;
       }
       const sendBtn = document.getElementById('feedbackSend');
       sendBtn.disabled = true;
-      document.getElementById('feedbackStatus').textContent = 'Sending…';
+      document.getElementById('feedbackStatus').textContent = t('feedback.sending');
       const data = {
         type: document.getElementById('feedbackType').value,
         description: desc,
@@ -3369,13 +3394,13 @@
           result = await res.json();
         }
         if (result && result.success !== false) {
-          document.getElementById('feedbackStatus').textContent = '✓ Feedback sent — thank you!';
+          document.getElementById('feedbackStatus').textContent = t('feedback.sent');
           setTimeout(() => { try { document.getElementById('feedbackDlg').close(); } catch (_) { } }, 1200);
         } else {
-          document.getElementById('feedbackStatus').textContent = '⚠ Could not send — please try again later.';
+          document.getElementById('feedbackStatus').textContent = t('feedback.failed');
         }
       } catch (e) {
-        document.getElementById('feedbackStatus').textContent = '⚠ Send failed: ' + (e.message || e);
+        document.getElementById('feedbackStatus').textContent = t('feedback.failed_with_reason', { message: e.message || e });
       } finally {
         sendBtn.disabled = false;
       }
@@ -3385,7 +3410,7 @@
     document.getElementById('feedbackCancel').addEventListener('click', () => document.getElementById('feedbackDlg').close());
     document.getElementById('feedbackSend').addEventListener('click', submitFeedback);
 
-    // ─── Analytics Consent dialog ─────────────────────────────────────────────
+    // ─── 统计分析授权对话框 ─────────────────────────────────────────────
     function showAnalyticsConsentDialog() {
       if (_analyticsConsentPending) return;
       if (getSetting('analytics_consent_shown', false)) return;
@@ -3403,7 +3428,7 @@
     document.getElementById('analyticsAccept').addEventListener('click', () => handleAnalyticsConsent(true));
     document.getElementById('analyticsDecline').addEventListener('click', () => handleAnalyticsConsent(false));
 
-    // ─── Donation / Support ──────────────────────────────────────────────────────
+    // ─── 捐助 / 支持 ──────────────────────────────────────────────────────
     const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A';
     const DONATE_THRESHOLD_KEY = 'kestrel-donate-thresholds-shown-v1';
 
@@ -3416,15 +3441,15 @@
     }
 
     function _loadDonateThresholdsShown() {
-      // Load from persistent settings (saved to settings.json)
+      // 从持久化设置中读取（保存于 settings.json）
       return getSetting('kestrel_donate_thresholds_shown', []);
     }
     function _saveDonateThresholdsShown(arr) {
-      // Save to both localStorage and backend settings (persists to settings.json)
+      // 同时写入 localStorage 与后端设置（最终持久化到 settings.json）
       const existing = loadSettings();
       const settings = { ...existing, kestrel_donate_thresholds_shown: arr };
       saveSettings(settings);
-      // Persist to backend (settings.json)
+      // 持久化到后端（settings.json）
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
         try { window.pywebview.api.save_settings_data(settings); } catch (_) { }
       }
@@ -3432,7 +3457,7 @@
 
     function showDonatePrompt(totalFiles) {
       const countEl = document.getElementById('donateCountDisplay');
-      // Round down to nearest threshold for "over N photos" phrasing
+      // 向下取最近的里程碑，用于“超过 N 张照片”的文案展示
       const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
       let milestone = totalFiles || 0;
       for (let i = thresholds.length - 1; i >= 0; i--) {
@@ -3440,11 +3465,11 @@
       }
       if (countEl) countEl.textContent = milestone.toLocaleString();
       const dlg = document.getElementById('donateDlg');
-      // Only show if no other dialog is already open
+      // 仅在当前没有其它打开的对话框时显示
       if (dlg && !document.querySelector('dialog[open]')) dlg.showModal();
     }
 
-    /** Check if the cumulative total crosses a donation milestone. Call after a folder finishes. */
+    /** 检查累计总数是否跨过捐助里程碑。应在某个文件夹分析完成后调用。 */
     async function checkDonationThresholdAsync() {
       try {
         let total = 0;
@@ -3459,7 +3484,7 @@
           if (total >= t && !shown.includes(t)) {
             shown.push(t);
             _saveDonateThresholdsShown(shown);
-            // Small delay so queue panel settles first
+            // 略微延迟，先让队列面板稳定下来
             setTimeout(() => showDonatePrompt(total), 2000);
             break;
           }
@@ -3467,10 +3492,10 @@
       } catch (_) { /* failsafe */ }
     }
 
-    /** Check donation threshold on app startup (only once). */
+    /** 在应用启动时检查捐助阈值（只执行一次）。 */
     async function checkDonationThresholdOnStartup() {
       try {
-        // Read from localStorage (same source as the settings dialog)
+        // 从 localStorage 读取（与设置对话框使用同一来源）
         let total = getSetting('kestrel_impact_total_files', 0);
         console.log('[donation] checkDonationThresholdOnStartup: total =', total);
         if (total < 1000) {
@@ -3485,7 +3510,7 @@
             console.log('[donation] Milestone crossed:', t, '- showing dialog');
             shown.push(t);
             _saveDonateThresholdsShown(shown);
-            // Show dialog after a brief delay to let UI settle
+            // 略微延迟后再显示对话框，让 UI 先稳定
             setTimeout(() => showDonatePrompt(total), 1000);
             break;
           }
@@ -3499,11 +3524,11 @@
     }
 
     document.getElementById('donateBtnMain')?.addEventListener('click', openDonateLink);
-    // Note: donateDlg button listeners are wired in the inline script after the dialog HTML,
-    // because that dialog is defined after this script block and wouldn't be in the DOM yet.
-    // ─── End Donation ─────────────────────────────────────────────────────
+    // 注意：donateDlg 的按钮监听器在对话框 HTML 后面的内联脚本中绑定，
+    // 因为该对话框定义在本脚本块之后，此处尚未进入 DOM。
+    // ─── 捐助逻辑结束 ─────────────────────────────────────────────────────
 
-    // Info dialog: load kestrel_metadata.json from opened photo folder (.kestrel)
+    // 信息对话框：从已打开的照片文件夹（.kestrel）中加载 kestrel_metadata.json
     async function getMetadataHandle() {
       if (!rootDirHandle) return null;
       try { return await getHandleFromRelativePath(rootDirHandle, '.kestrel/kestrel_metadata.json'); } catch { return null; }
@@ -3526,7 +3551,7 @@
       dlg.showModal();
       const meta = await readMetadata();
       if (meta && !meta.error) {
-        // Add derived helper fields (non-destructive)
+        // 添加衍生辅助字段（不改动原始数据）
         const enriched = { ...meta };
         if (rootDirHandle) enriched.photo_root_name = rootDirHandle.name || '';
         contentEl.textContent = JSON.stringify(enriched, null, 2);
@@ -3541,7 +3566,7 @@
     const infoCloseBtn = document.getElementById('infoClose');
     if (infoCloseBtn) infoCloseBtn.addEventListener('click', () => document.getElementById('infoDlg').close());
 
-    // Helper to infer root from absolute export/crop path strings in CSV
+    // 根据 CSV 中的绝对导出/裁切路径推断根目录
     function inferRootFromAbsPath(p) {
       if (!p) return null;
       const s = sanitizePath(p);
@@ -3554,21 +3579,21 @@
       const origRel = (row.filename || '').replace(/^[\\/]+/, '');
       const settings = loadSettings();
 
-      // Use the same root-finding logic as getBlobUrlForPath (which successfully loads thumbnails)
-      // PRIORITY 1: Row-specific root (set when loaded from a folder or multi-load)
+      // 复用与 getBlobUrlForPath 相同的根目录查找逻辑（缩略图加载已验证可用）
+      // 优先级 1：行级根目录（从文件夹加载或多文件夹加载时写入）
       let rootToSend = (row.__rootPath || '').trim();
 
-      // PRIORITY 2: Global rootPath (set when loading CSV from a folder)
+      // 优先级 2：全局 rootPath（从文件夹加载 CSV 时写入）
       if (!rootToSend && rootPath) {
         rootToSend = rootPath;
       }
 
-      // PRIORITY 3: Settings hint (explicit user configuration)
+      // 优先级 3：设置中的提示路径（用户显式配置）
       if (!rootToSend) {
         rootToSend = (settings.rootHint || '').trim();
       }
 
-      // PRIORITY 4: Infer from absolute paths in CSV
+      // 优先级 4：从 CSV 内的绝对路径推断
       if (!rootToSend) {
         rootToSend = inferRootFromAbsPath(row.export_path) || inferRootFromAbsPath(row.crop_path) || '';
       }
@@ -3597,31 +3622,31 @@
       }
     }
 
-    // ── Folder Tree ──────────────────────────────────────────────────────────────
-    let folderTreeRoot = null;       // absolute path of the scanned tree root
-    let folderTreeData = null;       // raw children array from API
-    let folderTreeRootNode = null;   // synthetic root node {name, path, has_kestrel, children}
+    // ── 文件夹树 ──────────────────────────────────────────────────────────────
+    let folderTreeRoot = null;       // 扫描树的根目录绝对路径
+    let folderTreeData = null;       // API 返回的原始 children 数组
+    let folderTreeRootNode = null;   // 合成的根节点 {name, path, has_kestrel, children}
     let folderTreeRootHasKestrel = false;
     let treeExpandedPaths = new Set();
-    let treeActivePath = null;       // currently single-loaded folder
-    let checkedFolderPaths = new Set(); // folders checked for multi-load
-    let queuedFolderPaths = new Set(); // folders queued for analysis (dialog selection)
-    let _treeFlatOrder = [];           // flat ordered list of visible tree paths for range-select
-    let _appVersion = '';              // current app version, fetched once
-    let _isFrozenApp = false;          // whether running as frozen (PyInstaller) build
+    let treeActivePath = null;       // 当前单独加载的文件夹
+    let checkedFolderPaths = new Set(); // 在多文件夹视图中被勾选的文件夹
+    let queuedFolderPaths = new Set(); // 加入分析队列的文件夹（对话框内选择）
+    let _treeFlatOrder = [];           // 可见树路径的扁平顺序列表，用于范围选择
+    let _appVersion = '';              // 当前应用版本，只拉取一次
+    let _isFrozenApp = false;          // 是否为冻结版（PyInstaller）构建
 
     async function scanFolderTree(rootPath) {
       if (!hasPywebviewApi || !window.pywebview?.api?.list_subfolders) return false;
       if (!rootPath) return false;
 
-      // Fetch app version once (for outdated-version detection)
+      // 拉取一次应用版本（用于判断是否为旧版本分析结果）
       if (!_appVersion && window.pywebview?.api?.get_app_version) {
         try {
           const vr = await window.pywebview.api.get_app_version();
           if (vr && vr.success) _appVersion = vr.version || '';
         } catch (e) { /* ignore */ }
       }
-      // Fetch frozen status once
+      // 拉取一次冻结状态
       if (!_isFrozenApp && window.pywebview?.api?.is_frozen_app) {
         try {
           const fr = await window.pywebview.api.is_frozen_app();
@@ -3640,7 +3665,7 @@
         }
         folderTreeData = result.tree;
         folderTreeRootHasKestrel = !!result.root_has_kestrel;
-        // Build a synthetic root node so the tree shows the top-level folder too
+        // 构建合成根节点，让树结构也显示顶层文件夹
         const rootName = rootPath.replace(/\\/g, '/').split('/').filter(Boolean).pop() || rootPath;
         folderTreeRootNode = {
           name: rootName,
@@ -3649,10 +3674,10 @@
           kestrel_version: result.root_kestrel_version || '',
           children: folderTreeData,
         };
-        // Auto-expand the root
+        // 默认展开根节点
         treeExpandedPaths.add(rootPath);
         renderFolderTree();
-        // Enable folder tree controls and remove empty placeholder state
+        // 启用文件夹树控制按钮，并移除空占位状态
         const treeWrap = document.getElementById('folderTreeWrap');
         treeWrap.classList.remove('folder-tree-empty');
         treeWrap.querySelectorAll('button[disabled]').forEach(b => b.removeAttribute('disabled'));
@@ -3663,7 +3688,7 @@
       }
     }
 
-    /** Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b. */
+    /** 比较两个 semver 字符串。a < b 返回 -1，相等返回 0，a > b 返回 1。 */
     function compareVersions(a, b) {
       if (!a || !b) return 0;
       const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
@@ -3675,13 +3700,13 @@
       return 0;
     }
 
-    /** Check if a node's kestrel_version is older than the current app version. */
+    /** 判断某个节点的 kestrel_version 是否早于当前应用版本。 */
     function isVersionOutdated(node) {
       if (!node || !node.has_kestrel || !node.kestrel_version || !_appVersion) return false;
       return compareVersions(node.kestrel_version, _appVersion) < 0;
     }
 
-    /** Show a custom context menu at (x, y) with given items. */
+    /** 在 (x, y) 位置显示给定项目的自定义右键菜单。 */
     function showContextMenu(x, y, items) {
       dismissContextMenu();
       const menu = document.createElement('div');
@@ -3701,11 +3726,11 @@
       menu.style.left = x + 'px';
       menu.style.top = y + 'px';
       document.body.appendChild(menu);
-      // Adjust if off-screen
+      // 超出屏幕时进行位置修正
       const rect = menu.getBoundingClientRect();
       if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
       if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
-      // Dismiss on any click outside
+      // 点击外部任意位置时关闭
       setTimeout(() => document.addEventListener('click', dismissContextMenu, { once: true }), 0);
     }
 
@@ -3714,61 +3739,57 @@
       if (old) old.remove();
     }
 
-    /** Clear kestrel analysis data for a folder (with confirmation). */
+    /** 清除某个文件夹的 kestrel 分析数据（带确认）。 */
     async function clearKestrelDataForFolder(folderPath, folderName, refreshCallback) {
-      const confirmed = confirm(
-        `Are you sure you want to delete all Kestrel analysis data for "${folderName}"?\n\n` +
-        `This will permanently remove the .kestrel folder and all its contents (database, exports, thumbnails) ` +
-        `in:\n${folderPath}\n\nThis action cannot be undone.`
-      );
+      const confirmed = confirm(t('analysis.clear_confirm', { folder: folderName }));
       if (!confirmed) return;
       try {
         const result = await window.pywebview.api.clear_kestrel_data(folderPath);
         if (result && result.success) {
-          showToast('Kestrel analysis data cleared for ' + folderName);
+          showToast(t('analysis.clear_success', { folder: folderName }));
           if (refreshCallback) refreshCallback();
         } else {
-          alert('Failed to clear analysis data:\n\n' + (result?.error || 'Unknown error'));
+          alert(t('analysis.clear_failed', { error: result?.error || 'Unknown error' }));
         }
       } catch (e) {
-        alert('Failed to clear analysis data:\n\n' + (e.message || e));
+        alert(t('analysis.clear_failed', { error: e.message || e }));
       }
     }
 
     function renderFolderTree() {
       const container = document.getElementById('folderTree');
       if (!container || !folderTreeRootNode) return;
-      // Rebuild the flat visible order for shift-range selection
+      // 重建可见路径的扁平顺序，用于 Shift 范围选择
       _treeFlatOrder = [];
       container.innerHTML = '';
       container.appendChild(buildTreeNode(folderTreeRootNode, _treeFlatOrder));
-      // Note: Do NOT populate counts for main folder tree
-      // The main tree is only for selecting which analyzed folders to LOAD
-      // Colors and counts are only for the Analyze dialog tree
+      // 注意：主文件夹树不要填充计数
+      // 主树只用于选择要加载的已分析文件夹
+      // 颜色和计数只用于“分析文件夹”对话框中的树
     }
 
-    /** Update a single main-folder-tree row for `path` without re-rendering whole tree.
-     *  Makes the node appear as having kestrel data (icon + checkbox) but does not
-     *  change selection or checked state. This avoids disturbing the user's view.
+    /** 在不重绘整棵树的前提下，更新主文件夹树中 `path` 对应的一行。
+     *  让该节点表现为已有 kestrel 数据（图标 + 复选框），但不改动
+     *  当前选择或勾选状态，从而避免打断用户当前视图。
      */
     function updateFolderTreeNode(path) {
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
         const target = norm(path);
-        // Find rows in the main folder tree matching this path
+        // 找出主文件夹树中与该路径匹配的行
         const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
         for (const row of rows) {
           const rp = norm(row.dataset.path || '');
           if (rp !== target) continue;
-          // Update classes
+          // 更新类名
           row.classList.remove('no-kestrel');
           row.classList.add('has-kestrel');
-          // Persist a transient marker so future rescans don't immediately clear it
+          // 记录临时标记，避免后续重扫立刻把它清掉
           try { _tempKestrelPaths.add(norm(path)); } catch (e) { }
-          // Update icon
+          // 更新图标
           const icon = row.querySelector('.tree-icon');
           if (icon) icon.textContent = '📂';
-          // Ensure checkbox exists (do not auto-check it)
+          // 确保复选框存在（但不要自动勾选）
           if (!row.querySelector('.tree-cb')) {
             const cb = document.createElement('input');
             cb.type = 'checkbox';
@@ -3781,7 +3802,7 @@
               else checkedFolderPaths.delete(row.dataset.path);
               debouncedAutoLoad();
             });
-            // Insert before the icon element if present
+            // 若图标存在，则插入到图标前面
             if (icon && icon.parentNode) icon.parentNode.insertBefore(cb, icon);
             else row.insertBefore(cb, row.firstChild);
           }
@@ -3789,8 +3810,8 @@
       } catch (e) { /* failsafe */ }
     }
 
-    // Build a single tree node DOM element.
-    // flatOrder is mutated to collect visible paths in order (for range-select).
+    // 构建单个树节点 DOM 元素。
+    // flatOrder 会被原地写入，用于按顺序收集可见路径（供范围选择使用）。
     function buildTreeNode(node, flatOrder) {
       flatOrder.push(node.path);
 
@@ -3811,14 +3832,14 @@
       const normPath = norm(node.path);
       const isInProgress = _inProgressFolderPaths.has(normPath);
       
-      const effectiveHasKestrel = subtreeHasKestrel(node) || isInProgress; // Show checkbox for in-progress too
+      const effectiveHasKestrel = subtreeHasKestrel(node) || isInProgress; // 分析进行中也显示复选框
       const outdated = isVersionOutdated(node);
       row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '') + (isInProgress ? ' in-progress' : '');
       if (node.path === treeActivePath) row.classList.add('active');
       if (isInProgress) row.title = 'Currently analyzing...';
       else if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
 
-      // Arrow toggle
+      // 箭头展开/折叠控件
       const arrow = document.createElement('span');
       arrow.className = 'tree-arrow';
       const hasChildren = node.children && node.children.length > 0;
@@ -3830,7 +3851,7 @@
         arrow.textContent = '▶';
       }
 
-      // Checkbox for loading ANALYZED folders OR in-progress folders (blue accent)
+      // 用于加载已分析文件夹或分析进行中文件夹的复选框（蓝色强调）
       let loadCheckbox = null;
       if (node.has_kestrel || isInProgress) {
         loadCheckbox = document.createElement('input');
@@ -3847,21 +3868,21 @@
         });
       }
 
-      // Folder icon
+      // 文件夹图标
       const icon = document.createElement('span');
       icon.className = 'tree-icon';
       icon.textContent = node.has_kestrel ? '📂' : '📁';
 
-      // Label
+      // 标签
       const label = document.createElement('span');
       label.className = 'tree-label';
       label.textContent = node.name;
       label.title = node.path;
 
-      // Attach path to the row for async inspection
+      // 把路径挂到行元素上，便于异步检查
       row.dataset.path = node.path;
 
-      // Count placeholder (populated asynchronously)
+      // 数量占位（异步填充）
       const countSpan = document.createElement('span');
       countSpan.className = 'tree-count';
       countSpan.textContent = '';
@@ -3870,7 +3891,7 @@
       if (loadCheckbox) {
         row.appendChild(loadCheckbox);
       } else {
-        // Always keep a fixed-width spacer so folder icons at every level align
+        // 始终保留固定宽度的占位，让各层级的文件夹图标对齐
         const spacer = document.createElement('span');
         spacer.className = 'tree-cb-spacer';
         row.appendChild(spacer);
@@ -3880,7 +3901,7 @@
       row.appendChild(countSpan);
       wrap.appendChild(row);
 
-      // Children container
+      // 子节点容器
       let childWrap = null;
       if (hasChildren) {
         childWrap = document.createElement('div');
@@ -3904,7 +3925,7 @@
         });
       }
 
-      // Click label/icon to load (only if this node has kestrel data)
+      // 点击标签或图标即可加载（仅当该节点已有 kestrel 数据时）
       if (node.has_kestrel) {
         label.addEventListener('click', async () => {
           treeActivePath = node.path;
@@ -3916,7 +3937,7 @@
           renderFolderTree();
           await loadFolderFromPath(node.path);
         });
-        // Right-click context menu for clearing analysis data
+        // 右键菜单：清除分析数据
         row.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -3939,18 +3960,18 @@
       return wrap;
     }
 
-    // Populate folder counts ONLY for the Analyze Folders dialog tree.
-    // Two-pass approach: (1) inspect all folders, (2) apply subtree-aware fading & colors.
-    // Colors: green=finished, purple=started-not-finished, blue=not-started-but-has-images.
-    // Fading: no-photos-deep = folder+all descendants have 0 images (full row faded).
-    //         no-photos-shallow = folder has 0 images but some descendant has images (checkbox faded only).
+    // 仅为“分析文件夹”对话框中的树填充文件夹计数。
+    // 使用两阶段方案：1）检查所有文件夹；2）应用感知子树状态的淡化与颜色。
+    // 颜色含义：绿色=已完成，紫色=已开始但未完成，蓝色=尚未开始但包含图片。
+    // 淡化含义：no-photos-deep = 当前文件夹及所有后代都没有图片（整行淡化）。
+    //          no-photos-shallow = 当前文件夹无图片，但后代有图片（仅复选框淡化）。
     async function populateAnalyzeFolderCounts() {
       if (!hasPywebviewApi || !window.pywebview?.api?.inspect_folder) return;
       try {
-        // Query ONLY the Analyze dialog tree nodes
+        // 只查询“分析文件夹”对话框中的树节点
         const rows = Array.from(document.querySelectorAll('#analyzeDlgTree .adlg-node-row'));
         const norm = p => (p || '').replace(/\\/g, '/');
-        const pathToRows = new Map(); // normalized path → [row, ...]
+        const pathToRows = new Map(); // 标准化路径 -> [row, ...]
         const normToOriginal = new Map();
         const paths = [];
 
@@ -3977,15 +3998,15 @@
 
         const total = uniq.length;
         let completed = 0;
-        // Store inspection results for the second pass
-        const inspectionMap = new Map(); // normalized path → { total, processed } | null
+        // 存储检查结果，供第二阶段使用
+        const inspectionMap = new Map(); // 标准化路径 -> { total, processed } | null
 
         const dlgProgWrap = document.getElementById('analyzeScanProgress');
         const dlgProgFill = document.getElementById('analyzeScanFill');
         const dlgProgLabel = document.getElementById('analyzeScanLabel');
         if (dlgProgWrap) dlgProgWrap.classList.remove('hidden');
 
-        // ── Pass 1: Inspect all folders concurrently ──
+        // ── 第 1 阶段：并发检查所有文件夹 ──
         const concurrency = Math.min(8, Math.max(2, Math.ceil(total / 8)));
         let idx = 0;
 
@@ -4018,8 +4039,8 @@
         for (let w = 0; w < concurrency; w++) workers.push(worker());
         await Promise.all(workers);
 
-        // ── Pass 2: Apply colors and subtree-aware fading ──
-        // Helper: does any descendant of `prefix` have images?
+        // ── 第 2 阶段：应用颜色与感知子树状态的淡化效果 ──
+        // 辅助判断：`prefix` 的任意后代是否包含图片？
         function subtreeHasImages(prefix) {
           const pfx = prefix.endsWith('/') ? prefix : prefix + '/';
           for (const [p, info] of inspectionMap) {
@@ -4028,7 +4049,7 @@
           return false;
         }
 
-        // Helper: look up kestrel_version from tree node by path
+        // 辅助函数：按路径从树节点中查找 kestrel_version
         function findNodeVersion(node, targetPath) {
           if (!node) return '';
           if (node.path === targetPath) return node.kestrel_version || '';
@@ -4060,7 +4081,7 @@
               if (span) span.textContent = ` ${processedImgs}/${totalImgs}`;
               if (processedImgs >= totalImgs) {
                 row.classList.add('analyzed-full');          // green: finished
-                // Check if analyzed on an outdated version
+                // 检查是否由旧版本分析得到
                 const origPath = normToOriginal.get(np) || np;
                 const nodeVer = findNodeVersion(folderTreeRootNode, origPath);
                 if (nodeVer && _appVersion && compareVersions(nodeVer, _appVersion) < 0) {
@@ -4073,13 +4094,13 @@
                 row.classList.add('analyzed-none');          // blue: has images, not started
               }
             } else {
-              // This folder has 0 images — determine deep vs shallow fading
+              // 当前文件夹图片数为 0，需要判断使用深度还是浅度淡化
               const hasDescendantImages = subtreeHasImages(np);
               if (hasDescendantImages) {
-                // Shallow: only fade the checkbox, not the name/arrow (descendant has images)
+                // 浅度淡化：仅淡化复选框，不淡化名称/箭头（后代仍有图片）
                 row.classList.add('no-photos-shallow');
               } else {
-                // Deep: entire row faded (no images anywhere in subtree)
+                // 深度淡化：整行淡化（整个子树都没有图片）
                 row.classList.add('no-photos-deep');
               }
               const cb = row.querySelector('.adlg-cb');
@@ -4093,7 +4114,7 @@
           }
         }
 
-        // Hide progress after brief delay
+        // 稍作延迟后隐藏进度条
         setTimeout(() => {
           if (dlgProgWrap) dlgProgWrap.classList.add('hidden');
           if (dlgProgFill) dlgProgFill.style.width = '0%';
@@ -4106,15 +4127,15 @@
       }
     }
 
-    // ── End Folder Tree ───────────────────────────────────────────────────────────
+    // ── 文件夹树结束 ───────────────────────────────────────────────────────────
 
-    // ── Analyze Folders Dialog ───────────────────────────────────────────────────
+    // ── 分析文件夹对话框 ───────────────────────────────────────────────────
 
     let _dlgSelected = new Set();
     let _dlgExpandedPaths = new Set();
-    let _dlgReanalyze = new Set(); // paths confirmed for re-analysis (fully analyzed folders)
+    let _dlgReanalyze = new Set(); // 已确认允许重新分析的路径（针对已完整分析过的文件夹）
 
-    /** Build a tree node for the Analyze dialog (amber checkboxes, no load-cb). */
+    /** 为“分析文件夹”对话框构建树节点（琥珀色复选框，不带 load-cb）。 */
     function buildAnalyzeDlgNode(node, selectedSet, onChangeCallback) {
       const wrap = document.createElement('div');
       wrap.className = 'tree-node';
@@ -4139,7 +4160,7 @@
       cb.addEventListener('change', (e) => {
         e.stopPropagation();
         if (cb.checked) {
-          // Prompt before re-queuing a fully analyzed folder
+          // 在把已完整分析的文件夹重新加入队列前进行确认
           if (row.classList.contains('analyzed-full')) {
             const confirmed = confirm(
               `"${node.name}" has already been fully analyzed.\n\n` +
@@ -4168,14 +4189,14 @@
       if (!outdated) label.title = node.path;
       else label.title = `v${node.kestrel_version} → v${_appVersion} (outdated)`;
 
-      // Version badge for outdated folders
+      // 旧版本文件夹的版本徽标
       const versionBadge = document.createElement('span');
       if (outdated) {
         versionBadge.style.cssText = 'font-size:10px;color:var(--ok);opacity:0.7;margin-left:4px;font-style:italic;';
         versionBadge.textContent = `v${node.kestrel_version}`;
       }
 
-      // Attach path for async inspection and add count placeholder
+      // 记录路径供异步检查使用，并加入数量占位
       row.dataset.path = node.path;
       const countSpan = document.createElement('span');
       countSpan.className = 'tree-count';
@@ -4188,7 +4209,7 @@
       if (outdated) row.appendChild(versionBadge);
       row.appendChild(countSpan);
 
-      // Right-click context menu for clearing analysis data
+      // 右键菜单：清除分析数据
       if (node.has_kestrel) {
         row.addEventListener('contextmenu', (e) => {
           e.preventDefault();
@@ -4200,10 +4221,10 @@
               danger: true,
               action: () => {
                 clearKestrelDataForFolder(node.path, folderName, () => {
-                  // Update the node state in-memory
+                  // 在内存中更新节点状态
                   node.has_kestrel = false;
                   node.kestrel_version = '';
-                  // Re-render the dialog tree
+                  // 重新渲染对话框树
                   const treeEl = document.getElementById('analyzeDlgTree');
                   if (treeEl && folderTreeRootNode) {
                     treeEl.innerHTML = '';
@@ -4236,8 +4257,8 @@
       return wrap;
     }
 
-    /** Render the right-side queue preview panel in the Analyze dialog.
-     *  Shows: running items, pending items (draggable + removable), and "will be added" selection. */
+    /** 渲染“分析文件夹”对话框右侧的队列预览面板。
+     *  显示内容包括：运行中项目、待处理项目（可拖拽排序与移除）、以及“将要加入”的选择项。 */
     function _refreshAnalyzeDlgQueuePreview() {
       const runningEl = document.getElementById('adlgQueueRunning');
       const willAddEl = document.getElementById('adlgQueueWillAdd');
@@ -4255,12 +4276,12 @@
           const runningItems = status.items.filter(i => i.status === 'running');
           const pendingItems = status.items.filter(i => i.status === 'pending');
 
-          // ── Running items ──
+          // ── 运行中项目 ──
           if (runningItems.length > 0) {
             hasActiveQueue = true;
             const title = document.createElement('div');
             title.className = 'adlg-queue-section-title';
-            title.textContent = '⚙ Analyzing';
+            title.textContent = t('queue.section_analyzing');
             runningEl.appendChild(title);
             for (const item of runningItems) {
               const row = document.createElement('div');
@@ -4271,19 +4292,19 @@
               nameEl.title = item.path;
               const statusEl = document.createElement('span');
               statusEl.className = 'adlg-qi-status';
-              statusEl.textContent = item.total > 0 ? `${item.processed}/${item.total}` : 'starting…';
+              statusEl.textContent = item.total > 0 ? `${item.processed}/${item.total}` : t('queue.starting');
               row.appendChild(nameEl);
               row.appendChild(statusEl);
               runningEl.appendChild(row);
             }
           }
 
-          // ── Pending items (drag-to-reorder + cancel) ──
+          // ── 待处理项目（拖拽排序 + 取消） ──
           if (pendingItems.length > 0) {
             hasActiveQueue = true;
             const pendTitle = document.createElement('div');
             pendTitle.className = 'adlg-queue-section-title';
-            pendTitle.textContent = `⏳ In Queue (${pendingItems.length})`;
+            pendTitle.textContent = t('queue.section_pending', { count: pendingItems.length });
             runningEl.appendChild(pendTitle);
 
             let _dragSrcPath = null;
@@ -4299,7 +4320,7 @@
               const grip = document.createElement('span');
               grip.className = 'adlg-qi-grip';
               grip.textContent = '⠿';
-              grip.title = 'Drag to reorder';
+              grip.title = '拖动以调整顺序';
 
               const nameEl = document.createElement('span');
               nameEl.className = 'adlg-qi-name';
@@ -4308,12 +4329,12 @@
 
               const statusEl = document.createElement('span');
               statusEl.className = 'adlg-qi-status';
-              statusEl.textContent = 'pending';
+              statusEl.textContent = t('queue.pending');
 
               const removeBtn = document.createElement('button');
               removeBtn.className = 'adlg-qi-remove';
               removeBtn.textContent = '✕';
-              removeBtn.title = 'Remove from queue';
+              removeBtn.title = t('queue.remove_from_queue');
               removeBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 if (hasPywebviewApi && window.pywebview?.api?.remove_queue_item) {
@@ -4324,7 +4345,7 @@
                 }
               });
 
-              // Drag events
+              // 拖拽事件
               row.addEventListener('dragstart', (e) => {
                 _dragSrcPath = item.path;
                 row.classList.add('dragging');
@@ -4375,12 +4396,12 @@
         }
       } catch (_) { }
 
-      // ── Will be added (selected but not yet queued) ──
+      // ── 将要加入（已选择但尚未入队） ──
       const selected = Array.from(_dlgSelected);
       if (selected.length > 0) {
         const title = document.createElement('div');
         title.className = 'adlg-queue-section-title';
-        title.textContent = `➕ Will Be Added (${selected.length})`;
+        title.textContent = t('queue.section_add', { count: selected.length });
         willAddEl.appendChild(title);
         for (const path of selected) {
           const name = path.replace(/\\/g, '/').split('/').pop() || path;
@@ -4393,7 +4414,7 @@
           const removeBtn = document.createElement('button');
           removeBtn.className = 'adlg-qi-remove';
           removeBtn.textContent = '✕';
-          removeBtn.title = 'Remove from selection';
+          removeBtn.title = t('queue.remove_from_selection');
           removeBtn.addEventListener('click', () => {
             _dlgSelected.delete(path);
             _dlgReanalyze.delete(path);
@@ -4407,7 +4428,7 @@
             }
             const countEl = document.getElementById('analyzeDlgCount');
             const addBtn = document.getElementById('analyzeDlgAdd');
-            if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
+            if (countEl) countEl.textContent = t('queue.restore_count', { count: _dlgSelected.size });
             if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
             _refreshAnalyzeDlgQueuePreview();
           });
@@ -4417,7 +4438,7 @@
             badge.className = 'adlg-qi-status';
             badge.style.color = '#f0a040';
             badge.style.fontStyle = 'italic';
-            badge.textContent = 'Will be Re-analyzed';
+            badge.textContent = t('queue.reanalyze');
             row.appendChild(badge);
           }
           row.appendChild(removeBtn);
@@ -4428,20 +4449,20 @@
       emptyEl.classList.toggle('hidden', hasActiveQueue || selected.length > 0);
     }
 
-    /** Open the 'Analyze Folders…' dialog. */
+    /** 打开“分析文件夹…”对话框。 */
     async function openAnalyzeDialog() {
       if (!hasPywebviewApi) {
-        alert('Analysis queue is only available in the desktop (pywebview) mode.\n\nRun kestrel_visualizer as a desktop app to use this feature.');
+        alert(t('queue.desktop_only'));
         return;
       }
-      // Make sure we have a tree to browse
+      // 确保当前有可供浏览的树
       if (!folderTreeRootNode) {
         const fp = await window.pywebview.api.choose_directory();
         if (!fp) return;
         await scanFolderTree(fp);
         if (!folderTreeRootNode) return;
       }
-      // Hide GPU checkbox in frozen (PyInstaller) builds — GPU not supported there
+      // 在冻结版（PyInstaller）构建中隐藏 GPU 复选框，因为那里不支持 GPU
       const gpuLabel = document.getElementById('analyzeGpuLabel');
       if (gpuLabel) {
         gpuLabel.style.display = _isFrozenApp ? 'none' : '';
@@ -4450,10 +4471,10 @@
           if (gpuCb) gpuCb.checked = false;
         }
       }
-      // Seed the dialog's selected set from any previously-queued paths
+      // 用之前已排队的路径初始化对话框中的已选集合
       _dlgSelected = new Set(queuedFolderPaths);
       
-      // Try to restore last queue state if available
+      // 如果有上次的队列状态，则尝试恢复
       const savedQueue = getSetting('lastQueueState', null);
       if (savedQueue && Array.isArray(savedQueue) && savedQueue.length > 0) {
         const restoreBtn = document.getElementById('analyzeDlgRestoreQueue');
@@ -4462,7 +4483,7 @@
           restoreBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             _dlgSelected = new Set(savedQueue);
-            // Restore queue in settings so it looks restored
+            // 从设置中恢复队列，让界面也呈现为已恢复状态
             const s = loadSettings();
             delete s.lastQueueState;
             saveSettings(s);
@@ -4478,7 +4499,7 @@
       function refreshDlg() {
         const countEl = document.getElementById('analyzeDlgCount');
         const addBtn = document.getElementById('analyzeDlgAdd');
-        if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
+        if (countEl) countEl.textContent = t('queue.restore_count', { count: _dlgSelected.size });
         if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
         _refreshAnalyzeDlgQueuePreview();
       }
@@ -4486,35 +4507,35 @@
       const treeEl = document.getElementById('analyzeDlgTree');
       treeEl.innerHTML = '';
       treeEl.appendChild(buildAnalyzeDlgNode(folderTreeRootNode, _dlgSelected, refreshDlg));
-      // Populate counts for dialog nodes with colors and progress bar
+      // 为对话框节点填充数量、颜色与进度条
       populateAnalyzeFolderCounts();
       refreshDlg();
       document.getElementById('analyzeQueueDlg').showModal();
     }
 
-    // ── Analysis Queue Panel / Polling ───────────────────────────────────────────
+    // ── 分析队列面板 / 轮询 ───────────────────────────────────────────
 
     let _queuePollingTimer = null;
     let _queuePanelExpanded = true;
-    let _queueLastDoneSet = new Set(); // track newly-done folders to auto-refresh tree
-    let _queueLastRunningSet = new Set(); // track newly-running folders to update tree
-    let _tempKestrelPaths = new Set(); // transiently-marked paths to prevent flicker
-    let _analyticsConsentPending = false; // guard against showing consent dialog multiple times
-    let _queueCountsTimer = null; // interval for updating folder counts from queue
+    let _queueLastDoneSet = new Set(); // 记录刚完成的文件夹，用于自动刷新树
+    let _queueLastRunningSet = new Set(); // 记录刚开始运行的文件夹，用于更新树
+    let _tempKestrelPaths = new Set(); // 临时标记路径，避免 UI 闪烁
+    let _analyticsConsentPending = false; // 防止统计授权对话框重复弹出
+    let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     
-    // In-progress folder tracking and auto-refresh for live updates
-    let _inProgressFolderPaths = new Set(); // folders with pending/running status
-    let _autoRefreshTimers = new Map(); // path -> intervalId for auto-refresh listeners
-    let _inProgressFoldersCheckedCount = 0; // count of in-progress folders that are checked
-    let _isFirstQueueStart = true; // used to detect Case 1 vs Case 2 for auto-load
+    // 记录进行中的文件夹，并为实时更新控制自动刷新
+    let _inProgressFolderPaths = new Set(); // 处于 pending/running 状态的文件夹
+    let _autoRefreshTimers = new Map(); // path -> 自动刷新监听器的 intervalId
+    let _inProgressFoldersCheckedCount = 0; // 当前已勾选的进行中文件夹数量
+    let _isFirstQueueStart = true; // 用于区分自动加载逻辑中的 Case 1 / Case 2
     
-    // Session state for ETA calculations: track baseline state from folder inspection
+    // ETA 计算的会话状态：记录从文件夹检查得到的基线数据
     let _queueSessionStartState = new Map(); // path -> { initialProcessed: int, totalImages: int, toAnalyze: int }
-    let _queueFolderInspections = new Map(); // path -> full inspection data from inspect_folder/inspect_folders
-    // ETA smoothing: exponential moving average to prevent wild per-image swings
-    let _etaSmoothed = null;   // smoothed secs/image
-    let _etaLastPath = null;   // reset EMA when folder changes
-    const _thumbCache = new Map();    // relPath+'|'+rootPath → dataUrl (avoids reload flash)
+    let _queueFolderInspections = new Map(); // path -> inspect_folder/inspect_folders 返回的完整检查数据
+    // ETA 平滑处理：使用指数移动平均，避免每张图的波动过大
+    let _etaSmoothed = null;   // 平滑后的每张图耗时
+    let _etaLastPath = null;   // 文件夹变化时重置 EMA
+    const _thumbCache = new Map();    // relPath+'|'+rootPath -> dataUrl（避免重载闪烁）
     let _liveAnalysisDlgOpen = false;
     let _liveLastThumbKey = '';
     let _liveLastOverlayKey = '';
@@ -4522,12 +4543,12 @@
     const CONF_HIGH = 0.75;
     const CONF_LOW = 0.30;
 
-    /** Call the backend (pywebview API or HTTP) to start the queue. */
+    /** 调用后端（pywebview API 或 HTTP）启动队列。 */
     async function apiStartQueue(paths, useGpu = true, wildlifeEnabled = true) {
       if (hasPywebviewApi && window.pywebview?.api?.start_analysis_queue) {
         return window.pywebview.api.start_analysis_queue(JSON.stringify(paths), useGpu, wildlifeEnabled);
       }
-      // HTTP fallback (browser mode)
+      // HTTP 回退方案（浏览器模式）
       const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
       const res = await fetch('/queue/start', { method: 'POST', headers, body: JSON.stringify({ paths, use_gpu: useGpu, wildlife_enabled: wildlifeEnabled }) });
       return res.json();
@@ -4552,7 +4573,7 @@
       return res.json();
     }
 
-    /** Format a duration in seconds to a readable string like "2m 30s". */
+    /** 将秒数格式化为可读字符串，例如 "2m 30s"。 */
     function formatDuration(secs) {
       if (!isFinite(secs) || secs < 0) return '–';
       secs = Math.round(secs);
@@ -4563,7 +4584,7 @@
       return h + 'h ' + (rm > 0 ? rm + 'm' : '');
     }
 
-    /** Render the queue panel from a status object. */
+    /** 根据状态对象渲染队列面板。 */
     function renderQueuePanel(status) {
       window._lastQueueStatus = status; // store for analyze dialog queue preview
       const panel = document.getElementById('queuePanel');
@@ -4579,7 +4600,7 @@
       const paused = !!status.paused;
       const hasItems = items.length > 0;
 
-      // While the queue is running, keep a short-lived poll to update folder rows
+      // 队列运行期间，保持短周期轮询以更新文件夹行状态
       if (running) startQueueCountsPoll(); else stopQueueCountsPoll();
 
       if (!hasItems && !running) {
@@ -4591,37 +4612,37 @@
 
       panel.classList.remove('hidden');
 
-      // Badge
+      // 徽标
       const runningItems = items.filter(i => i.status === 'running');
       const pendingItems = items.filter(i => i.status === 'pending');
       const doneItems = items.filter(i => i.status === 'done');
       if (paused) {
-        badge.textContent = 'Paused'; badge.className = 'queue-panel-badge paused';
+        badge.textContent = t('queue.badge_paused'); badge.className = 'queue-panel-badge paused';
       } else if (running) {
         const cur = runningItems[0];
         if (cur && cur.total > 0) {
           badge.textContent = `${cur.processed} / ${cur.total}`; badge.className = 'queue-panel-badge';
         } else {
-          badge.textContent = `${pendingItems.length + runningItems.length} pending`; badge.className = 'queue-panel-badge';
+          badge.textContent = t('queue.badge_pending', { count: pendingItems.length + runningItems.length }); badge.className = 'queue-panel-badge';
         }
       } else if (doneItems.length === items.length && items.length > 0) {
-        badge.textContent = 'Done'; badge.className = 'queue-panel-badge done';
+        badge.textContent = t('queue.badge_done'); badge.className = 'queue-panel-badge done';
       } else {
-        badge.textContent = `${pendingItems.length} pending`; badge.className = 'queue-panel-badge';
+        badge.textContent = t('queue.badge_pending', { count: pendingItems.length }); badge.className = 'queue-panel-badge';
       }
 
-      // Pause/resume button label
-      if (pauseBtn) pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+      // 暂停/继续按钮文案
+      if (pauseBtn) pauseBtn.textContent = paused ? t('queue.resume') : t('queue.pause');
 
       if (!_queuePanelExpanded) { body.classList.add('hidden'); if (controls) controls.classList.add('hidden'); return; }
       body.classList.remove('hidden'); if (controls) controls.classList.remove('hidden');
 
-      // ETA computation: secs/image from running item using TRUE baseline from folder inspection
+      // ETA 计算：基于文件夹检查得到的真实基线，推导运行项的每张图耗时
       const cur = runningItems[0];
       let secsPerImage = null;
-      // inspectionReady: inspection data exists for the running folder.
-      // Until it arrives, suppress ETA entirely (show "Calculating ETA…") so the early
-      // incorrect progress_cb(alreadyDone, total) call cannot produce a near-zero ETA.
+      // inspectionReady 表示已拿到该运行中文件夹的检查数据。
+      // 在数据到达前完全不显示 ETA（显示“正在计算 ETA…”），避免早期
+      // 错误的 progress_cb(alreadyDone, total) 调用产生接近 0 的误导性 ETA。
       const normCurPath = normalizePath(cur?.path);
       const inspectionReady = cur && _queueSessionStartState.has(normCurPath);
       if (cur && inspectionReady && cur.elapsed_seconds > 0) {
@@ -4630,33 +4651,33 @@
         const processedThisSession = Math.max(0, (cur.processed || 0) - initialProcessed);
         if (processedThisSession > 0) {
           const rawSecsPerImage = cur.elapsed_seconds / processedThisSession;
-          // Reset EMA if we moved to a different folder (compare normalized paths)
+          // 如果切换到了不同文件夹，则重置 EMA（比较标准化路径）
           if (_etaLastPath !== normCurPath) { _etaSmoothed = null; _etaLastPath = normCurPath; }
-          // Exponential moving average (α=0.15) — smooths per-image jitter without
-          // lagging too far behind the true rate
+          // 指数移动平均（α=0.15），用于平滑每张图耗时抖动，
+          // 同时又不至于落后于真实速度太多
           const alpha = 0.15;
           _etaSmoothed = _etaSmoothed === null ? rawSecsPerImage : alpha * rawSecsPerImage + (1 - alpha) * _etaSmoothed;
           secsPerImage = _etaSmoothed;
         }
       }
 
-      // Show loading message if models are being loaded (early in run)
+      // 如果当前正在加载模型，则显示加载提示（常出现在运行早期）
       if (running && cur) {
         const overallEl = overallEtaEl;
         const loadingMsg = (cur.current_status_msg || '').toLowerCase().includes('load');
         if (loadingMsg || (cur.processed === 0 && cur.current_status_msg)) {
-          if (overallEl) { overallEl.textContent = `⏳ ${cur.current_status_msg || 'Loading analyzer... please wait'}`; overallEl.classList.remove('hidden'); }
+          if (overallEl) { overallEl.textContent = t('queue.loading_analyzer', { message: cur.current_status_msg || t('queue.loading_analyzer_fallback') }); overallEl.classList.remove('hidden'); }
           try { showLoadingAnalyzer(); } catch (e) { }
         } else {
           try { hideLoadingAnalyzer(); } catch (e) { }
         }
       }
 
-      // Overall ETA: aggregate remaining images across queue using inspection data for accuracy
+      // 总 ETA：基于检查数据统计整个队列剩余图片，提升准确性
       if (overallEtaEl && running && cur) {
         if (!inspectionReady) {
-          // Inspection data still in flight — show placeholder so user isn't misled
-          overallEtaEl.textContent = '⏳ Calculating ETA…';
+          // 检查数据仍在返回途中，先显示占位提示，避免误导用户
+          overallEtaEl.textContent = t('queue.calculating_eta');
           overallEtaEl.classList.remove('hidden');
         } else if (secsPerImage !== null) {
           let totalRemaining = 0;
@@ -4671,7 +4692,7 @@
             }
           }
           if (totalRemaining > 5) {
-            overallEtaEl.textContent = `⏱ Overall est. remaining: ${formatDuration(totalRemaining)}`;
+            overallEtaEl.textContent = t('queue.overall_eta', { time: formatDuration(totalRemaining) });
             overallEtaEl.classList.remove('hidden');
           } else {
             overallEtaEl.classList.add('hidden');
@@ -4683,7 +4704,7 @@
         overallEtaEl.classList.add('hidden');
       }
 
-      // Queue items
+      // 队列项目
       const frag = document.createDocumentFragment();
       for (const item of items) {
         const div = document.createElement('div');
@@ -4692,7 +4713,7 @@
           (item.current_status_msg || '').toLowerCase().includes('no new files');
         div.className = 'queue-item' + (isDone || item.status === 'cancelled' ? ' done-item' : '');
 
-        // Header row: name + status badge
+        // 头部行：名称 + 状态徽标
         const hdr = document.createElement('div');
         hdr.className = 'queue-item-header';
         const nameEl = document.createElement('span');
@@ -4702,42 +4723,42 @@
         const statusEl = document.createElement('span');
         statusEl.className = `queue-item-status ${item.status}`;
         const labels = {
-          pending: '⏳ In Queue',
-          running: '⚙ Analyzing',
-          done: isAlreadyAnalyzed ? '✓ Already analyzed' : '✓ Done',
-          error: '✗ Error',
-          cancelled: '— Cancelled',
+          pending: t('queue.status_pending'),
+          running: t('queue.status_running'),
+          done: isAlreadyAnalyzed ? t('queue.status_already_done') : t('queue.status_done'),
+          error: t('queue.status_error'),
+          cancelled: t('queue.status_cancelled'),
         };
         statusEl.textContent = labels[item.status] || item.status;
         if (item.status === 'error' && item.error) statusEl.title = item.error;
         hdr.appendChild(nameEl); hdr.appendChild(statusEl);
         div.appendChild(hdr);
 
-        // Progress bar
+        // 进度条
         if (item.status === 'running' && item.total > 0) {
           const prog = document.createElement('div'); prog.className = 'queue-item-progress';
           const fill = document.createElement('div'); fill.className = 'queue-item-progress-fill';
           fill.style.width = Math.round((item.processed / item.total) * 100) + '%';
           prog.appendChild(fill); div.appendChild(prog);
 
-          // ETA / paused row
+          // ETA / 暂停状态行
           {
             const etaEl = document.createElement('div');
             etaEl.className = 'queue-item-eta';
             if (item.is_paused) {
-              etaEl.textContent = `${item.processed} / ${item.total} — ⏸ Paused`;
+              etaEl.textContent = t('queue.eta_paused', { processed: item.processed, total: item.total });
             } else if (!inspectionReady) {
-              etaEl.textContent = `${item.processed} / ${item.total} — ⏳ Calculating ETA…`;
+              etaEl.textContent = t('queue.eta_calculating', { processed: item.processed, total: item.total });
             } else if (secsPerImage !== null && item.total > item.processed) {
               const remaining = secsPerImage * (item.total - item.processed);
-              etaEl.textContent = `${item.processed} / ${item.total} — est. ${formatDuration(remaining)} left`;
+              etaEl.textContent = t('queue.eta_remaining', { processed: item.processed, total: item.total, time: formatDuration(remaining) });
             } else {
               etaEl.textContent = `${item.processed} / ${item.total}`;
             }
             div.appendChild(etaEl);
           }
 
-          // Current filename
+          // 当前文件名
           if (item.current_filename) {
             const fileEl = document.createElement('div');
             fileEl.className = 'queue-item-file';
@@ -4745,14 +4766,14 @@
             div.appendChild(fileEl);
           }
 
-          // Live preview thumbnail (async load deferred after DOM insert)
+          // 实时预览缩略图（等 DOM 插入后再异步加载）
           if (item.current_export_path && hasPywebviewApi) {
             const preview = document.createElement('div');
             preview.className = 'queue-live-preview';
             const thumb = document.createElement('img');
             thumb.className = 'queue-live-thumb';
             thumb.alt = '';
-            // Store paths as data attributes; loaded after DOM insert
+            // 先把路径写入 data 属性，等 DOM 插入后再加载
             thumb.dataset.thumbRel = item.current_export_path;
             thumb.dataset.thumbRoot = item.path;
             preview.appendChild(thumb);
@@ -4770,7 +4791,7 @@
       body.innerHTML = '';
       body.appendChild(frag);
 
-      // Async: load thumbnails for any img[data-thumb-rel] elements (cache avoids reload flash)
+      // 异步加载所有 img[data-thumb-rel] 的缩略图（缓存可避免重载闪烁）
       body.querySelectorAll('img[data-thumb-rel]').forEach(async img => {
         try {
           const rel = img.dataset.thumbRel || '';
@@ -4787,14 +4808,14 @@
         } catch (_) { }
       });
 
-      // Check if any folder newly finished — refresh tree + auto-reload CSV data
+      // 检查是否有文件夹刚刚完成，必要时刷新树并自动重载 CSV 数据
       const nowDone = new Set(items.filter(i => i.status === 'done').map(i => i.path));
       let treeRescanNeeded = false;
       for (const p of nowDone) {
         if (!_queueLastDoneSet.has(p)) {
           treeRescanNeeded = true;
           scheduleAutoRefresh(p);
-          // First-time folder completion → offer analytics consent if not yet asked
+          // 首次有文件夹分析完成时，如果还未询问过，则弹出统计授权
           if (!getSetting('analytics_consent_shown', false)) showAnalyticsConsentDialog();
         }
       }
@@ -4803,7 +4824,7 @@
       }
       _queueLastDoneSet = nowDone;
 
-      // Update in-progress folder tracking and UI (pending + running folders)
+      // 更新进行中文件夹的跟踪与界面状态（pending + running）
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
         const inProgressNow = new Set();
@@ -4813,7 +4834,7 @@
           }
         }
         
-        // Detect newly-running items (first time moving from pending to running)
+        // 识别刚开始运行的项目（首次从 pending 进入 running）
         const runningNow = new Set(items.filter(i => i.status === 'running').map(i => norm(i.path)));
         const runningRawPaths = {};
         items.filter(i => i.status === 'running').forEach(i => { runningRawPaths[norm(i.path)] = i.path; });
@@ -4825,12 +4846,12 @@
         const prevRunningSet = _queueLastRunningSet;
         _queueLastRunningSet = runningNow;
         
-        // Update in-progress set and refresh tree styling
+        // 更新进行中集合，并刷新树的样式
         _inProgressFolderPaths = inProgressNow;
         updateInProgressFoldersInTree();
         _updateAutoRefreshTimers();
         
-        // Newly-starting items: update the main folder tree after 500ms delay
+        // 对刚开始运行的项目：500ms 后更新主文件夹树
         for (const p of inProgressNow) {
           if (!prevRunningSet.has(p)) {
             setTimeout(() => {
@@ -4843,7 +4864,7 @@
         }
       } catch (e) { console.warn('[queue] in-progress tracking error:', e); }
 
-      // Remove auto-refresh timers for finished folders
+      // 移除已完成文件夹的自动刷新定时器
       try {
         const norm = p => (p || '').replace(/\\/g, '/');
         const nowDone = new Set(items.filter(i => i.status === 'done').map(i => norm(i.path)));
@@ -4855,14 +4876,14 @@
         }
       } catch (e) { console.warn('[timer] cleanup error:', e); }
 
-      // Update live dialog if open
+      // 如果实时分析对话框已打开，则同步刷新
       if (_liveAnalysisDlgOpen) {
         const runningItem = items.find(i => i.status === 'running') || null;
         updateLiveAnalysisDlg(runningItem || items[items.length - 1] || null);
       }
     }
 
-    // Normalize paths consistently: strip trailing slashes
+    // 统一标准化路径：去掉结尾斜杠
     function normalizePath(p) {
       if (!p) return '';
       let pp = String(p).trim();
@@ -4874,13 +4895,13 @@
       if (_queuePollingTimer) return;
       startAutoRefresh();
 
-      // Initialize session state by inspecting all folders in the queue
-      // This gives us TRUE baselines for accurate ETA calculations
+      // 通过检查队列中的全部文件夹来初始化会话状态
+      // 这样可以得到真实基线，从而更准确地计算 ETA
       (async () => {
         try {
           const status = await apiGetQueueStatus();
           if (status && status.items && status.items.length > 0) {
-            // Batch-inspect all folders to get true processed/total counts
+            // 批量检查所有文件夹，拿到真实的 processed/total 计数
             const paths = status.items.map(item => item.path);
             if (hasPywebviewApi && window.pywebview?.api?.inspect_folders) {
               try {
@@ -4907,15 +4928,15 @@
         } catch (e) { /* ignore */ }
       })();
 
-      // Poll more frequently to reflect per-image progress (500ms)
+      // 使用更高频率轮询，以反映逐张图片的进度（500ms）
       _queuePollingTimer = setInterval(async () => {
         try {
           const status = await apiGetQueueStatus();
           renderQueuePanel(status);
-          // Update auto-refresh timers based on pause state
+          // 根据暂停状态更新自动刷新定时器
           _updateAutoRefreshTimers();
 
-          // When new items appear, inspect and capture their baseline state
+          // 当有新项目出现时，检查并记录它们的基线状态
           if (status && status.items) {
             const newPaths = [];
             for (const item of status.items) {
@@ -4957,22 +4978,22 @@
     function stopPollingQueue() {
       if (_queuePollingTimer) { clearInterval(_queuePollingTimer); _queuePollingTimer = null; }
       stopAutoRefresh();
-      // Cleanup auto-refresh timers for in-progress folders
+      // 清理进行中文件夹的自动刷新定时器
       for (const timerId of _autoRefreshTimers.values()) {
         clearInterval(timerId);
       }
       _autoRefreshTimers.clear();
       _inProgressFolderPaths.clear();
-      // Cleanup session state
+      // 清理会话状态
       _queueSessionStartState.clear();
       _queueFolderInspections.clear();
       _etaSmoothed = null;
       _etaLastPath = null;
     }
 
-    // Poll the queue status frequently and update folder rows in the ANALYZE DIALOG ONLY
-    // with the running item's processed/total. This keeps per-folder counts live
-    // while analysis is in progress.
+    // 高频轮询队列状态，并只更新“分析文件夹”对话框中的文件夹行，
+    // 将运行项的 processed/total 写进去，从而在分析过程中持续保持
+    // 每个文件夹的计数实时可见。
     function startQueueCountsPoll() {
       if (_queueCountsTimer) return;
       _queueCountsTimer = setInterval(async () => {
@@ -4980,9 +5001,9 @@
           const status = await apiGetQueueStatus();
           if (!status || !status.items) return;
           const items = status.items;
-          // Normalize helper
+          // 标准化路径辅助函数
           const norm = p => (p || '').replace(/\\/g, '/');
-          // Update ONLY the Analyze dialog tree rows (not the main folder tree)
+          // 只更新“分析文件夹”对话框中的树行（不更新主文件夹树）
           const rows = Array.from(document.querySelectorAll('#analyzeDlgTree .adlg-node-row'));
           for (const it of items) {
             const ip = norm(it.path);
@@ -4993,7 +5014,7 @@
                 if (it.total && it.total > 0) span.textContent = ` ${it.processed}/${it.total}`;
                 else span.textContent = '';
               }
-              // Update analysis classes (partial/full/none) - only for analyze dialog
+              // 更新分析状态类名（partial/full/none），仅作用于分析对话框
               row.classList.remove('analyzed-full', 'analyzed-partial', 'analyzed-none');
               if (it.total && it.total > 0) {
                 if ((it.processed || 0) === 0) row.classList.add('analyzed-none');
@@ -5002,7 +5023,7 @@
               }
             }
           }
-          // Stop polling if queue no longer running
+          // 队列不再运行时停止轮询
           if (!status.running) stopQueueCountsPoll();
         } catch (_) { }
       }, 500);
@@ -5012,7 +5033,7 @@
       if (_queueCountsTimer) { clearInterval(_queueCountsTimer); _queueCountsTimer = null; }
     }
 
-    // ── Live Analysis Details dialog ──────────────────────────────────────────
+    // ── 实时分析详情对话框 ──────────────────────────────────────────
 
     function openLiveAnalysisDlg() {
       _liveAnalysisDlgOpen = true;
@@ -5020,8 +5041,8 @@
     }
 
     /**
-     * Load an image by relative path + root into an <img> element, using _thumbCache.
-     * Only issues a network/IPC call on cache miss.
+     * 使用相对路径 + 根目录把图片加载到 <img> 元素中，并复用 _thumbCache。
+     * 仅在缓存未命中时才发起网络/IPC 调用。
      */
     async function _loadImg(imgEl, relPath, rootPath) {
       if (!relPath || !rootPath || !hasPywebviewApi) return;
@@ -5038,12 +5059,12 @@
       } catch (_) { }
     }
 
-    /** Update the live dialog with data from a running (or recently-finished) queue item. */
+    /** 用运行中（或刚完成）的队列项目数据刷新实时对话框。 */
     function updateLiveAnalysisDlg(item) {
       const dlg = document.getElementById('liveAnalysisDlg');
       if (!dlg || !dlg.open) { _liveAnalysisDlgOpen = false; return; }
 
-      // Header
+      // 头部
       const folderEl = document.getElementById('liveDlgFolderName');
       const fnameEl = document.getElementById('liveDlgFilename');
       const statusEl = document.getElementById('liveDlgStatus');
@@ -5057,19 +5078,19 @@
 
       if (!item) return;
 
-      // Thumbnail
+      // 缩略图
       const thumbEl = document.getElementById('liveDlgThumb');
       if (thumbEl && item.current_export_path) {
         const k = item.current_export_path + '|' + item.path;
         if (_liveLastThumbKey !== k) { _liveLastThumbKey = k; _loadImg(thumbEl, item.current_export_path, item.path); }
       }
 
-      // Detection overlay
+      // 检测叠加图
       const overlayEl = document.getElementById('liveDlgOverlay');
       if (overlayEl) {
         if (item.current_overlay_rel) {
           const k = item.current_overlay_rel + '|' + item.path;
-          // Always reload live overlay images (they are overwritten in place).
+          // 实时叠加图总是重新加载（文件内容会被原地覆盖）。
           const isLiveOverlay = String(item.current_overlay_rel).indexOf('__live_') >= 0;
           if (isLiveOverlay) {
             _liveLastOverlayKey = k + '|' + Date.now();
@@ -5083,7 +5104,7 @@
         }
       }
 
-      // Crop cards
+      // 裁切卡片
       _updateLiveCropCards(item);
     }
 
@@ -5110,7 +5131,7 @@
       const quality = item.current_quality_results || [];
       const species = item.current_species_results || [];
 
-      // Ensure exactly 5 card elements exist
+      // 确保始终存在 5 个卡片元素
       while (row.children.length < 5) {
         const card = document.createElement('div');
         card.className = 'live-dlg-crop-card';
@@ -5155,7 +5176,7 @@
           continue;
         }
 
-        // Detection confidence
+        // 检测置信度
         confEl.textContent = i < dets.length
           ? `Conf: ${dets[i].confidence.toFixed(2)}`
           : '–';
@@ -5167,20 +5188,20 @@
           qualityEl.textContent = i < crops.length ? 'Quality: …' : 'Quality: —';
         }
 
-        // Live dialog intentionally uses raw quality thresholds (not normalized ratings).
+        // 实时对话框故意使用原始质量阈值，而不是标准化评分。
         const rawRating = Number.isFinite(qVal) ? _rawQualityToRating(qVal) : 0;
         starsEl.textContent = i < quality.length
           ? _formatStars(rawRating)
           : (i < crops.length ? '…' : '☆☆☆☆☆');
 
-        // Species
+        // 物种
         if (i < species.length) {
           const sp = species[i];
           const spConf = sp.species_confidence ?? 0;
           const fmConf = sp.family_confidence ?? 0;
-          spEl.textContent = `${sp.species || '–'} (${spConf.toFixed(2)})`;
+          spEl.textContent = `${getSpeciesDisplayName(sp.species || '–')} (${spConf.toFixed(2)})`;
           spEl.className = 'ldc-species ' + (spConf >= CONF_HIGH ? 'high-conf' : spConf < CONF_LOW ? 'low-conf' : '');
-          fmEl.textContent = sp.family ? `${sp.family} (${fmConf.toFixed(2)})` : '–';
+          fmEl.textContent = sp.family ? `${getFamilyDisplayName(sp.family)} (${fmConf.toFixed(2)})` : '–';
           fmEl.className = 'ldc-family ' + (fmConf >= CONF_HIGH ? 'high-conf' : fmConf < CONF_LOW ? 'low-conf' : '');
         } else {
           spEl.textContent = i < crops.length ? 'Classifying…' : '–';
@@ -5190,15 +5211,15 @@
       }
     }
 
-    // ── End Live Analysis Dialog ─────────────────────────────────────────────────
+    // ── 实时分析详情对话框结束 ─────────────────────────────────────────────────
 
-    // ── Auto-refresh: silently reload CSV data for newly-analyzed folders ─────────
+    // ── 自动刷新：为新分析完成的文件夹静默重载 CSV 数据 ─────────
 
     let _autoRefreshTimer = null;
-    let _autoRefreshPendingPaths = new Set(); // paths that need a quiet reload
-    let _silentRefreshRunning = false;        // guard against concurrent silentRefreshPending
+    let _autoRefreshPendingPaths = new Set(); // 需要静默重载的路径
+    let _silentRefreshRunning = false;        // 防止 silentRefreshPending 并发执行
 
-    /** Queue a silent reload for `path` (called when a queue item becomes done). */
+    /** 为 `path` 安排一次静默重载（当某个队列项完成时调用）。 */
     function scheduleAutoRefresh(path) {
       _autoRefreshPendingPaths.add(path);
     }
@@ -5212,7 +5233,7 @@
       if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null; }
     }
 
-    /** Silently reload CSV data for any paths in _autoRefreshPendingPaths that are checked. */
+    /** 对 _autoRefreshPendingPaths 中已勾选的路径执行静默 CSV 重载。 */
     async function silentRefreshPending() {
       if (_autoRefreshPendingPaths.size === 0) return;
       if (_silentRefreshRunning) return;
@@ -5265,7 +5286,7 @@
 
         if (changed) {
           ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
-          setStatus(`Auto-refreshed ${toRefresh.length} newly-analyzed folder(s)`);
+          setStatus(t('status.auto_refreshed', { count: toRefresh.length }));
         }
       } finally {
         _silentRefreshRunning = false;
@@ -5412,18 +5433,18 @@
           checkedFolderPaths.add(folderPath);
           renderFolderTree();
           await debouncedAutoLoad();
-          setStatus('Auto-loaded in-progress folder (Case 1: no other analyzed folders)');
+          setStatus('已自动加载正在分析中的文件夹（首次启动且当前没有其他已分析文件夹）');
         }
       } catch (e) { console.warn('[case1] error:', e); }
     }
 
-    // ── End Analysis Queue ────────────────────────────────────────────────────────
+    // ── 分析队列结束 ────────────────────────────────────────────────────────
 
-    // Helper function to load folder using native path (for pywebview API)
-    // Loads a single folder. For multi-folder loading, see loadMultipleFolders().
+    // 使用原生路径加载文件夹的辅助函数（供 pywebview API 使用）
+    // 这里只加载单个文件夹；多文件夹加载请见 loadMultipleFolders()。
 
-    // Auto-load: fires after a short debounce whenever checkboxes change.
-    // If nothing is checked, clears the view gracefully.
+    // 自动加载：复选框变化后，经过短暂防抖自动触发。
+    // 如果没有勾选任何内容，则平滑清空当前视图。
     const debouncedAutoLoad = debounce(async () => {
       if (checkedFolderPaths.size > 0) {
         await loadMultipleFolders(Array.from(checkedFolderPaths));
@@ -5431,11 +5452,11 @@
         ++_loadFoldersVersion; // cancel any in-progress load
         rows = []; header = []; scenes = [];
         sceneGrid.innerHTML = '';
-        setStatus('No folders selected — check folders in the tree to load scenes');
+        setStatus(t('status.no_folders_selected'));
       }
     }, 400);
 
-    // Collect all kestrel paths from the tree (recursively) for check-all
+    // 递归收集树中的全部 kestrel 路径，用于“全选”
     function collectKestrelPaths(node, out = []) {
       if (!node) return out;
       if (node.has_kestrel) out.push(node.path);
@@ -5456,7 +5477,7 @@
       debouncedAutoLoad();
     }
 
-    // Progress bar helpers
+    // 进度条辅助函数
     function showProgress(label, pct) {
       const row = document.getElementById('loadProgressRow');
       const lbl = document.getElementById('loadProgressLabel');
@@ -5497,14 +5518,14 @@
           const currentSlot = slot++;
           for (const r of newRows) { r.__rootPath = root; r.__folderSlot = currentSlot; }
           rows = rows.concat(newRows);
-          // Load scenedata for this folder
+          // 加载该文件夹的 scenedata
           if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
             try {
               const sdRes = await window.pywebview.api.read_kestrel_scenedata(root);
               if (sdRes?.success) _scenedata[root] = sdRes.data;
             } catch (_) {}
           }
-          // Apply normalization (in-memory: sets r.__normalized_rating)
+          // 应用标准化（仅在内存中写入 r.__normalized_rating）
           if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
             try {
               const normRes = await window.pywebview.api.apply_normalization(root);
@@ -5523,9 +5544,9 @@
       }
       if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
       if (loadedCount === 0) { hideProgress(); setStatus('No folders could be loaded'); return; }
-      showProgress(`Building scenes from ${loadedCount} folder${loadedCount === 1 ? '' : 's'}…`, 95);
-      // For single-folder image-loading compat: set rootPath to first loaded root.
-      // Per-row __rootPath handles multi-folder image loading in getBlobUrlForPath.
+      showProgress(t('status.building_scenes', { count: loadedCount }), 95);
+      // 为兼容单文件夹图片加载，把 rootPath 设为第一个已加载根目录。
+      // 多文件夹模式下由逐行 __rootPath 在 getBlobUrlForPath 中负责处理。
       const firstRow = rows.find(r => r.__rootPath);
       if (firstRow) rootPath = firstRow.__rootPath;
       rootDirHandle = null;
@@ -5542,27 +5563,27 @@
       await sleep(400);
       hideProgress();
       const label = loadedCount === 1 ? paths[0].replace(/.*[/\\]/, '') : `${loadedCount} folders`;
-      setStatus(`Loaded ${label} — ${rows.length} images`);
+      setStatus(`已加载 ${label} —— ${rows.length} 张图片`);
     }
 
     async function loadFolderFromPath(folderPath) {
       if (!folderPath) return;
 
       try {
-        // Use pywebview API to read the CSV file
+        // 使用 pywebview API 读取 CSV 文件
         const result = await window.pywebview.api.read_kestrel_csv(folderPath);
 
         if (!result.success) {
           throw new Error(result.error || 'Failed to read CSV');
         }
 
-        // Parse the CSV data
+        // 解析 CSV 数据
         const parsed = Papa.parse(result.data, { header: true, skipEmptyLines: true });
         header = parsed.meta.fields || [];
         const loadedRoot = result.root || folderPath;
         rows = (parsed.data || []).map(r => ({ ...r, __rootPath: loadedRoot, __folderSlot: 0 }));
         
-        // Load scenedata for this folder
+        // 加载该文件夹的 scenedata
         if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
           try {
             const sdRes = await window.pywebview.api.read_kestrel_scenedata(loadedRoot);
@@ -5570,7 +5591,7 @@
           } catch (_) {}
         }
         
-        // Apply normalization (in-memory: sets r.__normalized_rating)
+        // 应用标准化（仅在内存中写入 r.__normalized_rating）
         if (hasPywebviewApi && window.pywebview?.api?.apply_normalization) {
           try {
             const normRes = await window.pywebview.api.apply_normalization(loadedRoot);
@@ -5587,24 +5608,24 @@
         ensureRatingColumns();
         blobUrlCache.clear(); // new folder — clear stale cache entries
 
-        // IMPORTANT: Set rootPath BEFORE renderScenes so image loading works
+        // 重要：必须先设置 rootPath，再调用 renderScenes，图片加载才会正常
         rootPath = loadedRoot;
         rootDirHandle = null; // Clear handle since we're using Python API
         rootIsKestrel = false;
 
-        // Now render with rootPath set
+        // 在 rootPath 已设好的前提下进行渲染
         await renderScenes();
 
-        // Also save in settings for file opening (use rootHint for consistency)
+        // 同时写入设置，供打开文件时使用（统一使用 rootHint）
         const settings = loadSettings();
         settings.rootHint = rootPath;
         saveSettings(settings);
 
-        setStatus(`Loaded from: ${result.path}`);
+        setStatus(t('folder.loaded_from', { path: result.path }));
         const mergeBtn = document.getElementById('openMerge');
         if (mergeBtn) mergeBtn.disabled = true; // Can't save in pywebview mode
 
-        // Update active selection in tree if tree is open
+        // 如果文件夹树已打开，则更新当前激活项
         if (folderTreeData) {
           const loadedPath = result.root || folderPath;
           treeActivePath = loadedPath;
@@ -5614,33 +5635,32 @@
         }
       } catch (e) {
         const errorMsg = (e.message || String(e)).replace(/^Error: /, '');
-        // If the folder tree is already visible the user may have clicked a parent folder
-        // intentionally (no .kestrel there). Show a soft status message instead of an alert.
+        // 如果文件夹树已可见，用户可能是有意点击了父文件夹
+        // （其中并没有 .kestrel）。此时给出柔和状态提示，不弹警告框。
         if (folderTreeData) {
-          setStatus(`No Kestrel database in this folder — select one that shows 📂 in the tree`);
+          setStatus(t('folder.no_database_in_tree'));
         } else {
-          alert(`Could not load Kestrel database from this folder.\n\nMake sure:\n1. The folder has been analyzed with Kestrel Analyzer\n2. The .kestrel folder exists (it may be hidden on macOS)\n3. You selected the correct folder\n\nTip: On macOS, .kestrel folders are hidden by default. You can:\n• Press Cmd+Shift+. (period) to show hidden files in Finder\n• Or select the parent folder that contains the .kestrel folder\n\nError: ${errorMsg}`);
-          setStatus('Failed to load database');
+          alert(t('folder.database_missing_alert', { error: errorMsg }));
+          setStatus(t('folder.load_failed'));
         }
       }
     }
 
-    // Event wiring
+    // 事件绑定
     el('#pickFolder').addEventListener('click', async () => {
       console.log('[DEBUG] Folder picker clicked');
       console.log('[DEBUG] hasPywebviewApi:', hasPywebviewApi);
       console.log('[DEBUG] window.pywebview:', window.pywebview);
       console.log('[DEBUG] window.pywebview?.api:', window.pywebview?.api);
 
-      // Wait for pywebview API if it's not ready yet
+      // 若 pywebview API 尚未就绪，则先等待
       if (!hasPywebviewApi) {
         console.log('[DEBUG] Waiting for pywebview API...');
         const ready = await waitForPywebview();
         console.log('[DEBUG] Pywebview API ready:', ready);
       }
-      // When user opens a folder, reset any checked folders in the main tree
-      // (acts like pressing "Check none") so we don't accidentally load
-      // folders from a previous root selection.
+      // 当用户打开一个文件夹时，重置主树中所有已勾选项
+      // （等同于点击“取消全选”），避免误载入上一次根目录选择时留下的文件夹。
       try {
         checkedFolderPaths.clear();
         renderFolderTree();
@@ -5648,45 +5668,45 @@
       } catch (e) { /* ignore */ }
 
       try {
-        // PRIORITY 1: Python API (desktop app - all platforms)
-        // When available, ALWAYS use this for consistency
+        // 优先级 1：Python API（桌面应用，全平台）
+        // 只要可用，就始终优先使用它以保持行为一致
         if (hasPywebviewApi && window.pywebview?.api?.choose_directory) {
           console.log('[DEBUG] Using Python API for folder picker');
           try {
-            setStatus('Opening folder picker...');
+            setStatus(t('folder.opening_picker'));
             const folderPath = await window.pywebview.api.choose_directory();
             if (folderPath) {
-              // Scan the selected folder as the tree root (user may have picked a parent
-              // folder with multiple analyzed sub-folders, or a leaf folder directly).
+              // 将选中的文件夹作为树根来扫描
+              // （用户可能选的是包含多个已分析子目录的父目录，也可能直接选叶子目录）。
               treeExpandedPaths.clear();
               const treeScanned = await scanFolderTree(folderPath);
-              // Use the root_has_kestrel flag returned directly by scanFolderTree
-              // (folderTreeRootHasKestrel is set inside scanFolderTree).
-              // Only attempt CSV load if the root itself is an analyzed folder.
+              // 直接使用 scanFolderTree 返回的 root_has_kestrel 标记
+              // （folderTreeRootHasKestrel 会在 scanFolderTree 内部同步设置）。
+              // 只有根目录本身就是已分析文件夹时，才尝试加载 CSV。
               if (treeScanned && !folderTreeRootHasKestrel) {
-                // Tree scan succeeded but root has no .kestrel — it's a parent folder.
-                setStatus('Select a folder from the tree below to load its scenes');
+                // 树扫描成功，但根目录没有 .kestrel，说明它是父目录。
+                setStatus(t('queue.select_tree_folder'));
               } else {
-                // Either scan wasn't available, or the root itself has .kestrel — load it.
+                // 要么无法扫描树，要么根目录本身就有 .kestrel，此时直接加载。
                 await loadFolderFromPath(folderPath);
               }
               return; // Success - Python API handled everything
             } else {
-              setStatus('Folder selection cancelled');
+              setStatus(t('folder.selection_cancelled'));
               return; // User cancelled
             }
           } catch (e) {
             console.error('Python API folder picker failed:', e);
-            alert(`Desktop folder picker failed: ${e.message || e}\n\nPlease restart the application and try again.`);
-            setStatus('Folder picker failed');
+            alert(t('folder.picker_failed', { message: e.message || e }));
+            setStatus(t('folder.picker_failed_status'));
             return; // Don't fall through - Python API should always work in desktop app
           }
         }
 
-        // PRIORITY 2: File System Access API (browser mode only)
-        // This only runs when NOT in pywebview context
+        // 优先级 2：File System Access API（仅浏览器模式）
+        // 仅在不处于 pywebview 环境时执行
         if (supportsFS) {
-          // Primary path: pick a folder (root or .kestrel)
+          // 主路径：选择一个文件夹（根目录或 .kestrel）
           try {
             rootDirHandle = await window.showDirectoryPicker();
             rootIsKestrel = rootDirHandle && rootDirHandle.name === '.kestrel';
@@ -5697,10 +5717,10 @@
             if (e.name !== 'AbortError') {
               console.error('showDirectoryPicker failed:', e);
             }
-            // user may have cancelled; fall through to file picker
+            // 用户可能取消了选择，继续回退到文件选择器
           }
 
-          // Secondary path: open CSV directly
+          // 次路径：直接打开 CSV
           try {
             const [fh] = await window.showOpenFilePicker({ types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }] });
             if (!fh) return;
@@ -5710,19 +5730,19 @@
             await loadCsvFromHandle(fh);
             const mergeBtn = document.getElementById('openMerge');
             if (mergeBtn) mergeBtn.disabled = true;
-            setStatus('CSV loaded (limited previews; use folder selection for full features)');
+            setStatus(t('folder.csv_loaded_limited'));
             return;
           } catch (e) {
             if (e.name !== 'AbortError') {
               console.error('showOpenFilePicker failed:', e);
             }
-            // cancelled
+            // 用户取消
           }
           return;
         }
 
-        // Last resort fallback: file input for CSV only
-        setStatus('Opening file picker (limited functionality)...');
+        // 最后兜底：只用文件输入框选择 CSV
+        setStatus(t('folder.file_picker_limited'));
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.csv,text/csv';
@@ -5739,17 +5759,17 @@
             ensureSceneNameColumn();
             ensureRatingColumns();
             await renderScenes();
-            setStatus('CSV loaded (limited features - no folder access)');
-            alert('CSV loaded successfully.\n\nNote: Image previews and opening files in editors will not work without folder access.\n\nFor full functionality, use the desktop app or a Chromium-based browser (Chrome, Edge, Brave).');
+            setStatus(t('folder.csv_loaded_limited'));
+            alert(t('folder.csv_loaded_limited_alert'));
           } catch (e) {
             alert(`Failed to load CSV: ${e.message}`);
-            setStatus('CSV load failed');
+            setStatus(t('folder.csv_load_failed'));
           }
         };
         input.click();
       } catch (e) {
         console.error('Unexpected error in pickFolder:', e);
-        setStatus('An unexpected error occurred');
+        setStatus(t('folder.unexpected_error'));
       }
     });
 
@@ -5769,13 +5789,13 @@
       try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
     })();
 
-    // Apply initial auto-save visibility from cached localStorage settings
+    // 根据 localStorage 中缓存的设置，应用初始自动保存可见性
     (function initAutoSaveVisibility() {
       _autoSaveEnabled = getSetting('auto_save_enabled', true) !== false;
       _updateSaveRevertVisibility();
     })();
 
-    // Group-by-folder toggle
+    // “按文件夹分组”开关
     (function initGroupByFolder() {
       const t = document.getElementById('groupByFolder');
       if (!t) return;
@@ -5785,7 +5805,7 @@
       });
     })();
 
-    // Group-by-capture-time toggle
+    // “按拍摄时间分组”开关
     (function initGroupByTime() {
       const t = document.getElementById('groupByTime');
       if (!t) return;
@@ -5795,14 +5815,14 @@
       });
     })();
 
-    // Scroll position indicator — shows current folder/time-group while scrolling
+    // 滚动位置指示器，滚动时显示当前文件夹/时间分组
     (function initScrollPositionIndicator() {
       const mainEl = document.querySelector('main');
       const indicator = document.getElementById('scrollPositionIndicator');
       if (!mainEl || !indicator) return;
       let hideTimer = null;
       mainEl.addEventListener('scroll', () => {
-        // Track both folder headers and timeline day banners
+        // 同时跟踪文件夹标题和时间线日期横幅
         const headers = [...sceneGrid.querySelectorAll('.folder-group-header, .timeline-day-banner')];
         if (!headers.length) { indicator.style.opacity = '0'; return; }
         const mainRect = mainEl.getBoundingClientRect();
@@ -5824,13 +5844,13 @@
       }, { passive: true });
     })();
 
-    // Multi-select merge action bar
+    // 多选合并操作栏
     const selectMergeBtn = document.getElementById('selectMergeBtn');
     if (selectMergeBtn) selectMergeBtn.addEventListener('click', executeSelectionMerge);
     const selectClearBtn = document.getElementById('selectClearBtn');
     if (selectClearBtn) selectClearBtn.addEventListener('click', () => { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !document.querySelector('dialog[open]')) { if (selectedSceneIds.size > 0) { selectedSceneIds.clear(); _lastSelectedIdx = -1; updateSelectionUI(); } _clearGridFocus(); } });
-    // Revert button
+    // 还原按钮
     const revertBtn = el('#revertCsv');
     if (revertBtn) revertBtn.addEventListener('click', () => {
       if (!_cleanSnapshot) return;
@@ -5843,7 +5863,7 @@
     if (zoomInBtn) zoomInBtn.addEventListener('click', () => { uiZoom = Math.min(1.4, uiZoom + 0.1); applyZoom(); });
     if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => { uiZoom = Math.max(0.7, uiZoom - 0.1); applyZoom(); });
 
-    // Initialize toolbar toggle for scene-level manual-rated filter
+    // 初始化工具栏里的“仅场景级手动评分”过滤开关
     (function initScenesManualFilter() {
       const t = document.getElementById('filterScenesManualRated');
       if (!t) return;
@@ -5854,7 +5874,7 @@
       });
     })();
 
-    // Initialize secondary species/families inclusion toggle
+    // 初始化“包含次级物种/科”开关
     (function initIncludeSecondary() {
       const t = document.getElementById('includeSecondarySpecies');
       if (!t) return;
@@ -5864,9 +5884,9 @@
       });
     })();
 
-    // Merge scenes feature
+    // 合并场景功能
     function computeAllScenesForMerge() {
-      // Group rows by scene_count; keep simple stats and representative
+      // 按 scene_count 分组行数据，并保留基础统计与代表图
       const groups = new Map();
       for (const r of rows) {
         const id = r.scene_count;
@@ -5875,7 +5895,7 @@
       }
       const list = [];
       for (const [id, arr] of groups) {
-        // pick representative by max quality
+        // 选择质量最高的图片作为代表
         let rep = arr[0];
         for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
@@ -5884,7 +5904,7 @@
         const name = sdScene?.name || (arr.find(a => (a.scene_name || '').trim().length)?.scene_name || '').trim();
         list.push({ id, imageCount: arr.length, maxQuality: maxQ, sceneName: name, repPath: (rep.export_path || rep.crop_path || ''), repFilename: rep.filename || '' });
       }
-      // Sort numerically by id where possible
+      // 尽量按数字 ID 排序
       return list.sort((a, b) => parseNumber(a.id) - parseNumber(b.id));
     }
 
@@ -5907,37 +5927,37 @@
         const targetMode = modeRadios.find(r => r.checked)?.value || 'min';
         const targetId = targetMode === 'manual' && targetInput.value ? String(targetInput.value) : (n ? String(ids.map(x => parseNumber(x)).sort((a, b) => a - b)[0]) : '');
         const totalImgs = sceneList.filter(s => ids.includes(String(s.id))).reduce((acc, s) => acc + s.imageCount, 0);
-        summary.textContent = n < 2 ? 'Select at least two scenes to merge.' : `Merging ${n} scenes into Scene ${targetId} (${totalImgs} images).`;
+        summary.textContent = n < 2 ? '至少选择两个场景后才能合并。' : t('merge.summary', { count: n, target: targetId, images: totalImgs });
         applyBtn.disabled = n < 2 || !targetId;
       }
 
-      // Build rows: [thumb] [checkbox + title] [count]
+      // 构建行：[缩略图] [复选框 + 标题] [数量]
       for (const s of sceneList) {
         const row = document.createElement('div');
         row.style.display = 'contents';
 
-        // Thumb cell
+        // 缩略图单元格
         const cThumb = document.createElement('div');
         const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.style.aspectRatio = '16/10';
-        const img = document.createElement('img'); img.alt = s.repFilename || 'No preview'; img.loading = 'lazy';
+        const img = document.createElement('img'); img.alt = s.repFilename || '无预览'; img.loading = 'lazy';
         (async () => { const url = await getBlobUrlForPath(s.repPath); if (url) img.src = url; })();
         thumb.appendChild(img); cThumb.appendChild(thumb);
 
-        // Title + checkbox cell
+        // 标题 + 复选框单元格
         const cTitle = document.createElement('div');
         const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.id = String(s.id); cb.style.marginRight = '8px';
         cb.addEventListener('change', () => { if (cb.checked) sel.add(cb.dataset.id); else sel.delete(cb.dataset.id); updateSummary(); });
-        const title = document.createElement('span'); title.textContent = `Scene ${s.id}${s.sceneName ? ` — ${s.sceneName}` : ''}`; title.title = title.textContent;
+        const title = document.createElement('span'); title.textContent = `${t('merge.scene_label', { id: s.id })}${s.sceneName ? ` — ${s.sceneName}` : ''}`; title.title = title.textContent;
         cTitle.appendChild(cb); cTitle.appendChild(title);
 
-        // Count cell
-        const cCount = document.createElement('div'); cCount.className = 'muted'; cCount.style.textAlign = 'right'; cCount.textContent = `${s.imageCount} images`;
+        // 数量单元格
+        const cCount = document.createElement('div'); cCount.className = 'muted'; cCount.style.textAlign = 'right'; cCount.textContent = t('merge.images_count', { count: s.imageCount });
 
         row.appendChild(cThumb); row.appendChild(cTitle); row.appendChild(cCount);
         listEl.appendChild(row);
       }
 
-      // Wire radios
+      // 绑定单选按钮
       modeRadios.forEach(r => r.onchange = updateSummary);
       targetInput.oninput = updateSummary;
 
@@ -5953,7 +5973,7 @@
           const idStr = String(r.scene_count);
           if (ids.includes(idStr) && idStr !== targetId) { r.scene_count = targetId; changed++; }
         }
-        // Update scenedata: move filenames from non-target scenes into target scene
+        // 更新 scenedata：将非目标场景中的文件名移动到目标场景
         if (hasPywebviewApi && changed > 0) {
           const rowSample = rows.find(r => ids.includes(String(r.scene_count)));
           const rpForMerge = rowSample?.__rootPath || rootPath || '';
@@ -5974,7 +5994,7 @@
             }
           }
         }
-        if (changed) { dirty = true; _notifyDirty(true); document.getElementById('saveCsv').disabled = false; setStatus(`Merged scenes into ${targetId}. ${changed} rows updated.`); }
+        if (changed) { dirty = true; _notifyDirty(true); document.getElementById('saveCsv').disabled = false; setStatus(t('merge.merged_status', { target: targetId, changed })); }
         renderScenes();
         dlg.close();
       };
@@ -5983,12 +6003,12 @@
       dlg.showModal();
     }
 
-    // Init
+    // 初始化
     loadVersionBadge();
     setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
     hydrateSettingsFromServer();
 
-    // If a queue was running before this page loaded (e.g. page refresh), re-attach the polling
+    // 如果页面加载前队列就在运行（例如页面刷新），则重新接上轮询逻辑
     (async () => {
       try {
         const status = await apiGetQueueStatus();
@@ -5999,36 +6019,36 @@
       } catch (_) { }
     })();
 
-    // Wire "Change root…" button in the tree panel
+    // 绑定树面板中的“更换根目录…”按钮
     const treeChangeRootBtn = document.getElementById('treeChangeRoot');
     if (treeChangeRootBtn) {
       treeChangeRootBtn.addEventListener('click', async () => {
         if (!hasPywebviewApi) { const ready = await waitForPywebview(); if (!ready) return; }
         if (!window.pywebview?.api?.choose_directory) return;
-        setStatus('Opening folder picker…');
+        setStatus(t('folder.opening_picker'));
         const folderPath = await window.pywebview.api.choose_directory();
         if (folderPath) {
           treeExpandedPaths.clear();
           checkedFolderPaths.clear();
           const treeScanned = await scanFolderTree(folderPath);
           if (treeScanned && !folderTreeRootHasKestrel) {
-            setStatus('Select a folder from the tree below to load its scenes');
+            setStatus(t('queue.select_tree_folder'));
           } else {
             await loadFolderFromPath(folderPath);
           }
         } else {
-          setStatus('Folder selection cancelled');
+          setStatus(t('folder.selection_cancelled'));
         }
       });
     }
 
-    // Wire "Check all / Check none" buttons
+    // 绑定“全选 / 取消全选”按钮
     const treeCheckAllBtn = document.getElementById('treeCheckAll');
     if (treeCheckAllBtn) treeCheckAllBtn.addEventListener('click', checkAllTreeFolders);
     const treeCheckNoneBtn = document.getElementById('treeCheckNone');
     if (treeCheckNoneBtn) treeCheckNoneBtn.addEventListener('click', checkNoneTreeFolders);
 
-    // Wire "Load checked" button (removed from HTML; kept as no-op guard)
+    // 绑定“加载已勾选”按钮（HTML 中已移除，这里保留为空操作保护）
     const treeLoadSelectedBtn = document.getElementById('treeLoadSelected');
     if (treeLoadSelectedBtn) {
       treeLoadSelectedBtn.addEventListener('click', async () => {
@@ -6037,19 +6057,19 @@
       });
     }
 
-    // ── Analysis Queue event wiring ───────────────────────────────────────────────
+    // ── 分析队列事件绑定 ───────────────────────────────────────────────
 
-    // "Analyze Folders…" button opens the dialog
+    // “分析文件夹…”按钮打开对话框
     const analyzeQueueBtn = document.getElementById('analyzeQueueBtn');
     if (analyzeQueueBtn) {
       analyzeQueueBtn.addEventListener('click', openAnalyzeDialog);
     }
 
-    // Analyze dialog Cancel
+    // 分析对话框：取消
     const analyzeDlgCancel = document.getElementById('analyzeDlgCancel');
     if (analyzeDlgCancel) {
       analyzeDlgCancel.addEventListener('click', () => {
-        // Save the current selection so user can restore it on next dialog open
+        // 保存当前选择，便于用户下次打开对话框时恢复
         if (_dlgSelected && _dlgSelected.size > 0) {
           const s = loadSettings();
           s.lastQueueState = Array.from(_dlgSelected);
@@ -6059,7 +6079,7 @@
       });
     }
 
-    // Analyze dialog Add to Queue
+    // 分析对话框：加入队列
     const analyzeDlgAdd = document.getElementById('analyzeDlgAdd');
     if (analyzeDlgAdd) {
       analyzeDlgAdd.addEventListener('click', async () => {
@@ -6068,7 +6088,7 @@
         const useGpu = document.getElementById('analyzeUseGpu')?.checked ?? true;
         const wildlifeEnabled = document.getElementById('analyzeWildlife')?.checked ?? false;
 
-        // Check for outdated-version folders not already confirmed for re-analysis
+        // 检查是否有旧版本文件夹尚未确认允许重新分析
         const outdatedPaths = [];
         function findNode(node, targetPath) {
           if (node.path === targetPath) return node;
@@ -6090,18 +6110,13 @@
 
         if (outdatedPaths.length > 0) {
           const names = outdatedPaths.map(o => `  • ${o.name} (v${o.version})`).join('\n');
-          const confirmed = confirm(
-            `The following folder(s) were analyzed on an older version of Kestrel:\n\n${names}\n\n` +
-            `Current version: v${_appVersion}\n\n` +
-            `Re-analyzing will DELETE existing analysis data (.kestrel folder) before proceeding.\n\n` +
-            `Continue?`
-          );
+          const confirmed = confirm(t('analysis.outdated_confirm', { names, version: _appVersion }));
           if (!confirmed) return;
-          // Clear .kestrel for outdated folders before re-analysis
+          // 重新分析前，先清理旧版本文件夹中的 .kestrel
           for (const o of outdatedPaths) {
             try {
               await window.pywebview.api.clear_kestrel_data(o.path);
-              // Update in-memory node
+              // 更新内存中的节点状态
               const node = findNode(folderTreeRootNode, o.path);
               if (node) { node.has_kestrel = false; node.kestrel_version = ''; }
             } catch (e) {
@@ -6110,7 +6125,7 @@
           }
         }
 
-        // Clear .kestrel for fully-analyzed re-queue folders (confirmed at selection time)
+        // 对已完整分析且确认重新入队的文件夹，清理其 .kestrel
         for (const p of _dlgReanalyze) {
           if (!paths.includes(p)) continue;
           try {
@@ -6125,43 +6140,43 @@
         document.getElementById('analyzeQueueDlg').close();
         analyzeDlgAdd.disabled = true;
         try {
-          // Show loading overlay while analyzer imports models (lazy-load)
+          // 在分析器导入模型（懒加载）期间显示加载遮罩
           showLoadingAnalyzer();
           const result = await apiStartQueue(paths, useGpu, wildlifeEnabled);
           if (result && result.success) {
             queuedFolderPaths.clear();
             _dlgSelected.clear();
             _isFirstQueueStart = true; // reset for Case 1 logic on next queue start
-            // Clear saved queue state since we're starting a new queue
+            // 因为即将启动新队列，所以清空已保存的队列状态
             const s = loadSettings();
             delete s.lastQueueState;
             saveSettings(s);
-            // Clear session state for new queue start, so ETA calculations use fresh folder inspections
+            // 为新队列清空会话状态，让 ETA 使用最新的文件夹检查结果
             _queueSessionStartState.clear();
             _queueFolderInspections.clear();
             startPollingQueue();
             const status = await apiGetQueueStatus();
             renderQueuePanel(status);
-            setStatus(`Analysis queue started — ${result.added || paths.length} folder(s) queued`);
-            // Start polling; renderQueuePanel will hide the loader when processing begins.
-            // As a safety, hide the loader after 30s if nothing starts.
+            setStatus(t('analysis.queue_started', { count: result.added || paths.length }));
+            // 启动轮询；开始处理后 renderQueuePanel 会隐藏加载遮罩。
+            // 作为保险，如果 30 秒内仍未开始，也主动隐藏遮罩。
             setTimeout(() => { try { hideLoadingAnalyzer(); } catch (e) { } }, 30000);
           } else {
             hideLoadingAnalyzer();
-            alert('Failed to start analysis queue:\n\n' + (result?.error || 'Unknown error'));
+            alert(t('analysis.queue_start_failed', { error: result?.error || 'Unknown error' }));
           }
         } catch (e) {
           hideLoadingAnalyzer();
-          alert('Failed to start analysis queue:\n\n' + (e.message || e));
+          alert(t('analysis.queue_start_failed', { error: e.message || e }));
         } finally {
           analyzeDlgAdd.disabled = false;
         }
       });
     }
 
-    // Analyze dialog: Change Folder button
+    // 分析对话框：“更换文件夹”按钮
     document.getElementById('analyzeDlgChangeRoot')?.addEventListener('click', async () => {
-      if (!hasPywebviewApi) { alert('Directory browsing is only available in the desktop app.'); return; }
+      if (!hasPywebviewApi) { alert(t('analysis.desktop_browse_only')); return; }
       const fp = await window.pywebview.api.choose_directory();
       if (!fp) return;
       await scanFolderTree(fp);
@@ -6171,7 +6186,7 @@
       function refreshDlg2() {
         const countEl = document.getElementById('analyzeDlgCount');
         const addBtn = document.getElementById('analyzeDlgAdd');
-        if (countEl) countEl.textContent = _dlgSelected.size + ' folder' + (_dlgSelected.size === 1 ? '' : 's') + ' selected';
+        if (countEl) countEl.textContent = t('queue.restore_count', { count: _dlgSelected.size });
         if (addBtn) addBtn.disabled = _dlgSelected.size === 0;
         _refreshAnalyzeDlgQueuePreview();
       }
@@ -6182,9 +6197,9 @@
       refreshDlg2();
     });
 
-    // ── Welcome Panel action wiring ──────────────────────────────────────────────
+    // ── 欢迎面板事件绑定 ──────────────────────────────────────────────
 
-    // ── Legal Agreement Logic ──────────────────────────────────────────────
+    // ── 法律协议逻辑 ──────────────────────────────────────────────
     async function checkLegalAgreement() {
       if (!hasPywebviewApi || !window.pywebview?.api?.get_legal_status) return;
       try {
@@ -6204,7 +6219,7 @@
           if (hasPywebviewApi && window.pywebview?.api?.agree_to_legal) {
             await window.pywebview.api.agree_to_legal();
             document.getElementById('legalNotice').classList.add('hidden');
-            showToast('Terms accepted. Welcome to Project Kestrel!', 4000);
+            showToast(t('analysis.legal_accepted'), 4000);
           }
         } catch (e) {
           console.error('Failed to agree to legal terms', e);
@@ -6212,12 +6227,12 @@
       });
     }
 
-    // Initial checks
+    // 初始检查
     if (hasPywebviewApi) {
       checkLegalAgreement();
     }
 
-    // Queue panel header: toggle expand / collapse
+    // 队列面板头部：切换展开 / 折叠
     const queuePanelHeader = document.getElementById('queuePanelHeader');
     if (queuePanelHeader) {
       queuePanelHeader.addEventListener('click', () => {
@@ -6231,14 +6246,14 @@
       });
     }
 
-    // Pause / Resume button
+    // 暂停 / 继续按钮
     const queuePauseBtn = document.getElementById('queuePauseBtn');
     if (queuePauseBtn) {
       queuePauseBtn.addEventListener('click', async () => {
         try {
           const status = await apiGetQueueStatus();
           if (status.paused) {
-            // When resuming, re-inspect folders to get accurate baselines
+            // 恢复时重新检查文件夹，以获得准确基线
             if (status.items && status.items.length > 0 && hasPywebviewApi && window.pywebview?.api?.inspect_folders) {
               try {
                 const paths = status.items.map(item => item.path);
@@ -6267,16 +6282,16 @@
       });
     }
 
-    // Cancel button
+    // 取消按钮
     const queueCancelBtn = document.getElementById('queueCancelBtn');
     if (queueCancelBtn) {
       queueCancelBtn.addEventListener('click', async () => {
-        if (!confirm('Cancel the analysis queue? Pending folders will not be analyzed.')) return;
+        if (!confirm(t('analysis.cancel_queue_confirm'))) return;
         try { await apiQueueControl('cancel'); } catch (_) { }
       });
     }
 
-    // Clear done button
+    // 清除已完成按钮
     const queueClearBtn = document.getElementById('queueClearBtn');
     if (queueClearBtn) {
       queueClearBtn.addEventListener('click', async () => {
@@ -6293,13 +6308,13 @@
       });
     }
 
-    // ---- Culling Assistant launcher ----
+    // ---- 筛片助手启动器 ----
     async function openCullingAssistant(rootPath) {
       if (!window.pywebview?.api) {
         showToast('Culling Assistant requires desktop mode', 4000);
         return;
       }
-      // Prompt to save unsaved changes before opening (using custom dialog)
+      // 打开前先提示保存未保存改动（使用自定义对话框）
       if (dirty) {
         const userChoice = await showCullingAssistantPrompt();
         if (userChoice === 'cancel') {
@@ -6321,7 +6336,7 @@
       }
     }
     
-    // Custom dialog prompt for Culling Assistant save decision
+    // 用于筛片助手保存决策的自定义对话框
     function showCullingAssistantPrompt() {
       return new Promise((resolve) => {
         const dlg = document.createElement('dialog');
@@ -6488,7 +6503,7 @@
       dlg.showModal();
     }
 
-    // ---- Write Metadata launcher ----
+    // ---- 写入元数据启动器 ----
     async function writeMetadataForFolder(rootPath) {
       if (!window.pywebview?.api) {
         showToast('Write Metadata requires desktop mode', 4000);
@@ -6496,7 +6511,7 @@
       }
       const folderRows = rows.filter(r => r.__rootPath === rootPath);
       if (!folderRows.length) {
-        showToast('No images found for this folder', 3000);
+        showToast('此文件夹中未找到图片', 3000);
         return;
       }
 
@@ -6591,8 +6606,8 @@
         rating: getRating(r),
         culled: getRawCullStatus(r),
         culled_origin: normalizeCullOrigin(r),
-        species: r.species || '',
-        family: r.family || '',
+        species: getSpeciesDisplayName(r.species || ''),
+        family: getFamilyDisplayName(r.family || ''),
         quality: r.quality != null ? r.quality : null,
       }));
 
@@ -6665,7 +6680,7 @@
       dlg.showModal();
     }
 
-    // Reload current folders (called from Python via evaluate_js after culling completes)
+    // 重新加载当前文件夹（筛片完成后由 Python 通过 evaluate_js 调用）
     async function reloadCurrentFolders() {
       const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
       if (loadedPaths.length === 0) return;
@@ -6675,10 +6690,10 @@
         await loadMultipleFolders(loadedPaths);
       }
     }
-    // Expose globally for evaluate_js calls from Python
+    // 暴露到全局，供 Python 通过 evaluate_js 调用
     window.reloadCurrentFolders = reloadCurrentFolders;
 
-    // Periodically broadcast queue running state to window (for beforeunload guard)
+    // 定期把队列运行状态广播到 window（用于 beforeunload 防护）
     setInterval(async () => {
       try {
         if (hasPywebviewApi && window.pywebview?.api?.is_analysis_running) {
@@ -6688,13 +6703,13 @@
       } catch (_) { }
     }, 3000);
 
-    // 👁 Live Analysis button
+    // 👁 实时分析按钮
     const queueLiveBtn = document.getElementById('queueLiveBtn');
     if (queueLiveBtn) {
       queueLiveBtn.addEventListener('click', openLiveAnalysisDlg);
     }
 
-    // Live dialog close button + Escape handling
+    // 实时对话框关闭按钮与 Escape 处理
     const liveDlgClose = document.getElementById('liveDlgClose');
     if (liveDlgClose) {
       liveDlgClose.addEventListener('click', () => {
@@ -6708,26 +6723,26 @@
     }
 
     // ====================================================================
-    // Tutorial System  (Part 1 = Analyze intro, Part 2 = Browse features)
-    // Interactive: some steps require user action before advancing.
-    // Inspired by the website try-it-out demo's waitFor/trigger pattern.
+    // 教程系统（第 1 部分 = 分析介绍，第 2 部分 = 浏览功能）
+    // 交互式：部分步骤需要用户操作后才能继续。
+    // 参考网站 try-it-out 演示中的 waitFor/trigger 模式。
     // ====================================================================
 
     const TUTORIAL_PART1 = [
       {
-        title: 'Welcome to Project Kestrel!',
-        body: 'Project Kestrel uses machine learning to organize your photos, helping you review them more efficiently, search through your library, and quickly decide which ones to edit and share.<br><br>This guided tutorial will walk you through the core features of Kestrel.',
+        title: '欢迎使用 Project Kestrel！',
+        body: 'Project Kestrel 使用机器学习来整理你的照片，帮助你更高效地复查作品、搜索图库，并快速决定哪些照片值得编辑和分享。<br><br>这份引导教程会带你了解 Kestrel 的核心功能。',
         target: null,
       },
       {
-        title: 'First, Analyze Your Photos',
-        body: 'Click <b>Analyze Folders\u2026</b> to select folders that contain your bird photos. Kestrel groups them by scene, detects birds using AI, guesses the bird species and family, and scores quality automatically.',
+        title: '首先，分析你的照片',
+        body: '点击 <b>分析文件夹\u2026</b>，选择包含鸟类照片的文件夹。Kestrel 会按场景分组，使用 AI 检测鸟类、识别物种和科名，并自动评估图片质量。',
         target: '#analyzeQueueBtn',
         position: 'bottom',
       },
       {
-        title: 'Open an Analyzed Folder',
-        body: 'Once you\u2019ve analyzed a folder with Kestrel, click <b>Open Folder\u2026</b> to browse it. Kestrel loads your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
+        title: '打开一个已分析的文件夹',
+        body: '当你用 Kestrel 分析完一个文件夹后，点击 <b>打开文件夹\u2026</b> 即可浏览其中内容。Kestrel 会加载这些场景。<br><br>接下来我们会自动载入一组 <b>示例鸟类照片</b>，让你直观看到效果。',
         target: '#pickFolder',
         position: 'bottom',
       },
@@ -6735,87 +6750,87 @@
 
     const TUTORIAL_PART2 = [
       {
-        title: 'Your Photos, Organized by Scene',
-        body: 'Kestrel organizes your photos into <b>scenes</b> \u2014 groups of similar images captured in the same burst. The scene grid shows these scenes in the order they were taken.',
-        nudge: 'Click on a scene to open it!',
+        title: '你的照片会按场景整理',
+        body: 'Kestrel 会把你的照片整理成一个个 <b>场景</b>，也就是同一组连拍中相似的图片。场景网格会按照拍摄顺序显示这些场景。',
+        nudge: '点击一个场景来打开它！',
         target: '#sceneGrid .card',
         position: 'right',
         waitFor: 'clickScene',
       },
       {
-        title: 'Explore Your Scene',
-        body: 'Within each scene, your photos are automatically <b>sorted by quality</b> \u2014 from sharpest to blurriest. You can immediately focus your attention on the best shots!<br><br>Click on a photo in the filmstrip to view its details.',
-        nudge: 'Click a photo in the filmstrip below!',
+        title: '浏览场景内容',
+        body: '在每个场景中，你的照片都会按照 <b>质量</b> 自动排序，从最锐利到最模糊。这样你可以立刻把注意力放到最好的作品上。<br><br>点击下方胶片条中的任意照片来查看详情。',
+        nudge: '点击下方胶片条中的一张照片！',
         target: '#imageGrid',
         position: 'top',
         inDialog: true,
         waitFor: 'clickFilmstrip',
       },
       {
-        title: 'Ratings and Culling Decisions',
-        body: 'Kestrel computes <b>star ratings</b> based on each image\u2019s quality score. Click the stars to set your own. <span style="color:#6aa0ff">Blue stars</span> = AI rating \u00b7 <span style="color:#f5c542">Gold stars</span> = your manual override.<br><br>Use the <b>Accept \u00b7 Undecided \u00b7 Reject</b> buttons to make a culling decision for each photo. These will come in handy with the Culling Assistant later!',
-        nudge: 'Mark a photo as Accepted or Rejected to continue!',
+        title: '评分与筛片决定',
+        body: 'Kestrel 会根据每张图片的质量分数计算 <b>星级评分</b>。你也可以点击星星手动修改。<span style="color:#6aa0ff">蓝色星星</span> 表示 AI 评分，<span style="color:#f5c542">金色星星</span> 表示你的手动覆盖。<br><br>使用 <b>接受 · 未决定 · 拒绝</b> 按钮为每张照片做出筛片决定。后面使用筛片助手时，这些信息会非常有用。',
+        nudge: '把一张照片标记为“接受”或“拒绝”后继续！',
         target: '#sceneInfoBar',
         position: 'top-left',
         inDialog: true,
         waitFor: 'clickCullToggle',
       },
       {
-        title: 'Keyboard Shortcuts',
-        body: 'Kestrel has keyboard shortcuts to make reviewing photos faster. The shortcuts are listed above \u2014 try some out before continuing!',
+        title: '键盘快捷键',
+        body: 'Kestrel 提供了一组键盘快捷键，让复查照片更高效。快捷键就在上方，继续之前不妨试一试。',
         target: '#sceneShortcutLegend',
         position: 'bottom',
         inDialog: true,
         setupAction: 'expandShortcuts',
       },
       {
-        title: 'Other Scene Features',
-        body: 'A few more things you can do once you\u2019re browsing your <b>own photos</b> (these won\u2019t work on the sample images):<br><br>\u2022 <b>Click and drag</b> on the full image to load the RAW file and zoom in<br>\u2022 Edit the <b>scene name</b> and <b>tags</b> at the top<br>\u2022 Press <kbd>Space</kbd> to open the photo in your preferred photo editor<br>\u2022 Use <b>\u2702 Split Scene</b> if Kestrel accidentally merged two different scenes<br><br>Click <b>Close</b> to continue!',
-        nudge: 'Close the scene dialog to continue.',
+        title: '其他场景功能',
+        body: '当你浏览自己的 <b>真实照片</b> 时，还可以做这些事（示例图片上不会全部生效）：<br><br>\u2022 在完整图上 <b>点击并拖动</b>，加载 RAW 并放大查看<br>\u2022 编辑顶部的 <b>场景名称</b> 和 <b>标签</b><br>\u2022 按 <kbd>Space</kbd> 在你偏好的照片编辑器中打开图片<br>\u2022 如果 Kestrel 误把两个不同场景合并了，可以使用 <b>\u2702 拆分场景</b><br><br>点击 <b>关闭</b> 继续！',
+        nudge: '关闭场景对话框后继续。',
         target: '#closeDlg',
         position: 'bottom',
         inDialog: true,
         waitFor: 'closeDialog',
       },
       {
-        title: 'Filtering Options',
-        body: '\u2022 <b>Search</b> for any bird species or family \u2014 the grid filters instantly as you type.<br>\u2022 Don\u2019t see scenes after searching? Lower the <b>Confidence Threshold</b> to see more results.<br>\u2022 Enable <b>Multi-subject mode</b> if your scenes contain multiple bird species.<br>\u2022 <b>Sort</b> by Quality, Image Count, or Capture Time.',
+        title: '筛选选项',
+        body: '\u2022 可以直接 <b>搜索</b> 任意鸟类物种或科名，网格会随输入即时筛选。<br>\u2022 搜索后没有看到场景？可以降低 <b>置信度阈值</b> 以查看更多结果。<br>\u2022 如果场景中包含多种鸟类，请启用 <b>多主体模式</b>。<br>\u2022 也可以按质量、图片数量或拍摄时间进行 <b>排序</b>。',
         target: '.filter-panel',
         position: 'right',
       },
       {
-        title: 'Merging Scenes',
-        body: 'The two highlighted scenes above were actually one continuous burst that Kestrel split in two. Hold <kbd>Ctrl</kbd> and click both cards to select them, then click <b>Merge selected scenes</b> to combine them back into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
+        title: '合并场景',
+        body: '上方高亮的两个场景其实原本属于同一组连拍，只是被 Kestrel 拆成了两个。按住 <kbd>Ctrl</kbd> 并点击这两张卡片选中它们，然后点击 <b>合并所选场景</b>，就能把它们重新合并。<br><br>你也可以通过 <kbd>Shift+Click</kbd> 一次性范围选择多组场景。',
         target: '#sceneGrid .card:nth-child(2)',
         highlightFirst: '#sceneGrid .card:nth-child(1)',
         position: 'bottom',
       },
       {
-        title: 'Write Photo Metadata',
-        body: 'Click <b>Write Photo Metadata</b> to export Kestrel\u2019s star ratings and Accept/Reject decisions into XMP sidecar files alongside your photos. These <code>.xmp</code> files are understood natively by <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors.<br><br>\u26a0\ufe0f <b>Write photo metadata <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
+        title: '写入照片元数据',
+        body: '点击 <b>写入照片元数据</b>，即可把 Kestrel 的星级评分和接受/拒绝决定导出到照片旁的 XMP 旁车文件中。这些 <code>.xmp</code> 文件能被 <b>Adobe Lightroom</b>、<b>darktable</b>、<b>Capture One</b> 以及其他编辑器原生读取。<br><br>\u26a0\ufe0f <b>请在把照片导入编辑器 <em>之前</em> 写入元数据</b>，因为大多数目录式软件在照片导入后会忽略新生成的旁车文件。如果旁车文件原本由其他应用创建，Kestrel 会在覆盖前先询问你。',
         target: '.write-metadata-btn',
         position: 'bottom',
       },
       {
-        title: 'Culling Assistant',
-        body: 'The <b>Culling Assistant</b> helps you automatically assign photos as Accepted or Rejected based on star ratings \u2014 and can even move rejected photos into a dedicated folder.<br><br>Click <b>Open Culling Assistant</b> to open a dedicated Accept/Reject workspace for the folder.',
+        title: '筛片助手',
+        body: '<b>筛片助手</b> 可以根据星级评分帮你自动把照片标记为接受或拒绝，甚至能把拒绝项移动到单独的文件夹。<br><br>点击 <b>打开筛片助手</b>，即可为该文件夹打开专门的接受/拒绝工作区。',
         target: '.culling-assistant-btn',
         position: 'bottom',
       },
       {
-        title: 'Options',
-        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Lightroom, Darktable, or system default). Opening a photo with <kbd>Space</kbd> will launch it there. You can also tweak several other options.',
+        title: '设置选项',
+        body: '点击 <b>设置</b> 可选择你偏好的 <b>照片编辑器</b>（如 Lightroom、Darktable 或系统默认）。按下 <kbd>Space</kbd> 打开照片时，就会在这里启动。你也可以在设置里调整其他多个选项。',
         target: '#openSettings',
         position: 'bottom',
       },
       {
-        title: 'You\u2019re All Set!',
-        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view &amp; rate photos<br>\u2022 <b>Culling Assistant</b> for bulk Accept/Reject workflow<br>\u2022 <b>Write Photo Metadata</b> to export to Lightroom, darktable, etc.<br><br>\u26a0\ufe0f <b>Remember:</b> Write photo metadata <em>before</em> importing into Lightroom or Capture One for best results!<br><br>Click the <b>\uD83D\uDCD6 Tutorial</b> button anytime to replay this tour. Happy birding!',
+        title: '你已经准备好了！',
+        body: '教程到这里就结束了。快速回顾一下：<br><br>\u2022 用 <b>分析文件夹</b> 处理新照片<br>\u2022 用 <b>打开文件夹</b> 浏览已分析的照片<br>\u2022 <b>点击场景</b> 来查看并评分照片<br>\u2022 用 <b>筛片助手</b> 进行批量接受/拒绝操作<br>\u2022 用 <b>写入照片元数据</b> 导出到 Lightroom、darktable 等软件<br><br>\u26a0\ufe0f <b>记住：</b> 为了获得最佳效果，请先写入照片元数据，再导入 Lightroom 或 Capture One。<br><br>你随时都可以点击 <b>\uD83D\uDCD6 教程</b> 按钮重新播放本教程。祝你观鸟愉快！',
         target: null,
       },
       {
-        title: 'Please Send Feedback!',
-        body: 'I (the person who made Project Kestrel) would really love to hear from you! Please tell me if you found the app useful, or if you find any bugs or have suggestions for improvements.<br><br>Thank you for trying Kestrel!',
+        title: '欢迎发送反馈！',
+        body: '我，也就是 Project Kestrel 的开发者，非常希望听到你的真实感受。无论你觉得这个应用是否有帮助，或发现了 bug，又或者有改进建议，都欢迎告诉我。<br><br>感谢你试用 Kestrel！',
         target: '#openFeedback',
         position: 'top',
       },
@@ -6849,13 +6864,13 @@
     }
 
     function _tutCleanup() {
-      // Remove any highlight-target classes
+      // 移除所有 highlight-target 类
       document.querySelectorAll('.highlight-target').forEach(function(el) {
         el.classList.remove('highlight-target');
       });
-      // Run cleanup for waitFor listeners
+      // 执行 waitFor 监听器的清理逻辑
       if (_tutCleanupFn) { _tutCleanupFn(); _tutCleanupFn = null; }
-      // If tutorial card was moved inside the scene dialog (top layer), move it back
+      // 如果教程卡片被移动进场景对话框（顶层），就把它移回去
       if (_tutInDialog) {
         _tutInDialog = false;
         var _ovl = _tutEl('#tutorialOverlay');
@@ -6894,7 +6909,7 @@
       var nudge   = _tutEl('#tutorialNudge');
       var nextBtn = _tutEl('#tutorialNext');
 
-      // Pre-step setup actions (run before target positioning)
+      // 步骤前置动作（在定位目标前执行）
       if (step.setupAction === 'expandShortcuts') {
         var legend = document.getElementById('sceneShortcutLegend');
         if (legend && legend.classList.contains('hidden')) {
@@ -6903,12 +6918,12 @@
         }
       }
 
-      // Text
+      // 文案
       _tutEl('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + _tutSteps.length;
       _tutEl('#tutorialTitle').innerHTML = step.title;
       _tutEl('#tutorialBody').innerHTML  = step.body;
 
-      // Nudge (click-to-advance hint)
+      // 提示语（点击后继续）
       if (step.nudge) {
         nudge.textContent = step.nudge;
         nudge.style.display = '';
@@ -6916,7 +6931,7 @@
         nudge.style.display = 'none';
       }
 
-      // Dots
+      // 圆点进度
       var dotsCont = _tutEl('#tutorialProgress');
       dotsCont.innerHTML = '';
       _tutSteps.forEach(function(_, i) {
@@ -6925,58 +6940,58 @@
         dotsCont.appendChild(d);
       });
 
-      // Back / Next labels
+      // 上一步 / 下一步按钮文案
       _tutEl('#tutorialBack').disabled = (idx === 0);
       var isLast = (idx === _tutSteps.length - 1);
       nextBtn.textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
 
-      // If this step uses waitFor, hide the Next button until the action completes
+      // 如果当前步骤使用 waitFor，则在动作完成前隐藏“下一步”按钮
       var hasWaitFor = !!step.waitFor;
       nextBtn.style.display = hasWaitFor ? 'none' : '';
 
-      // Find the target element
+      // 找到目标元素
       var target = step.target ? document.querySelector(step.target) : null;
 
-      // For inDialog steps, check if the scene dialog is open
+      // 对于 inDialog 步骤，先检查场景对话框是否已打开
       var _inDialogActive = false;
       if (step.inDialog) {
         var dlg = document.getElementById('sceneDlg');
         if (!dlg || !dlg.open) {
-          // Dialog not open — show a message and allow Next to skip
+          // 对话框未打开，则显示提示，并允许通过“下一步”跳过
           _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first, then this step will highlight the right element.</span>';
           nudge.style.display = 'none';
           nextBtn.style.display = '';  // show Next even if waitFor was set
           target = null;  // treat as center
           hasWaitFor = false;
         } else {
-          // Dialog is open — physically move the tutorial card into the dialog so it
-          // appears in the browser's top layer (above the modal dialog content)
+          // 对话框已打开，则把教程卡片实际移动到对话框中，
+          // 让它处于浏览器顶层（高于模态内容）
           _inDialogActive = true;
           _tutInDialog = true;
           if (card.parentElement !== dlg) { dlg.appendChild(card); }
           overlay.style.display = 'none'; // hide the main-page dim; dialog has its own backdrop
         }
       }
-      // For steps that have a separate first-element highlight target
+      // 对于带有独立首个高亮目标的步骤
       if (step.highlightFirst && !_inDialogActive) {
         var _hfEl = document.querySelector(step.highlightFirst);
         if (_hfEl) _hfEl.classList.add('highlight-target');
       }
 
       if (!target || (target.offsetWidth === 0 && target.offsetHeight === 0)) {
-        // Center-screen card, full backdrop
+        // 卡片居中显示，并带完整背景遮罩
         hl.style.display = 'none';
         overlay.classList.add('has-backdrop');
         card.style.transform = 'translate(-50%, -50%)';
         card.style.top  = '50%';
         card.style.left = '50%';
       } else {
-        // For inDialog active steps the card is inside the dialog (top layer); skip overlay hl
+        // 对于 inDialog 激活步骤，卡片在对话框内部（顶层），因此不显示页面级高亮框
         hl.style.display = _inDialogActive ? 'none' : '';
         overlay.classList.remove('has-backdrop');
         card.style.transform = '';
 
-        // Add highlight-target class for the pulsing effect
+        // 为目标添加 highlight-target 类，触发脉冲效果
         target.classList.add('highlight-target');
 
         var pad = 8;
@@ -6988,7 +7003,7 @@
           hl.style.height = (r.height + pad * 2) + 'px';
         }
 
-        // Position card near target
+        // 将卡片定位到目标附近
         var pos    = step.position || 'right';
         var margin = 18;
         var vw     = window.innerWidth;
@@ -7007,16 +7022,16 @@
         card.style.top  = top  + 'px';
       }
 
-      // ---- Set up interactive waitFor listeners ----
+      // ---- 设置交互式 waitFor 监听器 ----
       if (hasWaitFor && step.waitFor === 'clickScene') {
-        // User must click any scene card in the grid. Listen on sceneGrid for clicks.
+        // 用户必须点击网格中的任一场景卡片，因此监听 sceneGrid 的点击事件。
         var sceneGridEl = document.getElementById('sceneGrid');
         if (sceneGridEl) {
           var handler = function(ev) {
             var cardEl = ev.target.closest('.card');
             if (cardEl) {
-              // Scene card was clicked — it will open the dialog via its own click handler.
-              // Wait a beat for the dialog to show, then advance.
+              // 场景卡片已被点击，它会通过自己的点击处理器打开对话框。
+              // 稍等片刻让对话框出现，再推进教程。
               setTimeout(function() { _tutAdvance(); }, 400);
             }
           };
@@ -7025,7 +7040,7 @@
         }
       }
       else if (hasWaitFor && step.waitFor === 'clickStar') {
-        // User must click a star in the scene dialog
+        // 用户必须在场景对话框中点击一颗星
         var onStarClick = function(ev) {
           var starEl = ev.target.closest('.star, .stars span');
           if (starEl) {
@@ -7036,7 +7051,7 @@
         _tutCleanupFn = function() { document.removeEventListener('click', onStarClick, true); };
       }
       else if (hasWaitFor && step.waitFor === 'clickFilmstrip') {
-        // User must click a photo in the filmstrip
+        // 用户必须在底片栏中点击一张照片
         var filmstripEl = document.getElementById('imageGrid');
         if (filmstripEl) {
           var onFilmstripClick = function(ev) {
@@ -7050,7 +7065,7 @@
         }
       }
       else if (hasWaitFor && step.waitFor === 'clickCullToggle') {
-        // User must click the Accept or Reject button (not Undecided)
+        // 用户必须点击“接受”或“拒绝”按钮（不能是“未决定”）
         var onCullClick = function(ev) {
           var cullBtn = ev.target.closest('.cull-btn[data-cull="accept"], .cull-btn[data-cull="reject"]');
           if (cullBtn) {
@@ -7061,7 +7076,7 @@
         _tutCleanupFn = function() { document.removeEventListener('click', onCullClick, true); };
       }
       else if (hasWaitFor && step.waitFor === 'closeDialog') {
-        // User must close the scene dialog
+        // 用户必须关闭场景对话框
         var sceneDlgEl = document.getElementById('sceneDlg');
         if (sceneDlgEl) {
           var onDlgClose = function() {
@@ -7078,10 +7093,10 @@
     function _tutAdvance() {
       _tutStep++;
       if (_tutStep >= _tutSteps.length) {
-        // End of current part
+        // 当前部分结束
         if (_tutPart === 1) {
           _closeMainTutorial();
-          // Transition to Part 2: auto-load sample sets then start part 2
+          // 切换到第 2 部分：自动加载示例集后开始
           _autoLoadSamplesAndStartPart2();
         } else {
           _closeMainTutorial();
@@ -7105,7 +7120,7 @@
         if (res && res.success && res.paths && res.paths.length > 0) {
           console.log('[tutorial] Found', res.paths.length, 'sample sets:', res.paths);
           _tutSampleLoaded = true;
-          // Scan the parent folder so the folder tree sidebar shows backyard_birds + forest_trail
+          // 扫描示例父目录，让侧边栏文件夹树显示 backyard_birds 与 forest_trail
           var sampleParent = res.paths[0].replace(/[/\\][^/\\]+$/, '');
           console.log('[tutorial] Sample parent folder:', sampleParent);
           try { 
@@ -7122,11 +7137,11 @@
             console.warn('[tutorial] loadMultipleFolders error:', e);
             throw e;
           }
-          // Small delay for render, then start Part 2
+          // 略微延迟等待渲染完成，再开始第 2 部分
           console.log('[tutorial] Starting Part 2 of tutorial');
           setTimeout(function() { startMainTutorial(2, 0); }, 600);
         } else {
-          // No sample sets found -- just start Part 2 anyway
+          // 没找到示例集，也直接开始第 2 部分
           console.warn('[tutorial] No sample sets found. res.success=', res?.success, 'res.paths=', res?.paths);
           startMainTutorial(2, 0);
         }
@@ -7137,7 +7152,7 @@
       }
     }
 
-    // Wire up tutorial buttons
+    // 绑定教程按钮
     var helpBtnMain = document.getElementById('helpBtnMain');
     if (helpBtnMain) {
       helpBtnMain.addEventListener('click', function() {
@@ -7149,7 +7164,7 @@
     _tutEl('#tutorialBack').addEventListener('click', _tutGoBack);
     _tutEl('#tutorialSkip').addEventListener('click', function() {
       if (_tutPart === 1) {
-        // Skipping part 1 still transitions to part 2 with samples
+        // 即使跳过第 1 部分，也要先加载示例后进入第 2 部分
         _closeMainTutorial();
         _autoLoadSamplesAndStartPart2();
       } else {
@@ -7157,15 +7172,15 @@
       }
     });
 
-    // Keyboard: only Escape closes the tutorial (arrow keys intentionally removed —
-    // users navigate via Next/Back buttons or by completing the waitFor action)
+    // 键盘：仅允许用 Escape 关闭教程（方向键被有意移除，
+    // 用户改用“上一步/下一步”按钮或完成 waitFor 动作来推进）
     document.addEventListener('keydown', function(ev) {
       if (!_tutEl('#tutorialOverlay').classList.contains('active')) return;
       if (_tutPart === 0) return;
       if (ev.key === 'Escape') { _closeMainTutorial(); }
     });
 
-    // Also wire welcome panel tutorial link to start inline tutorial
+    // 同时为欢迎面板中的教程链接绑定内嵌教程启动逻辑
     var welcomeTutLink = document.getElementById('welcomeTutorialLink');
     if (welcomeTutLink) {
       welcomeTutLink.addEventListener('click', function(e) {
@@ -7174,10 +7189,10 @@
       });
     }
 
-    // Auto-start tutorial on first launch (pywebview mode only)
+    // 首次启动时自动开始教程（仅 pywebview 模式）
     (async function() {
       if (!hasPywebviewApi) return;
-      // Wait a moment for the UI to settle
+      // 稍等片刻，让 UI 先稳定
       await new Promise(function(r) { setTimeout(r, 800); });
       var seen = await checkMainTutorialSeen();
       if (!seen) {
@@ -7186,7 +7201,7 @@
     })();
 
 
-    // Wire donation dialog buttons — this script runs after the dialog HTML is in the DOM
+    // 绑定捐助对话框按钮，此脚本在对话框 HTML 已进入 DOM 后执行
     (function() {
       var dlg = document.getElementById('donateDlg');
       document.getElementById('donateDlgGoBtn').addEventListener('click', function() {

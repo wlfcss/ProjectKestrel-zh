@@ -1,32 +1,35 @@
 #!/usr/bin/env python3
-"""XMP metadata writing utilities for Project Kestrel.
+"""Project Kestrel 的 XMP 元数据写入工具。
 
-Writes XMP sidecar files (.xmp) embedding star ratings, culling labels,
-and analysis metadata (species, family, quality score) alongside image
-files. Compatible with Adobe Lightroom, darktable, and Capture One.
+该模块会在原图旁写出 ``.xmp`` 旁车文件，写入星级评分、筛片标签
+以及分析元数据（物种、科、质量分数），兼容 Adobe Lightroom、
+darktable 和 Capture One。
 """
 
 import os
 import sys
 
-# XMP namespace URIs
+from taxonomy_utils import family_display_name, species_display_name
+
+# XMP 命名空间 URI
 _KESTREL_NS = 'http://ns.projectkestrel.app/xmp/1.0/'
 _NS_RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
 _NS_XMP = 'http://ns.adobe.com/xap/1.0/'
 _NS_DC = 'http://purl.org/dc/elements/1.1/'
 _NS_LR = 'http://ns.adobe.com/lightroom/1.0/'
 
-# Species/family values that indicate no meaningful detection
+# 表示“没有有效识别结果”的物种/科占位值
 _EMPTY_LABELS = {'', 'unknown', 'no bird'}
+_EMPTY_LABELS.update({'未知', '无鸟', '不适用', '未知科'})
 
 
 def log(*args):
-    """Log message to stderr with [metadata] prefix."""
+    """把日志写到 stderr，并带上 [metadata] 前缀。"""
     print('[metadata]', *args, file=sys.stderr)
 
 
 def _xml_escape(text: str) -> str:
-    """Escape special characters for XML attribute and text values."""
+    """转义 XML 属性和值中的特殊字符。"""
     return (
         text.replace('&', '&amp;')
         .replace('<', '&lt;')
@@ -37,7 +40,7 @@ def _xml_escape(text: str) -> str:
 
 
 def _is_meaningful(value: str) -> bool:
-    """Return True if a string label is a real detection (not blank/unknown)."""
+    """如果字符串标签代表真实识别结果，而不是空值/未知值，则返回 True。"""
     return bool(value) and value.lower() not in _EMPTY_LABELS
 
 
@@ -50,7 +53,7 @@ def _build_xmp_packet(
     family: str = '',
     quality_score: float = -1.0,
 ) -> str:
-    """Build a complete XMP packet string with rating, label, and Kestrel metadata."""
+    """构建完整的 XMP 数据包字符串，包含评分、标签和 Kestrel 元数据。"""
     rating = max(0, min(5, rating))
     has_species = _is_meaningful(species)
     has_family = _is_meaningful(family)
@@ -71,7 +74,7 @@ def _build_xmp_packet(
     if label:
         lines.append(f'      xmp:Label="{label}"')
 
-    # Kestrel-specific attributes
+    # Kestrel 自定义属性
     lines.append(f'      kestrel:CullStatus="{_xml_escape(cull_status)}"')
     lines.append(f'      kestrel:SourceFile="{_xml_escape(filename)}"')
     if has_species:
@@ -83,7 +86,7 @@ def _build_xmp_packet(
 
     lines.append('    >')
 
-    # dc:description — human-readable summary visible in Lightroom's metadata panel
+    # dc:description：写入 Lightroom 元数据面板可见的人类可读摘要
     desc_parts = []
     if has_species:
         desc_parts.append(f'Species: {species}')
@@ -102,7 +105,7 @@ def _build_xmp_packet(
         '      </dc:description>',
     ]
 
-    # dc:subject — hierarchical keywords for Lightroom keyword panel
+    # dc:subject：写入 Lightroom 关键词面板可见的层级关键词
     lines += [
         '      <dc:subject>',
         '        <rdf:Bag>',
@@ -125,52 +128,46 @@ def _build_xmp_packet(
 
 
 def _is_kestrel_xmp(path: str) -> bool:
-    """Return True if the XMP file at ``path`` was written by Kestrel."""
+    """如果 ``path`` 指向的 XMP 文件由 Kestrel 写出，则返回 True。"""
     try:
         with open(path, 'r', encoding='utf-8', errors='replace') as f:
-            content = f.read(4096)  # namespace declarations are near the top
+            content = f.read(4096)  # 命名空间声明通常出现在文件开头
         return _KESTREL_NS in content
     except Exception:
         return False
 
 
 def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = False, use_auto_labels: bool = False):
-    """Write XMP sidecar files for each image, embedding star rating, culling
-    label, and analysis metadata (species, family, quality score).
+    """为每张图片写入 XMP 旁车文件。
 
-    Each entry in ``image_data`` is expected to be a dict with:
-        filename       – bare filename (e.g. "IMG_0001.jpg")
-        rating         – integer 0-5
-        culled         – "accept" or "reject"
-        culled_origin  – "auto", "manual", or "verified" (optional)
-        species        – detected species name (optional)
-        family         – detected family name (optional)
-        quality        – raw quality score float 0.0–1.0 (optional)
+    写入内容包括星级评分、筛片标签，以及分析元数据（物种、科、质量分数）。
 
-    XMP sidecar files are written as ``<basename>.xmp`` alongside the
-    original in ``root_path``.
+    ``image_data`` 中的每个元素都应是一个字典，至少支持以下字段：
+        filename       裸文件名，例如 ``IMG_0001.jpg``
+        rating         0-5 的整数评分
+        culled         ``accept`` 或 ``reject``
+        culled_origin  ``auto``、``manual`` 或 ``verified``（可选）
+        species        识别得到的物种名（可选）
+        family         识别得到的科名（可选）
+        quality        0.0–1.0 的原始质量分数（可选）
 
-    Safety rules:
-      - If a ``.xmp`` file already exists and was written by Kestrel
-        (detected by the presence of the Kestrel namespace URI), it is
-        safe to overwrite and will always be updated.
-      - If a ``.xmp`` file already exists but was written by external
-        software (Lightroom, darktable, Capture One, etc.) AND
-        ``overwrite_external`` is False, the file is skipped and its
-        filename is added to ``skipped_conflicts`` in the response so the
-        caller can ask the user for confirmation.
-      - If ``overwrite_external`` is True, external XMP files are also
-        overwritten.
+    旁车文件会以 ``<basename>.xmp`` 的形式写在 ``root_path`` 下原图旁边。
 
-    Args:
-        root_path: Path to images.
-        image_data: List of dicts.
-        overwrite_external: Whether to overwrite non-Kestrel XMPs.
-        use_auto_labels: If True, write Red/Green color labels for AI-generated ('auto') culls.
-                         Labels are always written for user culls ('manual' and 'verified').
+    安全规则：
+      - 如果已有的 ``.xmp`` 文件由 Kestrel 写出，则始终允许覆盖；
+      - 如果已有的 ``.xmp`` 文件来自其他软件，而 ``overwrite_external`` 为 False，
+        则跳过写入，并把文件名加入 ``skipped_conflicts``；
+      - 如果 ``overwrite_external`` 为 True，则允许覆盖其他软件生成的 XMP。
 
-    Returns:
-        { success, written, skipped_conflicts: [filenames], errors }
+    参数：
+        root_path: 图片所在目录。
+        image_data: 图片数据字典列表。
+        overwrite_external: 是否覆盖非 Kestrel 生成的 XMP。
+        use_auto_labels: 是否为 AI 自动筛片结果写入红/绿颜色标签。
+            用户手动筛片（``manual`` / ``verified``）始终会写入标签。
+
+    返回：
+        ``{ success, written, skipped_conflicts: [filenames], errors }``
     """
     try:
         if not root_path or not os.path.isdir(root_path):
@@ -200,8 +197,8 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                     elif cull_status == 'reject':
                         label = 'Red'
 
-                species = str(entry.get('species', '') or '').strip()
-                family = str(entry.get('family', '') or '').strip()
+                species = species_display_name(str(entry.get('species', '') or '').strip())
+                family = family_display_name(str(entry.get('family', '') or '').strip())
 
                 quality_raw = entry.get('quality', None)
                 try:
@@ -213,7 +210,7 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                 xmp_filename = base + '.xmp'
                 xmp_path = os.path.join(root_path, xmp_filename)
 
-                # Safety check: if XMP already exists, verify origin
+                # 安全检查：如果 XMP 已存在，先确认它是不是 Kestrel 生成的
                 if os.path.exists(xmp_path):
                     if not _is_kestrel_xmp(xmp_path):
                         if not overwrite_external:

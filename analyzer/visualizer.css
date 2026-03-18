@@ -10,7 +10,7 @@
       --card: #161922;
       --card-border: #222634;
       --chip: #1d2230;
-      /* New: dialog column sizing */
+      /* 新增：对话框列宽设置 */
       --right-w: 510px;
       --divider-w: 8px;
     }
@@ -55,7 +55,7 @@
       flex-direction: column;
     }
 
-    /* Sidebar drag-resize handle */
+    /* 侧边栏拖拽调宽手柄 */
     .sidebar-resizer {
       width: 5px;
       flex: 0 0 5px;
@@ -114,7 +114,7 @@
       flex: 0 0 auto;
     }
 
-    /* Analyze + Settings on a shared second line */
+    /* “分析”和“设置”共享第二行 */
     .actions-secondary-row {
       display: flex;
       gap: 6px;
@@ -128,7 +128,7 @@
       flex-direction: column;
       align-items: stretch;
       flex: 0 0 auto;
-      /* Filters panel is outside .toolbar so it stays pinned regardless of tree visibility */
+      /* 筛选面板放在 .toolbar 之外，这样无论树是否显示都能固定在底部 */
     }
 
     .toolbar-row.status {
@@ -171,7 +171,7 @@
       margin: 2px 0;
     }
 
-    /* Centre the confidence threshold row horizontally in the panel */
+    /* 将置信度阈值这一行在面板内水平居中 */
     .filter-conf-row {
       width: 100%;
       justify-content: center;
@@ -290,17 +290,17 @@
       transform: translateY(0);
     }
 
-    /* Ensure dialog backdrops sit below floating toasts */
+    /* 确保对话框遮罩位于浮动 toast 之下 */
     dialog::backdrop {
       z-index: 10000;
     }
 
-    /* Place dialogs below the toasts */
+    /* 让对话框层级低于 toast */
     dialog {
       z-index: 11000;
     }
 
-    /* Toasts should always be on top */
+    /* Toast 始终保持在最上层 */
     #toastContainer {
       z-index: 9999999;
       pointer-events: none;
@@ -319,7 +319,7 @@
       font-size: 12px;
     }
 
-    /* Folder-load progress bar */
+    /* 文件夹加载进度条 */
     .load-progress {
       display: flex;
       flex-direction: column;
@@ -350,7 +350,7 @@
       transition: width .18s ease;
     }
 
-    /* ── Bottom status bar ── */
+    /* ── 底部状态栏 ── */
     .app-status-bar {
       flex: 0 0 auto;
       display: flex;
@@ -407,7 +407,7 @@
       flex: 0 0 auto;
     }
 
-    /* Circular zoom buttons */
+    /* 圆形缩放按钮 */
     #zoomOut, #zoomIn {
       width: 28px;
       height: 28px;
@@ -423,7 +423,7 @@
       flex-shrink: 0;
     }
 
-    /* Sidebar footer: uniform small button styles */
+    /* 侧边栏页脚：统一的小按钮样式 */
     .sidebar-footer button {
       height: 28px;
       font-size: 12px;
@@ -437,7 +437,7 @@
       height: 28px;
     }
 
-    /* Grid */
+    /* 网格 */
     .grid {
       display: grid;
       gap: 12px;
@@ -449,11 +449,11 @@
       background: var(--card);
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      /* overflow:clip clips border-radius without creating a stacking context */
+      /* overflow: clip 可裁切圆角，同时不会创建新的层叠上下文 */
       overflow: clip;
       display: flex;
       flex-direction: column;
-      /* content-visibility:auto lets the browser skip ALL rendering work (style,
+      /* content-visibility: auto 允许浏览器跳过整块渲染工作（样式、
          layout, paint) for cards that are off-screen.  This is the single biggest
          scroll-perf win when hundreds/thousands of scene cards are in the DOM:
          each image-load paint invalidation stays scoped to the visible card
@@ -465,7 +465,7 @@
     }
 
     .card:hover {
-      /* Simple border tint — no transform (avoids GPU layer promotion/demotion
+      /* 仅做边框着色，不使用 transform（避免 GPU 图层频繁提升/回收
          on every card the mouse crosses) and no background repaint */
       border-color: #3a4a6a;
     }
@@ -473,7 +473,7 @@
     .thumb {
       aspect-ratio: 16/10;
       background: #0e1117;
-      /* overflow:hidden is fine here — .thumb is a leaf container with no stacking
+      /* 这里使用 overflow: hidden 没问题，.thumb 是叶子容器，不涉及复杂层叠
          context concerns, and it correctly clips the image to the card's top corners */
       overflow: hidden;
       position: relative;
@@ -555,7 +555,7 @@
       font-weight: 600;
     }
 
-    /* Improve chip rendering & truncation */
+    /* 优化标签渲染与截断显示 */
     .chip {
       display: inline-flex;
       align-items: center;
@@ -565,12 +565,12 @@
       white-space: nowrap;
     }
 
-    /* Slight breathing room on meta row */
+    /* 为元信息行增加少量留白 */
     .meta {
       padding-right: 2px;
     }
 
-    /* Pill for score in meta rows to prevent clipping */
+    /* 在元信息行中使用胶囊样式显示分数，防止裁切 */
     .meta .score {
       display: inline-flex;
       align-items: center;
@@ -582,7 +582,7 @@
       border-radius: 999px;
     }
 
-    /* Further anti-clipping & wrapping safeguards */
+    /* 进一步防止裁切并增强换行保护 */
     .meta {
       flex-wrap: wrap;
     }
@@ -608,7 +608,7 @@
       white-space: nowrap;
     }
 
-    /* Editable species chips in scene edit mode */
+    /* 场景编辑模式下可编辑的物种标签 */
     .edit-chips {
       display: flex;
       gap: 6px;
@@ -636,7 +636,7 @@
     }
     .edit-chip .chip-x:hover { color: #ff8080; }
 
-    /* Inline chip input */
+    /* 内联标签输入框 */
     .chip-input-wrap {
       display: inline-flex;
       align-items: center;
@@ -670,7 +670,7 @@
     }
     .chip-commit-btn:hover { background: #56afff; }
 
-    /* Reviewed tags golden styling */
+    /* 已审核标签的金色样式 */
     .reviewed-tags .chip {
       background: rgba(245, 197, 66, 0.15);
       border-color: rgba(245, 197, 66, 0.4);
@@ -699,7 +699,7 @@
     }
     .edit-panel label { color: var(--muted); font-size: 12px; }
     .edit-section { display: grid; gap: 4px; }
-    /* Scene split mode: checkboxes on image cards */
+    /* 场景拆分模式：图片卡片上的复选框 */
     .card.split-mode { position: relative; }
     .card.split-mode .split-check {
       position: absolute;
@@ -711,7 +711,7 @@
       accent-color: #3a84e6;
     }
     .card.split-selected { outline: 2px solid #3a84e6; outline-offset: -2px; border-radius: 10px; }
-    /* Yellow save button when dirty */
+    /* 有未保存修改时使用黄色保存按钮 */
     #saveCsv:not(:disabled) {
       background: #b59b2e;
       color: #fff;
@@ -721,13 +721,13 @@
       background: #c9ae34;
     }
 
-    /* Anti-clipping improvements */
+    /* 防裁切优化 */
     .meta {
       gap: 8px;
     }
 
-    /* Removed invalid comma between overflow properties (was causing lint error) */
-    /* .meta > :first-child duplicate rule retained earlier above */
+    /* 已移除 overflow 属性之间的非法逗号（此前会触发 lint 报错） */
+    /* .meta > :first-child 的重复规则已保留在前文 */
     .inline input[type="text"] {
       min-width: 0;
     }
@@ -755,7 +755,7 @@
       color: var(--muted);
     }
 
-    /* Prevent text clipping with truncation */
+    /* 截断文本时避免被裁切 */
     .title {
       display: flex;
       gap: 6px;
@@ -815,7 +815,7 @@
       text-overflow: ellipsis;
     }
 
-    /* Sticky folder group headers */
+    /* 粘性文件夹分组标题 */
     .folder-group-header {
       position: sticky;
       top: 0;
@@ -823,7 +823,7 @@
       background: var(--bg);
     }
 
-    /* Multi-select: selected scene card */
+    /* 多选：已选中的场景卡片 */
     .card.selected {
       background: #1a2540 !important;
       border-color: #3a84e6 !important;
@@ -834,14 +834,14 @@
       background: #1f2d4e !important;
     }
 
-    /* Keyboard-focused scene card (after closing scene dialog or arrow-key nav) */
+    /* 键盘聚焦的场景卡片（关闭场景对话框后或方向键导航时） */
     .card.focused {
       outline: 2px solid rgba(58, 132, 230, .7);
       outline-offset: 2px;
       box-shadow: 0 0 12px rgba(58, 132, 230, .3);
     }
 
-    /* Folder group headers in scene grid */
+    /* 场景网格中的文件夹分组标题 */
     .folder-group {
       margin-bottom: 4px;
     }
@@ -942,7 +942,7 @@
       display: none;
     }
 
-    /* Floating multi-select action bar */
+    /* 浮动多选操作栏 */
     .select-action-bar {
       position: fixed;
       bottom: 28px;
@@ -1000,7 +1000,7 @@
       height: 100%;
     }
 
-    /* Modal */
+    /* 模态层 */
     dialog {
       border: 1px solid #2a3040;
       background: var(--panel);
@@ -1017,7 +1017,7 @@
       backdrop-filter: blur(2px);
     }
 
-    /* Compact dialogs that should size to their content */
+    /* 根据内容自适应大小的紧凑对话框 */
     dialog.dlg-compact {
       width: auto;
       height: auto;
@@ -1026,7 +1026,7 @@
       overflow-y: auto;
     }
 
-    /* Settings dialog: larger, flex column with sticky footer */
+    /* 设置对话框：更大尺寸，纵向 flex 布局，页脚吸附 */
     dialog.dlg-settings {
       width: min(660px, 96vw);
       max-width: min(660px, 96vw);
@@ -1035,7 +1035,7 @@
       overflow: hidden;
       padding: 0;
     }
-    /* Only apply flex layout when the dialog is actually open —
+    /* 仅在对话框真正打开时应用 flex 布局，
        otherwise display:flex overrides the browser's native display:none
        that keeps closed <dialog> elements hidden. */
     dialog.dlg-settings[open] {
@@ -1062,7 +1062,7 @@
       background: var(--panel);
     }
 
-    /* Yellow Save button when settings have unsaved changes */
+    /* 设置存在未保存改动时使用黄色保存按钮 */
     #settingsSave.dirty {
       background: #c9ae34;
       border-color: #d4b72e;
@@ -1079,7 +1079,7 @@
       max-height: none;
     }
 
-    /* ═══ Filmstrip Scene View Layout ═══ */
+    /* ═══ 底片栏场景视图布局 ═══ */
     .scene-filmstrip-layout {
       display: flex;
       flex-direction: column;
@@ -1087,7 +1087,7 @@
       overflow: hidden;
     }
 
-    /* ── TOP BAR ── */
+    /* ── 顶栏 ── */
     .scene-topbar {
       display: flex;
       align-items: center;
@@ -1215,7 +1215,7 @@
       background: #1d2230;
     }
 
-    /* ── Shortcut legend bar ── */
+    /* ── 快捷键说明栏 ── */
     .scene-shortcut-legend {
       display: flex;
       align-items: center;
@@ -1242,7 +1242,7 @@
 
 
 
-    /* ── CENTER: Dual previews ── */
+    /* ── 中部：双预览区 ── */
     .scene-main {
       flex: 1 1 auto;
       display: flex;
@@ -1317,7 +1317,7 @@
       background: rgba(16,19,26,0.7);
     }
 
-    /* Scene dialog RAW zoom mode (export preview only) */
+    /* 场景对话框 RAW 缩放模式（仅导出预览） */
     .scene-preview-img.zoom-active {
       overflow: hidden;
       cursor: crosshair;
@@ -1352,7 +1352,7 @@
       pointer-events: none;
     }
 
-    /* ── Info bar ── */
+    /* ── 信息栏 ── */
     .scene-info-bar {
       display: flex;
       align-items: center;
@@ -1427,7 +1427,7 @@
       flex-shrink: 0;
     }
 
-    /* ── BOTTOM: Filmstrip ── */
+    /* ── 底部：底片栏 ── */
     .scene-filmstrip-wrap {
       display: flex;
       align-items: stretch;
@@ -1486,7 +1486,7 @@
       border-right: none;
     }
 
-    /* Filmstrip card */
+    /* 底片栏卡片 */
     .filmstrip-card {
       flex-shrink: 0;
       width: 104px;
@@ -1561,7 +1561,7 @@
     }
     .filmstrip-card .filmstrip-stars .filled.auto { color: #6aa0ff; }
     .filmstrip-card .filmstrip-stars .filled.manual { color: #f5c542; }
-    /* Split mode on filmstrip */
+    /* 底片栏拆分模式 */
     .filmstrip-card.split-mode { position: relative; }
     .filmstrip-card.split-mode .split-check {
       position: absolute;
@@ -1577,7 +1577,7 @@
       outline-offset: -2px;
     }
 
-    /* Metadata tooltip on hover over filmstrip filename */
+    /* 悬停底片栏文件名时显示的元数据提示 */
     .filmstrip-card .filmstrip-tooltip {
       display: none;
       position: absolute;
@@ -1599,7 +1599,7 @@
       display: block;
     }
 
-    /* Legacy modal fallback (keep for dialogs that still use .modal) */
+    /* 旧版模态层回退（仍供使用 .modal 的对话框保留） */
     .modal {
       display: grid;
       grid-template-columns: minmax(0, 1fr) var(--divider-w) var(--right-w);
@@ -1651,7 +1651,7 @@
       color: var(--muted);
     }
 
-    /* New: column divider between grid and preview panel */
+    /* 新增：网格与预览面板之间的列分隔线 */
     .divider {
       width: var(--divider-w);
       background: #1f2533;
@@ -1685,7 +1685,7 @@
       font-size: 13px;
     }
 
-    /* Reuse dialog styling for settings */
+    /* 为设置面板复用对话框样式 */
     .settings {
       display: grid;
       gap: 10px;
@@ -1720,7 +1720,7 @@
       flex: 1;
     }
 
-    /* Final override: allow wrapping in meta rows (was nowrap earlier) */
+    /* 最终覆盖：允许元信息行换行（此前为 nowrap） */
     .meta {
       white-space: normal;
     }
@@ -1729,7 +1729,7 @@
       min-width: 0;
     }
 
-    /* Rating stars */
+    /* 评分星标 */
     .stars {
       display: flex;
       gap: 4px;
@@ -1742,7 +1742,7 @@
       line-height: 1;
       cursor: pointer;
       color: #2a3040;
-      /* No color transition — firing a transition on 5 stars × N cards during
+      /* 不做颜色过渡，避免在 5 颗星 × N 张卡片上触发过多过渡动画
          mouse movement adds up quickly */
     }
 
@@ -1753,7 +1753,7 @@
     .stars .star.manual.filled { color: #f5c542; }
     .stars .star.auto.filled { color: #6aa0ff; }
 
-    /* Timeline action buttons styling */
+    /* 时间线操作按钮样式 */
     .timeline-actions {
       display: flex;
       gap: 10px;
@@ -1788,7 +1788,7 @@
     }
 
 
-    /* Thumbnail badges (quality & image count) */
+    /* 缩略图徽标（质量与图片数量） */
     .thumb .badge {
       position: absolute;
       top: 8px;
@@ -1810,7 +1810,7 @@
       right: 8px;
     }
 
-    /* Title-level badges (placed under title, right-aligned) */
+    /* 标题级徽标（位于标题下方，右对齐） */
     .title-row {
       display: flex;
       align-items: center;
@@ -1839,7 +1839,7 @@
       border-radius: 999px;
     }
 
-    /* Folder tree panel */
+    /* 文件夹树面板 */
     .folder-tree-wrap {
       border-top: 1px solid #1d2230;
       padding-top: 8px;
@@ -1851,7 +1851,7 @@
       overflow: hidden;
     }
 
-    /* Empty state: tree visible but greyed out before any folder is opened */
+    /* 空状态：在尚未打开文件夹前，树结构可见但置灰 */
     .folder-tree-wrap.folder-tree-empty {
       opacity: 0.45;
       pointer-events: none;
@@ -1897,12 +1897,12 @@
       padding: 4px 2px;
     }
 
-    /* Lock the sidebar width so long folder names can't blow it out */
+    /* 锁定侧边栏宽度，避免超长文件夹名撑开布局 */
     .folder-tree-wrap {
       max-width: 100%;
     }
 
-    /* ── Tree node layout: consistent flex rows ──────────────────── */
+    /* ── 树节点布局：统一的 flex 行 ──────────────────── */
     .tree-node-row, .adlg-node-row {
       display: flex;
       align-items: center;
@@ -1914,7 +1914,7 @@
     }
     .tree-node-row:hover { background: rgba(255,255,255,.04); }
     .adlg-node-row:hover { background: rgba(255,255,255,.04); }
-    /* Expand arrow: fixed 12px slot, always present; leaf = invisible */
+    /* 展开箭头：固定 12px 位置，始终占位；叶子节点则不可见 */
     .tree-arrow {
       flex: 0 0 12px;
       width: 12px;
@@ -1928,17 +1928,17 @@
     }
     .tree-arrow.open { transform: rotate(90deg); }
     .tree-arrow.leaf { visibility: hidden; cursor: default; }
-    /* Folder icon: alignment anchor */
+    /* 文件夹图标：用于对齐的锚点 */
     .tree-icon { flex: 0 0 18px; font-size: 14px; text-align: center; }
-    /* Invisible spacer matching tree-cb width (sidebar rows without a checkbox) */
+    /* 与 tree-cb 同宽的透明占位（用于没有复选框的侧边栏行） */
     .tree-cb-spacer { flex: 0 0 13px; width: 13px; height: 1px; display: inline-block; }
-    /* Greyed-out folder: Kestrel found no supported photos */
-    /* Deep: folder AND every descendant have 0 images — fade whole row */
+    /* 置灰文件夹：Kestrel 未在其中发现受支持的照片 */
+    /* 深层空目录：当前文件夹及所有后代都没有图片，整行淡化 */
     .adlg-node-row.no-photos-deep { opacity: 0.38; }
     .adlg-node-row.no-photos-deep .adlg-cb { cursor: not-allowed; pointer-events: none; }
-    /* Shallow: folder itself has 0 images but a descendant has some — fade checkbox only */
+    /* 浅层空目录：当前文件夹自身无图片，但后代有图片，仅淡化复选框 */
     .adlg-node-row.no-photos-shallow .adlg-cb { opacity: 0.38; cursor: not-allowed; pointer-events: none; }
-    /* Legacy class kept for backwards compat */
+    /* 为向后兼容保留的旧类名 */
     .adlg-node-row.no-photos { opacity: 0.38; }
     .adlg-node-row.no-photos .adlg-cb { cursor: not-allowed; pointer-events: none; }
 
@@ -1968,7 +1968,7 @@
       color: #c8dcf5;
     }
 
-    /* Analysis completion states */
+    /* 分析完成状态样式 */
     .tree-node-row.analyzed-full .tree-label {
       color: var(--ok);
       cursor: pointer;
@@ -1987,7 +1987,7 @@
       font-weight: 700;
     }
 
-    /* Mirror classes for analyze dialog rows */
+    /* 为分析对话框行镜像这些类名 */
     .adlg-node-row.analyzed-full .tree-label {
       color: var(--ok);
       font-weight: 700;
@@ -2003,7 +2003,7 @@
       font-weight: 700;
     }
 
-    /* Mirror has-kestrel styling for analyze dialog rows */
+    /* 为分析对话框行镜像 has-kestrel 样式 */
     .adlg-node-row.has-kestrel:not(.analyzed-full):not(.analyzed-partial):not(.analyzed-none) .tree-label {
       color: var(--ok);
       cursor: pointer;
@@ -2014,7 +2014,7 @@
       color: #c8dcf5;
     }
 
-    /* Outdated version styling (analyzed on an earlier Kestrel version) */
+    /* 旧版本样式（使用更早版本的 Kestrel 分析过） */
     .tree-node-row.version-outdated .tree-label {
       color: var(--ok);
       cursor: pointer;
@@ -2027,7 +2027,7 @@
       font-style: italic;
     }
 
-    /* In-progress analysis styling (subtle purple indicator with text) */
+    /* 分析进行中样式（带文字的轻微紫色指示） */
     .tree-node-row.in-progress {
       background: rgba(179, 153, 204, 0.08);
       border-left: 3px solid #b399cc;
@@ -2045,7 +2045,7 @@
       opacity: 0.85;
     }
 
-    /* Context menu for folder tree */
+    /* 文件夹树右键菜单 */
     .kestrel-ctx-menu {
       position: fixed;
       z-index: 9999;
@@ -2079,7 +2079,7 @@
       opacity: 0.38;
     }
 
-    /* Bold non-analyzed folder labels for better visibility on all platforms */
+    /* 为未分析文件夹使用加粗标签，提升跨平台可见性 */
     .tree-node-row.no-kestrel .tree-label {
       font-weight: 700 !important;
       color: #cbd2dc !important;
@@ -2094,7 +2094,7 @@
       background: #10293d;
     }
 
-    /* Visual connector lines from parent to children */
+    /* 从父节点连接到子节点的可视化连线 */
     .tree-children {
       padding-left: 12px;
       border-left: 1px solid #1e2840;
@@ -2110,7 +2110,7 @@
       accent-color: #3a84e6;
     }
 
-    /* ── Analyze Folders dialog ──────────────────────────────────── */
+    /* ── 分析文件夹对话框 ──────────────────────────────────── */
     .analyze-dlg {
       display: flex;
       flex-direction: column;
@@ -2127,7 +2127,7 @@
       font-size: 16px;
     }
 
-    /* Split layout: folder tree (left) + queue preview (right) */
+    /* 分栏布局：左侧文件夹树 + 右侧队列预览 */
     .analyze-dlg-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2136,7 +2136,7 @@
       min-height: 0;
       overflow: hidden;
     }
-    /* Stack on narrow screens */
+    /* 窄屏时改为纵向堆叠 */
     @media (max-width: 640px) {
       .analyze-dlg-split { grid-template-columns: 1fr; }
       .analyze-dlg { width: min(520px, 96vw); }
@@ -2151,7 +2151,7 @@
       min-height: 0;
     }
 
-    /* Right panel: queue preview */
+    /* 右侧面板：队列预览 */
     .analyze-dlg-queue-wrap {
       display: flex;
       flex-direction: column;
@@ -2217,7 +2217,7 @@
     }
     .adlg-queue-item .adlg-qi-remove:hover { opacity: 1; background: rgba(231,76,60,.12); }
 
-    /* Drag-and-drop for pending queue items */
+    /* 待处理队列项的拖放样式 */
     .adlg-queue-item[draggable="true"] { cursor: grab; }
     .adlg-queue-item[draggable="true"]:active { cursor: grabbing; }
     .adlg-queue-item.drag-over { border-top: 2px solid var(--brand); margin-top: -2px; }
@@ -2259,7 +2259,7 @@
       color: var(--muted);
     }
 
-    /* Queue checkboxes in the analyze dialog (amber accent) */
+    /* 分析对话框中的队列复选框（琥珀色强调） */
     .adlg-cb {
       flex: 0 0 13px;
       width: 13px;
@@ -2277,7 +2277,7 @@
       color: #f5c542 !important;
     }
 
-    /* ── Analysis Queue floating notification panel ────────────────── */
+    /* ── 分析队列浮动通知面板 ────────────────── */
     .queue-panel {
       position: fixed;
       bottom: 20px;
@@ -2465,7 +2465,7 @@
       max-width: 100%;
     }
 
-    /* Live preview inside queue panel */
+    /* 队列面板内的实时预览 */
     .queue-live-preview {
       display: flex;
       gap: 8px;
@@ -2520,7 +2520,7 @@
       text-align: right;
     }
 
-    /* ── Live Analysis Details dialog ───────────────────────────────────── */
+    /* ── 实时分析详情对话框 ───────────────────────────────────── */
     .live-dlg {
       display: grid;
       grid-template-columns: 2.2fr 0.8fr;
@@ -2705,7 +2705,7 @@
       color: #606878 !important;
     }
 
-    /* ── Welcome / Quick-Start Panel ───────────────────────────── */
+    /* ── 欢迎 / 快速开始面板 ───────────────────────────── */
     #welcomePanel {
       display: flex;
       flex-direction: column;
@@ -2855,7 +2855,7 @@
       white-space: nowrap;
     }
 
-    /* ── Feedback Dialog ───────────────────────────────────────────── */
+    /* ── 反馈对话框 ───────────────────────────────────────────── */
     .feedback-dlg {
       display: flex;
       flex-direction: column;
@@ -2938,7 +2938,7 @@
       margin-top: 4px;
     }
 
-    /* ── Analytics Consent Dialog ─────────────────────────────────── */
+    /* ── 统计分析授权对话框 ─────────────────────────────────── */
     .analytics-dlg {
       display: flex;
       flex-direction: column;
@@ -2980,7 +2980,7 @@
       margin-top: 4px;
     }
 
-    /* ── Legal Notice Banner ───────────────────────────────────────── */
+    /* ── 法律提示横幅 ───────────────────────────────────────── */
     .legal-notice-banner {
       position: fixed;
       top: 0;
@@ -3025,7 +3025,7 @@
       opacity: 0.9;
     }
 
-    /* ---- Tutorial overlay ---- */
+    /* ---- 教程遮罩层 ---- */
     #tutorialOverlay {
       position: fixed;
       inset: 0;
@@ -3035,7 +3035,7 @@
     }
     #tutorialOverlay.active {
       display: block;
-      /* pointer-events stays none so users can interact with UI underneath */
+      /* 保持 pointer-events 为 none，用户仍可操作下层界面 */
     }
     #tutorialOverlay.has-backdrop {
       background: rgba(0,0,0,0.6);
@@ -3138,7 +3138,7 @@
     }
     .tut-btn.primary:hover { background: #1e4a6e; }
     .tut-btn:disabled { opacity: 0.4; cursor: default; }
-    /* Highlight-target pulsing animation for interactive steps */
+    /* 交互步骤中高亮目标的脉冲动画 */
     @keyframes pulse-highlight {
       0%   { box-shadow: 0 0 0 0 rgba(74,163,255,0.6); }
       70%  { box-shadow: 0 0 0 12px rgba(74,163,255,0); }
@@ -3151,7 +3151,7 @@
       border-color: var(--brand) !important;
       pointer-events: auto !important;
     }
-    /* Instruction nudge that appears below tutorial body for click-to-advance steps */
+    /* 出现在教程正文下方、用于点击推进的提示语 */
     .tutorial-nudge {
       display: flex;
       align-items: center;
@@ -3194,7 +3194,7 @@
       border-color: var(--brand); 
       color: var(--brand); 
     }
-    /* ── Donate button ────────────────────────────────────────────── */
+    /* ── 捐助按钮 ────────────────────────────────────────────── */
     .donate-btn {
       padding: 5px 10px;
       height: auto;
@@ -3214,7 +3214,7 @@
       border-color: #c49050;
       color: #f5d98b;
     }
-    /* ── Donation prompt dialog ──────────────────────────────────── */
+    /* ── 捐助提示对话框 ──────────────────────────────────── */
     #donateDlg {
       width: fit-content !important;
       height: fit-content !important;
@@ -3266,7 +3266,7 @@
     }
     .donate-dlg-close-btn:hover { color: var(--text); background: transparent; border: none; }
 
-    /* ---- Timeline view (group-by-capture-time) ---- */
+    /* ---- 时间线视图（按拍摄时间分组） ---- */
     .timeline-body {
       padding: 4px 0 8px 0;
     }
@@ -3350,17 +3350,17 @@
       font-size: 11px;
     }
 
-    /* Inside a timeline node, cards are a bit denser */
+    /* 时间线节点内部的卡片布局更紧凑一些 */
     .timeline-grid {
       gap: 10px;
     }
 
-    /* Folder body collapse */
+    /* 文件夹主体折叠 */
     .folder-group-body.hidden {
       display: none;
     }
 
-    /* Scroll position indicator */
+    /* 滚动位置指示器 */
     #scrollPositionIndicator {
       position: fixed;
       right: 22px;

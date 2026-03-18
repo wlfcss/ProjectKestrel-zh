@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
-"""Standalone local web server for the Project Kestrel visualizer (supersedes backend/editor_bridge.py).
+"""Project Kestrel 可视化界面的独立本地 Web 服务器。
 
-Features:
- - Serves the existing visualizer.html (and any static assets in the folder).
- - Exposes the /open endpoint (same contract as backend/editor_bridge.py) so the
-   web UI can open originals in the configured editor.
- - Intended to be frozen into a single executable with PyInstaller.
+该模块取代了旧的 ``backend/editor_bridge.py``，负责：
+ - 提供 ``visualizer.html`` 及其静态资源；
+ - 暴露 ``/open`` 接口，供前端用已配置的编辑器打开原图；
+ - 支持通过 PyInstaller 冻结为单文件或单目录应用。
 
-Usage (development):
-    python visualizer/visualizer.py --port 8765 --root C:\Photos\Trip
+开发环境示例：
+    python visualizer/visualizer.py --port 8765 --root C:\\Photos\\Trip
 
-After starting it will open the default browser at http://127.0.0.1:<port>/ .
+启动后会默认打开浏览器访问 ``http://127.0.0.1:<port>/``。
 
-Build single-file EXE (example):
+单文件打包示例：
     pyinstaller --onefile --name kestrel_viz visualizer/visualizer.py
 
-Optionally set env vars (same as editor_bridge):
-  KESTREL_ALLOWED_ROOT=C:\Photos\Trip  (restrict paths)
-  KESTREL_BRIDGE_TOKEN=secret              (require auth header)
-  KESTREL_ALLOWED_EXTENSIONS=.cr3,.jpg,... (override allowed list)
-  KESTREL_ALLOW_ANY_EXTENSION=1            (disable extension filtering)
-
+可选环境变量：
+  KESTREL_ALLOWED_ROOT=C:\\Photos\\Trip    限制允许访问的根目录
+  KESTREL_BRIDGE_TOKEN=secret              要求请求携带认证头
+  KESTREL_ALLOWED_EXTENSIONS=.cr3,.jpg,... 覆盖允许的扩展名列表
+  KESTREL_ALLOW_ANY_EXTENSION=1            禁用扩展名过滤
 """
 
 from __future__ import annotations
@@ -44,13 +42,13 @@ import threading
 from urllib.parse import urlparse
 from typing import Set
 
-# --- Extracted modules ---
+# --- 拆分出的功能模块 ---
 from settings_utils import load_persisted_settings, save_persisted_settings, log, _normalize
 from editor_launch import launch
 from queue_manager import _queue_manager
 from api_bridge import Api
 
-# Telemetry — failsafe import (never blocks startup)
+# 遥测模块，导入失败也不能阻塞启动
 try:
     import kestrel_telemetry as _telemetry
 except ImportError:
@@ -61,14 +59,14 @@ except ImportError:
 
 HOST = '127.0.0.1'
 
-# --- Security / behavior configuration (env override matches editor_bridge) ---
+# --- 安全与行为配置（环境变量约定与 editor_bridge 保持一致） ---
 ALLOWED_ROOT = os.environ.get('KESTREL_ALLOWED_ROOT')
 if ALLOWED_ROOT:
     ALLOWED_ROOT = os.path.abspath(os.path.expanduser(ALLOWED_ROOT))
 
 AUTH_TOKEN = os.environ.get('KESTREL_BRIDGE_TOKEN')
 if not AUTH_TOKEN:
-    # Generate an ephemeral token per run; injected into served page via /bridge_config.js
+    # 每次启动生成临时令牌，并通过 /bridge_config.js 注入前端页面
     AUTH_TOKEN = secrets.token_urlsafe(32)
 MAX_REQUEST_BYTES = int(os.environ.get('KESTREL_MAX_REQUEST_BYTES', '4096'))
 ALLOWED_EDITORS: Set[str] = {
@@ -113,29 +111,29 @@ def _extension_allowed(path: str) -> bool:
 
 
 class Handler(SimpleHTTPRequestHandler):
-    # Serve from directory of this script (project root) by default.
+    # 默认从当前脚本所在目录对应的项目路径提供静态文件
     def translate_path(self, path: str) -> str:  # type: ignore[override]
-        """Resolve file paths robustly across dev, frozen, and installed builds.
-        
-        Checks multiple locations:
-        1. Normal CWD-relative translation (for dev mode)
-        2. analyzer/ subfolder (for files like culling.html)
-        3. _internal/analyzer/ (for PyInstaller frozen install in Program Files)
+        """兼容开发态、冻结态和安装态，稳健地解析静态文件路径。
+
+        会依次检查：
+        1. 当前工作目录下的常规路径；
+        2. ``analyzer/`` 子目录；
+        3. PyInstaller 安装目录中的 ``_internal/analyzer/``。
         """
-        # Try the normal translation first
+        # 先尝试标准路径解析
         resolved = super().translate_path(path)
         if os.path.exists(resolved):
             return resolved
         
-        # If not found and path doesn't already contain /analyzer, try analyzer/ prefix
+        # 如果没找到且路径本身不带 /analyzer，则补上前缀再试一次
         if not path.startswith('/analyzer'):
             alt = super().translate_path('/analyzer' + path)
             if os.path.exists(alt):
                 return alt
         
-        # For frozen builds, also check _internal subdirectories
+        # 冻结构建时，再检查 _internal 子目录
         if getattr(sys, 'frozen', False):
-            # Try <exe_dir>/_internal/analyzer/<file>
+            # 尝试 <exe_dir>/_internal/analyzer/<file>
             try:
                 exe_dir = os.path.dirname(sys.executable)
                 internal_dir = os.path.join(exe_dir, '_internal')
@@ -143,16 +141,16 @@ class Handler(SimpleHTTPRequestHandler):
                 alt = os.path.join(internal_dir, alt_path)
                 if os.path.exists(alt):
                     return alt
-                # If path already has /analyzer, also check _internal/analyzer/<file>
+                # 如果路径已经带 /analyzer，也检查 _internal/analyzer/<file>
                 if path.startswith('/analyzer'):
-                    alt_path = path[1:]  # Strip leading /
+                    alt_path = path[1:]  # 去掉开头的 /
                     alt = os.path.join(internal_dir, alt_path)
                     if os.path.exists(alt):
                         return alt
             except Exception:
                 pass
             
-            # Try _MEIPASS (PyInstaller temp extraction)
+            # 再尝试 _MEIPASS（PyInstaller 临时解包目录）
             meipass = getattr(sys, '_MEIPASS', None)
             if meipass:
                 alt_path = path.lstrip('/')
@@ -160,15 +158,15 @@ class Handler(SimpleHTTPRequestHandler):
                 if os.path.exists(alt):
                     return alt
         
-        # Return the original resolution (will 404 if file doesn't exist)
+        # 返回原始解析结果；如果文件不存在，后续会自然返回 404
         return resolved
 
-    def end_headers(self):  # Inject basic headers (no wildcard CORS; same-origin only)
+    def end_headers(self):  # 注入基础响应头，不允许通配跨域
         self.send_header('Cache-Control', 'no-store')
         super().end_headers()
 
     def do_GET(self):  # type: ignore[override]
-        # Dynamic token/config injection script
+        # 动态注入桥接令牌与来源配置
         if self.path == '/bridge_config.js':
             body = (
                 f"// Generated at runtime\n"
@@ -188,22 +186,21 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(200, _queue_manager.get_status())
             return
         if self.path in ('/', '/index.html'):
-            # Prefer analyzer/visualizer.html when present (merged layout).
-            # Check multiple locations across dev, frozen, and installed builds.
+            # 优先使用 analyzer/visualizer.html，并兼容开发态与打包态位置
             def _find_visualizer():
-                # List of relative paths to try (from various base dirs)
+                # 需要尝试的相对路径列表
                 candidates = [
                     'analyzer/visualizer.html',
                     'visualizer.html',
                 ]
                 
-                # Check from CWD
+                # 先检查当前工作目录
                 for rel in candidates:
                     full = os.path.join(os.getcwd(), rel)
                     if os.path.exists(full):
                         return '/' + rel
                 
-                # Check from exe dir (frozen/installed)
+                # 再检查可执行文件目录（冻结/安装场景）
                 try:
                     exe_dir = os.path.dirname(sys.executable)
                     internal_dir = os.path.join(exe_dir, '_internal')
@@ -214,7 +211,7 @@ class Handler(SimpleHTTPRequestHandler):
                 except Exception:
                     pass
                 
-                # Check PyInstaller _MEIPASS
+                # 再检查 PyInstaller 的 _MEIPASS 目录
                 meipass = getattr(sys, '_MEIPASS', None)
                 if meipass:
                     for rel in candidates:
@@ -222,13 +219,13 @@ class Handler(SimpleHTTPRequestHandler):
                         if os.path.exists(full):
                             return '/' + rel
                 
-                # Default fallback
+                # 最后的默认回退
                 return '/analyzer/visualizer.html'
             
             self.path = _find_visualizer()
         return super().do_GET()
 
-    def do_OPTIONS(self):  # Minimal preflight (only allow same-origin JS; token still required)
+    def do_OPTIONS(self):  # 最小化预检，只允许同源 JS
         origin = self.headers.get('Origin')
         if origin and origin != f'http://{HOST}:{self.server.server_port}':  # type: ignore[attr-defined]
             self.send_response(403); self.end_headers(); return
@@ -268,7 +265,7 @@ class Handler(SimpleHTTPRequestHandler):
         body = json.dumps(obj).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
-        # Only echo same-origin to mitigate unsolicited cross-origin token use
+        # 只回显同源 Origin，降低跨站滥用令牌的风险
         self.send_header('Access-Control-Allow-Origin', f'http://{HOST}:{self.server.server_port}')  # type: ignore[attr-defined]
         self.end_headers()
         self.wfile.write(body)
@@ -278,7 +275,7 @@ class Handler(SimpleHTTPRequestHandler):
             token = self.headers.get('X-Bridge-Token') or ''
             if token != AUTH_TOKEN:
                 self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
-        # Basic origin check (best-effort; Origin may be absent for some requests)
+        # 基础 Origin 校验；部分请求可能不会携带 Origin
         origin = self.headers.get('Origin')
         expected_origin = f'http://{HOST}:{self.server.server_port}'  # type: ignore[attr-defined]
         if origin and origin != expected_origin:
@@ -319,17 +316,17 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(500, {'ok': False, 'error': str(e)})
 
     def handle_shutdown(self):
-        # Require token (always) to prevent CSRF/drive-by shutdown
+        # 关闭接口始终要求令牌，避免 CSRF 或外部恶意触发
         if AUTH_TOKEN:
             token = self.headers.get('X-Bridge-Token') or ''
             if token != AUTH_TOKEN:
                 self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
         log('Received shutdown request from client; scheduling server shutdown.')
-        # Respond first, then shutdown asynchronously so reply is delivered
+        # 先响应，再异步关闭，确保客户端能收到返回值
         self._json(200, {'ok': True, 'message': 'Shutting down'})
         def _shutdown():
             try:
-                # slight delay to let response flush
+                # 略微延迟，给响应刷出留时间
                 import time; time.sleep(0.25)
                 self.server.shutdown()
             except Exception as e:  # noqa: BLE001
@@ -432,12 +429,10 @@ def parse_args():
 
 def main():
     args = parse_args()
-    # When visualizer.py is run from inside analyzer/ (merged layout) set
-    # the working directory to the repository root so assets and shared
-    # files (assets/, visualizer files) are served correctly.
-    # If frozen by PyInstaller (onedir), prefer the bundled _internal folder
-    # inside the distribution so static assets (visualizer.html, logos) are
-    # served from the on-disk bundle.
+    # 当 visualizer.py 从 analyzer/ 内部运行时，将工作目录切到仓库根目录，
+    # 这样 assets/ 与可视化静态文件都能被正确访问。
+    # 如果是 PyInstaller 的 onedir 版本，则优先使用打包产物里的 _internal 目录，
+    # 确保 visualizer.html、logo 等静态资源直接从磁盘包内提供。
     if getattr(sys, 'frozen', False):
         meipass = getattr(sys, '_MEIPASS', None) or os.path.dirname(sys.executable)
         candidate = os.path.join(meipass, '_internal')
@@ -446,7 +441,7 @@ def main():
         elif meipass and os.path.isdir(meipass):
             os.chdir(meipass)
         else:
-            # Fallback to repo-root relative when running unpacked
+            # 未打包运行时，回退到相对于仓库根目录的位置
             os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') or '.')
     else:
         os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..') or '.')
@@ -454,7 +449,7 @@ def main():
     log(f'Serving visualizer at http://{HOST}:{args.port}/  (Press Ctrl+C to stop)')
     log('Ephemeral bridge token (auto-injected):', AUTH_TOKEN[:8] + '…')
 
-    # ── Settings init: ensure machine_id and version are persisted ──
+    # ── 初始化设置：确保 machine_id 和 version 已持久化 ──
     try:
         if _telemetry is not None:
             _init_settings = load_persisted_settings()
@@ -463,7 +458,7 @@ def main():
             _init_settings.setdefault('raw_preview_cache_enabled', True)
             save_persisted_settings(_init_settings)
     except Exception:
-        pass  # failsafe
+        pass  # 这里不能影响启动流程
 
     if args.root:
         log('Default root (client-supplied):', args.root)
@@ -487,37 +482,37 @@ def main():
         t.start()
         try:
             log('Starting windowed UI via pywebview...')
-            api = Api() # start maximized
+            api = Api()  # 窗口默认最大化启动
             api._server_port = args.port
             win = webview.create_window('Project Kestrel', url, js_api=api, maximized=True)
             api._main_window = win
 
-            # When the analysis queue is running, intercept the close event so the
-            # window minimizes to the taskbar instead of killing mid-analysis.
+            # 当分析队列正在运行时，拦截关闭事件并改为最小化，
+            # 避免用户误关导致分析中断。
             def _on_closing():
-                # Check for unsaved changes via the Python-side flag
-                # (avoid evaluate_js here — it deadlocks because closing runs on the GUI thread)
+                # 通过 Python 侧标记检查是否有未保存更改。
+                # 这里不要调用 evaluate_js，否则关闭阶段会在 GUI 线程死锁。
                 has_unsaved = getattr(api, '_has_unsaved_changes', False)
 
-                # When an analysis is running or paused, prompt the user with
-                # options to Minimize, Exit (cancel) or Cancel the close.
+                # 如果分析正在运行或已暂停，则提示用户选择：
+                # 最小化、退出（取消分析）或取消关闭。
                 if _queue_manager.is_running or _queue_manager.is_paused:
                     try:
-                        # Use native Windows MessageBox if available for a simple
-                        # three-button prompt. Fallback to tkinter dialog when not.
+                        # Windows 下优先使用原生 MessageBox，提供简单的三按钮提示；
+                        # 其他情况下回退到 tkinter。
                         if sys.platform.startswith('win'):
                             import ctypes
                             MB_YESNOCANCEL = 0x00000003
                             MB_ICONQUESTION = 0x00000020
-                            title = 'Analysis in progress'
+                            title = '分析进行中'
                             if _queue_manager.is_paused:
-                                msg = 'Analysis is paused. Exit Project Kestrel? You can re-open later to resume.'
+                                msg = '分析已暂停。要退出 Project Kestrel 吗？稍后重新打开后可以继续。'
                             else:
-                                msg = 'Analysis is in progress. Cancel analysis and exit?'
+                                msg = '分析仍在进行中。要取消分析并退出吗？'
                             resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNOCANCEL | MB_ICONQUESTION)
-                            # IDYES=6 -> Exit (cancel analysis and close)
-                            # IDNO=7  -> Minimize instead of closing
-                            # IDCANCEL=2 -> Do not close
+                            # IDYES=6   表示退出（取消分析并关闭）
+                            # IDNO=7    表示最小化而不是关闭
+                            # IDCANCEL=2 表示取消这次关闭
                             if resp == 6:
                                 try:
                                     _queue_manager.cancel()
@@ -532,18 +527,19 @@ def main():
                                 return False
                             return False
                         else:
-                            # Tkinter fallback
+                            # tkinter 回退方案
                             import tkinter as _tk
                             from tkinter import messagebox as _mb
                             root = _tk.Tk()
                             root.withdraw()
                             if _queue_manager.is_paused:
-                                msg = 'Analysis is paused. Exit Project Kestrel? You can re-open later to resume.'
+                                msg = '分析已暂停。要退出 Project Kestrel 吗？稍后重新打开后可以继续。'
                             else:
-                                msg = 'Analysis is in progress. Cancel analysis and exit?'
-                            res = _mb.askyesnocancel('Analysis in progress', msg)
+                                msg = '分析仍在进行中。要取消分析并退出吗？'
+                            res = _mb.askyesnocancel('分析进行中', msg)
                             root.destroy()
-                            # askyesnocancel returns True=Yes, False=No, None=Cancel
+                            # askyesnocancel 的返回值：
+                            # True=是，False=否，None=取消
                             if res is True:
                                 try:
                                     _queue_manager.cancel()
@@ -558,47 +554,46 @@ def main():
                                 return False
                             return False
                     except Exception:
-                        # If the prompt fails, fall back to minimizing when running
+                        # 如果提示框本身失败，运行中场景默认回退到最小化
                         try:
                             win.minimize()
                         except Exception:
                             pass
                         return False
 
-                # Prompt for unsaved changes when no analysis is running
+                # 没有分析在运行时，只处理未保存更改提示
                 if has_unsaved:
                     try:
                         if sys.platform.startswith('win'):
                             import ctypes
                             MB_YESNO = 0x00000004
                             MB_ICONWARNING = 0x00000030
-                            msg = 'You have unsaved changes that will be lost. Close anyway?'
-                            title = 'Unsaved Changes'
+                            msg = '你有未保存的更改，关闭后将会丢失。仍要关闭吗？'
+                            title = '未保存的更改'
                             resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNO | MB_ICONWARNING)
-                            if resp == 6:  # Yes – close and discard
+                            if resp == 6:  # 是：关闭并丢弃未保存更改
                                 return True
-                            return False  # No – don't close
+                            return False  # 否：取消关闭
                         else:
                             import tkinter as _tk
                             from tkinter import messagebox as _mb
                             root = _tk.Tk()
                             root.withdraw()
-                            res = _mb.askyesno('Unsaved Changes',
-                                               'You have unsaved changes that will be lost. Close anyway?')
+                            res = _mb.askyesno('未保存的更改',
+                                               '你有未保存的更改，关闭后将会丢失。仍要关闭吗？')
                             root.destroy()
                             if res:
                                 return True
                             return False
-                            return True
                     except Exception:
-                        return True  # on failure, allow close
+                        return True  # 如果提示失败，则允许关闭
 
-                return True  # allow normal close
+                return True  # 允许正常关闭
 
             try:
                 win.events.closing += _on_closing
             except Exception:
-                pass  # older pywebview versions may not support this event
+                pass  # 旧版 pywebview 可能不支持这个事件
 
             webview.start()
         except Exception as e:
@@ -632,14 +627,14 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     except Exception as _main_exc:
-        # Top-level crash handler — send crash report before re-raising
+        # 顶层崩溃兜底：先尝试上报，再把异常重新抛出
         try:
             import traceback as _tb
             if _telemetry is not None:
                 _crash_settings = load_persisted_settings()
                 _crash_mid = _telemetry.get_machine_id(_crash_settings)
                 
-                # Fetch recent log tail, passing the active folder's log if available
+                # 获取最近的日志尾部；如果有当前活跃文件夹，则优先取该文件夹日志
                 _folder_path = _crash_settings.get('active_analysis_path', '')
                 if _folder_path:
                     _log_tail = _telemetry.get_recent_log_tail(folder_path=_folder_path)
@@ -653,9 +648,9 @@ if __name__ == '__main__':
                     machine_id=_crash_mid,
                     version=_telemetry._read_version(),
                 )
-                # Give daemon thread a moment to fire off the HTTP request
+                # 给守护线程一点时间发出 HTTP 请求
                 import time as _t
                 _t.sleep(2)
         except Exception:
-            pass  # crash handler itself must never hide the real error
+            pass  # 崩溃处理自身绝不能掩盖真正的异常
         raise

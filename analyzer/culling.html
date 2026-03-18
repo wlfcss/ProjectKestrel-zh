@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Culling Assistant — Project Kestrel</title>
+  <title>筛片助手 — Project Kestrel</title>
   <link rel="icon" href="data:," />
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="papaparse.local.js"></script>
   <script src="bridge_config.js"></script>
   <style>
     :root {
@@ -38,7 +38,7 @@
       flex-direction: column;
     }
 
-    /* ---- Top bar (merged: left title | center hints | right stats) ---- */
+    /* ---- 顶栏（合并布局：左标题 | 中提示 | 右统计） ---- */
     .topbar {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -93,14 +93,14 @@
       font-size: 12px;
     }
 
-    /* ---- Main layout ---- */
+    /* ---- 主布局 ---- */
     .main-layout {
       display: flex;
       flex: 1 1 0;
       min-height: 0;
     }
 
-    /* ---- Culling pane (left 75%) ---- */
+    /* ---- 筛片面板（左侧 75%） ---- */
     .culling-pane {
       flex: 1 1 0;
       display: flex;
@@ -129,7 +129,7 @@
       overflow-x: hidden;
     }
 
-    /* ---- Scene row ---- */
+    /* ---- 场景行 ---- */
     .scene-row {
       border-bottom: 1px solid var(--card-border);
     }
@@ -179,7 +179,7 @@
       flex-shrink: 0;
     }
 
-    /* ---- Image card (compact) ---- */
+    /* ---- 图片卡片（紧凑模式） ---- */
     .cull-card {
       width: var(--card-width, 150px);
       background: var(--card);
@@ -252,7 +252,7 @@
     .cull-stars .star.filled.manual { color: #f5c542; }
     .cull-stars .star:hover { color: #8fb6ff; }
 
-    /* ---- Preview pane (right 25%) ---- */
+    /* ---- 预览面板（右侧 25%） ---- */
     .preview-pane {
       flex: 0 0 var(--preview-w, 350px);
       min-width: 200px;
@@ -301,7 +301,7 @@
     .preview-meta .label { color: var(--muted); }
     .preview-meta .value { font-weight: 600; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    /* ---- Bottom action bar ---- */
+    /* ---- 底部操作栏 ---- */
     .bottom-bar {
       display: flex;
       align-items: center;
@@ -342,7 +342,7 @@
     .btn.danger:hover { background: #4a2020; }
     .btn:disabled { opacity: 0.4; cursor: default; }
 
-    /* ---- Dialogs (base) ---- */
+    /* ---- 对话框（基础样式） ---- */
     dialog {
       background: var(--panel);
       color: var(--text);
@@ -364,7 +364,7 @@
       justify-content: flex-end;
     }
 
-    /* ---- Finish Culling dialog ---- */
+    /* ---- 完成筛片对话框 ---- */
     .dlg-header {
       display: flex;
       align-items: flex-start;
@@ -439,7 +439,7 @@
     }
     .dlg-xmp-note.visible { display: block; }
 
-    /* ---- Progress steps ---- */
+    /* ---- 进度步骤 ---- */
     .dlg-steps {
       list-style: none;
       margin: 14px 22px 6px;
@@ -489,7 +489,7 @@
     .dlg-step-detail { font-size: 11px; color: var(--muted); }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ---- XMP conflict list ---- */
+    /* ---- XMP 冲突列表 ---- */
     .conflict-file-list {
       max-height: 140px;
       overflow-y: auto;
@@ -517,7 +517,7 @@
 
     .hidden { display: none !important; }
 
-    /* toast */
+    /* Toast 通知 */
     .toast {
       position: fixed;
       bottom: 18px;
@@ -535,7 +535,7 @@
     }
     .toast.show { opacity: 1; }
 
-    /* ---- Resize divider ---- */
+    /* ---- 拖拽分隔条 ---- */
     .resize-divider {
       width: 6px;
       background: #1f2533;
@@ -546,7 +546,7 @@
     .resize-divider:hover { background: #2a3040; }
     .resize-divider:active { background: var(--brand); }
 
-    /* ---- Bottom bar zoom controls ---- */
+    /* ---- 底栏缩放控制 ---- */
     .btn.icon-btn {
       padding: 2px 9px;
       font-size: 15px;
@@ -567,7 +567,7 @@
       flex-shrink: 0;
     }
 
-    /* ---- Preview header with zoom control ---- */
+    /* ---- 带缩放控制的预览头部 ---- */
     .preview-header {
       display: flex;
       align-items: center;
@@ -589,7 +589,7 @@
       cursor: pointer;
     }
 
-    /* ---- Preview zoom mode ---- */
+    /* ---- 预览缩放模式 ---- */
     .preview-img-box { position: relative; }
     .preview-img-box.zoom-active {
       overflow: hidden;
@@ -618,7 +618,7 @@
       pointer-events: none;
     }
 
-    /* ---- Tutorial overlay ---- */
+    /* ---- 教程遮罩层 ---- */
     #tutorialOverlay {
       position: fixed;
       inset: 0;
@@ -628,7 +628,7 @@
     }
     #tutorialOverlay.active {
       display: block;
-      /* pointer-events stays none so users can interact with UI underneath */
+      /* 保持 pointer-events 为 none，用户仍可操作下层界面 */
     }
     #tutorialOverlay.has-backdrop {
       background: rgba(0,0,0,0.6);
@@ -707,7 +707,7 @@
       font-size: 12px;
       padding: 4px 10px;
     }
-    /* Highlight-target pulsing animation for interactive steps */
+    /* 交互步骤中高亮目标的脉冲动画 */
     @keyframes pulse-highlight {
       0%   { box-shadow: 0 0 0 0 rgba(74,163,255,0.6); }
       70%  { box-shadow: 0 0 0 12px rgba(74,163,255,0); }
@@ -720,7 +720,7 @@
       border-color: var(--brand) !important;
       pointer-events: auto !important;
     }
-    /* Instruction nudge for click-to-advance steps */
+    /* 点击推进步骤时的提示语 */
     .tutorial-nudge {
       display: flex;
       align-items: center;
@@ -766,7 +766,7 @@
       border-color: var(--brand); 
     }
 
-    /* ---- Auto-categorize toolbar & panel ---- */
+    /* ---- 自动分类工具栏与面板 ---- */
     .culling-toolbar {
       display: flex;
       align-items: center;
@@ -857,7 +857,7 @@
       50%       { box-shadow: 0 0 0 4px rgba(74,163,255,0.5); }
     }
 
-    /* Scene bulk actions (Verify / Accept All / Reject All) */
+    /* 场景批量操作（确认 / 全接受 / 全拒绝） */
     .scene-bulk-actions {
       display: flex;
       gap: 6px;
@@ -882,50 +882,50 @@
 </head>
 <body>
 
-  <!-- Top bar (merged) -->
+  <!-- 顶栏（合并布局） -->
   <div class="topbar">
     <div class="topbar-left">
-      <h1>Culling Assistant</h1>
-      <span class="folder-name" id="folderName">Loading…</span>
+      <h1>筛片助手</h1>
+      <span class="folder-name" id="folderName">加载中…</span>
     </div>
     <div class="topbar-center">
-      <kbd>Shift+Click</kbd> accept/reject &nbsp;·&nbsp;
-      Click <b>★</b> to rate &nbsp;·&nbsp;
-      <kbd>Drag</kbd> thumbnail to zoom preview (loads RAW)
+      <kbd>Shift+Click</kbd> 接受/拒绝 &nbsp;·&nbsp;
+      点击 <b>★</b> 评分 &nbsp;·&nbsp;
+      <kbd>拖动</kbd> 缩略图可放大预览（自动加载 RAW）
     </div>
     <div class="topbar-right" style="gap:8px">
       <span id="statsLabel"></span>
-      <button class="help-btn" id="helpBtn" title="Show tutorial">📖 Tutorial</button>
+      <button class="help-btn" id="helpBtn" title="显示教程">📖 教程</button>
     </div>
   </div>
 
-  <!-- Main layout -->
+  <!-- 主布局 -->
   <div class="main-layout">
-    <!-- Culling pane -->
+    <!-- 筛片面板 -->
     <div class="culling-pane">
-      <!-- Auto-categorize toolbar -->
+      <!-- 自动分类工具栏 -->
       <div class="culling-toolbar">
-        <button class="btn auto-cat-toggle-btn" id="autoCatToggle">⚙ Auto-Categorize ▾</button>
-        <span class="toolbar-label" id="autoCatSummary">Rated &gt; ★3 · Min 0 · Max ∞ · Unrated → Auto-Reject</span>
+        <button class="btn auto-cat-toggle-btn" id="autoCatToggle">⚙ 自动分类 ▾</button>
+        <span class="toolbar-label" id="autoCatSummary">评分 &gt; ★3 · 最少 0 · 最多 ∞ · 未评分 → 自动拒绝</span>
       </div>
-      <!-- Auto-categorize settings panel (hidden by default) -->
+      <!-- 自动分类设置面板（默认隐藏） -->
       <div class="auto-cat-panel hidden" id="autoCatPanel">
         <div class="slider-group">
-          <label for="qualityCutoffSlider">Accept if rated above</label>
+          <label for="qualityCutoffSlider">高于此评分则接受</label>
           <div class="slider-row">
             <input type="range" id="qualityCutoffSlider" min="0" max="5" value="3" step="1" />
             <span class="slider-val" id="qualityCutoffVal">★3</span>
           </div>
         </div>
         <div class="slider-group">
-          <label for="minPerSceneSlider">Min Accepted Per Scene</label>
+          <label for="minPerSceneSlider">每个场景至少接受</label>
           <div class="slider-row">
             <input type="range" id="minPerSceneSlider" min="0" max="5" value="0" step="1" />
             <span class="slider-val" id="minPerSceneVal">0</span>
           </div>
         </div>
         <div class="slider-group">
-          <label for="maxPerSceneSlider" title="0 = no cap">Max Accepted Per Scene</label>
+          <label for="maxPerSceneSlider" title="0 = 不设上限">每个场景最多接受</label>
           <div class="slider-row">
             <input type="range" id="maxPerSceneSlider" min="0" max="20" value="0" step="1" />
             <span class="slider-val" id="maxPerSceneVal">∞</span>
@@ -934,44 +934,44 @@
         <div class="slider-group unrated-group">
           <div class="slider-row">
             <select id="unratedDefaultSelect" class="btn" style="height:26px; padding:2px 8px; font-size:12px;">
-              <option value="reject" selected>Auto-Reject</option>
-              <option value="accept">Auto-Accept</option>
+              <option value="reject" selected>自动拒绝</option>
+              <option value="accept">自动接受</option>
             </select>
-            <label for="unratedDefaultSelect">unrated images</label>
+            <label for="unratedDefaultSelect">未评分图片</label>
           </div>
         </div>
         <div class="panel-actions">
-          <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current settings; manual Shift+Click decisions are preserved">↻ Re-apply</button>
-          <button class="btn danger" id="resetAutoBtn" title="Clear all manual assignments and re-apply from scratch">⚠ Reset</button>
+          <button class="btn primary" id="reapplyAutoBtn" title="按当前设置重新应用；手动 Shift+Click 决定会保留">↻ 重新应用</button>
+          <button class="btn danger" id="resetAutoBtn" title="清除所有手动分配并从头重新应用">⚠ 重置</button>
         </div>
       </div>
-      <!-- Column headers -->
+      <!-- 列标题 -->
       <div class="culling-header">
-        <div class="col-header accept">✓ Accept</div>
-        <div class="col-header reject">✗ Reject</div>
+        <div class="col-header accept">✓ 接受</div>
+        <div class="col-header reject">✗ 拒绝</div>
       </div>
       <div class="culling-scroll" id="cullingScroll">
-        <!-- Scene rows rendered here -->
+        <!-- 场景行渲染在这里 -->
       </div>
     </div>
 
-    <!-- Resize divider -->
-    <div class="resize-divider" id="resizeDivider" title="Drag to resize"></div>
+    <!-- 拖拽分隔条 -->
+    <div class="resize-divider" id="resizeDivider" title="拖动以调整大小"></div>
 
-    <!-- Preview pane -->
+    <!-- 预览面板 -->
     <div class="preview-pane">
       <div class="preview-header">
-        <h3>Preview</h3>
-        <label class="zoom-level-wrap" title="RAW preview zoom (Shift+Drag on thumbnail)">
-          <span>RAW Zoom</span>
+        <h3>预览</h3>
+        <label class="zoom-level-wrap" title="RAW 预览缩放（在缩略图上 Shift+拖动）">
+          <span>RAW 缩放</span>
           <input type="range" id="previewZoomSlider" min="2" max="10" value="5" step="1" />
           <span id="previewZoomLabel">5×</span>
         </label>
       </div>
       <div class="preview-img-box" id="previewExport">
-        <span class="muted">Hover an image…</span>
+        <span class="muted">将鼠标悬停在图片上…</span>
       </div>
-      <h3>Crop</h3>
+      <h3>裁切图</h3>
       <div class="preview-img-box" id="previewCrop">
         <span class="muted">—</span>
       </div>
@@ -979,42 +979,42 @@
     </div>
   </div>
 
-  <!-- Bottom action bar -->
+  <!-- 底部操作栏 -->
   <div class="bottom-bar">
-    <button class="btn icon-btn" id="cardZoomOut" title="Smaller cards">−</button>
-    <input type="range" id="cardZoomSlider" min="100" max="300" value="150" step="10" title="Card thumbnail size" />
-    <button class="btn icon-btn" id="cardZoomIn" title="Larger cards">+</button>
+    <button class="btn icon-btn" id="cardZoomOut" title="更小的卡片">−</button>
+    <input type="range" id="cardZoomSlider" min="100" max="300" value="150" step="10" title="卡片缩略图大小" />
+    <button class="btn icon-btn" id="cardZoomIn" title="更大的卡片">+</button>
     <div class="bar-sep"></div>
-    <span class="status" id="statusLabel">Loading…</span>
-    <button class="btn" id="undoBtn" disabled style="display:none">↩ Undo Move</button>
-    <button class="btn primary" id="doneCullingBtn" disabled>Done Culling, Proceed to Review</button>
+    <span class="status" id="statusLabel">加载中…</span>
+    <button class="btn" id="undoBtn" disabled style="display:none">↩ 撤销移动</button>
+    <button class="btn primary" id="doneCullingBtn" disabled>完成筛片，继续复查</button>
   </div>
 
-  <!-- Finish Culling dialog -->
+  <!-- 完成筛片对话框 -->
   <dialog id="confirmDlg">
 
-    <!-- ── View 1: Options ── -->
+    <!-- ── 视图 1：选项 ── -->
     <div id="dlgOptions">
       <div class="dlg-header">
         <span class="dlg-icon">&#x1F3C1;</span>
         <div>
-          <h2>Finish Culling</h2>
+          <h2>完成筛片</h2>
           <p class="dlg-subtitle" id="dlgSubtitle">—</p>
         </div>
       </div>
       <div class="dlg-divider"></div>
 
-      <p class="dlg-section-label">Choose export actions</p>
+      <p class="dlg-section-label">选择导出操作</p>
 
-      <!-- XMP option -->
+      <!-- XMP 选项 -->
       <div class="dlg-option-card" id="xmpOptionCard">
         <label class="dlg-option-label">
           <input type="checkbox" id="doXmpCheck" />
           <span class="dlg-option-icon">&#x1F4DD;</span>
           <div class="dlg-option-body">
-            <b>Write XMP Sidecar Files</b>
-            <span>Writes a <code>.xmp</code> sidecar file next to each original. Embeds your star rating and Accept / Reject label so you can import directly into Lightroom, Capture One, or any XMP-aware application.<br>
-            <a class="dlg-help-link" id="xmpHelpLink">&#x2753; Issues reading metadata in your photo editor?</a></span>
+            <b>写入 XMP 旁车文件</b>
+            <span>在每个原始文件旁写入一个 <code>.xmp</code> 旁车文件。它会包含你的星级评分和接受/拒绝标签，方便直接导入 Lightroom、Capture One 或其他支持 XMP 的应用。<br>
+            <a class="dlg-help-link" id="xmpHelpLink">&#x2753; 你的照片编辑器读取元数据有问题？</a></span>
           </div>
         </label>
       </div>
@@ -1023,25 +1023,25 @@
           <input type="checkbox" id="doAutoLabelCheck" checked />
           <span class="dlg-option-icon">&#x1F3F7;&#xFE0F;</span>
           <div class="dlg-option-body">
-            <b>Write auto-categorized Accept/Reject decisions to XMP labels</b>
-            <span>When enabled, images given Accept or Reject by auto rules also receive Green/Red XMP color labels.</span>
+            <b>将自动分类的接受/拒绝决定写入 XMP 标签</b>
+            <span>启用后，被自动规则判定为接受或拒绝的图片也会得到绿色/红色 XMP 颜色标签。</span>
           </div>
         </label>
       </div>
-      <!-- XMP early-access note (shown when checked) -->
+      <!-- XMP 抢先体验说明（勾选时显示） -->
       <div class="dlg-xmp-note" id="xmpNote">
-        &#x26A0; <b>Write XMP files <em>before</em> importing into your photo editor.</b> Once a program like Lightroom or Capture One has imported a photo, it typically ignores new sidecar files and manages metadata in its own catalogue instead. Write XMP first, then import, for best results.
-        <br>Kestrel will not overwrite XMP files generated by other software without your permission.
+        &#x26A0; <b>请在导入照片编辑器 <em>之前</em> 写入 XMP 文件。</b> 一旦 Lightroom 或 Capture One 之类的程序已经导入照片，它们通常会忽略后续新增的旁车文件，而改由自己的目录管理元数据。最佳做法是先写入 XMP，再导入。
+        <br>未经你的允许，Kestrel 不会覆盖其他软件生成的 XMP 文件。
       </div>
 
-      <!-- Move option -->
+      <!-- 移动文件选项 -->
       <div class="dlg-option-card" id="moveOptionCard">
         <label class="dlg-option-label">
           <input type="checkbox" id="doMoveCheck" checked />
           <span class="dlg-option-icon">&#x1F4C1;</span>
           <div class="dlg-option-body">
-            <b>Move Rejects to Folder</b>
-            <span id="moveCardDesc">Moves rejected files into <code>_KESTREL_Rejects/</code>. A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.</span>
+            <b>将拒绝项移动到文件夹</b>
+            <span id="moveCardDesc">把被拒绝的文件移动到 <code>_KESTREL_Rejects/</code>。系统会自动备份 <code>kestrel_database.csv</code>。此步骤可撤销。</span>
           </div>
         </label>
       </div>
@@ -1050,80 +1050,79 @@
           <input type="checkbox" id="doPromoteVerifiedCheck" />
           <span class="dlg-option-icon">&#x2705;</span>
           <div class="dlg-option-body">
-            <b>Confirm auto-categorized decisions</b>
-            <span>Marks all auto-assigned Accept/Reject decisions as <em>Confirmed</em>. Confirmed decisions appear in the filmstrip and scene view just like manual ones, but can still be reset via Folder Options.</span>
+            <b>确认自动分类决定</b>
+            <span>将所有自动分配的接受/拒绝决定标记为 <em>已确认</em>。已确认的决定会像手动决定一样显示在胶片条和场景视图中，但仍可通过文件夹选项重置。</span>
           </div>
         </label>
       </div>
 
       <div class="actions">
-        <button class="btn" id="confirmCancel">Cancel</button>
-        <button class="btn primary" id="confirmOk">Execute &#x2713;</button>
+        <button class="btn" id="confirmCancel">取消</button>
+        <button class="btn primary" id="confirmOk">执行 &#x2713;</button>
       </div>
     </div>
 
-    <!-- ── View 2: XMP Conflict Prompt ── -->
+    <!-- ── 视图 2：XMP 冲突提示 ── -->
     <div id="dlgXmpConflict" class="hidden">
       <div class="dlg-header">
         <span class="dlg-icon">&#x26A0;&#xFE0F;</span>
         <div>
-          <h2>External XMP Files Detected</h2>
-          <p class="dlg-subtitle">Some sidecar files were not created by Kestrel.</p>
+          <h2>检测到外部 XMP 文件</h2>
+          <p class="dlg-subtitle">部分旁车文件并非由 Kestrel 创建。</p>
         </div>
       </div>
       <div class="dlg-divider"></div>
       <p style="padding:12px 22px 0;font-size:13px;line-height:1.6">
-        The following XMP files appear to have been generated by another program (such as Lightroom or darktable).
-        Overwriting them may interfere with metadata managed by that software.
+        以下 XMP 文件看起来是由其他程序（例如 Lightroom 或 darktable）生成的。
+        覆盖它们可能会干扰该软件所管理的元数据。
         <br><br>
-        <a class="dlg-help-link" id="xmpConflictHelpLink">&#x2753; How photo editors handle XMP sidecar metadata</a>
+        <a class="dlg-help-link" id="xmpConflictHelpLink">&#x2753; 照片编辑器如何处理 XMP 旁车元数据</a>
       </p>
       <ul class="conflict-file-list" id="conflictFileList"></ul>
       <div class="actions">
-        <button class="btn" id="conflictSkipBtn">Skip these files</button>
-        <button class="btn danger" id="conflictOverwriteBtn">Overwrite Anyway</button>
+        <button class="btn" id="conflictSkipBtn">跳过这些文件</button>
+        <button class="btn danger" id="conflictOverwriteBtn">仍然覆盖</button>
       </div>
     </div>
 
-    <!-- ── View 3: Progress ── -->
+    <!-- ── 视图 3：进度 ── -->
     <div id="dlgProgress" class="hidden">
       <div class="dlg-header">
         <span class="dlg-icon" id="dlgProgressIcon">&#x23F3;</span>
         <div>
-          <h2 id="dlgProgressTitle">Working&hellip;</h2>
-          <p class="dlg-subtitle" id="dlgProgressSubtitle">Please wait.</p>
+          <h2 id="dlgProgressTitle">处理中&hellip;</h2>
+          <p class="dlg-subtitle" id="dlgProgressSubtitle">请稍候。</p>
         </div>
       </div>
       <div class="dlg-divider"></div>
       <ul class="dlg-steps" id="dlgStepsList"></ul>
       <div class="actions" id="dlgProgressActions" style="display:none">
-        <button class="btn primary" id="dlgDoneBtn">Close</button>
+        <button class="btn primary" id="dlgDoneBtn">关闭</button>
       </div>
     </div>
 
   </dialog>
 
-  <!-- Reset Manual Assignments confirmation dialog -->
+  <!-- 重置手动分配确认对话框 -->
   <dialog id="resetConfirmDlg">
     <div class="dlg-header">
       <span class="dlg-icon">&#x26A0;&#xFE0F;</span>
       <div>
-        <h2>Reset Manual Assignments?</h2>
-        <p class="dlg-subtitle">This cannot be undone.</p>
+        <h2>重置手动分配？</h2>
+        <p class="dlg-subtitle">此操作无法撤销。</p>
       </div>
     </div>
     <div class="dlg-divider"></div>
     <p style="padding:12px 22px 4px;font-size:13px;line-height:1.6">
-      This will clear all <b id="resetOverrideCount">your</b> manual Accept/Reject decisions and re-run
-      auto-categorize from scratch using the current slider settings.
+      这将清除你所有 <b id="resetOverrideCount">当前的</b> 手动接受/拒绝决定，并使用当前滑块设置从头重新执行自动分类。
     </p>
     <div class="actions">
-      <button class="btn" id="resetConfirmCancel">Cancel</button>
-      <button class="btn danger" id="resetConfirmOk">Reset Manual Assignments</button>
+      <button class="btn" id="resetConfirmCancel">取消</button>
+      <button class="btn danger" id="resetConfirmOk">重置手动分配</button>
     </div>
   </dialog>
 
-  <!-- Tutorial overlay -->
+  <!-- 教程遮罩层 -->
   <div id="tutorialOverlay">
     <div id="tutorialHighlight"></div>
     <div id="tutorialCard">
@@ -1133,26 +1132,31 @@
       <div class="tutorial-body" id="tutorialBody"></div>
       <div class="tutorial-nudge" id="tutorialNudge" style="display:none"></div>
       <div class="tutorial-actions">
-        <button class="btn tutorial-skip" id="tutorialSkip">Skip Tour</button>
-        <button class="btn" id="tutorialBack">&larr; Back</button>
-        <button class="btn primary" id="tutorialNext">Next &rarr;</button>
+        <button class="btn tutorial-skip" id="tutorialSkip">跳过教程</button>
+        <button class="btn" id="tutorialBack">&larr; 上一步</button>
+        <button class="btn primary" id="tutorialNext">下一步 &rarr;</button>
       </div>
     </div>
   </div>
 
-  <!-- Toast -->
+  <!-- Toast 通知 -->
   <div class="toast" id="toast"></div>
 
+  <script src="i18n.js"></script>
+  <script src="taxonomy.js"></script>
   <script>
     // ====================================================================
-    // Culling Assistant — Project Kestrel
+    // Project Kestrel 筛片助手
     // ====================================================================
 
-    // ---- Helpers ----
+    // ---- 辅助函数 ----
     function el(sel) { return document.querySelector(sel); }
+    function tr(key, vars) { return window.KestrelI18n?.t ? window.KestrelI18n.t(key, vars) : key; }
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function parseNumber(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : -1; }
     function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
+    function speciesDisplayName(name) { return window.KestrelTaxonomy?.speciesDisplayName ? window.KestrelTaxonomy.speciesDisplayName(name) : String(name || ''); }
+    function familyDisplayName(name) { return window.KestrelTaxonomy?.familyDisplayName ? window.KestrelTaxonomy.familyDisplayName(name) : String(name || ''); }
 
     let toastTimer = null;
     function showToast(msg, ms = 3000) {
@@ -1163,7 +1167,7 @@
       toastTimer = setTimeout(() => t.classList.remove('show'), ms);
     }
 
-    // ---- State ----
+    // ---- 状态 ----
     let rootPath = '';
     let rows = [];
     let header = [];
@@ -1177,17 +1181,17 @@
     let moveCompleted = false;
 
 
-    // ---- URL param ----
+    // ---- URL 参数 ----
     function getUrlParam(name) {
       const u = new URL(window.location.href);
       return u.searchParams.get(name) || '';
     }
 
-    // ---- Wait for pywebview ----
+    // ---- 等待 pywebview ----
     function waitForPywebview(timeout = 5000) {
       return new Promise((resolve) => {
         const checkApi = () => {
-          // Check for both the api object AND a known method
+          // 同时检查 api 对象和一个已知方法
           if (window.pywebview?.api && typeof window.pywebview.api.read_kestrel_csv === 'function') {
             resolve(true);
             return true;
@@ -1209,10 +1213,10 @@
       });
     }
 
-    // ---- Image loading ----
+    // ---- 图片加载 ----
     async function getBlobUrl(relPath, root) {
       if (!relPath) return '';
-      // Normalize path separators (convert backslashes to forward slashes on macOS)
+      // 统一路径分隔符（在 macOS 上把反斜杠改成正斜杠）
       relPath = relPath.replace(/\\/g, '/');
       const key = `${root}:${relPath}`;
       if (blobUrlCache.has(key)) return blobUrlCache.get(key);
@@ -1228,7 +1232,7 @@
       return '';
     }
 
-    // Lazy-load images via IntersectionObserver
+    // 使用 IntersectionObserver 懒加载图片
     const _lazyObserver = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) {
@@ -1248,23 +1252,23 @@
       _lazyObserver.observe(img);
     }
 
-    // ---- Rating helpers ----
+    // ---- 评分辅助函数 ----
     function getRating(row) {
       const fn = row?.filename || '';
 
-      // 1) Manual ratings from scenedata
+      // 1) 来自 scenedata 的手动评分
       if (fn && _scenedata?.image_ratings && Object.prototype.hasOwnProperty.call(_scenedata.image_ratings, fn)) {
         const n = parseInt(_scenedata.image_ratings[fn], 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
 
-      // 2) Auto ratings returned by apply_normalization (runtime only)
+      // 2) 由 apply_normalization 返回的自动评分（仅运行期）
       if (fn && _normalizedRatings && Object.prototype.hasOwnProperty.call(_normalizedRatings, fn)) {
         const n = parseInt(_normalizedRatings[fn], 10);
         return Number.isFinite(n) ? Math.max(0, Math.min(5, n)) : 0;
       }
 
-      // 3) Legacy CSV fallback
+      // 3) 旧版 CSV 回退
       const norm = parseInt(row?.normalized_rating, 10);
       if (Number.isFinite(norm)) return Math.max(0, Math.min(5, norm));
       const raw = parseInt(row?.rating, 10);
@@ -1286,11 +1290,11 @@
       const fn = row?.filename || '';
       if (!fn) return;
 
-      // Keep legacy row fields in-memory only for compatibility with existing UI code.
+      // 旧版行字段仅保留在内存中，用于兼容现有 UI 代码。
       row.rating = String(n);
       row.rating_origin = origin;
 
-      // Persist manual overrides in scenedata only.
+      // 手动覆盖只持久化到 scenedata。
       if (!_scenedata.image_ratings) _scenedata.image_ratings = {};
       if (n > 0) _scenedata.image_ratings[fn] = n;
       else delete _scenedata.image_ratings[fn];
@@ -1300,7 +1304,7 @@
       const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
       const raw = String(row?.culled_origin || '').toLowerCase();
       if (raw === 'manual' || raw === 'auto' || raw === 'verified') return raw;
-      // Compatibility: legacy rows with cull status but no origin should be treated as user assignments.
+      // 兼容逻辑：旧数据中有筛片状态但没有来源时，视为用户手动分配。
       if (status) return 'manual';
       return '';
     }
@@ -1319,7 +1323,7 @@
       return state === 'accept' || state === 'reject';
     }
     function needsRatingAttention(row) {
-      // Unrated images that are already user-assigned are considered handled.
+      // 已由用户分配状态的未评分图片视为已处理。
       if (getRating(row) > 0) return false;
       if (isProtectedCull(row) && hasAnyCull(row)) return false;
       return true;
@@ -1341,7 +1345,7 @@
       scene.hasAnyUnrated = scene.images.some(r => needsRatingAttention(r));
     }
 
-    // Interactive star bar (DOM-based, matching visualizer.html pattern)
+    // 交互式星级条（基于 DOM，与 visualizer.html 的样式一致）
     function createStarBar(row) {
       const wrap = document.createElement('div');
       wrap.className = 'cull-stars';
@@ -1377,7 +1381,7 @@
       return wrap;
     }
 
-    // ---- CSV helpers ----
+    // ---- CSV 辅助函数 ----
     function csvEscape(v) {
       const s = String(v ?? '');
       if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
@@ -1394,7 +1398,7 @@
       return lines.join('\r\n');
     }
 
-    // ---- Ensure columns ----
+    // ---- 确保列存在 ----
     function ensureColumns() {
       _needsLegacyCullOriginUpgrade = false;
       if (!header.includes('scene_name')) header.push('scene_name');
@@ -1415,7 +1419,7 @@
       }
     }
 
-    // ---- Aggregate scenes ----
+    // ---- 聚合场景 ----
     function aggregateScenes() {
       const groups = new Map();
       for (const r of rows) {
@@ -1425,7 +1429,7 @@
       }
       const list = [];
       for (const [sceneId, arr] of groups) {
-        // representative by max quality
+        // 使用最高质量图片作为代表
         let rep = arr[0];
         for (const r of arr) if (parseNumber(r.quality) > parseNumber(rep.quality)) rep = r;
         const speciesSet = new Set();
@@ -1448,12 +1452,12 @@
           hasDetections,
         });
       }
-      // Sort by scene_count ascending (chronological)
+      // 按 scene_count 升序排序（时间顺序）
       list.sort((a, b) => parseInt(a.id, 10) - parseInt(b.id, 10));
       return list;
     }
 
-    // ---- Auto-categorize helpers ----
+    // ---- 自动分类辅助函数 ----
     function getSliderValues() {
       const cutoff  = parseInt(el('#qualityCutoffSlider')?.value ?? '3', 10);
       const minKeep = parseInt(el('#minPerSceneSlider')?.value  ?? '0', 10);
@@ -1472,11 +1476,11 @@
       if (qEl)   qEl.textContent   = '\u2605' + cutoff;
       if (minEl) minEl.textContent = String(minKeep);
       if (maxEl) maxEl.textContent = maxKeep === Infinity ? '\u221e' : String(maxKeep);
-      const unratedLabel = unratedDefault === 'accept' ? 'Auto-Accept' : 'Auto-Reject';
+      const unratedLabel = unratedDefault === 'accept' ? '自动接受' : '自动拒绝';
       const summary = el('#autoCatSummary');
       if (summary) summary.textContent =
-        `Rated > \u2605${cutoff} \u00b7 Min ${minKeep} \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep} \u00b7 Unrated \u2192 ${unratedLabel}`;
-      // Highlight Re-apply button when rules change (but not on initial page load)
+        `评分 > \u2605${cutoff} \u00b7 最少 ${minKeep} \u00b7 最多 ${maxKeep === Infinity ? '\u221e' : maxKeep} \u00b7 未评分 \u2192 ${unratedLabel}`;
+      // 规则变化时高亮“重新应用”按钮（首次加载页面时除外）
       if (!fromLoad && _autoRulesLoaded) {
         el('#reapplyAutoBtn')?.classList.add('needs-reapply');
       }
@@ -1485,13 +1489,13 @@
     function applyAutoCategorize(preserveManual = true) {
       const { cutoff, minKeep, maxKeep, unratedDefault } = getSliderValues();
       for (const scene of scenes) {
-        // Sort by rating desc, then quality score desc
+        // 先按评分降序，再按质量分降序
         const sorted = scene.images.slice().sort((a, b) => {
           const ra = getRating(a), rb = getRating(b);
           return rb !== ra ? rb - ra : parseNumber(b.quality) - parseNumber(a.quality);
         });
 
-        // Phase 1: quality cutoff — unrated images follow explicit default setting.
+        // 阶段 1：质量阈值筛选，未评分图片遵循显式默认设置。
         const qualityAcceptSet = new Set(
           sorted.filter(r => {
             const rt = getRating(r);
@@ -1501,7 +1505,7 @@
                 .map(r => r.filename)
         );
 
-        // Phase 2: min-per-scene guarantee — promote top images if below minKeep
+        // 阶段 2：每个场景的最小保留保障，不足 minKeep 时提升最高优先级图片。
         let acceptCount = qualityAcceptSet.size;
         if (acceptCount < minKeep) {
           for (const r of sorted) {
@@ -1513,7 +1517,7 @@
           }
         }
 
-        // Phase 3: max-per-scene cap (min always wins: effective cap = max(maxKeep, minKeep))
+        // 阶段 3：每个场景的最大保留上限（最小值优先，实际取 max(maxKeep, minKeep)）。
         const effectiveCap = maxKeep === Infinity ? Infinity : Math.max(maxKeep, minKeep);
         const finalAccepts = new Set();
         let keptSoFar = 0;
@@ -1526,7 +1530,7 @@
           }
         }
 
-        // Write results (manual/confirmed culling decisions are preserved by default)
+        // 写回结果（默认保留手动/已确认的筛片决定）
         for (const r of scene.images) {
           if (preserveManual && isProtectedCull(r)) continue;
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
@@ -1535,7 +1539,7 @@
       }
     }
 
-    // ---- Initialize culling state ----
+    // ---- 初始化筛片状态 ----
     function initCullingState() {
       cullingState.clear();
       for (const r of rows) {
@@ -1547,18 +1551,18 @@
           cullingState.delete(r.filename);
         }
       }
-      // Always backfill non-protected images so assistant columns include untouched rows too.
+      // 始终为未受保护的图片补齐状态，确保助手列也包含尚未处理的行。
       applyAutoCategorize(true);
     }
 
-    // ---- Swap image between accept/reject ----
+    // ---- 在接受/拒绝之间切换图片 ----
     function swapImage(row) {
       const current = cullingState.get(row.filename) || 'accept';
       const newState = current === 'accept' ? 'reject' : 'accept';
       setCullState(row, newState, 'manual');
     }
 
-    // ---- Wire a column element as a drag-and-drop target ----
+    // ---- 把列元素接成拖放目标 ----
     function wireColDropZone(colEl, targetState) {
       colEl.addEventListener('dragover', (ev) => {
         ev.preventDefault();
@@ -1583,7 +1587,7 @@
       });
     }
 
-    // ---- Verify all unrated images in a scene (promote current auto state to manual) ----
+    // ---- 确认场景中所有未评分图片（将当前自动状态提升为手动状态） ----
     function verifyUnratedInScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
@@ -1602,7 +1606,7 @@
       return verified;
     }
 
-    // ---- Accept all images in a scene ----
+    // ---- 接受场景中的全部图片 ----
     function acceptAllInScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
@@ -1614,7 +1618,7 @@
       debouncedSave();
     }
 
-    // ---- Reject all images in a scene ----
+    // ---- 拒绝场景中的全部图片 ----
     function rejectAllInScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
@@ -1626,10 +1630,10 @@
       debouncedSave();
     }
 
-    // ---- Build an image card ----
+    // ---- 构建图片卡片 ----
     function buildImageCard(row) {
       const rating = getRating(row);
-      // Only show yellow unrated style if unrated AND not already manually/confirmed culled
+      // 仅当图片未评分且未被手动/确认筛片时，显示黄色未评分样式
       const isUnrated = rating === 0 && !isProtectedCull(row);
       const side = cullingState.get(row.filename) || 'accept';
       const card = document.createElement('div');
@@ -1656,14 +1660,14 @@
       info.appendChild(createStarBar(row));
       card.appendChild(info);
 
-      // Drag card to other column to swap
+      // 将卡片拖到另一列以切换状态
       card.draggable = true;
       card.addEventListener('dragstart', (ev) => {
         ev.dataTransfer.effectAllowed = 'move';
         ev.dataTransfer.setData('text/plain', row.filename);
       });
 
-      // Shift+click to swap Accept/Reject
+      // Shift + 点击切换接受/拒绝
       card.addEventListener('click', (ev) => {
         if (ev.shiftKey) {
           ev.preventDefault();
@@ -1674,13 +1678,13 @@
         }
       });
 
-      // Hover: update preview
+      // 悬停时更新预览
       card.addEventListener('mouseenter', () => updatePreview(row));
 
       return card;
     }
 
-    // ---- Render a single scene row ----
+    // ---- 渲染单个场景行 ----
     function renderScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
@@ -1704,7 +1708,7 @@
       if (rejectCol) { rejectCol.innerHTML = ''; rejects.forEach(r => rejectCol.appendChild(buildImageCard(r))); }
     }
 
-    // ---- Render all scenes ----
+    // ---- 渲染全部场景 ----
     function renderAllScenes() {
       const container = el('#cullingScroll');
       container.innerHTML = '';
@@ -1716,23 +1720,23 @@
         row.id = `scene-row-${scene.id}`;
         if (scene.allUnrated) row.classList.add('unrated');
 
-        // Scene label
+        // 场景标签
         const label = document.createElement('div');
         label.className = 'scene-label';
-        const speciesText = scene.species.length ? scene.species.join(', ') : 'Unknown';
-        label.innerHTML = `<b>Scene #${escapeHtml(scene.id)}</b>` +
+        const speciesText = scene.species.length ? scene.species.map(speciesDisplayName).join(', ') : '未知';
+        label.innerHTML = `<b>场景 #${escapeHtml(scene.id)}</b>` +
           (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
-          ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
-          `<span class="unrated-badge scene-unrated-badge ${scene.hasAnyUnrated ? '' : 'hidden'}">⚠ Contains unrated photos</span>`;
+          ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} 张图片</span>` +
+          `<span class="unrated-badge scene-unrated-badge ${scene.hasAnyUnrated ? '' : 'hidden'}">⚠ 包含未评分照片</span>`;
         
-        // Add bulk action buttons
+        // 添加批量操作按钮
         const bulkActionsDiv = document.createElement('div');
         bulkActionsDiv.className = 'scene-bulk-actions';
 
         const verifyBtn = document.createElement('button');
         verifyBtn.className = `btn verify scene-verify-btn${scene.hasAnyUnrated ? '' : ' hidden'}`;
-        verifyBtn.textContent = '✦ Confirm Unrated';
-        verifyBtn.title = 'Manually confirm the current placement of all unrated images, dismissing the unrated warning and locking their accept/reject status';
+        verifyBtn.textContent = '✦ 确认未评分项';
+        verifyBtn.title = '手动确认当前所有未评分图片的位置，移除未评分警告并锁定它们的接受/拒绝状态';
         verifyBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           verifyUnratedInScene(scene.id);
@@ -1740,8 +1744,8 @@
         
         const acceptAllBtn = document.createElement('button');
         acceptAllBtn.className = 'btn primary';
-        acceptAllBtn.textContent = '✓ Accept All';
-        acceptAllBtn.title = 'Move all images in this scene to Accept';
+        acceptAllBtn.textContent = '✓ 全部接受';
+        acceptAllBtn.title = '将此场景中的所有图片移到“接受”列';
         acceptAllBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           acceptAllInScene(scene.id);
@@ -1749,8 +1753,8 @@
         
         const rejectAllBtn = document.createElement('button');
         rejectAllBtn.className = 'btn danger';
-        rejectAllBtn.textContent = '✗ Reject All';
-        rejectAllBtn.title = 'Move all images in this scene to Reject';
+        rejectAllBtn.textContent = '✗ 全部拒绝';
+        rejectAllBtn.title = '将此场景中的所有图片移到“拒绝”列';
         rejectAllBtn.addEventListener('click', (ev) => {
           ev.stopPropagation();
           rejectAllInScene(scene.id);
@@ -1762,7 +1766,7 @@
         label.appendChild(bulkActionsDiv);
         row.appendChild(label);
 
-        // Columns
+        // 列内容
         const cols = document.createElement('div');
         cols.className = 'scene-columns';
 
@@ -1791,13 +1795,13 @@
       }
     }
 
-    // ---- Update preview pane ----
+    // ---- 更新预览面板 ----
     async function updatePreview(row) {
       if (zoomActive) return; // don't interrupt an active zoom session
       previewRow = row;
-      // Export image
+      // 导出图
       const exportBox = el('#previewExport');
-      exportBox.innerHTML = '<span class="muted">Loading…</span>';
+      exportBox.innerHTML = '<span class="muted">加载中…</span>';
       const exportUrl = await getBlobUrl(row.export_path, rootPath);
       if (exportUrl) {
         exportBox.innerHTML = '';
@@ -1805,12 +1809,12 @@
         img.src = exportUrl;
         exportBox.appendChild(img);
       } else {
-        exportBox.innerHTML = '<span class="muted">No export image</span>';
+        exportBox.innerHTML = '<span class="muted">没有导出图</span>';
       }
 
-      // Crop image
+      // 裁切图
       const cropBox = el('#previewCrop');
-      cropBox.innerHTML = '<span class="muted">Loading…</span>';
+      cropBox.innerHTML = '<span class="muted">加载中…</span>';
       const cropUrl = await getBlobUrl(row.crop_path, rootPath);
       if (cropUrl) {
         cropBox.innerHTML = '';
@@ -1818,21 +1822,21 @@
         img.src = cropUrl;
         cropBox.appendChild(img);
       } else {
-        cropBox.innerHTML = '<span class="muted">No crop image</span>';
+        cropBox.innerHTML = '<span class="muted">没有裁切图</span>';
       }
 
-      // Metadata
+      // 元数据
       const side = cullingState.get(row.filename) || '—';
       const meta = el('#previewMeta');
       meta.innerHTML = `
-        <div class="row"><span class="label">Filename</span><span class="value" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
-        <div class="row"><span class="label">Species</span><span class="value">${escapeHtml(row.species || 'Unknown')} (${fmt3(row.species_confidence)})</span></div>
-        <div class="row"><span class="label">Quality</span><span class="value">${fmt3(row.quality)}</span></div>
-        <div class="row meta-rating-row"><span class="label">Rating</span></div>
-        <div class="row"><span class="label">Status</span><span class="value" style="color:${side==='accept' ? 'var(--ok)' : 'var(--bad)'}">${side === 'accept' ? '✓ Accept' : '✗ Reject'}</span></div>
-        <div class="row"><span class="label">Scene</span><span class="value">#${escapeHtml(String(row.scene_count || ''))}</span></div>
+        <div class="row"><span class="label">文件名</span><span class="value" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
+        <div class="row"><span class="label">物种</span><span class="value" title="${escapeHtml(row.species || '')}">${escapeHtml(speciesDisplayName(row.species || '未知'))} (${fmt3(row.species_confidence)})</span></div>
+        <div class="row"><span class="label">质量</span><span class="value">${fmt3(row.quality)}</span></div>
+        <div class="row meta-rating-row"><span class="label">评分</span></div>
+        <div class="row"><span class="label">状态</span><span class="value" style="color:${side==='accept' ? 'var(--ok)' : 'var(--bad)'}">${side === 'accept' ? '✓ 接受' : '✗ 拒绝'}</span></div>
+        <div class="row"><span class="label">场景</span><span class="value">#${escapeHtml(String(row.scene_count || ''))}</span></div>
       `;
-      // Insert interactive star bar into the rating row
+      // 在评分行中插入交互式星级条
       const ratingRow = meta.querySelector('.meta-rating-row');
       if (ratingRow) {
         const starWrap = createStarBar(row);
@@ -1841,51 +1845,51 @@
       }
     }
 
-    // ---- Stats ----
+    // ---- 统计 ----
     function updateStats() {
       let acceptCount = 0, rejectCount = 0;
       for (const [, side] of cullingState) {
         if (side === 'accept') acceptCount++;
         else rejectCount++;
       }
-      el('#statsLabel').textContent = `${acceptCount} accept · ${rejectCount} reject · ${rows.length} total`;
-      el('#statusLabel').textContent = `${acceptCount} images accepted, ${rejectCount} to reject`;
+      el('#statsLabel').textContent = `${acceptCount} 接受 · ${rejectCount} 拒绝 · 共 ${rows.length}`;
+      el('#statusLabel').textContent = `已接受 ${acceptCount} 张图片，待拒绝 ${rejectCount} 张`;
 
       const doneBtn = el('#doneCullingBtn');
       if (doneBtn) doneBtn.disabled = moveCompleted;
     }
 
-    // ---- Auto-save (debounced) ----
+    // ---- 自动保存（防抖） ----
     let saveTimer = null;
     function debouncedSave() {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => saveCullingState(), 1500);
     }
 
-    // ---- Clean up scenedata to remove rejected files and empty scenes ----
+    // ---- 清理 scenedata，移除被拒绝文件和空场景 ----
     function cleanupScenedataForRejects(rejectSet) {
       "Remove rejected images from scenedata and clean up empty scenes."
-      // Remove from image_ratings
+      // 从 image_ratings 中移除
       if (_scenedata && _scenedata.image_ratings) {
         for (const fn of rejectSet) {
           delete _scenedata.image_ratings[fn];
         }
       }
       
-      // Remove from scenes and clean up empty ones
+      // 从 scenes 中移除，并清理空场景
       if (_scenedata && _scenedata.scenes) {
         const scenesToRemove = [];
         for (const [sceneId, sceneData] of Object.entries(_scenedata.scenes)) {
           if (sceneData.images && Array.isArray(sceneData.images)) {
-            // Filter out rejected images from this scene
+            // 从该场景中过滤掉被拒绝的图片
             sceneData.images = sceneData.images.filter(f => !rejectSet.has(f));
-            // If scene has no images left, mark for removal
+            // 如果场景内已无图片，则标记待删除
             if (sceneData.images.length === 0) {
               scenesToRemove.push(sceneId);
             }
           }
         }
-        // Remove empty scenes
+        // 删除空场景
         for (const sceneId of scenesToRemove) {
           delete _scenedata.scenes[sceneId];
         }
@@ -1894,7 +1898,7 @@
 
     async function saveCullingState() {
       try {
-        // Filter out internal __ keys
+        // 过滤内部使用的 __ 键
         const exportCols = header.filter(c => !c.startsWith('__'));
         const content = rowsToCsvString(exportCols, rows);
         await window.pywebview.api.write_kestrel_csv(rootPath, content);
@@ -1906,10 +1910,10 @@
       }
     }
 
-    // ---- Show XMP conflict sub-view; resolves true (overwrite) or false (skip) ----
+    // ---- 显示 XMP 冲突子视图；返回 true（覆盖）或 false（跳过） ----
     function showXmpConflictPrompt(conflictFiles) {
       return new Promise((resolve) => {
-        // Populate list
+        // 填充列表
         const listEl = el('#conflictFileList');
         listEl.innerHTML = '';
         for (const fn of conflictFiles) {
@@ -1917,7 +1921,7 @@
           li.textContent = fn;
           listEl.appendChild(li);
         }
-        // Swap views
+        // 切换视图
         el('#dlgProgress').classList.add('hidden');
         el('#dlgXmpConflict').classList.remove('hidden');
 
@@ -1933,7 +1937,7 @@
       });
     }
 
-    // ---- Done Culling flow ----
+    // ---- 完成筛片流程 ----
     function onDoneCulling() {
       let acceptCount = 0, rejectCount = 0;
       for (const r of rows) {
@@ -1941,13 +1945,13 @@
         else acceptCount++;
       }
 
-      // Populate summary
-      el('#dlgSubtitle').textContent = `${acceptCount} accepted \u00b7 ${rejectCount} to reject`;
+      // 填充摘要
+      el('#dlgSubtitle').textContent = `${acceptCount} 已接受 \u00b7 ${rejectCount} 待拒绝`;
       el('#moveCardDesc').innerHTML =
-        `Moves <b>${rejectCount}</b> rejected file${rejectCount === 1 ? '' : 's'} into <code>_KESTREL_Rejects/</code>. ` +
-        `A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.`;
+        `将 <b>${rejectCount}</b> 个被拒绝的文件移动到 <code>_KESTREL_Rejects/</code>。` +
+        `系统会自动备份 <code>kestrel_database.csv</code>，此步骤可以撤销。`;
 
-      // Reset to options view
+      // 重置为选项视图
       el('#dlgOptions').classList.remove('hidden');
       el('#dlgProgress').classList.add('hidden');
       el('#dlgProgressActions').style.display = 'none';
@@ -1963,7 +1967,7 @@
       if (btn) btn.disabled = !any;
       const autoLabel = el('#doAutoLabelCheck');
       const autoLabelCard = el('#xmpAutoLabelCard');
-      // Auto-label sub-option only makes sense when writing XMP; Confirm is independent
+      // 自动标注子选项只在写入 XMP 时有意义；确认操作独立存在
       if (autoLabel) autoLabel.disabled = !xmpChecked;
       if (autoLabelCard) autoLabelCard.classList.toggle('hidden', !xmpChecked);
     }
@@ -1980,7 +1984,7 @@
       return promoted;
     }
 
-    // ---- Execute selected actions ----
+    // ---- 执行已选操作 ----
     async function executeActions() {
       const doXmp  = el('#doXmpCheck')?.checked  || false;
       const doMove = el('#doMoveCheck')?.checked || false;
@@ -1988,20 +1992,20 @@
       const doPromoteVerified = !!el('#doPromoteVerifiedCheck')?.checked;
       if (!doXmp && !doMove && !doPromoteVerified) return;
 
-      // Switch to progress view
+      // 切换到进度视图
       el('#dlgOptions').classList.add('hidden');
       el('#dlgProgress').classList.remove('hidden');
       el('#dlgProgressIcon').textContent = '\u23F3';
-      el('#dlgProgressTitle').textContent = 'Working\u2026';
-      el('#dlgProgressSubtitle').textContent = 'Please wait.';
+      el('#dlgProgressTitle').textContent = '处理中\u2026';
+      el('#dlgProgressSubtitle').textContent = '请稍候。';
 
-      // Build ordered step list
+      // 构建有序步骤列表
       const stepDefs = [
-        { id: 'promote', label: 'Confirming auto-categorized decisions',  cond: doPromoteVerified },
-        { id: 'save',   label: 'Saving database',                    always: true },
-        { id: 'backup', label: 'Backing up kestrel_database.csv',    cond: doMove },
-        { id: 'xmp',    label: 'Writing XMP sidecar files',          cond: doXmp  },
-        { id: 'move',   label: 'Moving rejects to _KESTREL_Rejects', cond: doMove },
+        { id: 'promote', label: '确认自动分类决定',  cond: doPromoteVerified },
+        { id: 'save',   label: '保存数据库',                    always: true },
+        { id: 'backup', label: '备份 kestrel_database.csv',    cond: doMove },
+        { id: 'xmp',    label: '写入 XMP 旁车文件',          cond: doXmp  },
+        { id: 'move',   label: '将拒绝项移动到 _KESTREL_Rejects', cond: doMove },
       ];
       const stepsEl = el('#dlgStepsList');
       stepsEl.innerHTML = '';
@@ -2026,29 +2030,29 @@
       }
 
       el('#doneCullingBtn').disabled = true;
-      el('#statusLabel').textContent = 'Processing\u2026';
+      el('#statusLabel').textContent = '处理中\u2026';
 
       let anyFailed = false;
       try {
-        // 1. Optional confirm auto-categorizations
+        // 1. 可选：确认自动分类结果
         if (doPromoteVerified) {
           setStep('promote', 'running');
           const promoted = promoteAutoToVerified();
-          setStep('promote', 'done', `${promoted} image${promoted === 1 ? '' : 's'} confirmed`);
+          setStep('promote', 'done', `已确认 ${promoted} 张图片`);
         }
 
-        // 2. Save
+        // 2. 保存
         setStep('save', 'running');
         await saveCullingState();
         setStep('save', 'done');
 
-        // 3. Backup (only if moving)
+        // 3. 备份（仅在移动文件时）
         if (doMove) {
           setStep('backup', 'running');
           const backupRes = await window.pywebview.api.backup_kestrel_db(rootPath);
           if (!backupRes.success) {
             setStep('backup', 'failed', backupRes.error || '');
-            throw new Error('Backup failed: ' + (backupRes.error || ''));
+            throw new Error('备份失败：' + (backupRes.error || ''));
           }
           setStep('backup', 'done');
         }
@@ -2060,46 +2064,46 @@
             filename: r.filename,
             rating: getRating(r),
             culled: cullingState.get(r.filename) || r.culled || '',
-            species: r.species || '',
-            family: r.family || '',
+            species: speciesDisplayName(r.species || ''),
+            family: familyDisplayName(r.family || ''),
             quality: r.quality != null ? r.quality : null,
             culled_origin: getCullOrigin(r),
           }));
 
-          // First pass: detect conflicts (existing non-Kestrel XMPs)
+          // 第一轮：检测冲突（已有非 Kestrel 生成的 XMP）
           const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false, doAutoLabels);
           if (!firstXmpRes.success) {
             setStep('xmp', 'failed', firstXmpRes.error || '');
             anyFailed = true;
           } else if (firstXmpRes.skipped_conflicts && firstXmpRes.skipped_conflicts.length > 0) {
-            // Pause and ask the user about conflicts
-            setStep('xmp', 'pending', `${firstXmpRes.skipped_conflicts.length} conflict${firstXmpRes.skipped_conflicts.length === 1 ? '' : 's'} detected`);
+            // 暂停并向用户询问如何处理冲突
+            setStep('xmp', 'pending', `检测到 ${firstXmpRes.skipped_conflicts.length} 个冲突`);
             const overwriteExternal = await showXmpConflictPrompt(firstXmpRes.skipped_conflicts);
-            // Resume progress view
+            // 恢复进度视图
             el('#dlgXmpConflict').classList.add('hidden');
             el('#dlgProgress').classList.remove('hidden');
             setStep('xmp', 'running');
             if (overwriteExternal) {
-              // Second pass: overwrite the conflicting files too
+              // 第二轮：连同冲突文件一并覆盖
               const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true, doAutoLabels);
               if (!secondXmpRes.success) {
                 setStep('xmp', 'failed', secondXmpRes.error || '');
                 anyFailed = true;
               } else {
-                setStep('xmp', 'done', `${secondXmpRes.written} file${secondXmpRes.written === 1 ? '' : 's'} written`);
+              setStep('xmp', 'done', `已写入 ${secondXmpRes.written} 个文件`);
               }
             } else {
-              // User chose to skip conflicts; count only what was written in the first pass
+              // 用户选择跳过冲突；仅统计第一轮已写入的文件
               const written = firstXmpRes.written || 0;
               const skipped = firstXmpRes.skipped_conflicts.length;
-              setStep('xmp', 'done', `${written} written, ${skipped} skipped`);
+              setStep('xmp', 'done', `已写入 ${written} 个，跳过 ${skipped} 个`);
             }
           } else {
-            setStep('xmp', 'done', `${firstXmpRes.written} file${firstXmpRes.written === 1 ? '' : 's'} written`);
+            setStep('xmp', 'done', `已写入 ${firstXmpRes.written} 个文件`);
           }
         }
 
-        // 5. Move
+        // 5. 移动文件
         let moveRes = null;
         if (doMove) {
           setStep('move', 'running');
@@ -2109,11 +2113,11 @@
           moveRes = await window.pywebview.api.move_rejects_to_folder(rootPath, rejectFilenames);
           if (!moveRes.success) {
             setStep('move', 'failed', moveRes.error || '');
-            throw new Error('Move failed: ' + (moveRes.error || ''));
+            throw new Error('移动失败：' + (moveRes.error || ''));
           }
-          setStep('move', 'done', `${moveRes.moved} file${moveRes.moved === 1 ? '' : 's'} moved`);
+          setStep('move', 'done', `已移动 ${moveRes.moved} 个文件`);
 
-          // Post-move: strip rejects from working data
+          // 移动完成后：从当前工作数据中剔除拒绝项
           const rejectSet = new Set(rejectFilenames);
           rows = rows.filter(r => !rejectSet.has(r.filename));
           for (const fn of rejectSet) cullingState.delete(fn);
@@ -2131,76 +2135,76 @@
           renderAllScenes();
           updateStats();
           el('#statusLabel').textContent =
-            `Done! ${moveRes.moved} reject${moveRes.moved === 1 ? '' : 's'} moved. Click \u201cUndo Move\u201d to revert.`;
+            `完成！已移动 ${moveRes.moved} 个拒绝项。点击“撤销移动”即可恢复。`;
         } else {
           try { await window.pywebview.api.notify_main_window_refresh(); } catch (_) {}
-          el('#statusLabel').textContent = 'Done!';
+          el('#statusLabel').textContent = '完成！';
         }
 
-        // Finish UI
+        // 收尾 UI 状态
         el('#dlgProgressIcon').textContent = anyFailed ? '\u26A0\uFE0F' : '\u2705';
-        el('#dlgProgressTitle').textContent = anyFailed ? 'Completed with warnings' : 'Complete!';
+        el('#dlgProgressTitle').textContent = anyFailed ? '完成，但有警告' : '全部完成！';
         const parts = [];
-        if (doXmp && !anyFailed)  parts.push('XMP files written');
-        if (doXmp &&  anyFailed)  parts.push('XMP had errors \u2014 check above');
-        if (doMove) parts.push('Undo available via the bottom bar');
+        if (doXmp && !anyFailed)  parts.push('XMP 文件已写入');
+        if (doXmp &&  anyFailed)  parts.push('XMP 写入有错误，请查看上方信息');
+        if (doMove) parts.push('可通过底部工具栏撤销');
         el('#dlgProgressSubtitle').textContent = parts.join(' \u00b7 ');
         el('#dlgProgressActions').style.display = 'flex';
 
         if (moveRes && moveRes.errors && moveRes.errors.length > 0) {
           console.warn('Move errors:', moveRes.errors);
-          showToast(`${moveRes.errors.length} file(s) had move errors \u2014 check console`, 5000);
+          showToast(`${moveRes.errors.length} 个文件在移动时出错，请查看控制台`, 5000);
         }
 
       } catch (e) {
         console.error('executeActions error', e);
         el('#dlgProgressIcon').textContent = '\u274C';
-        el('#dlgProgressTitle').textContent = 'Error';
+        el('#dlgProgressTitle').textContent = '错误';
         el('#dlgProgressSubtitle').textContent = e.message;
         el('#dlgProgressActions').style.display = 'flex';
         el('#doneCullingBtn').disabled = false;
-        showToast('Error: ' + e.message, 6000);
+        showToast('错误：' + e.message, 6000);
       }
     }
 
     async function undoMove() {
-      el('#statusLabel').textContent = 'Undoing move…';
+      el('#statusLabel').textContent = '正在撤销移动…';
       el('#undoBtn').disabled = true;
       try {
-        // 1. Move files back
+        // 1. 将文件移回原处
         const undoRes = await window.pywebview.api.undo_reject_move(rootPath, rejectFilenames);
         if (!undoRes.success) {
-          showToast('Undo failed: ' + (undoRes.error || ''), 5000);
+          showToast('撤销失败：' + (undoRes.error || ''), 5000);
           el('#undoBtn').disabled = false;
           return;
         }
 
-        // 2. Restore backup CSV
+        // 2. 恢复备份 CSV
         const restoreRes = await window.pywebview.api.restore_kestrel_db_backup(rootPath);
         if (!restoreRes.success) {
-          showToast('CSV restore failed: ' + (restoreRes.error || ''), 5000);
+          showToast('CSV 恢复失败：' + (restoreRes.error || ''), 5000);
         }
 
-        // 3. Reload data from restored CSV
+        // 3. 从恢复后的 CSV 重新加载数据
         await loadData();
 
-        // 4. Notify main window
+        // 4. 通知主窗口
         try { await window.pywebview.api.notify_main_window_refresh(); } catch(_) {}
 
         moveCompleted = false;
         el('#undoBtn').style.display = 'none';
         el('#doneCullingBtn').disabled = false;
 
-        showToast(`Restored ${undoRes.restored} file${undoRes.restored===1?'':'s'}.`, 4000);
-        el('#statusLabel').textContent = 'Move undone. Continue culling or click Done Culling when ready.';
+        showToast(`已恢复 ${undoRes.restored} 个文件。`, 4000);
+        el('#statusLabel').textContent = '移动已撤销。你可以继续筛片，或在准备好后点击“完成筛片”。';
       } catch (e) {
         console.error('undoMove error', e);
-        showToast('Undo error: ' + e.message, 5000);
+        showToast('撤销出错：' + e.message, 5000);
         el('#undoBtn').disabled = false;
       }
     }
 
-    // ---- Load data ----
+    // ---- 加载数据 ----
     async function loadData() {
       console.log('[culling] loadData() starting...');
       console.log('[culling] window.pywebview:', window.pywebview);
@@ -2209,10 +2213,10 @@
       
       if (typeof window.pywebview?.api?.read_kestrel_csv !== 'function') {
         console.error('[culling] read_kestrel_csv is not available! Available properties:', Object.keys(window.pywebview?.api || {}));
-        throw new Error('read_kestrel_csv is not available on the API');
+        throw new Error('API 中没有可用的 read_kestrel_csv');
       }
 
-      // Compute runtime normalized ratings map (no CSV write)
+      // 计算运行期标准化评分映射（不写回 CSV）
       if (typeof window.pywebview?.api?.apply_normalization === 'function') {
         try {
           const normRes = await window.pywebview.api.apply_normalization(rootPath);
@@ -2224,7 +2228,7 @@
         _normalizedRatings = {};
       }
 
-      // Load scenedata for manual ratings
+      // 加载用于手动评分的 scenedata
       if (typeof window.pywebview?.api?.read_kestrel_scenedata === 'function') {
         try {
           const sdRes = await window.pywebview.api.read_kestrel_scenedata(rootPath);
@@ -2243,12 +2247,12 @@
       }
 
       const res = await window.pywebview.api.read_kestrel_csv(rootPath);
-      if (!res.success) throw new Error(res.error || 'Failed to read CSV');
+      if (!res.success) throw new Error(res.error || '读取 CSV 失败');
 
       const parsed = Papa.parse(res.data, { header: true, skipEmptyLines: true });
       header = parsed.meta.fields || [];
       rows = parsed.data || [];
-      // Stamp rootPath (no __folderSlot needed — single folder)
+      // 写入 rootPath（单文件夹模式下不需要 __folderSlot）
       for (const r of rows) r.__rootPath = rootPath;
       ensureColumns();
 
@@ -2259,7 +2263,7 @@
       if (_needsLegacyCullOriginUpgrade) {
         try {
           await saveCullingState();
-          showToast('Upgraded legacy cull origin metadata for compatibility.', 2500);
+          showToast('已升级旧版筛片来源元数据以保持兼容。', 2500);
         } catch (e) {
           console.warn('Legacy cull origin upgrade save failed', e);
         }
@@ -2267,7 +2271,7 @@
     }
 
     // ====================================================================
-    // Persistent zoom settings
+    // 持久化缩放设置
     // ====================================================================
     let _settingsSaveTimer = null;
 
@@ -2287,7 +2291,7 @@
           const lb = document.getElementById('previewZoomLabel');
           if (sl) { sl.value = rawZoom; if (lb) lb.textContent = rawZoom + '\u00d7'; }
         }
-        // Auto-categorize slider settings
+        // 自动分类滑块设置
         const qCutoff = parseInt(s.culling_quality_cutoff, 10);
         const minPS   = parseInt(s.culling_min_per_scene,  10);
         const maxPS   = parseInt(s.culling_max_per_scene,  10);
@@ -2319,7 +2323,7 @@
       }, 1200);
     }
 
-    // ---- Card size zoom slider ----
+    // ---- 卡片尺寸缩放滑块 ----
     (function setupCardZoom() {
       const slider = document.getElementById('cardZoomSlider');
       const zoomIn = document.getElementById('cardZoomIn');
@@ -2337,7 +2341,7 @@
       });
     })();
 
-    // ---- Resize divider between culling and preview pane ----
+    // ---- 筛片区与预览区之间的拖拽分隔条 ----
     (function setupResizeDivider() {
       const divider = document.getElementById('resizeDivider');
       const layout = document.querySelector('.main-layout');
@@ -2370,7 +2374,7 @@
       });
     })();
 
-    // ---- Preview zoom (click-drag on export preview image to pan/zoom) ----
+    // ---- 预览缩放（在导出预览图上点击拖拽进行平移/缩放） ----
     let zoomActive = false;
     let zoomRow = null;
     let previewRow = null;       // row currently shown in the preview pane
@@ -2381,8 +2385,8 @@
       return row.filename || '';
     }
 
-    // Wire click-drag zoom directly on the export preview image (right-side preview pane).
-    // Mousedown → enter zoom; drag → pan; scroll wheel → adjust level; mouseup → exit.
+    // 直接在导出预览图（右侧预览面板）上接入点击拖拽缩放。
+    // 按下鼠标进入缩放；拖拽平移；滚轮调整倍率；松开鼠标退出。
     (function setupPreviewDragZoom() {
       const exportBox = el('#previewExport');
       if (!exportBox) return;
@@ -2399,7 +2403,7 @@
         zoomRow = row;
         exportBox.classList.add('zoom-active');
 
-        // Upgrade to cached RAW if available, otherwise ensure image is present
+        // 若有缓存 RAW 则升级到高质量源，否则先确保已有图片可显示
         async function applyBestImage(clientX, clientY) {
           let img = exportBox.querySelector('img');
           const scale = getScale();
@@ -2428,7 +2432,7 @@
 
         applyBestImage(ev.clientX, ev.clientY);
 
-        // Kick off RAW loading
+        // 异步启动 RAW 加载
         const cacheKey = getRawPreviewKey(row);
         if (!rawCache.has(cacheKey) && !rawLoading.has(cacheKey)) loadRawAsync(row);
 
@@ -2468,7 +2472,7 @@
       });
     })();
 
-    // exitZoomMode: called by Escape key to abort an active zoom session
+    // exitZoomMode：由 Escape 键调用，用于中止当前缩放会话
     function exitZoomMode() {
       if (!zoomActive) return;
       zoomActive = false;
@@ -2479,7 +2483,7 @@
         const img = box.querySelector('img');
         if (img) { img.style.transform = ''; img.style.transformOrigin = ''; delete img.dataset.isRaw; }
       }
-      // Dispatch a synthetic mouseup so any active mousemove/mouseup window listeners clean up
+      // 触发一个合成 mouseup，让仍在监听的 mousemove/mouseup 逻辑完成清理
       window.dispatchEvent(new MouseEvent('mouseup'));
     }
 
@@ -2492,7 +2496,7 @@
         if (res && res.success && res.data) {
           const url = `data:image/jpeg;base64,${res.data}`;
           rawCache.set(cacheKey, url);
-          // If still zooming on this row, swap to the high-res source
+          // 如果当前行仍处于缩放状态，则切换到高分辨率图源
           if (zoomActive && zoomRow === row) {
             const img = el('#previewExport')?.querySelector('img');
             if (img) {
@@ -2510,7 +2514,7 @@
       }
     }
 
-    // Zoom slider live update while dragging
+    // 拖动时实时更新缩放滑块
     (function setupPreviewZoom() {
       const slider = document.getElementById('previewZoomSlider');
       const label = document.getElementById('previewZoomLabel');
@@ -2528,56 +2532,56 @@
     })();
 
     // ====================================================================
-    // Tutorial  (Interactive — some steps require user action)
+    // 教程（交互式，部分步骤需要用户操作）
     // ====================================================================
     const TUTORIAL_STEPS = [
       {
-        title: 'Welcome to the Culling Assistant',
-        body: "This assistant sorts your photos into <b>Accept</b> and <b>Reject</b> using rules you control. Tweak the rules, then use <kbd>Shift+Click</kbd> or drag to move individual photos, and hit <b>Done</b> when you’re finished.<br><br>Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
+        title: '欢迎使用筛片助手',
+        body: "这个助手会根据你设定的规则，把照片分到 <b>接受</b> 和 <b>拒绝</b> 两列。你可以调整规则，然后通过 <kbd>Shift+Click</kbd> 或拖拽来移动单张照片，完成后点击 <b>完成</b>。<br><br>点击 <b>下一步</b> 或按 <kbd>→</kbd> 前进，也可以点 <b>跳过教程</b> 直接开始。",
         target: null,
       },
       {
-        title: 'Photos Grouped by Scene',
-        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.<br><br>Any culling decisions you already made in Kestrel’s Scene View are carried over here.',
+        title: '按场景分组的照片',
+        body: '你的照片会按 <b>场景</b> 分组，也就是时间上相邻的连拍序列。Kestrel 的 AI 已经按质量评分为每个场景排序，因此最好的照片会排在前面。<br><br>你之前在 Kestrel 场景视图里做过的筛片决定，也会同步带到这里。',
         target: '#cullingScroll',
         position: 'right',
       },
       {
-        title: 'Accept &amp; Reject Columns',
-        body: 'Each scene has two columns: <span style="color:var(--ok)"><b>Accept</b></span> and <span style="color:var(--bad)"><b>Reject</b></span>. Images are assigned automatically when Kestrel loads — a <span style="color:var(--ok)">green</span> left border means Accept, <span style="color:var(--bad)">red</span> means Reject.',
+        title: '接受与拒绝两列',
+        body: '每个场景都有两列：<span style="color:var(--ok)"><b>接受</b></span> 和 <span style="color:var(--bad)"><b>拒绝</b></span>。Kestrel 加载时会自动分配图片；左侧边框为 <span style="color:var(--ok)">绿色</span> 表示接受，为 <span style="color:var(--bad)">红色</span> 表示拒绝。',
         target: '.culling-header',
         position: 'bottom',
       },
       {
-        title: 'Setting the Rules',
-        body: 'The <b>Auto-Categorize</b> rules define how Kestrel sorts images into Accept and Reject. Set a quality cutoff, a minimum and maximum number to keep per scene, and what to do with unrated images.<br><br>When you change a setting, the <b>↻ Re-apply</b> button will pulse — click it to re-run the rules. Kestrel never overwrites your manual decisions.',
+        title: '设置规则',
+        body: '<b>自动分类</b> 规则决定 Kestrel 如何把图片分到接受和拒绝。你可以设置质量阈值、每个场景最少和最多保留多少张，以及如何处理未评分图片。<br><br>当你修改设置后，<b>↻ 重新应用</b> 按钮会闪动，点击即可重新执行规则。Kestrel 不会覆盖你的手动决定。',
         target: '#autoCatPanel',
         position: 'bottom',
         openAutoCat: true,
       },
       {
-        title: 'Hover to Preview',
-        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop.',
+        title: '悬停即可预览',
+        body: '将鼠标悬停在任意照片卡片上，右侧面板就会加载 <b>完整预览</b>。Kestrel 已经自动检测出照片中的鸟，并准备好了放大的裁切图。',
         target: '.scene-columns',
         position: 'right',
       },
       {
-        title: 'Preview Pane &amp; Zoom',
-        body: 'The preview pane shows the full export and a Kestrel bird crop. To zoom in, <b>click and hold anywhere on the preview image</b> then drag to pan. <b>Scroll the mouse wheel</b> while holding to adjust zoom level. Release to return to normal view. If RAW files are available, Kestrel loads the full-resolution original automatically.',
+        title: '预览面板与缩放',
+        body: '预览面板会显示完整导出图以及 Kestrel 生成的鸟体裁切图。要放大查看，请在预览图上 <b>按住鼠标</b> 并拖动平移；按住时再 <b>滚动鼠标滚轮</b> 可以调整缩放级别。松开后会回到普通视图。如果存在 RAW 文件，Kestrel 会自动加载全分辨率原图。',
         target: '.preview-pane',
         position: 'left',
       },
       {
-        title: 'Moving Photos',
-        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. You can also <b>drag a card</b> directly from one column to the other.<br><br>All changes are <b>auto-saved as you go</b>.',
-        nudge: 'Try Shift+Clicking a photo now!',
+        title: '移动照片',
+        body: '<kbd>Shift+Click</kbd> 任意照片卡片，可在“接受”和“拒绝”之间切换。你也可以直接 <b>拖拽卡片</b>，把它从一列移动到另一列。<br><br>所有更改都会 <b>自动保存</b>。',
+        nudge: '现在试着 Shift+点击一张照片！',
         target: '.scene-columns',
         position: 'right',
         waitFor: 'shiftClick',
       },
       {
-        title: 'Done Culling',
-        body: 'When you’re ready, click <b>“Done Culling, Proceed to Review”</b>. You can write <b>XMP sidecar files</b> (Accept/Reject label for Lightroom, Capture One, etc.), <b>move rejects to a subfolder</b>, or both.<br><br><b>Kestrel never deletes your original photos</b> — they are always safe.',
+        title: '完成筛片',
+        body: '准备好后，点击 <b>“完成筛片，继续复查”</b>。你可以选择写入 <b>XMP 旁车文件</b>（供 Lightroom、Capture One 等识别接受/拒绝标签），也可以 <b>把拒绝项移动到子文件夹</b>，或者两者都做。<br><br><b>Kestrel 永远不会删除你的原始照片</b>，它们始终是安全的。',
         target: '#doneCullingBtn',
         position: 'top',
       },
@@ -2643,12 +2647,12 @@
       var nudge    = el('#tutorialNudge');
       var nextBtn  = el('#tutorialNext');
 
-      // Update text
-      el('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + TUTORIAL_STEPS.length;
+      // 更新文案
+      el('#tutorialCounter').textContent = '步骤 ' + (idx + 1) + ' / ' + TUTORIAL_STEPS.length;
       el('#tutorialTitle').innerHTML = step.title;
       el('#tutorialBody').innerHTML  = step.body;
 
-      // Nudge (click-to-advance hint)
+      // 提示语（点击后继续）
       if (step.nudge) {
         nudge.textContent = step.nudge;
         nudge.style.display = '';
@@ -2656,7 +2660,7 @@
         nudge.style.display = 'none';
       }
 
-      // Dots
+      // 圆点指示器
       var dotsCont = el('#tutorialProgress');
       dotsCont.innerHTML = '';
       TUTORIAL_STEPS.forEach(function(_, i) {
@@ -2665,24 +2669,24 @@
         dotsCont.appendChild(d);
       });
 
-      // Back / Next labels
+      // 上一步 / 下一步按钮文案
       el('#tutorialBack').disabled = (idx === 0);
       var isLast = (idx === TUTORIAL_STEPS.length - 1);
-      nextBtn.textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
+      nextBtn.textContent = isLast ? '完成 \u2713' : '下一步 \u2192';
 
-      // If this step uses waitFor, hide the Next button until the action completes
+      // 如果当前步骤使用 waitFor，则在动作完成前隐藏“下一步”按钮
       var hasWaitFor = !!step.waitFor;
       nextBtn.style.display = hasWaitFor ? 'none' : '';
 
-      // Step-specific side effects: open the auto-categorize panel if needed.
-      // Track whether it was just opened so we can defer layout measurement.
+      // 步骤专属副作用：按需打开自动分类面板。
+      // 记录是否刚刚打开，以便延后布局测量。
       var needsLayoutDefer = false;
       if (step.openAutoCat) {
         var autoCatPanel = el('#autoCatPanel');
         var autoCatToggle = el('#autoCatToggle');
         if (autoCatPanel && autoCatPanel.classList.contains('hidden')) {
           autoCatPanel.classList.remove('hidden');
-          if (autoCatToggle) autoCatToggle.textContent = '\u2699 Auto-Categorize \u25b4';
+          if (autoCatToggle) autoCatToggle.textContent = '\u2699 自动分类 \u25b4';
           needsLayoutDefer = true;
         }
       }
@@ -2691,7 +2695,7 @@
         var target = step.target ? document.querySelector(step.target) : null;
 
         if (!target) {
-          // Center-screen card, full backdrop
+          // 卡片居中显示，带完整遮罩
           hl.style.display = 'none';
           overlay.classList.add('has-backdrop');
           card.style.transform = 'translate(-50%, -50%)';
@@ -2702,7 +2706,7 @@
           overlay.classList.remove('has-backdrop');
           card.style.transform = '';
 
-          // Pulsing highlight on target
+          // 对目标元素应用脉冲高亮
           target.classList.add('highlight-target');
 
           var pad = 6;
@@ -2712,7 +2716,7 @@
           hl.style.width  = (r.width  + pad * 2) + 'px';
           hl.style.height = (r.height + pad * 2) + 'px';
 
-          // Position card near target
+          // 将卡片定位到目标附近
           var pos    = step.position || 'right';
           var margin = 18;
           var vw     = window.innerWidth;
@@ -2731,13 +2735,13 @@
         }
       } // end _positionCard
 
-      // Defer layout measurement by one frame if the panel was just opened (size was 0 before)
+      // 如果面板刚打开，则将布局测量延后一帧（此前尺寸可能还是 0）
       if (needsLayoutDefer) requestAnimationFrame(_positionCard); else _positionCard();
 
-      // ---- Set up interactive waitFor listeners ----
+      // ---- 设置交互式 waitFor 监听器 ----
       if (hasWaitFor && step.waitFor === 'hoverCard') {
-        // Wait for user to hover over any cull-card.
-        // Use a fired flag to prevent multiple rapid mouseenter events from multi-advancing.
+        // 等待用户悬停到任意筛片卡片上。
+        // 使用 fired 标记，避免连续 mouseenter 导致多次推进。
         var _hoverFired = false;
         var hoverHandler = function(ev) {
           if (_hoverFired) return;
@@ -2751,7 +2755,7 @@
         _tutCleanupFn = function() { document.removeEventListener('mouseenter', hoverHandler, true); };
       }
       else if (hasWaitFor && step.waitFor === 'shiftClick') {
-        // Wait for user to Shift+Click a cull-card
+        // 等待用户对筛片卡片执行 Shift + 点击
         var shiftHandler = function(ev) {
           if (ev.shiftKey) {
             var cardEl = ev.target.closest('.cull-card');
@@ -2764,7 +2768,7 @@
         _tutCleanupFn = function() { document.removeEventListener('click', shiftHandler, true); };
       }
       else if (hasWaitFor && step.waitFor === 'clickStar') {
-        // Wait for user to click a star
+        // 等待用户点击星级
         var starHandler = function(ev) {
           var starEl = ev.target.closest('.star, .stars span');
           if (starEl) {
@@ -2776,11 +2780,11 @@
       }
     }
 
-    // ---- Init ----
+    // ---- 初始化 ----
     async function init() {
       rootPath = decodeURIComponent(getUrlParam('root'));
       if (!rootPath) {
-        el('#statusLabel').textContent = 'Error: no folder specified';
+        el('#statusLabel').textContent = '错误：未指定文件夹';
         return;
       }
 
@@ -2789,27 +2793,28 @@
 
       const ready = await waitForPywebview();
       if (!ready) {
-        el('#statusLabel').textContent = 'Error: pywebview API not available';
+        el('#statusLabel').textContent = '错误：pywebview API 不可用';
         return;
       }
 
+      try { await window.KestrelTaxonomy?.load?.(); } catch (_) {}
       updateSliderLabels(); // apply defaults before settings load
       await loadCullingSettings();
 
       try {
         await loadData();
         el('#doneCullingBtn').disabled = false;
-        el('#statusLabel').textContent = 'Ready \u2014 Drag images to zoom (auto-loads RAW), Shift+Click to decide, Click \u2605 to rate';
+        el('#statusLabel').textContent = '就绪 —— 拖动图片以缩放（自动加载 RAW），Shift+Click 做决定，点击 ★ 评分';
 
-        // Auto-launch tutorial on first run
+        // 首次运行时自动启动教程
         const seen = await checkTutorialSeen();
         if (!seen) setTimeout(function() { startTutorial(0); }, 600);
       } catch (e) {
         console.error('init error', e);
-        el('#statusLabel').textContent = 'Error loading data: ' + e.message;
+        el('#statusLabel').textContent = '加载数据出错：' + e.message;
       }
 
-      // On window close/unload, clean up the culling_TMP cache
+      // 在窗口关闭/卸载时清理 culling_TMP 缓存
       window.addEventListener('beforeunload', async () => {
         try {
           await window.pywebview.api.cleanup_culling_cache(rootPath);
@@ -2819,14 +2824,14 @@
       });
     }
 
-    // ---- Wire up buttons ----
+    // ---- 绑定按钮事件 ----
     el('#doneCullingBtn').addEventListener('click', onDoneCulling);
     el('#confirmOk').addEventListener('click', executeActions);
     el('#confirmCancel').addEventListener('click', () => el('#confirmDlg').close());
     el('#undoBtn').addEventListener('click', undoMove);
     el('#helpBtn').addEventListener('click', () => startTutorial(0));
     el('#dlgDoneBtn').addEventListener('click', () => el('#confirmDlg').close());
-    // Help links open the metadata help article
+    // 帮助链接会打开元数据帮助文档
     const METADATA_HELP_URL = 'https://projectkestrel.org/help/metadata-help';
     el('#xmpHelpLink').addEventListener('click', () => {
       try { window.pywebview.api.open_url(METADATA_HELP_URL); } catch(_) { window.open(METADATA_HELP_URL, '_blank'); }
@@ -2835,7 +2840,7 @@
       try { window.pywebview.api.open_url(METADATA_HELP_URL); } catch(_) { window.open(METADATA_HELP_URL, '_blank'); }
     });
 
-    // XMP checkbox shows/hides early-access note; both checkboxes update execute button state
+    // XMP 复选框控制抢先体验说明显示；两个复选框都会更新执行按钮状态
     el('#doXmpCheck').addEventListener('change', () => {
       el('#xmpNote').classList.toggle('visible', el('#doXmpCheck').checked);
       _updateExecuteBtn();
@@ -2844,11 +2849,11 @@
     el('#doPromoteVerifiedCheck').addEventListener('change', _updateExecuteBtn);
     el('#doMoveCheck').addEventListener('change', _updateExecuteBtn);
 
-    // Auto-categorize panel controls
+    // 自动分类面板控件
     el('#autoCatToggle').addEventListener('click', () => {
       const panel = el('#autoCatPanel');
       const nowHidden = panel.classList.toggle('hidden');
-      el('#autoCatToggle').textContent = nowHidden ? '\u2699 Auto-Categorize \u25be' : '\u2699 Auto-Categorize \u25b4';
+      el('#autoCatToggle').textContent = nowHidden ? '\u2699 自动分类 \u25be' : '\u2699 自动分类 \u25b4';
     });
     el('#reapplyAutoBtn').addEventListener('click', () => {
       el('#reapplyAutoBtn').classList.remove('needs-reapply');
@@ -2856,15 +2861,15 @@
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize re-applied \u2014 manual and confirmed decisions preserved', 3000);
+      showToast('已重新应用自动分类，手动和已确认的决定已保留', 3000);
     });
     el('#resetAutoBtn').addEventListener('click', () => {
-      // Show confirmation dialog with override count
+      // 弹出确认对话框，并显示将覆盖的数量
       const overrideCount = rows.filter(r => getCullOrigin(r) === 'manual').length;
       const countEl = el('#resetOverrideCount');
       if (countEl) countEl.textContent = overrideCount > 0
-        ? `${overrideCount} manual assignment${overrideCount === 1 ? '' : 's'}`
-        : 'any manual';
+        ? `${overrideCount} 个手动分配`
+        : '任意手动分配';
       el('#resetConfirmDlg').showModal();
     });
     el('#resetConfirmCancel').addEventListener('click', () => el('#resetConfirmDlg').close());
@@ -2881,9 +2886,9 @@
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize reset \u2014 manual decisions cleared', 3000);
+      showToast('自动分类已重置，手动决定已清除', 3000);
     });
-    // Slider/select live label updates
+    // 滑块 / 下拉框的实时标签更新
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {
       const sl = el('#' + id);
       if (sl) sl.addEventListener('input', () => { updateSliderLabels(); saveCullingSettings(); });
@@ -2893,7 +2898,7 @@
     el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
     el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
     el('#tutorialSkip').addEventListener('click', _closeTutorial);
-    // Keyboard navigation inside tutorial; Escape also exits zoom mode
+    // 教程内的键盘导航；Escape 也会退出缩放模式
     document.addEventListener('keydown', function(ev) {
       if (ev.key === 'Escape' && zoomActive) { exitZoomMode(); return; }
       if (!el('#tutorialOverlay').classList.contains('active')) return;
@@ -2907,7 +2912,7 @@
       else if (ev.key === 'Escape') _closeTutorial();
     });
 
-    // ---- Start ----
+    // ---- 启动 ----
     init();
   </script>
 </body>

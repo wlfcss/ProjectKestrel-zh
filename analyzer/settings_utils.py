@@ -1,4 +1,4 @@
-"""Persisted settings I/O and general utility functions for the Kestrel visualizer."""
+"""Kestrel 可视化界面的设置持久化与通用工具函数。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 
 SETTINGS_FILENAME = 'settings.json'
 
-# Telemetry — failsafe import (never blocks startup)
+# 遥测模块，导入失败也不能阻塞启动
 try:
     import kestrel_telemetry as _telemetry
 except ImportError:
@@ -19,7 +19,7 @@ except ImportError:
 
 
 def _get_user_data_dir() -> str:
-    # Use a unified application folder name for Project Kestrel
+    # 为 Project Kestrel 统一使用固定的应用数据目录名
     if sys.platform.startswith('win'):
         base = os.environ.get('LOCALAPPDATA') or os.environ.get('APPDATA') or os.path.expanduser('~')
         return os.path.join(base, 'ProjectKestrel')
@@ -49,7 +49,7 @@ def save_persisted_settings(data: dict) -> None:
     if not isinstance(data, dict):
         raise ValueError('Settings payload must be an object')
         
-    # --- Flush pending analytics on consent ---
+    # --- 用户同意后，补发此前暂存的分析遥测 ---
     if data.get('analytics_consent_shown', False) and 'pending_analytics' in data:
         pending = data.pop('pending_analytics')
         if data.get('analytics_opted_in', False) and _telemetry is not None:
@@ -58,13 +58,13 @@ def save_persisted_settings(data: dict) -> None:
                 log('[analytics] Flushed pending detailed analytics after opt-in.')
             except Exception as e:
                 log(f'[analytics] Failed to flush pending analytics: {e}')
-    # ------------------------------------------
+    # --------------------------------------
 
     path = _get_settings_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'
     try:
-        # Remove any stale .tmp from a previous crash (Windows can't replace a locked file)
+        # 清理上次异常退出遗留的 .tmp 文件（Windows 下无法替换被锁定的文件）
         try:
             os.remove(tmp)
         except FileNotFoundError:
@@ -73,7 +73,7 @@ def save_persisted_settings(data: dict) -> None:
             json.dump(data, f, indent=2, sort_keys=True)
         os.replace(tmp, path)
     except OSError:
-        # Fallback: write directly — non-atomic but safe for settings
+        # 回退方案：直接写入；虽然不是原子操作，但对设置文件足够安全
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, sort_keys=True)

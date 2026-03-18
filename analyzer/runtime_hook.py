@@ -29,14 +29,14 @@ if sys.platform == 'win32' and getattr(sys, 'frozen', False):
     _debug(f"frozen=True platform=win32 base_path={base_path}")
     _dump_tree(base_path, max_depth=2)
 
-    # Add base path to DLL search
+    # 将基础目录加入 DLL 搜索路径
     os.add_dll_directory(base_path)
     
-    # Prepend to PATH
+    # 同时把基础目录放到 PATH 最前面
     path_env = os.environ.get('PATH', '')
     os.environ['PATH'] = base_path + os.pathsep + path_env
 
-    # Preload MSVC runtime
+    # 预加载 MSVC 运行时
     msvc_dlls = ['msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll']
     for dll in msvc_dlls:
         dll_path = os.path.join(base_path, dll)

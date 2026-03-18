@@ -9,7 +9,7 @@ from PyInstaller.utils.hooks import collect_all
 # See if sample_sets exists
 print(os.listdir("sample_sets"))
 # Build datas list with proper sample_sets bundling using Tree()
-datas = [('models', 'models'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('visualizer.css', '.'), ('visualizer.js', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.'), ('settings_utils.py', '.'), ('editor_launch.py', '.'), ('queue_manager.py', '.'), ('api_bridge.py', '.')]
+datas = [('models', 'models'), ('kestrel_telemetry.py', '.'), ('folder_inspector.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('visualizer.css', '.'), ('visualizer.js', '.'), ('i18n.js', '.'), ('taxonomy.js', '.'), ('taxonomy_zh_cn.json', '.'), ('papaparse.local.js', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.'), ('settings_utils.py', '.'), ('editor_launch.py', '.'), ('queue_manager.py', '.'), ('api_bridge.py', '.')]
 
 # Add sample_sets using Tree() - convert 3-element tuples to 2-element format for datas
 sample_sets_tree = Tree('sample_sets', prefix='sample_sets')
