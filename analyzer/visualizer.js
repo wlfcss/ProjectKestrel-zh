@@ -2310,7 +2310,7 @@
         case 'Z':
           e.preventDefault();
           if (images[currentImageIndex]) {
-            setCullStatus(images[currentImageIndex], 'reject');
+            setCullStatus(images[currentImageIndex], 'accept');
             _refreshCurrentFilmstripCard();
           }
           break;
@@ -2326,7 +2326,7 @@
         case 'C':
           e.preventDefault();
           if (images[currentImageIndex]) {
-            setCullStatus(images[currentImageIndex], 'accept');
+            setCullStatus(images[currentImageIndex], 'reject');
             _refreshCurrentFilmstripCard();
           }
           break;
