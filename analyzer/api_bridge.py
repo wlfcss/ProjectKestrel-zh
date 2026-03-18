@@ -220,7 +220,7 @@ class Api:
         Returns:
             dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str, 'root': str
         """
-        print(f"[API] read_kestrel_csv() called with folder_path: {folder_path}", flush=True)
+        
         try:
             # Normalize path: remove trailing separators to ensure reliable basename detection
             folder_path = folder_path.strip()
@@ -230,26 +230,23 @@ class Api:
             if not folder_path:
                 raise ValueError("Empty folder path")
             
-            print(f"[API] Normalized folder_path: {folder_path}", flush=True)
             
             # Determine if this IS the .kestrel folder or contains one
             folder_name = os.path.basename(folder_path)
-            print(f"[API] Folder name: '{folder_name}'", flush=True)
             
             is_kestrel_folder = (folder_name == '.kestrel')
-            print(f"[API] Is .kestrel folder: {is_kestrel_folder}", flush=True)
             
             if is_kestrel_folder:
                 csv_path = os.path.join(folder_path, 'kestrel_database.csv')
                 parent_folder = os.path.dirname(folder_path)
-                print(f"[API] Selected .kestrel folder directly. Parent: {parent_folder}", flush=True)
+                
             else:
                 csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
                 parent_folder = folder_path
-                print(f"[API] Selected parent folder. Will look for .kestrel subfolder.", flush=True)
+                
             
             if not os.path.exists(csv_path):
-                print(f"[API] read_kestrel_csv() -> CSV not found at: {csv_path}", flush=True)
+                
                 return {
                     'success': False,
                     'error': f'Could not find kestrel_database.csv at: {csv_path}',
@@ -260,7 +257,7 @@ class Api:
             with open(csv_path, 'r', encoding='utf-8') as f:
                 data = f.read()
             
-            print(f"[API] read_kestrel_csv() -> Success: Read {len(data)} bytes from {csv_path}", flush=True)
+            
             return {
                 'success': True,
                 'data': data,
@@ -668,7 +665,7 @@ class Api:
                 str(row['filename']): _get_rating(row['quality'])
                 for _, row in df.iterrows()
             }
-            print(f'[API] apply_normalization({folder_path!r}, profile={profile!r}) -> {len(normalized_map)} ratings computed (no CSV write)', flush=True)
+            
             return {
                 'success': True,
                 'normalized_ratings': normalized_map,
@@ -695,7 +692,7 @@ class Api:
 
             if not os.path.exists(scenedata_path):
                 # Return an empty-but-valid structure; the UI will fall back to scene_count grouping
-                print(f'[API] read_kestrel_scenedata({folder_path!r}) -> not found, returning empty', flush=True)
+                
                 return {'success': True, 'data': {'version': '2.0', 'image_ratings': {}, 'scenes': {}}, 'error': ''}
 
             with open(scenedata_path, 'r', encoding='utf-8') as f:
@@ -704,7 +701,7 @@ class Api:
             data.setdefault('version', '2.0')
             data.setdefault('image_ratings', {})
             data.setdefault('scenes', {})
-            print(f'[API] read_kestrel_scenedata({folder_path!r}) -> {len(data["scenes"])} scenes', flush=True)
+            
             return {'success': True, 'data': data, 'error': ''}
         except Exception as e:
             print(f'[API] read_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
