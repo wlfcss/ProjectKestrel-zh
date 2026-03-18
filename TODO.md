@@ -97,14 +97,18 @@ Whats working
 * refresh behavior keeps refreshing when paused.
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024) - fixed
 
-# Next version changelog
-* new scene view + changes to accept/reject workflow
-* fixed bugs with grouping algo
-* fixed bugs with quality algo
-* brand new filmstrip view for scene
-* changes to how accepting and rejecting images is handled by kestrel in parity with ratings
-* several UI improvements and bug fixes
-
--todo: make quality algo still more generous by default
--more keyboard shortcuts
--patch tutorial to include latest workflow. 
+# Version Willow Ptarmigan Changelog
+* Major improvements to Kestrel User Interface! Kestrel now shows your scenes in a filmstrip style view, allowing you to rapidly relive your memories and select which ones to edit and share.
+    - New keyboard shortcuts let you rapidly flick through a scene and seamless advance to previous/next scenes.
+    - New accept/reject tagging system lets you make culling decisions from the scene visualizer
+    - Streamlined user interface maintains all functionality: rename the scene, edit tags, split the scene into multiple scenes, and view RAW previews.
+* Significant improvements to Kestrel's analysis pipeline
+    - New configurable rating system lets you customize how Kestrel assigns star ratings to your scenes.
+    - New exposure compensation algorithm improves analysis options
+    - Fixed bugs with Kestrel's scene grouping algorithm.
+* Other User Interface tweaks
+    - Consolidated buttons in the main GUI
+    - Updated in-app tutorials to thoroughly explain all new features and workflows
+    - Improvements to how Kestrel writes metadata to align more consistently with visuals.
+    - Tweaks to simplify language around metadata and culling categories.
+    - Improved handling of auto-generated ratings and auto-generated culling decisions to enhance consistency and decouple the two features.
