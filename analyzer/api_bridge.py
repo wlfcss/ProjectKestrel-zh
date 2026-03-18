@@ -1110,8 +1110,55 @@ class Api:
             log(f'[culling] Traceback: {traceback.format_exc()}')
             return {'success': False, 'error': str(e)}
 
+    def _find_sidecar_file(self, root_path: str, filename: str, ext: str = '.xmp'):
+        """Find sidecar file with given extension for an image file.
+        
+        Returns the filename (not path) if found, None otherwise.
+        Searches in the same directory as the image.
+        """
+        sidecar_path = os.path.join(root_path, filename + ext)
+        if os.path.exists(sidecar_path):
+            return filename + ext
+        return None
+
+    def _move_file_with_sidecars(self, root_path: str, filename: str, reject_dir: str):
+        """Move a file and its sidecar files (.xmp) to reject directory.
+        
+        Returns (success: bool, moved_files: list[str])
+        """
+        moved_files = []
+        errors = []
+        
+        # Move main file
+        src = os.path.join(root_path, filename)
+        dst = os.path.join(reject_dir, filename)
+        try:
+            if os.path.exists(src):
+                shutil.move(src, dst)
+                moved_files.append(filename)
+            else:
+                errors.append(f'{filename}: file not found')
+        except Exception as e:
+            errors.append(f'{filename}: {e}')
+            return False, moved_files
+        
+        # Move XMP sidecar if it exists
+        xmp_sidecar = self._find_sidecar_file(root_path, filename, '.xmp')
+        if xmp_sidecar:
+            xmp_src = os.path.join(root_path, xmp_sidecar)
+            xmp_dst = os.path.join(reject_dir, xmp_sidecar)
+            try:
+                if os.path.exists(xmp_src):
+                    shutil.move(xmp_src, xmp_dst)
+                    moved_files.append(xmp_sidecar)
+            except Exception as e:
+                # Log warning but don't fail the main move if XMP fails
+                log(f'  Warning: Failed to move {xmp_sidecar}: {e}')
+        
+        return True, moved_files
+
     def move_rejects_to_folder(self, root_path: str, filenames):
-        """Move original photo files into _KESTREL_Rejects subfolder."""
+        """Move original photo files and their XMP sidecars into _KESTREL_Rejects subfolder."""
         try:
             if not root_path or not os.path.isdir(root_path):
                 return {'success': False, 'error': 'Invalid root path'}
@@ -1120,17 +1167,12 @@ class Api:
             moved = []
             errors = []
             for fn in (filenames or []):
-                src = os.path.join(root_path, fn)
-                dst = os.path.join(reject_dir, fn)
-                try:
-                    if os.path.exists(src):
-                        shutil.move(src, dst)
-                        moved.append(fn)
-                    else:
-                        errors.append(f'{fn}: file not found')
-                except Exception as e:
-                    errors.append(f'{fn}: {e}')
-            log(f'move_rejects: moved {len(moved)}, errors {len(errors)}')
+                success, moved_files = self._move_file_with_sidecars(root_path, fn, reject_dir)
+                if success:
+                    moved.extend(moved_files)
+                else:
+                    errors.append(f'{fn}: move failed')
+            log(f'move_rejects: moved {len(moved)} file(s) (including sidecars), errors {len(errors)}')
             return {'success': True, 'moved': len(moved), 'errors': errors, 'reject_folder': reject_dir}
         except Exception as e:
             log(f'move_rejects_to_folder error: {e}')
@@ -1143,60 +1185,114 @@ class Api:
         return _write_xmp_metadata(root_path, image_data, overwrite_external, use_auto_labels)
 
     def undo_reject_move(self, root_path: str, filenames):
-        """Move files back from _KESTREL_Rejects to the root folder."""
+        """Move files and their XMP sidecars back from _KESTREL_Rejects to the root folder."""
         try:
-            reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+            reject_dir = os.path.join(root_path, "_KESTREL_Rejects")
             if not os.path.isdir(reject_dir):
-                return {'success': False, 'error': '_KESTREL_Rejects folder not found'}
+                return {"success": False, "error": "_KESTREL_Rejects folder not found"}
             restored = []
             errors = []
             for fn in (filenames or []):
-                src = os.path.join(reject_dir, fn)
-                dst = os.path.join(root_path, fn)
-                try:
-                    if os.path.exists(src):
-                        shutil.move(src, dst)
-                        restored.append(fn)
-                    else:
-                        errors.append(f'{fn}: not found in rejects')
-                except Exception as e:
-                    errors.append(f'{fn}: {e}')
-            log(f'undo_reject_move: restored {len(restored)}, errors {len(errors)}')
-            return {'success': True, 'restored': len(restored), 'errors': errors}
+                success, restored_files = self._restore_file_with_sidecars(reject_dir, root_path, fn)
+                if success:
+                    restored.extend(restored_files)
+                else:
+                    errors.append(f"{fn}: not found in rejects")
+            log(f"undo_reject_move: restored {len(restored)} file(s) (including sidecars), errors {len(errors)}")
+            return {"success": True, "restored": len(restored), "errors": errors}
         except Exception as e:
-            log(f'undo_reject_move error: {e}')
-            return {'success': False, 'error': str(e)}
-
+            log(f"undo_reject_move error: {e}")
+            return {"success": False, "error": str(e)}
     def backup_kestrel_csv(self, root_path: str):
-        """Copy kestrel_database.csv to kestrel_database_old.csv as backup."""
+        """Copy kestrel_database.csv to kestrel_database_old.csv as backup.
+        
+        Deprecated: Use backup_kestrel_db instead for dual backup.
+        Kept for backward compatibility.
+        """
+        return self.backup_kestrel_db(root_path)
+
+    def backup_kestrel_db(self, root_path: str):
+        """Backup both kestrel_database.csv and kestrel_scenedata.json before major operations.
+        
+        Creates:
+        - .kestrel/kestrel_database_old.csv (from kestrel_database.csv)
+        - .kestrel/kestrel_scenedata_old.json (from kestrel_scenedata.json)
+        
+        Returns:
+            {"success": bool, "backup_csv": str, "backup_scenedata": str, "error": str}
+        """
         try:
-            kestrel_dir = os.path.join(root_path, '.kestrel')
-            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
+            kestrel_dir = os.path.join(root_path, ".kestrel")
+            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
+            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
+            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
+            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            
             if not os.path.exists(csv_path):
-                return {'success': False, 'error': 'kestrel_database.csv not found'}
-            shutil.copy2(csv_path, backup_path)
-            log(f'backup_kestrel_csv: backed up to {backup_path}')
-            return {'success': True, 'backup_path': backup_path}
+                return {"success": False, "error": "kestrel_database.csv not found", "backup_csv": "", "backup_scenedata": ""}
+            
+            # Backup CSV
+            shutil.copy2(csv_path, csv_backup)
+            log(f"backup_kestrel_db: CSV backed up to {csv_backup}")
+            
+            # Backup scenedata if it exists
+            scenedata_backed = False
+            if os.path.exists(scenedata_path):
+                shutil.copy2(scenedata_path, scenedata_backup)
+                scenedata_backed = True
+                log(f"backup_kestrel_db: Scenedata backed up to {scenedata_backup}")
+            
+            return {
+                "success": True,
+                "backup_csv": csv_backup,
+                "backup_scenedata": scenedata_backup if scenedata_backed else "",
+                "error": ""
+            }
         except Exception as e:
-            log(f'backup_kestrel_csv error: {e}')
-            return {'success': False, 'error': str(e)}
+            log(f"backup_kestrel_db error: {e}")
+            return {"success": False, "error": str(e), "backup_csv": "", "backup_scenedata": ""}
 
     def restore_kestrel_csv_backup(self, root_path: str):
-        """Restore kestrel_database_old.csv back to kestrel_database.csv."""
-        try:
-            kestrel_dir = os.path.join(root_path, '.kestrel')
-            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
-            if not os.path.exists(backup_path):
-                return {'success': False, 'error': 'kestrel_database_old.csv not found'}
-            shutil.copy2(backup_path, csv_path)
-            log(f'restore_kestrel_csv_backup: restored from {backup_path}')
-            return {'success': True}
-        except Exception as e:
-            log(f'restore_kestrel_csv_backup error: {e}')
-            return {'success': False, 'error': str(e)}
+        """Restore kestrel_database_old.csv back to kestrel_database.csv.
+        
+        Deprecated: Use restore_kestrel_db_backup instead for dual restore.
+        Kept for backward compatibility.
+        """
+        return self.restore_kestrel_db_backup(root_path)
 
+    def restore_kestrel_db_backup(self, root_path: str):
+        """Restore both kestrel_database.csv and kestrel_scenedata.json from backups.
+        
+        Restores from:
+        - .kestrel/kestrel_database_old.csv (to kestrel_database.csv)
+        - .kestrel/kestrel_scenedata_old.json (to kestrel_scenedata.json, if backup exists)
+        
+        Returns:
+            {"success": bool, "error": str}
+        """
+        try:
+            kestrel_dir = os.path.join(root_path, ".kestrel")
+            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
+            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
+            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
+            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            
+            if not os.path.exists(csv_backup):
+                return {"success": False, "error": "kestrel_database_old.csv not found"}
+            
+            # Restore CSV
+            shutil.copy2(csv_backup, csv_path)
+            log(f"restore_kestrel_db_backup: CSV restored from {csv_backup}")
+            
+            # Restore scenedata if backup exists
+            if os.path.exists(scenedata_backup):
+                shutil.copy2(scenedata_backup, scenedata_path)
+                log(f"restore_kestrel_db_backup: Scenedata restored from {scenedata_backup}")
+            
+            return {"success": True, "error": ""}
+        except Exception as e:
+            log(f"restore_kestrel_db_backup error: {e}")
+            return {"success": False, "error": str(e)}
     def open_reject_folder(self, root_path: str):
         """Open the _KESTREL_Rejects folder in the system file browser."""
         reject_dir = os.path.join(root_path, '_KESTREL_Rejects')

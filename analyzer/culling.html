@@ -1862,6 +1862,36 @@
       saveTimer = setTimeout(() => saveCullingState(), 1500);
     }
 
+    // ---- Clean up scenedata to remove rejected files and empty scenes ----
+    function cleanupScenedataForRejects(rejectSet) {
+      "Remove rejected images from scenedata and clean up empty scenes."
+      // Remove from image_ratings
+      if (_scenedata && _scenedata.image_ratings) {
+        for (const fn of rejectSet) {
+          delete _scenedata.image_ratings[fn];
+        }
+      }
+      
+      // Remove from scenes and clean up empty ones
+      if (_scenedata && _scenedata.scenes) {
+        const scenesToRemove = [];
+        for (const [sceneId, sceneData] of Object.entries(_scenedata.scenes)) {
+          if (sceneData.images && Array.isArray(sceneData.images)) {
+            // Filter out rejected images from this scene
+            sceneData.images = sceneData.images.filter(f => !rejectSet.has(f));
+            // If scene has no images left, mark for removal
+            if (sceneData.images.length === 0) {
+              scenesToRemove.push(sceneId);
+            }
+          }
+        }
+        // Remove empty scenes
+        for (const sceneId of scenesToRemove) {
+          delete _scenedata.scenes[sceneId];
+        }
+      }
+    }
+
     async function saveCullingState() {
       try {
         // Filter out internal __ keys
@@ -2015,7 +2045,7 @@
         // 3. Backup (only if moving)
         if (doMove) {
           setStep('backup', 'running');
-          const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
+          const backupRes = await window.pywebview.api.backup_kestrel_db(rootPath);
           if (!backupRes.success) {
             setStep('backup', 'failed', backupRes.error || '');
             throw new Error('Backup failed: ' + (backupRes.error || ''));
@@ -2087,6 +2117,7 @@
           const rejectSet = new Set(rejectFilenames);
           rows = rows.filter(r => !rejectSet.has(r.filename));
           for (const fn of rejectSet) cullingState.delete(fn);
+          cleanupScenedataForRejects(rejectSet);
           await saveCullingState();
 
           try { await window.pywebview.api.open_reject_folder(rootPath); } catch (_) {}
@@ -2145,7 +2176,7 @@
         }
 
         // 2. Restore backup CSV
-        const restoreRes = await window.pywebview.api.restore_kestrel_csv_backup(rootPath);
+        const restoreRes = await window.pywebview.api.restore_kestrel_db_backup(rootPath);
         if (!restoreRes.success) {
           showToast('CSV restore failed: ' + (restoreRes.error || ''), 5000);
         }
