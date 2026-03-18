@@ -1209,6 +1209,7 @@ class Api:
     def _restore_file_with_sidecars(self, reject_dir: str, root_path: str, filename: str):
         """Restore a file and its sidecar files (.xmp) from reject directory.
         
+        Checks multiple XMP naming conventions to ensure compatibility.
         Returns (success: bool, restored_files: list[str])
         """
         restored_files = []
@@ -1220,23 +1221,45 @@ class Api:
             if os.path.exists(src):
                 shutil.move(src, dst)
                 restored_files.append(filename)
+                log(f'undo_reject_move: Restored main file: {filename}')
             else:
+                log(f'undo_reject_move: Main file not found in rejects: {filename}')
                 return False, restored_files
         except Exception as e:
-            log(f'  Error restoring {filename}: {e}')
+            log(f'undo_reject_move: Error restoring {filename}: {e}')
             return False, restored_files
         
-        # Restore XMP sidecar if it exists
-        xmp_sidecar = filename + '.xmp'
-        xmp_src = os.path.join(reject_dir, xmp_sidecar)
-        xmp_dst = os.path.join(root_path, xmp_sidecar)
-        if os.path.exists(xmp_src):
+        # Restore XMP sidecar - check multiple naming conventions
+        xmp_sidecar = None
+        
+        # Check primary naming: filename + .xmp (e.g., IMG_001.CR3.xmp)
+        xmp_primary = filename + '.xmp'
+        xmp_src_primary = os.path.join(reject_dir, xmp_primary)
+        if os.path.exists(xmp_src_primary):
+            xmp_sidecar = xmp_primary
+            log(f'undo_reject_move: Found XMP with full name: {xmp_primary}')
+        else:
+            # Check secondary naming: name_without_ext + .xmp (e.g., IMG_001.xmp)
+            if '.' in filename:
+                base_name = filename.rsplit('.', 1)[0]
+                xmp_secondary = base_name + '.xmp'
+                xmp_src_secondary = os.path.join(reject_dir, xmp_secondary)
+                if os.path.exists(xmp_src_secondary):
+                    xmp_sidecar = xmp_secondary
+                    log(f'undo_reject_move: Found XMP with base name: {xmp_secondary}')
+        
+        if xmp_sidecar:
+            xmp_src = os.path.join(reject_dir, xmp_sidecar)
+            xmp_dst = os.path.join(root_path, xmp_sidecar)
             try:
                 shutil.move(xmp_src, xmp_dst)
                 restored_files.append(xmp_sidecar)
+                log(f'undo_reject_move: Restored XMP sidecar: {xmp_sidecar}')
             except Exception as e:
                 # Log warning but don't fail if XMP restore fails
-                log(f'  Warning: Failed to restore {xmp_sidecar}: {e}')
+                log(f'undo_reject_move: Warning - Failed to restore {xmp_sidecar}: {e}')
+        else:
+            log(f'undo_reject_move: No XMP sidecar found for: {filename}')
         
         return True, restored_files
 
