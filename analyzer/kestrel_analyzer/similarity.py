@@ -21,7 +21,7 @@ def compute_similarity_timestamp(path1, path2, threshold_seconds: float = 1.0):
 
 
 def compute_image_similarity_akaze(img1, img2, max_dim=1600):
-    if img1 is None or img2 is None:
+    if img1 is None or img2 is None or img1.shape != img2.shape:
         return {
             "feature_similarity": -1,
             "feature_confidence": -1,
@@ -82,69 +82,52 @@ def compute_image_similarity_akaze(img1, img2, max_dim=1600):
         akaze = cv2.AKAZE_create()
         kp1, des1 = akaze.detectAndCompute(gray1, None)
         kp2, des2 = akaze.detectAndCompute(gray2, None)
-        if des1 is not None and len(kp1) > 400:
-            kp1, des1 = zip(*sorted(zip(kp1, des1), key=lambda x: x[0].response, reverse=True)[:400])
+        if des1 is not None and len(kp1) > 300:
+            kp1, des1 = zip(*sorted(zip(kp1, des1), key=lambda x: x[0].response, reverse=True)[:300])
             kp1 = list(kp1)
             des1 = np.array(des1)
-        if des2 is not None and len(kp2) > 400:
-            kp2, des2 = zip(*sorted(zip(kp2, des2), key=lambda x: x[0].response, reverse=True)[:400])
+        if des2 is not None and len(kp2) > 300:
+            kp2, des2 = zip(*sorted(zip(kp2, des2), key=lambda x: x[0].response, reverse=True)[:300])
             kp2 = list(kp2)
             des2 = np.array(des2)
-        min_kp = min(len(kp1), len(kp2)) if kp1 and kp2 else 0
-        feature_confidence = clamp(min_kp / 240.0, 0.0, 1.0)
-        color_similarity, color_confidence = color_similarity_score(img1, img2)
+        feature_confidence = min(len(kp1), len(kp2)) / 300 if kp1 and kp2 else 0
+        if feature_confidence < 0.25 or des1 is None or des2 is None or len(kp1) == 0 or len(kp2) == 0:
+            color_similarity, color_confidence = color_similarity_score(img1, img2)
+            return {
+                "feature_similarity": 0,
+                "feature_confidence": 0,
+                "color_similarity": float(color_similarity),
+                "color_confidence": float(color_confidence),
+                "similar": bool(color_similarity >= 0.82),
+                "confidence": float(color_confidence),
+            }
 
-        feature_similarity = 0.0
-        if des1 is not None and des2 is not None and len(kp1) > 0 and len(kp2) > 0:
-            bf = cv2.BFMatcher(cv2.NORM_HAMMING)
-            matches = bf.knnMatch(des1, des2, k=2)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING)
+        matches = bf.knnMatch(des1, des2, k=2)
+        valid_pairs = [pair for pair in matches if len(pair) == 2]
+        if not valid_pairs:
+            color_similarity, color_confidence = color_similarity_score(img1, img2)
+            return {
+                "feature_similarity": 0,
+                "feature_confidence": 0,
+                "color_similarity": float(color_similarity),
+                "color_confidence": float(color_confidence),
+                "similar": bool(color_similarity >= 0.82),
+                "confidence": float(color_confidence),
+            }
 
-            ratio_thresh = 0.72 + 0.08 * (1.0 - feature_confidence)
-            good_matches = []
-            for pair in matches:
-                if len(pair) < 2:
-                    continue
-                m, n = pair
-                if m.distance < ratio_thresh * n.distance:
-                    good_matches.append(m)
-
-            denom = float(max(1, min_kp))
-            match_ratio = float(len(good_matches) / denom)
-
-            inlier_ratio = 0.0
-            if len(good_matches) >= 8:
-                src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-                dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-                _, inlier_mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 4.0)
-                if inlier_mask is not None and len(inlier_mask) > 0:
-                    inlier_ratio = float(np.sum(inlier_mask) / len(inlier_mask))
-
-            feature_similarity = 0.7 * match_ratio + 0.3 * inlier_ratio
-            feature_similarity = clamp(feature_similarity, 0.0, 1.0)
-
-        # Blend feature and color paths. Sparse-keypoint pairs rely more on color.
-        weight_feature = 0.2 + 0.65 * feature_confidence
-        weight_color = 1.0 - weight_feature
-        blended_score = weight_feature * feature_similarity + weight_color * color_similarity
-
-        # "Very high confidence on either path" override.
-        very_high_feature = feature_confidence >= 0.75 and feature_similarity >= 0.09
-        very_high_color = color_confidence >= 0.80 and color_similarity >= 0.92
-        similar = bool(very_high_feature or very_high_color or blended_score >= 0.56)
-
-        overall_confidence = clamp(
-            max(feature_confidence * feature_similarity, color_confidence * color_similarity),
-            0.0,
-            1.0,
-        )
-
+        m_arr = np.array([m.distance for m, n in valid_pairs])
+        n_arr = np.array([n.distance for m, n in valid_pairs])
+        good_mask = m_arr < 0.7 * n_arr
+        feature_similarity = np.sum(good_mask) / ((len(kp1) + len(kp2)) / 2) if (len(kp1) + len(kp2)) > 0 else 0
+        similar = feature_similarity >= 0.05
         return {
             "feature_similarity": float(feature_similarity),
             "feature_confidence": float(feature_confidence),
-            "color_similarity": float(color_similarity),
-            "color_confidence": float(color_confidence),
+            "color_similarity": 0,
+            "color_confidence": 0,
             "similar": bool(similar),
-            "confidence": float(overall_confidence),
+            "confidence": float(feature_confidence),
         }
     except Exception:
         return {

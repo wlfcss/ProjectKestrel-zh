@@ -134,17 +134,18 @@ def _is_kestrel_xmp(path: str) -> bool:
         return False
 
 
-def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = False):
+def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = False, use_auto_labels: bool = False):
     """Write XMP sidecar files for each image, embedding star rating, culling
     label, and analysis metadata (species, family, quality score).
 
     Each entry in ``image_data`` is expected to be a dict with:
-        filename  – bare filename (e.g. "IMG_0001.jpg")
-        rating    – integer 0-5
-        culled    – "accept" or "reject"
-        species   – detected species name (optional)
-        family    – detected family name (optional)
-        quality   – raw quality score float 0.0–1.0 (optional)
+        filename       – bare filename (e.g. "IMG_0001.jpg")
+        rating         – integer 0-5
+        culled         – "accept" or "reject"
+        culled_origin  – "auto", "manual", or "verified" (optional)
+        species        – detected species name (optional)
+        family         – detected family name (optional)
+        quality        – raw quality score float 0.0–1.0 (optional)
 
     XMP sidecar files are written as ``<basename>.xmp`` alongside the
     original in ``root_path``.
@@ -160,6 +161,13 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
         caller can ask the user for confirmation.
       - If ``overwrite_external`` is True, external XMP files are also
         overwritten.
+
+    Args:
+        root_path: Path to images.
+        image_data: List of dicts.
+        overwrite_external: Whether to overwrite non-Kestrel XMPs.
+        use_auto_labels: If True, write Red/Green color labels for AI-generated ('auto') culls.
+                         Labels are always written for user culls ('manual' and 'verified').
 
     Returns:
         { success, written, skipped_conflicts: [filenames], errors }
@@ -182,8 +190,15 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                 rating = int(entry.get('rating', 0) or 0)
                 rating = max(0, min(5, rating))
 
-                cull_status = str(entry.get('culled', 'accept')).lower()
-                label = 'Green' if cull_status == 'accept' else 'Red'
+                cull_status = str(entry.get('culled', '')).lower()
+                origin = str(entry.get('culled_origin', '')).lower()
+                
+                label = ''
+                if use_auto_labels or origin in ('manual', 'verified'):
+                    if cull_status == 'accept':
+                        label = 'Green'
+                    elif cull_status == 'reject':
+                        label = 'Red'
 
                 species = str(entry.get('species', '') or '').strip()
                 family = str(entry.get('family', '') or '').strip()

@@ -1,4 +1,4 @@
-﻿    // State
+    // State
     // NOTE: Two modes for file access:
     // 1. Python API mode (desktop app): Uses rootPath + Python backend API calls
     // 2. File System Access API mode (browser): Uses rootDirHandle for direct file access
@@ -174,7 +174,7 @@
     // Concurrency-limited to avoid flooding the Python IPC bridge with dozens of
     // simultaneous read_image_file calls when a large section of the grid scrolls
     // into view.  Excess loads are queued and drained as earlier ones finish.
-    const _imgLoadThrottle = { active: 0, max: 30, queue: [] };
+    const _imgLoadThrottle = { active: 0, max: 100, queue: [] };
     function _scheduleLoad(fn) {
       if (_imgLoadThrottle.active < _imgLoadThrottle.max) {
         _imgLoadThrottle.active++;
@@ -224,27 +224,56 @@
 
     function loadVersionBadge() {
       if (!versionBadge) return;
-      fetch('VERSION.txt', { cache: 'no-store' })
-        .then((resp) => (resp.ok ? resp.text() : ''))
-        .then((text) => {
-          const lines = String(text || '')
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(Boolean);
-          if (lines.length === 0) {
-            versionBadge.textContent = 'Version: unknown';
-            return;
+      
+      async function updateVersionBadge() {
+        try {
+          // Fetch app version from VERSION.txt
+          let displayVersion = 'Version: unknown';
+          try {
+            const resp = await fetch('VERSION.txt', { cache: 'no-store' });
+            if (resp.ok) {
+              const text = await resp.text();
+              const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+              if (lines.length > 0) {
+                const firstLine = lines[0];
+                if (firstLine.toLowerCase().startsWith('version')) {
+                  displayVersion = firstLine;
+                } else {
+                  displayVersion = `Version: ${firstLine}`;
+                }
+              }
+            }
+          } catch (e) {
+            console.error('[loadVersionBadge] Failed to fetch VERSION.txt:', e);
           }
-          if (lines.length === 1) {
-            const line = lines[0];
-            versionBadge.textContent = line.toLowerCase().startsWith('version') ? line : `Version: ${line}`;
-            return;
+          
+          // Fetch pipeline version from config.py via API
+          if (hasPywebviewApi && window.pywebview?.api?.get_app_version) {
+            try {
+              const result = await window.pywebview.api.get_app_version();
+              const pipelineVersion = result?.version || result;
+              if (pipelineVersion && pipelineVersion !== 'unknown') {
+                displayVersion += ` | Pipeline Version: ${pipelineVersion}`;
+              }
+            } catch (e) {
+              console.error('[loadVersionBadge] Failed to fetch pipeline version:', e);
+            }
           }
-          versionBadge.textContent = lines.join(' | ');
-        })
-        .catch(() => {
-          versionBadge.textContent = 'Version: unknown';
-        });
+          
+          versionBadge.textContent = displayVersion;
+        } catch (e) {
+          console.error('[loadVersionBadge] Unexpected error:', e);
+          versionBadge.textContent = 'Version: error';
+        }
+      }
+      
+      // If API is not ready yet, wait for it
+      if (!hasPywebviewApi) {
+        waitForPywebview().then(() => updateVersionBadge());
+      } else {
+        updateVersionBadge();
+      }
+      
       // Check for new versions from remote JSON endpoint but we need pywebview to be ready, 
       // so listen for the event or execute immediately if already mounted
       if (window.pywebview?.api) {
@@ -716,13 +745,26 @@
       if (!header.includes('normalized_rating')) header.push('normalized_rating');
       if (!header.includes('exposure_correction')) header.push('exposure_correction');
       if (!header.includes('detection_scores')) header.push('detection_scores');
+      if (!header.includes('culled')) header.push('culled');
+      if (!header.includes('culled_origin')) header.push('culled_origin');
       for (const r of rows) {
         if (!('rating' in r)) r.rating = '';
         if (!('rating_origin' in r)) r.rating_origin = '';
         if (!('normalized_rating' in r)) r.normalized_rating = '';
         if (!('exposure_correction' in r)) r.exposure_correction = '0';
         if (!('detection_scores' in r)) r.detection_scores = '';
+        if (!('culled' in r)) r.culled = '';
+        if (!('culled_origin' in r)) r.culled_origin = '';
+        r.culled_origin = normalizeCullOrigin(r);
       }
+    }
+
+    function normalizeCullOrigin(row) {
+      const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
+      const raw = String(row?.culled_origin || '').toLowerCase();
+      if (raw === 'manual' || raw === 'auto' || raw === 'verified') return raw;
+      if (status) return 'manual';
+      return '';
     }
 
     /** Get (or lazily initialise) the scenedata object for a rootPath. */
@@ -1094,7 +1136,7 @@
         const _titleHtml = (_folderName && !showFolderHeaders)
           ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
           : `<b>#${_localNum}</b>`;
-        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${escapeHtml(s.sceneName)}</span>` : '');
+        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${decodeEntities(escapeHtml(s.sceneName))}</span>` : '');
         title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
         const meta = document.createElement('div');
         // Use a dedicated class for title-level badges so other .meta uses are unaffected
@@ -1104,11 +1146,7 @@
         chips.className = 'chips';
         if (s.isApproved) {
           card.classList.add('scene-approved');
-          chips.classList.add('chips-approved');
-          const approvedBadge = document.createElement('span');
-          approvedBadge.className = 'chip manual-approved scene-approved-badge';
-          approvedBadge.textContent = 'Reviewed';
-          meta.appendChild(approvedBadge);
+          chips.classList.add('reviewed-tags');
         }
         for (const sp of s.species.slice(0, 3)) {
           const c = document.createElement('span'); c.className = s.isApproved ? 'chip manual-approved' : 'chip'; c.textContent = sp; c.title = sp; chips.appendChild(c);
@@ -1248,17 +1286,50 @@
           hdr.className = 'folder-group-header' + (collapsed ? ' collapsed' : '');
           hdr.innerHTML = `<span class="folder-group-toggle">\u25bc</span><span class="folder-group-name">${escapeHtml(folderName)}</span><span class="folder-group-count muted">${allScenesInFolder.length} scene${allScenesInFolder.length === 1 ? '' : 's'}</span>`;
 
-          const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'culling-btn';
-          cullingBtn.textContent = 'Open Culling Assistant';
-          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
-          hdr.appendChild(cullingBtn);
+          // Left-aligned secondary actions
+          const leftActions = document.createElement('div');
+          leftActions.className = 'folder-group-left-actions';
+
+          const explorerBtn = document.createElement('button');
+          explorerBtn.className = 'action-btn';
+          explorerBtn.innerHTML = '<i>📂</i> Open';
+          explorerBtn.title = 'Open this folder in File Explorer';
+          explorerBtn.addEventListener('click', (ev) => { ev.stopPropagation(); window.pywebview.api.open_file_explorer(fd.folderPath); });
+          leftActions.appendChild(explorerBtn);
+
+          const folderOptionsBtn = document.createElement('button');
+          folderOptionsBtn.className = 'action-btn';
+          folderOptionsBtn.innerHTML = '<i>↺</i> Reset Culling Decisions';
+          folderOptionsBtn.title = 'Reset Accept/Reject culling decisions for this folder';
+          folderOptionsBtn.addEventListener('click', (ev) => { ev.stopPropagation(); showFolderOptionsDialog(fd.folderPath); });
+          leftActions.appendChild(folderOptionsBtn);
+
+          hdr.appendChild(leftActions);
+
+          // Spacer pushes right actions to the far right
+          const spacer = document.createElement('div');
+          spacer.style.flex = '1';
+          hdr.appendChild(spacer);
+
+          // Right-aligned primary actions
+          const rightActions = document.createElement('div');
+          rightActions.className = 'folder-group-right-actions';
 
           const writeMetaBtn = document.createElement('button');
-          writeMetaBtn.className = 'write-metadata-btn';
-          writeMetaBtn.textContent = 'Write Metadata';
+          writeMetaBtn.className = 'action-btn write-metadata-btn';
+          writeMetaBtn.innerHTML = '<i>📝</i> Write Photo Metadata';
+          writeMetaBtn.title = 'Write XMP sidecar files alongside your photos — carries star ratings, Accept/Reject decisions, and species tags. Readable by Lightroom, Capture One, darktable, and other editors.';
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
-          hdr.appendChild(writeMetaBtn);
+          rightActions.appendChild(writeMetaBtn);
+
+          const cullingBtn = document.createElement('button');
+          cullingBtn.className = 'action-btn culling-assistant-btn';
+          cullingBtn.innerHTML = '<i>✂</i> Open Culling Assistant';
+          cullingBtn.title = 'Open the AI-assisted culling workflow for this folder';
+          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
+          rightActions.appendChild(cullingBtn);
+
+          hdr.appendChild(rightActions);
 
           bodyEl = document.createElement('div');
           bodyEl.className = 'folder-group-body' + (collapsed ? ' hidden' : '');
@@ -1383,11 +1454,13 @@
     const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
 
     function getSceneRawCacheKey(row) {
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
       return [
         row.__rootPath || '',
         row.filename || '',
         row.export_path || '',
-        row.crop_path || ''
+        row.crop_path || '',
+        disabled ? 'noexp' : 'exp'
       ].join('|');
     }
 
@@ -1449,7 +1522,8 @@
     }
 
     async function loadSceneRawAsync(row) {
-      const expCorr = parseFloat(row.exposure_correction) || 0;
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
+      const expCorr = disabled ? 0.0 : (parseFloat(row.exposure_correction) || 0);
       const key = getSceneRawCacheKey(row);
       sceneRawLoading.add(key);
       try {
@@ -1495,8 +1569,10 @@
       sceneZoomThumbEl = thumbEl;
       const key = getSceneRawCacheKey(row);
       const previewBox = el('#previewBox');
+      const disabled = getSetting('raw_exposure_correction_disabled', false);
+      const expCorr = disabled ? 0.0 : (parseFloat(row.exposure_correction) || 0);
       previewBox.classList.add('zoom-active');
-      previewBox.dataset.rawLabel = `RAW (${formatExposureEv(row.exposure_correction)} EV)`;
+      previewBox.dataset.rawLabel = `RAW Zoom (${formatExposureEv(expCorr)} EV) (Scroll to zoom in/out)`;
       zoomLastX = mouseEv.clientX;
       zoomLastY = mouseEv.clientY;
 
@@ -1615,76 +1691,249 @@
     }
     // ---- End scene dialog RAW zoom ----
 
-    function renderSceneImages(scene) {
-      const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
-      imageGrid.innerHTML = '';
+    // ── Filmstrip scene view state ──
+    let currentImageIndex = 0;
+    let _currentScene = null; // reference to the scene object currently shown
+
+    function ensureCulledColumn() {
+      if (!header.includes('culled')) header.push('culled');
+      for (const r of rows) { if (r.culled === undefined) r.culled = ''; }
+    }
+
+    function getCullStatus(row) {
+      const raw = (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
+      if (!raw) return '';
+      const origin = normalizeCullOrigin(row);
+      // Auto culls are non-authoritative in filmstrip/main scene view.
+      if (origin === 'auto') return '';
+      return raw;
+    }
+
+    function getRawCullStatus(row) {
+      return (row.culled === 'accept' || row.culled === 'reject') ? row.culled : '';
+    }
+
+    function setCullStatus(row, status) {
+      ensureRatingColumns();
+      row.culled = status || ''; // 'accept', 'reject', or ''
+      row.culled_origin = status ? 'manual' : '';
+      markDirty();
+    }
+
+    function renderFilmstrip(scene) {
+      const grid = el('#imageGrid');
+      grid.innerHTML = '';
       const images = scene.images;
+      const frag = document.createDocumentFragment();
 
-      const batch = 48;
-      for (let i = 0; i < images.length; i += batch) {
-        const slice = images.slice(i, i + batch);
-        const frag = document.createDocumentFragment();
-        // Append synchronously in order; load preview images asynchronously
-        for (const r of slice) {
-          const card = document.createElement('article'); card.className = 'card';
-          const th = document.createElement('div'); th.className = 'thumb';
-          const img = document.createElement('img'); img.alt = r.filename || ''; img.loading = 'lazy';
-          lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
-          th.appendChild(img); card.appendChild(th);
-          const body = document.createElement('div'); body.className = 'body';
-          body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename || '')}"><b>${escapeHtml(r.filename || '')}</b></div>
-          <div class="meta"><span class="truncate" title="${escapeHtml(r.species || 'Unknown')}">${escapeHtml(r.species || 'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
-          const stars = createStarBar(r);
-          body.appendChild(stars);
-          card.appendChild(body);
+      for (let idx = 0; idx < images.length; idx++) {
+        const r = images[idx];
+        const card = document.createElement('div');
+        card.className = 'filmstrip-card';
+        card.dataset.idx = idx;
+        const cull = getCullStatus(r);
+        const cullOrigin = normalizeCullOrigin(r);
+        if (cull === 'accept') card.classList.add('accepted');
+        if (cull === 'reject') card.classList.add('rejected');
+        if (cullOrigin === 'manual') card.classList.add('manual-cull');
+        if (cullOrigin === 'verified') card.classList.add('verified-cull');
+        if (cullOrigin === 'auto') card.classList.add('auto-cull');
+        if (idx === currentImageIndex) card.classList.add('active');
 
-          card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
+        // Thumbnail
+        const th = document.createElement('div');
+        th.className = 'filmstrip-thumb';
+        const img = document.createElement('img');
+        img.alt = r.filename || '';
+        img.loading = 'lazy';
+        lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
+        th.appendChild(img);
+        card.appendChild(th);
 
-          // Click-drag on thumbnail → zoom preview with RAW upgrade
-          card.addEventListener('mousedown', (ev) => {
-            if (ev.button !== 0) return;  // left button only
-            ev.preventDefault();
-            startSceneZoomPreview(r, th, ev);
-          });
-
-          card.addEventListener('mouseenter', async () => {
-            if (sceneZoomActive) return;  // don't interfere with drag zoom
-            const pv = el('#previewBox'); pv.innerHTML = '';
-            const pimg = document.createElement('img');
-            const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
-            if (purl) { pimg.src = purl; pv.appendChild(pimg); }
-            else { pv.innerHTML = '<span class="muted">No preview</span>'; }
-            const info = el('#previewInfo');
-            if (info) {
-              const rn = getRating(r);
-              const ro = getOrigin(r);
-              const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
-              info.innerHTML = `
-              <div><b>${escapeHtml(r.filename || '')}</b></div>
-              <div class="meta"><span title="Species confidence">${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
-              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5 - rn)} ${originTxt ? `(${originTxt})` : ''}</span></div>
-            `;
-            }
-          });
-
-          card.title = [
-            `File: ${r.filename}`,
-            `Species: ${r.species} (${fmt3(r.species_confidence)})`,
-            `Quality: ${fmt3(r.quality)}`
-          ].join('\n');
-
-          frag.appendChild(card);
+        // Info
+        const info = document.createElement('div');
+        info.className = 'filmstrip-info';
+        const fn = document.createElement('div');
+        fn.className = 'filmstrip-filename';
+        fn.textContent = r.filename || '';
+        info.appendChild(fn);
+        const meta = document.createElement('div');
+        meta.className = 'filmstrip-meta';
+        const rating = getRating(r);
+        const origin = getOrigin(r);
+        let starHtml = '';
+        for (let s = 1; s <= 5; s++) {
+          const filled = s <= rating;
+          const cls = filled ? (origin === 'manual' ? 'filled manual' : 'filled auto') : '';
+          starHtml += `<span class="${cls}">${filled ? '★' : '☆'}</span>`;
         }
-        imageGrid.appendChild(frag);
+        meta.innerHTML = `<span class="filmstrip-stars">${starHtml}</span><span>Q ${fmt3(r.quality)}</span>`;
+        info.appendChild(meta);
+        card.appendChild(info);
+
+        // Tooltip with detailed metadata
+        const tip = document.createElement('div');
+        tip.className = 'filmstrip-tooltip';
+        tip.innerHTML = [
+          `<b>${escapeHtml(r.filename || '')}</b>`,
+          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
+          `Quality: ${fmt3(r.quality)}`,
+          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} ${origin ? `(${origin})` : ''}`,
+          cull ? `Status: ${cull === 'accept' ? '✓ Accepted' : '✗ Rejected'}` : '',
+        ].filter(Boolean).join('<br>');
+        card.appendChild(tip);
+
+        // Click to select
+        card.addEventListener('click', () => {
+          if (_splitMode) return; // handled by split mode
+          selectFilmstripImage(idx, scene);
+        });
+
+        // Hover to temporarily preview
+        card.addEventListener('mouseenter', () => {
+          if (_splitMode) return;
+          selectFilmstripImage(idx, scene, true);
+        });
+        card.addEventListener('mouseleave', () => {
+          if (_splitMode) return;
+          selectFilmstripImage(currentImageIndex, scene, true);
+        });
+
+        // Double-click to open in editor
+        card.addEventListener('dblclick', (ev) => { ev.stopPropagation(); openInEditor(r); });
+
+        frag.appendChild(card);
+      }
+      grid.appendChild(frag);
+
+      // Update scene navigation hints
+      updateFilmstripHints(scene);
+    }
+
+    function updateFilmstripHints(scene) {
+      const sceneIdx = scenes.indexOf(scene);
+      const hintL = el('#filmstripHintLeft');
+      const hintR = el('#filmstripHintRight');
+      if (hintL) {
+        if (sceneIdx > 0) { hintL.classList.remove('hidden'); }
+        else { hintL.classList.add('hidden'); }
+      }
+      if (hintR) {
+        if (sceneIdx >= 0 && sceneIdx < scenes.length - 1) { hintR.classList.remove('hidden'); }
+        else { hintR.classList.add('hidden'); }
+      }
+    }
+
+    function scrollFilmstripToCenter(idx) {
+      const grid = el('#imageGrid');
+      const card = grid?.children[idx];
+      if (!card || !grid) return;
+      const gridRect = grid.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const targetScrollLeft = card.offsetLeft - grid.offsetWidth / 2 + card.offsetWidth / 2;
+      grid.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+    }
+
+    async function selectFilmstripImage(idx, scene, isHover = false) {
+      if (!scene || !scene.images || idx < 0 || idx >= scene.images.length) return;
+      if (!isHover) {
+        currentImageIndex = idx;
+      }
+      const r = scene.images[idx];
+
+      // Update filmstrip card active state and center if not just hovering
+      const grid = el('#imageGrid');
+      if (grid && !isHover) {
+        grid.querySelectorAll('.filmstrip-card').forEach((c, i) => {
+          c.classList.toggle('active', i === idx);
+        });
+        scrollFilmstripToCenter(idx);
+      }
+
+      // Load export preview
+      const exportBox = el('#previewBox');
+      if (exportBox) {
+        exportBox.innerHTML = '';
+        const eurl = await getBlobUrlForPath(r.export_path, r.__rootPath);
+        if (eurl) {
+          const eimg = document.createElement('img');
+          eimg.src = eurl;
+          exportBox.appendChild(eimg);
+        } else { exportBox.innerHTML = '<span class="muted">No export preview</span>'; }
+      }
+
+      // Load crop preview
+      const cropBox = el('#previewCropBox');
+      if (cropBox) {
+        cropBox.innerHTML = '';
+        const curl = await getBlobUrlForPath(r.crop_path, r.__rootPath);
+        if (curl) {
+          const cimg = document.createElement('img');
+          cimg.src = curl;
+          cropBox.appendChild(cimg);
+        } else { cropBox.innerHTML = '<span class="muted">No crop preview</span>'; }
+      }
+
+      // Update preview panel accept/reject glow
+      const exportPanel = el('#scenePreviewExport');
+      const cropPanel = el('#scenePreviewCrop');
+      const cull = getCullStatus(r);
+      [exportPanel, cropPanel].forEach(p => {
+        if (!p) return;
+        p.classList.remove('scene-accepted', 'scene-rejected');
+        if (cull === 'accept') p.classList.add('scene-accepted');
+        if (cull === 'reject') p.classList.add('scene-rejected');
+      });
+
+      // Update info bar
+      const fnEl = el('#sceneInfoFilename');
+      if (fnEl) { fnEl.textContent = r.filename || '—'; fnEl.title = r.filename || ''; }
+
+      const qEl = el('#sceneInfoQuality');
+      if (qEl) qEl.textContent = `Quality: ${fmt3(r.quality)}`;
+
+      const cullToggle = el('#sceneCullToggle');
+      if (cullToggle) {
+        cullToggle.querySelectorAll('.cull-btn').forEach(btn => {
+          const btnCull = btn.dataset.cull;
+          btn.classList.toggle('active', btnCull === cull || (btnCull === 'none' && !cull));
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            const newCull = btnCull === 'none' ? null : btnCull;
+            const currentRaw = getRawCullStatus(r);
+            const currentNormalized = currentRaw || null;
+            const forceClearAuto = newCull === null && normalizeCullOrigin(r) === 'auto' && currentRaw;
+            if (currentNormalized !== newCull || forceClearAuto) {
+              setCullStatus(r, newCull);
+              _refreshCurrentFilmstripCard(); // re-renders card classes (borders) + info bar
+              renderScenes(); // refresh timeline
+            }
+          };
+        });
+      }
+
+      const metaEl = el('#sceneInfoMeta');
+      if (metaEl) {
+        const sp = decodeEntities(r.species || 'Unknown');
+        const spConf = fmt3(r.species_confidence);
+        const fam = decodeEntities(r.family || 'Unknown');
+        const famConf = fmt3(r.family_confidence);
+        metaEl.textContent = `${sp} (${spConf}) | ${fam} (${famConf}) · Image ${idx + 1} of ${scene.images.length}`;
+      }
+
+      // Render star bar in info bar
+      const starsEl = el('#sceneInfoStars');
+      if (starsEl) {
+        starsEl.innerHTML = '';
+        starsEl.appendChild(createStarBar(r));
       }
     }
 
     // Allow other code to refresh the scene images when filter or ratings change
     window.refreshSceneFilter = function () {
-      const chk = el('#filterManualRated');
-      if (chk && chk.checked && currentSceneId != null) {
-        const sc = scenes.find(s => String(s.id) === String(currentSceneId));
-        if (sc) renderSceneImages(sc);
+      if (currentSceneId != null && _currentScene) {
+        renderFilmstrip(_currentScene);
+        selectFilmstripImage(currentImageIndex, _currentScene);
       }
     };
 
@@ -1740,157 +1989,242 @@
       return { ...computed, approved: false };
     }
 
-    function renderSceneMetaChips(scene, editable) {
-      const _sceneLocalNum = String(scene.id).split(':').pop();
-      const _sceneFolderName = folderBaseName(scene.representative?.__rootPath || '');
+    let _activeTagInputType = null; // 'species' or 'family'
+    let _activeTagInputSceneId = null;
+
+    function renderTopbarTags(scene) {
+      const tagsEl = el('#sceneTopbarTags');
+      if (!tagsEl) return;
       const { species, families, approved } = collectSceneSpecies(scene.id);
       const chipClass = approved ? 'chip manual-approved' : 'chip';
-      const editChipClass = approved ? 'edit-chip manual-approved' : 'edit-chip';
 
-      let html = `<div><b>${escapeHtml(_sceneFolderName || ('Scene ' + scene.id))}</b> — scene #${_sceneLocalNum}`;
-      if (scene.sceneName) html += ` — ${escapeHtml(scene.sceneName)}`;
-      html += `</div>`;
-      const rating = _rawQualityToRating(scene.maxQuality);
-      const starDisplay = rating > 0 ? '⭐'.repeat(rating) : '—';
-      html += `<div class="muted">${scene.imageCount} images • ${starDisplay}${approved ? ' • <span class="approval-note">Manually Reviewed</span>' : ''}</div>`;
-
-      // Species chips
-      html += `<div style="margin-top:6px"><span class="muted" style="font-size:12px">Species:</span> `;
+      let html = '';
+      // Species
+      html += '<span class="scene-tag-label">Species:</span> ';
       if (species.length) {
-        html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const sp of species) {
-          if (editable) {
-            html += `<span class="${editChipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">&times;</span></span>`;
-          } else {
-            html += `<span class="${chipClass}">${escapeHtml(sp)}</span>`;
-          }
+          html += `<span class="${chipClass}">${escapeHtml(sp)}<span class="chip-x" data-remove-species="${escapeHtml(sp)}" title="Remove '${escapeHtml(sp)}'">×</span></span>`;
         }
-        html += `</span>`;
       } else {
-        html += `<span class="muted">—</span>`;
+        html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `</div>`;
+      if (_activeTagInputType === 'species' && _activeTagInputSceneId === String(scene.id)) {
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Species..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+      } else {
+        html += `<button class="scene-chip-add" data-add-type="species" title="Add species tag">+</button>`;
+      }
 
-      // Family chips
-      html += `<div style="margin-top:4px"><span class="muted" style="font-size:12px">Family:</span> `;
+      html += '<span class="scene-tag-sep"></span>';
+
+      // Families
+      html += '<span class="scene-tag-label">Family:</span> ';
       if (families.length) {
-        html += `<span class="edit-chips" style="display:inline-flex">`;
         for (const fm of families) {
-          if (editable) {
-            html += `<span class="${editChipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">&times;</span></span>`;
-          } else {
-            html += `<span class="${chipClass}">${escapeHtml(fm)}</span>`;
-          }
+          html += `<span class="${chipClass}">${escapeHtml(fm)}<span class="chip-x" data-remove-family="${escapeHtml(fm)}" title="Remove '${escapeHtml(fm)}'">×</span></span>`;
         }
-        html += `</span>`;
       } else {
-        html += `<span class="muted">—</span>`;
+        html += '<span class="muted" style="font-size:11px">—</span>';
       }
-      html += `</div>`;
+      if (_activeTagInputType === 'family' && _activeTagInputSceneId === String(scene.id)) {
+        html += `<span class="chip-input-wrap"><input type="text" class="chip-input" id="inlineTagInput" placeholder="Family..." /><button class="chip-commit-btn" title="Save">✓</button></span>`;
+      } else {
+        html += `<button class="scene-chip-add" data-add-type="family" title="Add family tag">+</button>`;
+      }
 
-      el('#sceneMeta').innerHTML = html;
+      if (approved) {
+        html += '<span class="scene-tag-sep"></span><span class="approval-note" style="font-size:11px">✓ Reviewed</span>';
+      }
 
-      // Wire up remove buttons if editable
-      if (editable) {
-        el('#sceneMeta').querySelectorAll('[data-remove-species]').forEach(btn => {
-          btn.onclick = () => removeSpeciesFromScene(scene, btn.dataset.removeSpecies);
-        });
-        el('#sceneMeta').querySelectorAll('[data-remove-family]').forEach(btn => {
-          btn.onclick = () => removeFamilyFromScene(scene, btn.dataset.removeFamily);
-        });
+      tagsEl.innerHTML = html;
+
+      // Wire remove buttons
+      tagsEl.querySelectorAll('[data-remove-species]').forEach(btn => {
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+          if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+          _sceneEditMode = true;
+          removeSpeciesFromScene(scene, btn.dataset.removeSpecies);
+          _finalizeSceneReview(scene.id);
+          _sceneEditMode = false;
+          _sceneEditDraft = null;
+          const updatedScene = reloadScene(scene.id) || scene;
+          renderTopbarTags(updatedScene);
+          renderScenes();
+        };
+      });
+      tagsEl.querySelectorAll('[data-remove-family]').forEach(btn => {
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+          if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+          _sceneEditMode = true;
+          removeFamilyFromScene(scene, btn.dataset.removeFamily);
+          _finalizeSceneReview(scene.id);
+          _sceneEditMode = false;
+          _sceneEditDraft = null;
+          const updatedScene = reloadScene(scene.id) || scene;
+          renderTopbarTags(updatedScene);
+          renderScenes();
+        };
+      });
+
+      // Wire (+) add buttons
+      tagsEl.querySelectorAll('.scene-chip-add').forEach(btn => {
+        btn.onclick = () => {
+          _activeTagInputType = btn.dataset.addType;
+          _activeTagInputSceneId = String(scene.id);
+          renderTopbarTags(scene);
+          const inp = el('#inlineTagInput');
+          if (inp) inp.focus();
+        };
+      });
+
+      // Wire inline input
+      const inp = el('#inlineTagInput');
+      if (inp) {
+        const commit = () => {
+          const val = inp.value.trim();
+          if (val) {
+            if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+            _sceneEditMode = true;
+            if (_activeTagInputType === 'species') {
+              _sceneEditDraft.species = Array.from(new Set([..._sceneEditDraft.species, val])).sort();
+            } else {
+              _sceneEditDraft.families = Array.from(new Set([..._sceneEditDraft.families, val])).sort();
+            }
+            _finalizeSceneReview(scene.id);
+            _sceneEditMode = false;
+            _sceneEditDraft = null;
+            showToast(`Added ${_activeTagInputType} "${val}"`, 2000);
+          }
+          _activeTagInputType = null;
+          _activeTagInputSceneId = null;
+          const updated = reloadScene(scene.id) || scene;
+          renderTopbarTags(updated);
+          renderScenes();
+        };
+
+        inp.onkeydown = (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            _activeTagInputType = null;
+            _activeTagInputSceneId = null;
+            renderTopbarTags(scene);
+          }
+        };
+        inp.onblur = (e) => {
+          // Small delay to allow clicking the commit button if it exists
+          setTimeout(() => {
+            if (document.activeElement === tagsEl.querySelector('.chip-commit-btn')) return;
+            if (_activeTagInputType) commit(); 
+          }, 150);
+        };
+        const commitBtn = tagsEl.querySelector('.chip-commit-btn');
+        if (commitBtn) commitBtn.onclick = commit;
       }
     }
 
-    async function openSceneDialog(sceneId) {
+    // Keep renderSceneMetaChips as an alias for compatibility
+    function renderSceneMetaChips(scene, editable) {
+      renderTopbarTags(scene);
+    }
+
+    async function openSceneDialog(sceneId, startIndex = 0) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
       currentSceneId = scene.id;
+      _currentScene = scene;
       _splitMode = false;
       _sceneEditMode = false;
       _sceneEditDraft = null;
+      currentImageIndex = startIndex;
 
+      // ── Top bar: title ──
+      const localNum = String(scene.id).split(':').pop();
+      const folderName = folderBaseName(scene.representative?.__rootPath || '');
+      let titleText = folderName || ('Scene ' + scene.id);
+      titleText += ' — #' + localNum;
+      if (scene.sceneName) titleText += ' — ' + scene.sceneName;
+      titleText += ` (${scene.images.length} images)`;
+      const titleEl = el('#sceneTopbarTitle');
+      if (titleEl) titleEl.textContent = titleText;
+
+      // ── Rename setup ──
       el('#sceneName').value = scene.sceneName || '';
+      el('#sceneRenameInline').classList.add('hidden');
 
-      // Reset to non-edit mode
-      el('#sceneRenameRow').classList.add('hidden');
-      el('#editPanel').classList.add('hidden');
-      el('#editToggleBtn').textContent = 'Edit Species & Tags\u2026';
-      el('#splitSceneBtn').textContent = 'Split Scene\u2026';
-
-      // Render meta with non-editable chips
-      renderSceneMetaChips(scene, false);
-
-      // Populate folder path and wire double-click to open in system file browser
-      const folderPathEl = el('#sceneFolderPath');
-      if (folderPathEl) {
-        const fp = scene.representative?.__rootPath || '';
-        folderPathEl.textContent = fp || '—';
-        folderPathEl.title = fp ? 'Double-click to open folder in file explorer' : '';
-        if (fp) {
-          folderPathEl.ondblclick = async (ev) => {
-            try {
-              ev?.preventDefault(); ev?.stopPropagation();
-              if (window.pywebview?.api && window.pywebview.api.open_folder) {
-                const res = await window.pywebview.api.open_folder(fp);
-                if (res && typeof res === 'object' && res.success === false) {
-                  showToast('Failed to open folder: ' + (res.error || 'Unknown'), 5000, () => showSettings());
-                }
-              } else {
-                showToast('Open folder not supported in this mode', 4000);
-              }
-            } catch (e) {
-              console.error('open_folder failed', e);
-              showToast('Error opening folder', 5000);
-            }
-          };
+      // ── Pencil rename button ──
+      el('#scenePencilBtn').onclick = () => {
+        const renameRow = el('#sceneRenameInline');
+        const isShown = !renameRow.classList.contains('hidden');
+        if (isShown) {
+          // Apply rename
+          applySceneName(scene.id, el('#sceneName').value);
+          renameRow.classList.add('hidden');
+          // Update title
+          const updScene = reloadScene(scene.id) || scene;
+          const nm = updScene.sceneName || '';
+          let t = folderName || ('Scene ' + scene.id);
+          t += ' — #' + localNum;
+          if (nm) t += ' — ' + nm;
+          t += ` (${scene.images.length} images)`;
+          titleEl.textContent = t;
+          renderScenes();
         } else {
-          folderPathEl.ondblclick = null;
+          renameRow.classList.remove('hidden');
+          el('#sceneName').focus();
         }
+      };
+      el('#sceneRenameOk').onclick = () => { el('#scenePencilBtn').click(); };
+      el('#sceneRenameCancel').onclick = () => { el('#sceneRenameInline').classList.add('hidden'); };
+      el('#sceneName').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); el('#scenePencilBtn').click(); } };
+
+      // ── Tags ──
+      renderTopbarTags(scene);
+
+      // ── Shortcut legend toggle ──
+      el('#sceneShortcutBtn').onclick = () => {
+        el('#sceneShortcutLegend').classList.toggle('hidden');
+      };
+      el('#sceneShortcutLegend').classList.add('hidden');
+
+      // ── Filmstrip ──
+      renderFilmstrip(scene);
+
+      // Wire horizontal scrolling via mouse wheel for filmstrip
+      const grid = el('#imageGrid');
+      if (grid) {
+        grid.onwheel = (ev) => {
+          if (ev.deltaY !== 0) {
+            grid.scrollLeft += ev.deltaY;
+            ev.preventDefault();
+          }
+        };
       }
 
-      renderSceneImages(scene);
+      // ── RAW zoom on export preview (mousedown on the export preview box) ──
+      const exportImgBox = el('#previewBox');
+      if (exportImgBox) {
+        exportImgBox.onmousedown = (ev) => {
+          if (ev.button !== 0) return;
+          const r = scene.images[currentImageIndex];
+          if (!r) return;
+          ev.preventDefault();
+          startSceneZoomPreview(r, exportImgBox, ev);
+        };
+      }
 
-      // Hook up actions
+      // ── Close ──
       el('#closeDlg').onclick = () => {
         if (_splitMode) { exitSplitMode(); }
         _sceneEditDraft = null;
         _sceneEditMode = false;
+        _currentScene = null;
+        document.removeEventListener('keydown', _sceneKeyHandler);
         sceneDlg.close();
       };
 
-      // Edit Species & Tags toggle
-      el('#editToggleBtn').onclick = () => {
-        const nextEditMode = !_sceneEditMode;
-        if (nextEditMode) {
-          _beginSceneEditDraft(scene.id);
-        }
-        _sceneEditMode = nextEditMode;
-        el('#editPanel').classList.toggle('hidden', !_sceneEditMode);
-        el('#sceneRenameRow').classList.toggle('hidden', !_sceneEditMode);
-        el('#previewBox').classList.toggle('hidden', _sceneEditMode);
-        el('#previewInfo').classList.toggle('hidden', _sceneEditMode);
-        el('#editToggleBtn').textContent = _sceneEditMode ? 'Done Editing' : 'Edit Species & Tags…';
-        // On exit: apply rename and finalize the exact tags visible in edit mode.
-        if (!_sceneEditMode) {
-          applySceneName(scene.id, el('#sceneName').value);
-          _finalizeSceneReview(scene.id);
-          _sceneEditDraft = null;
-        }
-        // Re-render meta chips (editable or not)
-        const updatedScene = reloadScene(scene.id) || scene;
-        renderSceneMetaChips(updatedScene, _sceneEditMode);
-        if (!_sceneEditMode) renderScenes();
-      };
-
-      // Add species via button or Enter key
-      el('#editAddSpeciesBtn').onclick = () => addSpeciesToScene(scene);
-      el('#editAddSpecies').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addSpeciesToScene(scene); } };
-
-      // Add family via button or Enter key
-      el('#editAddFamilyBtn').onclick = () => addFamilyToScene(scene);
-      el('#editAddFamily').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addFamilyToScene(scene); } };
-
-      // Split Scene toggle
+      // ── Split Scene ──
       el('#splitSceneBtn').onclick = () => {
         if (_splitMode) {
           applySplitScene(scene);
@@ -1899,7 +2233,143 @@
         }
       };
 
+      // ── Scene navigation hints ──
+      const hintL = el('#filmstripHintLeft');
+      const hintR = el('#filmstripHintRight');
+      if (hintL) hintL.onclick = () => navigateToScene(-1);
+      if (hintR) hintR.onclick = () => navigateToScene(1);
+
+      // ── Keyboard handler ──
+      document.removeEventListener('keydown', _sceneKeyHandler);
+      document.addEventListener('keydown', _sceneKeyHandler);
+
+      // ── Show dialog and select start image ──
       sceneDlg.showModal();
+      await selectFilmstripImage(startIndex, scene);
+    }
+
+    // Navigate to prev/next scene
+    function navigateToScene(direction, startIndex = 0) {
+      if (!_currentScene) return;
+      const idx = scenes.indexOf(_currentScene);
+      if (idx < 0) return;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= scenes.length) return;
+      const nextScene = scenes[newIdx];
+      // Close current and open next
+      _sceneEditDraft = null;
+      _sceneEditMode = false;
+      document.removeEventListener('keydown', _sceneKeyHandler);
+      sceneDlg.close();
+      openSceneDialog(nextScene.id, startIndex);
+    }
+
+    // Keyboard handler for scene dialog
+    function _sceneKeyHandler(e) {
+      // Skip if focused in input/textarea (but allow our inline tag input to handle its own Esc/Enter)
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if (!_currentScene) return;
+
+      const images = _currentScene.images;
+      const len = images.length;
+
+      // Tab skips to next scene; Ctrl+Tab skips to previous
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        navigateToScene(e.ctrlKey ? -1 : 1, 0);
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowRight':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            // Jump to end of scene, or next scene's start if already at end
+            if (currentImageIndex < len - 1) {
+              selectFilmstripImage(len - 1, _currentScene);
+            } else {
+              navigateToScene(1, 0);
+            }
+          } else {
+            if (currentImageIndex < len - 1) {
+              selectFilmstripImage(currentImageIndex + 1, _currentScene);
+            } else {
+              navigateToScene(1, 0);
+            }
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (e.ctrlKey) {
+            // Jump to start of scene, or prev scene's start if already at start
+            if (currentImageIndex > 0) {
+              selectFilmstripImage(0, _currentScene);
+            } else {
+              navigateToScene(-1, 0);
+            }
+          } else {
+            if (currentImageIndex > 0) {
+              selectFilmstripImage(currentImageIndex - 1, _currentScene);
+            } else {
+              // At first image — jump to previous scene's LAST image
+              const prevIdx = scenes.indexOf(_currentScene) - 1;
+              if (prevIdx >= 0) {
+                const prevScene = scenes[prevIdx];
+                navigateToScene(-1, prevScene.images.length - 1);
+              }
+            }
+          }
+          break;
+        case 'z':
+        case 'Z':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], 'accept');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case 'x':
+        case 'X':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], '');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setCullStatus(images[currentImageIndex], 'reject');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case '1': case '2': case '3': case '4': case '5':
+          e.preventDefault();
+          if (images[currentImageIndex]) {
+            setRating(images[currentImageIndex], parseInt(e.key, 10), 'manual');
+            _refreshCurrentFilmstripCard();
+          }
+          break;
+        case ' ':
+          e.preventDefault();
+          if (images[currentImageIndex]) openInEditor(images[currentImageIndex]);
+          break;
+        case 'Escape':
+          e.preventDefault();
+          el('#closeDlg')?.click();
+          break;
+      }
+    }
+
+    // Refresh the current filmstrip card + info bar after a status/rating change
+    function _refreshCurrentFilmstripCard() {
+      if (!_currentScene) return;
+      // Re-render the filmstrip to update card classes
+      renderFilmstrip(_currentScene);
+      // Re-select the current image to update previews and info bar
+      selectFilmstripImage(currentImageIndex, _currentScene);
     }
 
     function applySceneName(sceneId, name) {
@@ -1984,36 +2454,58 @@
       const input = el('#editAddSpecies');
       const name = (input.value || '').trim();
       if (!name) return;
-      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      
+      const wasEdit = _sceneEditMode;
+      if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+      _sceneEditMode = true;
+      
       const before = _sceneEditDraft.species.length;
       _sceneEditDraft.species = Array.from(new Set([..._sceneEditDraft.species, name])).sort();
       const changed = _sceneEditDraft.species.length !== before;
+      
       if (changed) {
+        _finalizeSceneReview(scene.id);
         input.value = '';
-        const updatedScene = reloadScene(scene.id);
-        if (updatedScene) {
-          renderSceneMetaChips(updatedScene, _sceneEditMode);
-        }
+        const updatedScene = reloadScene(scene.id) || scene;
+        renderTopbarTags(updatedScene);
+        renderScenes();
         showToast(`Added species "${name}" to reviewed scene tags`, 2000);
       }
+      
+      if (!wasEdit) {
+        _sceneEditMode = false;
+        _sceneEditDraft = null;
+      }
+      el('#editPanel')?.classList.add('hidden');
     }
 
     function addFamilyToScene(scene) {
       const input = el('#editAddFamily');
       const name = (input.value || '').trim();
       if (!name) return;
-      if (!_sceneEditDraft || _sceneEditDraft.sceneId !== String(scene.id)) return;
+      
+      const wasEdit = _sceneEditMode;
+      if (!_sceneEditDraft) _beginSceneEditDraft(scene.id);
+      _sceneEditMode = true;
+      
       const before = _sceneEditDraft.families.length;
       _sceneEditDraft.families = Array.from(new Set([..._sceneEditDraft.families, name])).sort();
       const changed = _sceneEditDraft.families.length !== before;
+      
       if (changed) {
+        _finalizeSceneReview(scene.id);
         input.value = '';
-        const updatedScene = reloadScene(scene.id);
-        if (updatedScene) {
-          renderSceneMetaChips(updatedScene, _sceneEditMode);
-        }
+        const updatedScene = reloadScene(scene.id) || scene;
+        renderTopbarTags(updatedScene);
+        renderScenes();
         showToast(`Added family "${name}" to reviewed scene tags`, 2000);
       }
+      
+      if (!wasEdit) {
+        _sceneEditMode = false;
+        _sceneEditDraft = null;
+      }
+      el('#editPanel')?.classList.add('hidden');
     }
 
     function reloadScene(sceneId) {
@@ -2047,17 +2539,30 @@
       el('#splitSceneBtn').textContent = 'Split Scene\u2026';
       // Re-render images without checkboxes
       const scene = scenes.find(s => String(s.id) === String(currentSceneId));
-      if (scene) renderSceneImages(scene);
+      if (scene) {
+        renderFilmstrip(scene);
+        selectFilmstripImage(currentImageIndex, scene);
+      }
     }
 
     function renderSceneImagesWithSplit(scene) {
-      const infoBox = el('#previewInfo'); if (infoBox) infoBox.textContent = '—';
-      imageGrid.innerHTML = '';
-      const images = scene.images;
+      const infoBox = el('#previewInfo');
+      if (infoBox) infoBox.textContent = '—';
+      const grid = el('#imageGrid');
+      grid.innerHTML = '';
+      
+      // Temporarily sort images by filename for splitting
+      const images = scene.images.slice().sort((a, b) => {
+        return (a.filename || '').localeCompare(b.filename || '');
+      });
+      const frag = document.createDocumentFragment();
 
-      for (const r of images) {
-        const card = document.createElement('article');
-        card.className = 'card split-mode';
+      for (let i = 0; i < images.length; i++) {
+        const r = images[i];
+        const origIdx = scene.images.indexOf(r);
+        const card = document.createElement('div');
+        card.className = 'filmstrip-card split-mode';
+        card.dataset.idx = origIdx;
         const key = r.filename || r.export_path || '';
 
         // Checkbox for split selection
@@ -2065,50 +2570,67 @@
         cb.type = 'checkbox';
         cb.className = 'split-check';
         cb.checked = _splitSelected.has(key);
+        if (cb.checked) card.classList.add('split-selected');
+        
         cb.onchange = () => {
           if (cb.checked) { _splitSelected.add(key); card.classList.add('split-selected'); }
           else { _splitSelected.delete(key); card.classList.remove('split-selected'); }
         };
         card.appendChild(cb);
 
-        const th = document.createElement('div'); th.className = 'thumb';
-        const img = document.createElement('img'); img.alt = r.filename || ''; img.loading = 'lazy';
+        // Thumbnail
+        const th = document.createElement('div');
+        th.className = 'filmstrip-thumb';
+        const img = document.createElement('img');
+        img.alt = r.filename || '';
+        img.loading = 'lazy';
         lazyLoadImg(img, () => getBlobUrlForPath(r.export_path || r.crop_path, r.__rootPath));
-        th.appendChild(img); card.appendChild(th);
-        const body = document.createElement('div'); body.className = 'body';
-        body.innerHTML = `<div class="filename" title="${escapeHtml(r.filename || '')}"><b>${escapeHtml(r.filename || '')}</b></div>
-          <div class="meta"><span class="truncate" title="${escapeHtml(r.species || 'Unknown')}">${escapeHtml(r.species || 'Unknown')}</span><span>Q ${fmt3(r.quality)}</span></div>`;
-        const stars = createStarBar(r);
-        body.appendChild(stars);
-        card.appendChild(body);
+        th.appendChild(img);
+        card.appendChild(th);
+
+        // Info
+        const info = document.createElement('div');
+        info.className = 'filmstrip-info';
+        const fn = document.createElement('div');
+        fn.className = 'filmstrip-filename';
+        fn.textContent = r.filename || '';
+        info.appendChild(fn);
+        const meta = document.createElement('div');
+        meta.className = 'filmstrip-meta';
+        const rating = getRating(r);
+        meta.innerHTML = `<span class="filmstrip-stars">${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}</span><span>Q ${fmt3(r.quality)}</span>`;
+        info.appendChild(meta);
+        card.appendChild(info);
 
         // Click card to toggle selection
         card.addEventListener('click', (ev) => {
           if (ev.target === cb) return; // checkbox handles itself
           cb.checked = !cb.checked;
           cb.onchange();
+          
+          // Also set as active and update preview using original index
+          selectFilmstripImage(origIdx, scene);
         });
 
-        card.addEventListener('mouseenter', async () => {
-          const pv = el('#previewBox'); pv.innerHTML = '';
-          const pimg = document.createElement('img');
-          const purl = await getBlobUrlForPath(r.crop_path || r.export_path, r.__rootPath);
-          if (purl) { pimg.src = purl; pv.appendChild(pimg); }
-          else { pv.innerHTML = '<span class="muted">No preview</span>'; }
-          const info = el('#previewInfo');
-          if (info) {
-            const rn = getRating(r);
-            const ro = getOrigin(r);
-            const originTxt = rn ? (ro === 'manual' ? 'manual' : (ro === 'auto' ? 'auto' : '')) : '';
-            info.innerHTML = `
-              <div><b>${escapeHtml(r.filename || '')}</b></div>
-              <div class="meta"><span title="Species confidence">${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})</span><span title="Quality">Q ${fmt3(r.quality)}</span></div>
-              <div class="meta"><span>Rating:</span><span>${'★'.repeat(rn)}${'☆'.repeat(5 - rn)} ${originTxt ? `(${originTxt})` : ''}</span></div>
-            `;
-          }
-        });
+        // Tooltip with detailed metadata
+        const tip = document.createElement('div');
+        tip.className = 'filmstrip-tooltip';
+        tip.innerHTML = [
+          `<b>${escapeHtml(r.filename || '')}</b>`,
+          `Species: ${escapeHtml(r.species || 'Unknown')} (${fmt3(r.species_confidence)})`,
+          `Quality: ${fmt3(r.quality)}`,
+          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}`,
+        ].filter(Boolean).join('<br>');
+        card.appendChild(tip);
 
-        imageGrid.appendChild(card);
+        frag.appendChild(card);
+      }
+      grid.appendChild(frag);
+      updateFilmstripHints(scene);
+      
+      // Select the first one or current one by default to show preview
+      if (images.length > 0) {
+        selectFilmstripImage(currentImageIndex < images.length ? currentImageIndex : 0, scene);
       }
     }
 
@@ -2173,7 +2695,8 @@
         const updatedScene = reloadScene(scene.id);
         if (updatedScene) {
           refreshSceneMeta(updatedScene);
-          renderSceneImages(updatedScene);
+          renderFilmstrip(updatedScene);
+          selectFilmstripImage(0, updatedScene);
           el('#sceneName').value = updatedScene.sceneName || '';
         }
         showToast(`Split ${moved} image(s) into new scene #${newSceneCount}`, 3000);
@@ -2181,6 +2704,13 @@
     }
 
     function fmt3(v) { const n = parseNumber(v); return n < 0 ? '—' : n.toFixed(3); }
+
+    function decodeEntities(s) {
+      if (!s || typeof s !== 'string') return s;
+      const txt = document.createElement('textarea');
+      txt.innerHTML = s;
+      return txt.value;
+    }
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c])); }
     function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 
@@ -2305,7 +2835,7 @@
         return;
       }
 
-      // Pywebview desktop mode: save scenedata (CSV is read-only; user edits go to JSON)
+      // Pywebview desktop mode: save both CSV row state and scenedata JSON.
       if (window.pywebview?.api) {
         const groups = new Map();
         for (const r of rows) {
@@ -2314,18 +2844,34 @@
           groups.get(rp).push(r);
         }
         let saved = 0, failed = 0;
+        const exportCols = allCols.filter(c => !String(c).startsWith('__'));
         for (const [rp, groupRows] of groups) {
           if (!rp) { failed++; continue; }
-          const sd = _normalizeScenedataForSave(rp, groupRows);
           try {
+            // Persist cull/rating columns to CSV so culling assistant and reloads see authoritative state.
+            if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
+              const content = rowsToCsvString(exportCols, groupRows);
+              const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
+              if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write kestrel_database.csv');
+            }
+
+            const sd = _normalizeScenedataForSave(rp, groupRows);
             const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
             if (res.success) saved++;
             else { failed++; console.warn('[save scenedata] Failed for', rp, res.error); }
-          } catch (e) { failed++; console.warn('[save scenedata] Error for', rp, e); }
+          } catch (e) {
+            failed++;
+            console.warn('[save pywebview] Error for', rp, e);
+          }
         }
-        dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
-        takeSnapshot();
-        setStatus(failed > 0 ? `Saved ${saved} folder(s), ${failed} failed` : `Saved changes to ${saved} folder(s)`);
+        if (failed > 0) {
+          dirty = true; _notifyDirty(true); el('#saveCsv').disabled = false;
+          setStatus(`Saved ${saved} folder(s), ${failed} failed`);
+        } else {
+          dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
+          takeSnapshot();
+          setStatus(`Saved changes to ${saved} folder(s)`);
+        }
         return;
       }
 
@@ -2432,6 +2978,7 @@
         if (data && data.settings && typeof data.settings === 'object') {
           saveSettings(data.settings);
           _autoSaveEnabled = data.settings.auto_save_enabled !== false;
+          _updateSaveRevertVisibility();
         }
       } catch (_) { }
     }
@@ -2468,15 +3015,9 @@
         }
       };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
-      // Rating normalization
-      const normSelect = document.getElementById('ratingNormalization');
-      if (normSelect) normSelect.value = getSetting('rating_normalization', 'none');
-      // Rating distribution thresholds
-      document.getElementById('ratingThreshold5').value = getSetting('rating_threshold_5', 12);
-      document.getElementById('ratingThreshold4').value = getSetting('rating_threshold_4', 15);
-      document.getElementById('ratingThreshold3').value = getSetting('rating_threshold_3', 20);
-      document.getElementById('ratingThreshold2').value = getSetting('rating_threshold_2', 30);
-      document.getElementById('ratingThreshold1').value = getSetting('rating_threshold_1', 23);
+      // Rating profile
+      const profileSelect = document.getElementById('ratingProfile');
+      if (profileSelect) profileSelect.value = getSetting('rating_profile', 'balanced');
       // Detection confidence threshold
       const dtEl = document.getElementById('detectionThreshold');
       if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
@@ -2508,6 +3049,9 @@
       // Auto-Save setting
       const autoSaveCb = document.getElementById('settingsAutoSave');
       if (autoSaveCb) autoSaveCb.checked = getSetting('auto_save_enabled', true);
+
+      const rawExpDisableCb = document.getElementById('rawExposureCorrectionDisabled');
+      if (rawExpDisableCb) rawExpDisableCb.checked = getSetting('raw_exposure_correction_disabled', false);
       
       dlg.showModal();
     }
@@ -2517,8 +3061,8 @@
       const customEditorPath = document.getElementById('customEditorPath').value.trim();
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
       const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
-      const normalizationEl = document.getElementById('ratingNormalization');
-      const ratingNormalization = normalizationEl ? normalizationEl.value : 'none';
+      const profileEl = document.getElementById('ratingProfile');
+      const ratingProfile = profileEl ? profileEl.value : 'balanced';
       const dtEl2 = document.getElementById('detectionThreshold');
       const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
@@ -2529,37 +3073,22 @@
       const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
-      // Rating distribution thresholds
-      const t5 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold5').value, 10) || 12));
-      const t4 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold4').value, 10) || 15));
-      const t3 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold3').value, 10) || 20));
-      const t2 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold2').value, 10) || 30));
-      const t1 = Math.max(1, Math.min(50, parseInt(document.getElementById('ratingThreshold1').value, 10) || 23));
-      
       // Merge into existing settings so keys like machine_id / analytics_consent_shown are preserved
       const existing = loadSettings();
-      const prevNormalization = existing.rating_normalization || 'none';
-      const prevT5 = parseInt(existing.rating_threshold_5, 10) || 12;
-      const prevT4 = parseInt(existing.rating_threshold_4, 10) || 15;
-      const prevT3 = parseInt(existing.rating_threshold_3, 10) || 20;
-      const prevT2 = parseInt(existing.rating_threshold_2, 10) || 30;
-      const prevT1 = parseInt(existing.rating_threshold_1, 10) || 23;
+      const prevProfile = existing.rating_profile || 'balanced';
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
         analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
-        rating_normalization: ratingNormalization,
-        rating_threshold_5: t5,
-        rating_threshold_4: t4,
-        rating_threshold_3: t3,
-        rating_threshold_2: t2,
-        rating_threshold_1: t1,
+        rating_profile: ratingProfile,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
         mask_threshold: maskThreshold,
         raw_preview_cache_enabled: rawPreviewCacheEnabled,
         auto_save_enabled: autoSaveEnabled,
+        raw_exposure_correction_disabled: document.getElementById('rawExposureCorrectionDisabled').checked,
       };
       _autoSaveEnabled = autoSaveEnabled;
+      _updateSaveRevertVisibility();
       // Persist settings to localStorage immediately
       saveSettings(settings);
       if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
@@ -2575,14 +3104,8 @@
         });
       } catch (_) { }
       document.getElementById('settingsDlg').close();
-      // If normalization mode or thresholds changed and folders are loaded, reapply immediately
-      const thresholdsChanged =
-        t5 !== prevT5 ||
-        t4 !== prevT4 ||
-        t3 !== prevT3 ||
-        t2 !== prevT2 ||
-        t1 !== prevT1;
-      if ((ratingNormalization !== prevNormalization || thresholdsChanged) && rows.length > 0) {
+      // If rating profile changed and folders are loaded, reapply immediately
+      if (ratingProfile !== prevProfile && rows.length > 0) {
         await reapplyNormalizationForLoadedFolders();
       }
     }
@@ -2611,9 +3134,74 @@
       await renderScenes();
     }
 
+    /** Show or hide the Save/Revert wrap based on whether auto-save is active. */
+    function _updateSaveRevertVisibility() {
+      const wrap = document.getElementById('saveRevertWrap');
+      if (!wrap) return;
+      if (_autoSaveEnabled) {
+        wrap.classList.add('hidden');
+      } else {
+        wrap.classList.remove('hidden');
+      }
+    }
+
+    /** Mark settings Save button dirty (yellow) or clean. */
+    function _setSettingsDirty(dirty) {
+      const btn = document.getElementById('settingsSave');
+      if (!btn) return;
+      if (dirty) btn.classList.add('dirty'); else btn.classList.remove('dirty');
+    }
+
+    // Track changes inside the settings dialog to highlight the Save button
+    document.getElementById('settingsDlg').addEventListener('change', () => _setSettingsDirty(true));
+    document.getElementById('settingsDlg').addEventListener('input', () => _setSettingsDirty(true));
+
     document.getElementById('openSettings').addEventListener('click', showSettings);
-    document.getElementById('settingsSave').addEventListener('click', applySettings);
-    document.getElementById('settingsCancel').addEventListener('click', () => document.getElementById('settingsDlg').close());
+    document.getElementById('settingsSave').addEventListener('click', async () => {
+      await applySettings();
+      _setSettingsDirty(false);
+    });
+    document.getElementById('settingsCancel').addEventListener('click', () => {
+      document.getElementById('settingsDlg').close();
+      _setSettingsDirty(false);
+    });
+
+    // ── Sidebar resize ────────────────────────────────────────────────────────
+    (function initSidebarResize() {
+      const resizer = document.getElementById('sidebarResizer');
+      const sidebar = document.querySelector('header');
+      if (!resizer || !sidebar) return;
+
+      let dragging = false;
+      let startX = 0;
+      let startW = 0;
+
+      resizer.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        startW = sidebar.getBoundingClientRect().width;
+        resizer.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const delta = e.clientX - startX;
+        const newW = Math.max(260, Math.min(600, startW + delta));
+        sidebar.style.width = newW + 'px';
+        sidebar.style.flex = '0 0 ' + newW + 'px';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        resizer.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      });
+    })();
 
     // ─── Telemetry helpers ────────────────────────────────────────────────────
     /** Merge a single key into persisted settings (localStorage + pywebview). */
@@ -2980,7 +3568,10 @@
         // Auto-expand the root
         treeExpandedPaths.add(rootPath);
         renderFolderTree();
-        document.getElementById('folderTreeWrap').classList.remove('hidden');
+        // Enable folder tree controls and remove empty placeholder state
+        const treeWrap = document.getElementById('folderTreeWrap');
+        treeWrap.classList.remove('folder-tree-empty');
+        treeWrap.querySelectorAll('button[disabled]').forEach(b => b.removeAttribute('disabled'));
         return true;
       } catch (e) {
         console.error('[tree] scanFolderTree error:', e);
@@ -4958,6 +5549,7 @@
       try {
         checkedFolderPaths.clear();
         renderFolderTree();
+        debouncedAutoLoad(); // Unload current folder (same as Check None)
       } catch (e) { /* ignore */ }
 
       try {
@@ -5080,6 +5672,12 @@
       const sortSel = document.getElementById('sortBy');
       if (!sortSel) return;
       try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
+    })();
+
+    // Apply initial auto-save visibility from cached localStorage settings
+    (function initAutoSaveVisibility() {
+      _autoSaveEnabled = getSetting('auto_save_enabled', true) !== false;
+      _updateSaveRevertVisibility();
     })();
 
     // Group-by-folder toggle
@@ -5680,55 +6278,296 @@
       });
     }
 
+    function resetFolderCullState(rootPath, mode) {
+      let changed = 0;
+      for (const r of rows) {
+        if (r.__rootPath !== rootPath) continue;
+        const origin = normalizeCullOrigin(r);
+        const isResetAll = mode === 'all' && (origin === 'manual' || origin === 'verified');
+        const isResetVerified = mode === 'verified' && origin === 'verified';
+        if (!isResetAll && !isResetVerified) continue;
+        if (r.culled || r.culled_origin) {
+          r.culled = '';
+          r.culled_origin = '';
+          changed++;
+        }
+      }
+      if (changed > 0) {
+        markDirty();
+        renderScenes();
+        if (currentSceneId != null && _currentScene) {
+          const refreshed = reloadScene(currentSceneId);
+          if (refreshed) {
+            _currentScene = refreshed;
+            renderFilmstrip(refreshed);
+            selectFilmstripImage(Math.min(currentImageIndex, Math.max(0, refreshed.images.length - 1)), refreshed);
+          }
+        }
+      }
+      return changed;
+    }
+
+    function showFolderOptionsDialog(folderPath) {
+      const folderName = folderBaseName(folderPath) || folderPath || 'folder';
+      const dlg = document.createElement('dialog');
+      dlg.style.cssText = [
+        'border:1px solid #303a52',
+        'border-radius:12px',
+        'background:#141a24',
+        'color:#e8f0f8',
+        'padding:0',
+        'min-width:440px',
+        'max-width:540px',
+        'width:90vw',
+        'height:auto',
+        'overflow-y:auto',
+        'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+      ].join(';');
+
+      dlg.innerHTML = `
+        <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Folder Options</div>
+          <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(folderPath)}">${escapeHtml(folderName)}</div>
+        </div>
+
+        <div style="padding:14px 22px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">Reset Culling Decisions</div>
+
+          <div class="folder-opt-card" id="folderOptCardVerified" style="
+            display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+            border:1px solid #263045;border-radius:8px;background:#1a2235;
+            cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s;">
+            <div style="margin-top:2px;font-size:16px;line-height:1;">↺</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Reset Confirmed Decisions</div>
+              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">Clears only Accept/Reject decisions that were <em>Confirmed</em> via the Culling Assistant's finalize step. Manual (user-assigned) decisions are kept.</div>
+            </div>
+          </div>
+
+          <div class="folder-opt-card" id="folderOptCardAll" style="
+            display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+            border:1px solid #3f2020;border-radius:8px;background:#2a1a1a;
+            cursor:pointer;margin-bottom:0;transition:border-color 0.15s,background 0.15s;">
+            <div style="margin-top:2px;font-size:16px;line-height:1;color:#ff8888;">⊘</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">Reset All Decisions</div>
+              <div style="font-size:12px;color:#b07878;line-height:1.45;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed Accept/Reject decisions for this folder, returning every image to Undecided. Auto-categorized decisions are unaffected.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:10px 22px 18px;display:flex;justify-content:flex-end;border-top:1px solid #1a2235;margin-top:4px;">
+          <button id="folderOptCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Close</button>
+        </div>
+      `;
+      document.body.appendChild(dlg);
+
+      const closeAndRemove = () => {
+        dlg.close();
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+      };
+
+      dlg.querySelector('#folderOptCancel').addEventListener('click', closeAndRemove);
+
+      const cardVerified = dlg.querySelector('#folderOptCardVerified');
+      cardVerified.addEventListener('mouseenter', () => { cardVerified.style.borderColor = '#4d6a9a'; cardVerified.style.background = '#1e2a40'; });
+      cardVerified.addEventListener('mouseleave', () => { cardVerified.style.borderColor = '#263045'; cardVerified.style.background = '#1a2235'; });
+      cardVerified.addEventListener('click', () => {
+        const changed = resetFolderCullState(folderPath, 'verified');
+        showToast(changed > 0 ? `Reset ${changed} confirmed decision${changed === 1 ? '' : 's'}` : 'No confirmed decisions to reset', 3000);
+        closeAndRemove();
+      });
+
+      const cardAll = dlg.querySelector('#folderOptCardAll');
+      cardAll.addEventListener('mouseenter', () => { cardAll.style.borderColor = '#7f3f3f'; cardAll.style.background = '#361818'; });
+      cardAll.addEventListener('mouseleave', () => { cardAll.style.borderColor = '#3f2020'; cardAll.style.background = '#2a1a1a'; });
+      cardAll.addEventListener('click', () => {
+        const ok = confirm(`Reset ALL manual and confirmed culling decisions for "${folderName}"?\n\nThis cannot be undone.`);
+        if (!ok) return;
+        const changed = resetFolderCullState(folderPath, 'all');
+        showToast(changed > 0 ? `Reset ${changed} manual/confirmed decision${changed === 1 ? '' : 's'}` : 'No manual or confirmed decisions to reset', 3000);
+        closeAndRemove();
+      });
+
+      dlg.addEventListener('close', () => { if (dlg.parentNode) dlg.parentNode.removeChild(dlg); });
+      dlg.showModal();
+    }
+
     // ---- Write Metadata launcher ----
     async function writeMetadataForFolder(rootPath) {
       if (!window.pywebview?.api) {
         showToast('Write Metadata requires desktop mode', 4000);
         return;
       }
-      try {
-        const folderRows = rows.filter(r => r.__rootPath === rootPath);
-        if (!folderRows.length) {
-          showToast('No images found for this folder', 3000);
-          return;
-        }
-        const payload = folderRows.map(r => ({
-          filename: r.filename,
-          rating: getRating(r),
-          culled: 'accept',
-          species: r.species || '',
-          family: r.family || '',
-          quality: r.quality != null ? r.quality : null,
-        }));
-
-        showToast('Writing XMP metadata\u2026', 2000);
-        const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false);
-        if (!res.success) {
-          showToast('Write Metadata failed: ' + (res.error || 'Unknown error'), 5000);
-          return;
-        }
-        if (res.skipped_conflicts && res.skipped_conflicts.length > 0) {
-          const n = res.skipped_conflicts.length;
-          const ok = confirm(
-            `${n} existing XMP file${n === 1 ? '' : 's'} in this folder were created by another application (e.g. Lightroom or darktable).\n\nOverwrite them with Kestrel metadata?`
-          );
-          if (ok) {
-            const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true);
-            if (!res2.success) {
-              showToast('Write Metadata failed: ' + (res2.error || 'Unknown error'), 5000);
-              return;
-            }
-            showToast(`Metadata written: ${res2.written} file${res2.written === 1 ? '' : 's'}`, 4000);
-          } else {
-            showToast(`Metadata written: ${res.written || 0} written, ${n} skipped`, 4000);
-          }
-        } else {
-          showToast(`Metadata written: ${res.written} file${res.written === 1 ? '' : 's'}`, 4000);
-        }
-      } catch (e) {
-        console.error('writeMetadataForFolder error', e);
-        showToast('Error writing metadata', 4000);
+      const folderRows = rows.filter(r => r.__rootPath === rootPath);
+      if (!folderRows.length) {
+        showToast('No images found for this folder', 3000);
+        return;
       }
+
+      const folderName = folderBaseName(rootPath) || rootPath;
+      const imageCount = folderRows.length;
+
+      const dlg = document.createElement('dialog');
+      dlg.style.cssText = [
+        'border:1px solid #303a52', 'border-radius:12px', 'background:#141a24',
+        'color:#e8f0f8', 'padding:0', 'min-width:440px', 'max-width:560px',
+        'width:90vw', 'height:auto', 'overflow-y:auto',
+        'box-shadow:0 8px 40px rgba(0,0,0,0.6)',
+      ].join(';');
+
+      dlg.innerHTML = `
+        <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Write Photo Metadata</div>
+          <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(rootPath)}">${escapeHtml(folderName)} &middot; ${imageCount} image${imageCount === 1 ? '' : 's'}</div>
+        </div>
+
+        <div id="wmOptView" style="padding:16px 22px;">
+          <div style="background:#1a2235;border:1px solid #263045;border-radius:8px;padding:12px 14px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-start;">
+            <div style="font-size:18px;margin-top:2px;">📝</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">XMP Sidecar Files</div>
+              <div style="font-size:12px;color:#7a90b8;line-height:1.5;">Writes a <code style="background:#1c2438;padding:1px 4px;border-radius:3px;">.xmp</code> sidecar file next to each original. Embeds star ratings, Accept/Reject decisions, and species tags in a format readable by Lightroom, Capture One, darktable, and other editors.</div>
+            </div>
+          </div>
+          <div style="background:#1a1f10;border:1px solid #3a4020;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#b0c070;line-height:1.5;">
+            &#9888; <b>Write metadata before importing into your photo editor.</b> Most catalogues ignore new sidecar files once a photo is already imported. Write first, then import, for best results.<br>Kestrel will not overwrite XMP files generated by other software without your permission.
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="wmCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Cancel</button>
+            <button id="wmOk" style="padding:8px 16px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Write Metadata &#10003;</button>
+          </div>
+        </div>
+
+        <div id="wmProgressView" style="display:none;padding:16px 22px;">
+          <ul id="wmStepsList" style="list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px;"></ul>
+          <div id="wmProgressActions" style="display:none;justify-content:flex-end;">
+            <button id="wmDone" style="padding:8px 16px;border:1px solid #2a5fa8;background:#1a3a6a;color:#7eb8e0;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Done</button>
+          </div>
+        </div>
+
+        <div id="wmConflictView" style="display:none;padding:16px 22px;">
+          <p id="wmConflictDesc" style="font-size:13px;line-height:1.5;margin:0 0 10px;color:#9fb0cc;"></p>
+          <ul id="wmConflictList" style="max-height:160px;overflow-y:auto;list-style:none;padding:0;margin:0 0 16px;font-size:12px;color:#7a90b8;border:1px solid #222e45;border-radius:6px;"></ul>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button id="wmSkip" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Skip these files</button>
+            <button id="wmOverwrite" style="padding:8px 12px;border:1px solid #7f3f3f;background:#5c2a2a;color:#ffdede;border-radius:6px;cursor:pointer;font-size:13px;">Overwrite Anyway</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(dlg);
+
+      const closeAndRemove = () => {
+        try { dlg.close(); } catch (_) {}
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+      };
+
+      const showView = (id) => {
+        ['wmOptView', 'wmProgressView', 'wmConflictView'].forEach(v => {
+          const el = dlg.querySelector('#' + v);
+          if (el) el.style.display = (v === id) ? 'block' : 'none';
+        });
+      };
+
+      const addStep = (id, label, state) => {
+        const icons  = { pending:'○', running:'⟳', done:'✓', failed:'✗', skipped:'–' };
+        const colors = { pending:'#7a90b8', running:'#6aa0ff', done:'#50c878', failed:'#ff6b6b', skipped:'#555' };
+        const li = document.createElement('li');
+        li.id = 'wm-step-' + id;
+        li.style.cssText = 'display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid #1a2235;';
+        li.innerHTML =
+          `<span id="wm-step-icon-${id}" style="font-size:15px;width:18px;text-align:center;flex-shrink:0;color:${colors[state]}">${icons[state]}</span>` +
+          `<span style="flex:1;color:#e8f0f8;">${label}</span>` +
+          `<span id="wm-step-detail-${id}" style="font-size:11px;color:#7a90b8;"></span>`;
+        dlg.querySelector('#wmStepsList').appendChild(li);
+      };
+
+      const setStep = (id, state, detail = '') => {
+        const icons  = { pending:'○', running:'⟳', done:'✓', failed:'✗', skipped:'–' };
+        const colors = { pending:'#7a90b8', running:'#6aa0ff', done:'#50c878', failed:'#ff6b6b', skipped:'#555' };
+        const iconEl   = dlg.querySelector('#wm-step-icon-' + id);
+        const detailEl = dlg.querySelector('#wm-step-detail-' + id);
+        if (iconEl)   { iconEl.textContent = icons[state]; iconEl.style.color = colors[state]; }
+        if (detailEl && detail) detailEl.textContent = detail;
+      };
+
+      const payload = folderRows.map(r => ({
+        filename: r.filename,
+        rating: getRating(r),
+        culled: getRawCullStatus(r),
+        culled_origin: normalizeCullOrigin(r),
+        species: r.species || '',
+        family: r.family || '',
+        quality: r.quality != null ? r.quality : null,
+      }));
+
+      dlg.querySelector('#wmCancel').addEventListener('click', closeAndRemove);
+
+      dlg.querySelector('#wmOk').addEventListener('click', async () => {
+        showView('wmProgressView');
+        addStep('write', 'Writing XMP sidecar files', 'running');
+        try {
+          const res = await window.pywebview.api.write_xmp_metadata(rootPath, payload, false, false);
+          if (!res.success) {
+            setStep('write', 'failed', res.error || 'Unknown error');
+            dlg.querySelector('#wmProgressActions').style.display = 'flex';
+            return;
+          }
+          if (res.skipped_conflicts && res.skipped_conflicts.length > 0) {
+            const n = res.skipped_conflicts.length;
+            setStep('write', 'done', `${res.written} written, ${n} conflict${n === 1 ? '' : 's'}`);
+            dlg.querySelector('#wmConflictDesc').textContent =
+              `${n} existing XMP file${n === 1 ? '' : 's'} appear to have been created by another application (such as Lightroom or darktable). Overwriting them may interfere with metadata managed by that software.`;
+            const conflictList = dlg.querySelector('#wmConflictList');
+            res.skipped_conflicts.slice(0, 10).forEach(f => {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding:5px 8px;border-bottom:1px solid #1a2235;';
+              li.textContent = f;
+              conflictList.appendChild(li);
+            });
+            if (res.skipped_conflicts.length > 10) {
+              const li = document.createElement('li');
+              li.style.cssText = 'padding:5px 8px;color:#7a90b8;';
+              li.textContent = `\u2026and ${res.skipped_conflicts.length - 10} more`;
+              conflictList.appendChild(li);
+            }
+            showView('wmConflictView');
+
+            dlg.querySelector('#wmSkip').addEventListener('click', () => {
+              showToast(`Metadata written: ${res.written} written, ${n} skipped`, 4000);
+              closeAndRemove();
+            });
+            dlg.querySelector('#wmOverwrite').addEventListener('click', async () => {
+              showView('wmProgressView');
+              addStep('overwrite', 'Overwriting conflicting XMP files', 'running');
+              try {
+                const res2 = await window.pywebview.api.write_xmp_metadata(rootPath, payload, true, false);
+                if (!res2.success) {
+                  setStep('overwrite', 'failed', res2.error || 'Unknown error');
+                } else {
+                  setStep('overwrite', 'done', `${res2.written} file${res2.written === 1 ? '' : 's'} written`);
+                  showToast(`Metadata written: ${res2.written} file${res2.written === 1 ? '' : 's'}`, 4000);
+                }
+              } catch (e) {
+                setStep('overwrite', 'failed', 'Error overwriting');
+              }
+              dlg.querySelector('#wmProgressActions').style.display = 'flex';
+            });
+          } else {
+            setStep('write', 'done', `${res.written} file${res.written === 1 ? '' : 's'} written`);
+            showToast(`Metadata written: ${res.written} file${res.written === 1 ? '' : 's'}`, 4000);
+            dlg.querySelector('#wmProgressActions').style.display = 'flex';
+          }
+        } catch (e) {
+          console.error('writeMetadataForFolder error', e);
+          setStep('write', 'failed', 'Unexpected error');
+          dlg.querySelector('#wmProgressActions').style.display = 'flex';
+        }
+      });
+
+      dlg.querySelector('#wmDone').addEventListener('click', closeAndRemove);
+      dlg.addEventListener('close', () => { if (dlg.parentNode) dlg.parentNode.removeChild(dlg); });
+      dlg.showModal();
     }
 
     // Reload current folders (called from Python via evaluate_js after culling completes)
@@ -5782,18 +6621,18 @@
     const TUTORIAL_PART1 = [
       {
         title: 'Welcome to Project Kestrel!',
-        body: "Let\u2019s take a quick guided tour of Kestrel. You can <b>interact with the UI at any time</b> while this tour is open.<br><br>Click <b>Next \u2192</b> or press the right-arrow key to continue.",
+        body: 'Project Kestrel uses machine learning to organize your photos, helping you review them more efficiently, search through your library, and quickly decide which ones to edit and share.<br><br>This guided tutorial will walk you through the core features of Kestrel.',
         target: null,
       },
       {
-        title: 'Analyze Your Photos',
-        body: 'Click <b>Analyze Folders\u2026</b> to select folders of bird photos. Kestrel scans them, detects birds using AI, identifies species, and scores quality automatically.',
+        title: 'First, Analyze Your Photos',
+        body: 'Click <b>Analyze Folders\u2026</b> to select folders that contain your bird photos. Kestrel groups them by scene, detects birds using AI, guesses the bird species and family, and scores quality automatically.',
         target: '#analyzeQueueBtn',
         position: 'bottom',
       },
       {
-        title: 'Open an Existing Folder',
-        body: 'Already analyzed a folder? Click <b>Open Folder\u2026</b> to browse it. Kestrel reads the <code>.kestrel</code> database and displays all your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
+        title: 'Open an Analyzed Folder',
+        body: 'Once you\u2019ve analyzed a folder with Kestrel, click <b>Open Folder\u2026</b> to browse it. Kestrel loads your scenes.<br><br>We\u2019ll auto-load some <b>sample bird photos</b> next so you can see it in action!',
         target: '#pickFolder',
         position: 'bottom',
       },
@@ -5802,69 +6641,88 @@
     const TUTORIAL_PART2 = [
       {
         title: 'Your Photos, Organized by Scene',
-        body: 'The <b>Scene Grid</b> shows your photos grouped by when they were taken. Each card shows the best photo, species detected, and the AI quality rating.',
-        nudge: 'Click the highlighted scene card to open it!',
-        target: '#sceneGrid .card',  // highlights the first card
+        body: 'Kestrel organizes your photos into <b>scenes</b> \u2014 groups of similar images captured in the same burst. The scene grid shows these scenes in the order they were taken.',
+        nudge: 'Click on a scene to open it!',
+        target: '#sceneGrid .card',
         position: 'right',
-        waitFor: 'clickScene',   // hide Next; require user to click a scene card
+        waitFor: 'clickScene',
       },
       {
-        title: 'Scene Detail View',
-        body: 'Inside a scene, photos are <b>sorted by quality</b> \u2014 the sharpest, best-composed shots appear first. Hover over a photo to preview it on the right.<br><br>When you analyze your own photos, you can <b>double-click</b> any photo to open it in your photo editor.',
-        target: '#sceneDlg',
-        highlightFirst: '#sceneDlg .card:first-child',
-        position: 'left',
-        inDialog: true,          // position relative to the dialog
-      },
-      {
-        title: 'Star Ratings',
-        body: 'Click the <b>\u2605 stars</b> on any photo to set your own rating. <span style="color:#6aa0ff">Blue stars</span> = AI rating. <span style="color:#f5c542">Gold stars</span> = your manual override.',
-        nudge: 'Try clicking a star on one of the photos!',
-        target: '#sceneDlg .card:first-child .stars',
-        position: 'right',
+        title: 'Explore Your Scene',
+        body: 'Within each scene, your photos are automatically <b>sorted by quality</b> \u2014 from sharpest to blurriest. You can immediately focus your attention on the best shots!<br><br>Click on a photo in the filmstrip to view its details.',
+        nudge: 'Click a photo in the filmstrip below!',
+        target: '#imageGrid',
+        position: 'top',
         inDialog: true,
-        waitFor: 'clickStar',    // wait for user to click a star
+        waitFor: 'clickFilmstrip',
       },
       {
-        title: 'Search & Filter',
-        body: 'Type a species or family name in the <b>Search</b> box. The grid filters instantly as you type.',
-        target: '#search',
-        position: 'right',
+        title: 'Ratings and Culling Decisions',
+        body: 'Kestrel computes <b>star ratings</b> based on each image\u2019s quality score. Click the stars to set your own. <span style="color:#6aa0ff">Blue stars</span> = AI rating \u00b7 <span style="color:#f5c542">Gold stars</span> = your manual override.<br><br>Use the <b>Accept \u00b7 Undecided \u00b7 Reject</b> buttons to make a culling decision for each photo. These will come in handy with the Culling Assistant later!',
+        nudge: 'Mark a photo as Accepted or Rejected to continue!',
+        target: '#sceneInfoBar',
+        position: 'top-left',
+        inDialog: true,
+        waitFor: 'clickCullToggle',
       },
       {
-        title: 'Sorting & Grouping',
-        body: 'Sort scenes by <b>Scene ID</b>, <b>Max Quality</b>, or <b>Image Count</b>. Toggle <b>Group by folder</b> to organize multi-folder libraries.',
-        target: '#sortBy',
+        title: 'Keyboard Shortcuts',
+        body: 'Kestrel has keyboard shortcuts to make reviewing photos faster. The shortcuts are listed above \u2014 try some out before continuing!',
+        target: '#sceneShortcutLegend',
+        position: 'bottom',
+        inDialog: true,
+        setupAction: 'expandShortcuts',
+      },
+      {
+        title: 'Other Scene Features',
+        body: 'A few more things you can do once you\u2019re browsing your <b>own photos</b> (these won\u2019t work on the sample images):<br><br>\u2022 <b>Click and drag</b> on the full image to load the RAW file and zoom in<br>\u2022 Edit the <b>scene name</b> and <b>tags</b> at the top<br>\u2022 Press <kbd>Space</kbd> to open the photo in your preferred photo editor<br>\u2022 Use <b>\u2702 Split Scene</b> if Kestrel accidentally merged two different scenes<br><br>Click <b>Close</b> to continue!',
+        nudge: 'Close the scene dialog to continue.',
+        target: '#closeDlg',
+        position: 'bottom',
+        inDialog: true,
+        waitFor: 'closeDialog',
+      },
+      {
+        title: 'Filtering Options',
+        body: '\u2022 <b>Search</b> for any bird species or family \u2014 the grid filters instantly as you type.<br>\u2022 Don\u2019t see scenes after searching? Lower the <b>Confidence Threshold</b> to see more results.<br>\u2022 Enable <b>Multi-subject mode</b> if your scenes contain multiple bird species.<br>\u2022 <b>Sort</b> by Quality, Image Count, or Capture Time.',
+        target: '.filter-panel',
         position: 'right',
       },
       {
         title: 'Merging Scenes',
-        body: 'Did Kestrel split a burst into two scene cards? Hold <kbd>Ctrl</kbd> and click to <b>select multiple scenes</b>, then hit <b>Merge selected scenes</b> to combine them into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
-        target: '#sceneGrid',
-        position: 'left',
-      },
-      {
-        title: 'Culling Assistant',
-        body: 'When you\u2019re ready to select your best shots, click <b>Open Culling Assistant</b> in any folder\u2019s header bar. It opens a dedicated accept/reject workspace.',
-        target: '.culling-btn',
+        body: 'The two highlighted scenes above were actually one continuous burst that Kestrel split in two. Hold <kbd>Ctrl</kbd> and click both cards to select them, then click <b>Merge selected scenes</b> to combine them back into one.<br><br>You can also <kbd>Shift+Click</kbd> to range-select a group of scenes at once.',
+        target: '#sceneGrid .card:nth-child(2)',
+        highlightFirst: '#sceneGrid .card:nth-child(1)',
         position: 'bottom',
       },
       {
-        title: 'Write XMP Metadata',
-        body: 'Click <b>Write Metadata</b> to write XMP sidecar files alongside your photos. These <code>.xmp</code> files carry Kestrel\u2019s star ratings, species ID, and quality scores in a format that <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors understand natively.<br><br>\u26a0\ufe0f <b>Write XMP files <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
+        title: 'Write Photo Metadata',
+        body: 'Click <b>Write Photo Metadata</b> to export Kestrel\u2019s star ratings and Accept/Reject decisions into XMP sidecar files alongside your photos. These <code>.xmp</code> files are understood natively by <b>Adobe Lightroom</b>, <b>darktable</b>, <b>Capture One</b>, and other editors.<br><br>\u26a0\ufe0f <b>Write photo metadata <em>before</em> importing into your photo editor</b> \u2014 most catalogues ignore new sidecar files once a photo is already imported. If a sidecar was already created by another application, Kestrel will ask before overwriting it.',
         target: '.write-metadata-btn',
         position: 'bottom',
       },
       {
-        title: 'Settings',
-        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Darktable, Lightroom, or system default). Double-clicking a photo will open it there.',
+        title: 'Culling Assistant',
+        body: 'The <b>Culling Assistant</b> helps you automatically assign photos as Accepted or Rejected based on star ratings \u2014 and can even move rejected photos into a dedicated folder.<br><br>Click <b>Open Culling Assistant</b> to open a dedicated Accept/Reject workspace for the folder.',
+        target: '.culling-assistant-btn',
+        position: 'bottom',
+      },
+      {
+        title: 'Options',
+        body: 'Click <b>Settings</b> to choose your preferred <b>photo editor</b> (Lightroom, Darktable, or system default). Opening a photo with <kbd>Space</kbd> will launch it there. You can also tweak several other options.',
         target: '#openSettings',
         position: 'bottom',
       },
       {
         title: 'You\u2019re All Set!',
-        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view & rate photos<br>\u2022 <b>Culling Assistant</b> for accept/reject workflow<br>\u2022 <b>Write Metadata</b> to export ratings &amp; species to Lightroom or darktable<br><br>Click the <b>?</b> button anytime to replay this tour. Happy birding!',
+        body: 'That\u2019s the tour! Quick recap:<br><br>\u2022 <b>Analyze Folders</b> to process new photos<br>\u2022 <b>Open Folder</b> to browse analyzed photos<br>\u2022 <b>Click scenes</b> to view &amp; rate photos<br>\u2022 <b>Culling Assistant</b> for bulk Accept/Reject workflow<br>\u2022 <b>Write Photo Metadata</b> to export to Lightroom, darktable, etc.<br><br>\u26a0\ufe0f <b>Remember:</b> Write photo metadata <em>before</em> importing into Lightroom or Capture One for best results!<br><br>Click the <b>\uD83D\uDCD6 Tutorial</b> button anytime to replay this tour. Happy birding!',
         target: null,
+      },
+      {
+        title: 'Please Send Feedback!',
+        body: 'I (the person who made Project Kestrel) would really love to hear from you! Please tell me if you found the app useful, or if you find any bugs or have suggestions for improvements.<br><br>Thank you for trying Kestrel!',
+        target: '#openFeedback',
+        position: 'top',
       },
     ];
 
@@ -5940,6 +6798,15 @@
       var card    = _tutEl('#tutorialCard');
       var nudge   = _tutEl('#tutorialNudge');
       var nextBtn = _tutEl('#tutorialNext');
+
+      // Pre-step setup actions (run before target positioning)
+      if (step.setupAction === 'expandShortcuts') {
+        var legend = document.getElementById('sceneShortcutLegend');
+        if (legend && legend.classList.contains('hidden')) {
+          var shortcutToggleBtn = document.getElementById('sceneShortcutBtn');
+          if (shortcutToggleBtn) shortcutToggleBtn.click();
+        }
+      }
 
       // Text
       _tutEl('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + _tutSteps.length;
@@ -6035,9 +6902,10 @@
         var ch     = card.offsetHeight || 220;
         var top, left;
         if (pos === 'right')       { left = r.right + margin;                 top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'left')   { left = r.left - cw - margin;             top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'bottom') { left = r.left + r.width / 2 - cw / 2;   top = r.bottom + margin; }
-        else                       { left = r.left + r.width / 2 - cw / 2;   top = r.top - ch - margin; }
+        else if (pos === 'left')     { left = r.left - cw - margin;             top = r.top + r.height / 2 - ch / 2; }
+        else if (pos === 'bottom')   { left = r.left + r.width / 2 - cw / 2;   top = r.bottom + margin; }
+        else if (pos === 'top-left') { left = r.left;                           top = r.top - ch - margin; }
+        else                         { left = r.left + r.width / 2 - cw / 2;   top = r.top - ch - margin; } // 'top'
         left = Math.max(margin, Math.min(left, vw - cw - margin));
         top  = Math.max(margin, Math.min(top,  vh - ch - margin));
         card.style.left = left + 'px';
@@ -6071,6 +6939,44 @@
         };
         document.addEventListener('click', onStarClick, true);
         _tutCleanupFn = function() { document.removeEventListener('click', onStarClick, true); };
+      }
+      else if (hasWaitFor && step.waitFor === 'clickFilmstrip') {
+        // User must click a photo in the filmstrip
+        var filmstripEl = document.getElementById('imageGrid');
+        if (filmstripEl) {
+          var onFilmstripClick = function(ev) {
+            var cardEl = ev.target.closest('.filmstrip-card, .card');
+            if (cardEl) {
+              setTimeout(function() { _tutAdvance(); }, 350);
+            }
+          };
+          filmstripEl.addEventListener('click', onFilmstripClick, true);
+          _tutCleanupFn = function() { filmstripEl.removeEventListener('click', onFilmstripClick, true); };
+        }
+      }
+      else if (hasWaitFor && step.waitFor === 'clickCullToggle') {
+        // User must click the Accept or Reject button (not Undecided)
+        var onCullClick = function(ev) {
+          var cullBtn = ev.target.closest('.cull-btn[data-cull="accept"], .cull-btn[data-cull="reject"]');
+          if (cullBtn) {
+            setTimeout(function() { _tutAdvance(); }, 400);
+          }
+        };
+        document.addEventListener('click', onCullClick, true);
+        _tutCleanupFn = function() { document.removeEventListener('click', onCullClick, true); };
+      }
+      else if (hasWaitFor && step.waitFor === 'closeDialog') {
+        // User must close the scene dialog
+        var sceneDlgEl = document.getElementById('sceneDlg');
+        if (sceneDlgEl) {
+          var onDlgClose = function() {
+            sceneDlgEl.removeEventListener('close', onDlgClose);
+            _tutCleanupFn = null;
+            setTimeout(function() { _tutAdvance(); }, 250);
+          };
+          sceneDlgEl.addEventListener('close', onDlgClose);
+          _tutCleanupFn = function() { sceneDlgEl.removeEventListener('close', onDlgClose); };
+        }
       }
     }
 
@@ -6156,19 +7062,12 @@
       }
     });
 
-    // Keyboard navigation
+    // Keyboard: only Escape closes the tutorial (arrow keys intentionally removed —
+    // users navigate via Next/Back buttons or by completing the waitFor action)
     document.addEventListener('keydown', function(ev) {
       if (!_tutEl('#tutorialOverlay').classList.contains('active')) return;
       if (_tutPart === 0) return;
-      var step = _tutSteps[_tutStep];
-      var hasWaitFor = step && step.waitFor;
-      if (ev.key === 'ArrowRight' || ev.key === 'Enter') {
-        ev.preventDefault();
-        // Don't advance with keyboard if a waitFor is active
-        if (!hasWaitFor) _tutAdvance();
-      }
-      else if (ev.key === 'ArrowLeft') { ev.preventDefault(); _tutGoBack(); }
-      else if (ev.key === 'Escape') { _closeMainTutorial(); }
+      if (ev.key === 'Escape') { _closeMainTutorial(); }
     });
 
     // Also wire welcome panel tutorial link to start inline tutorial

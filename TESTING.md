@@ -188,8 +188,9 @@ From the main scene grid, click **Culling Assistant** on a folder group that has
 - [ ] Adjusting Accept threshold slider re-categorizes images correctly — images above threshold move to Accept.
 - [ ] Adjusting Reject threshold slider re-categorizes correctly.
 - [ ] Slider value labels update in real time as sliders are dragged.
-- [ ] "Re-apply Auto-Categorize" button applies current thresholds while preserving manual overrides (toast message confirms).
-- [ ] "Reset All" button opens a confirmation dialog; confirming resets all manual overrides to auto defaults.
+- [ ] "Re-apply Auto-Categorize" button applies current thresholds while preserving manual and verified culls (toast message confirms).
+- [ ] "Reset Manual Assignments" button opens a confirmation dialog; confirming resets manual culls and re-runs auto-categorization.
+- [ ] Legacy folder with existing `culled` values but missing `culled_origin` preserves those values as manual after opening culling assistant and reapplying auto-categorization.
 - [ ] Scene rows with all images rated show no "unrated" badge.
 - [ ] Scene rows with unrated images show a yellow "unrated" badge in the scene label.
 
@@ -203,7 +204,8 @@ From the main scene grid, click **Culling Assistant** on a folder group that has
 - [ ] **Shift+click** (or drag) on a card moves it between Accept and Reject columns; card gets border color accordingly.
   - [ ] Accept cards show green left border.
   - [ ] Reject cards show red left border.
-  - [ ] Moved cards gain the `moved-card` stamp overlay ("Moved" label visible).
+  - [ ] Moved cards gain the `moved-card` stamp overlay ("User moved" label visible).
+- [ ] Cards with manual cull or manual star rating (without shift+click in this session) show a "User assigned" badge.
 - [ ] Manual overrides are preserved when "Re-apply Auto-Categorize" is run (only non-manually-moved cards change).
 - [ ] **Star rating** can be changed in-place from the culling card. Confirms rating updates in parent CSV.
 - [ ] **Card thumbnail zoom**: bottom bar `−` and `+` buttons change card size; slider also works.
@@ -237,8 +239,25 @@ Click **Done Culling, Proceed to Review**.
 - [ ] Dialog shows scene summary: # accepted, # rejected, # unrated.
 - [ ] **Move Rejects to _KESTREL_Rejects/** checkbox is present and checked by default.
 - [ ] **Write XMP Metadata** checkbox is present.
+- [ ] **Write color labels for auto-categorized images** checkbox is present and checked by default.
+- [ ] **Treat current auto categories as verified** checkbox is present and unchecked by default.
 - [ ] **XMP early-access note** is shown/hidden correctly when XMP checkbox is toggled.
 - [ ] Both checkboxes can be independently toggled.
+- [ ] With "Treat current auto categories as verified" enabled, finalized images with auto origin become `verified` and remain visible as accepted/rejected in the scene filmstrip.
+- [ ] With promotion disabled, auto categories stay hidden in filmstrip/main scene view (shown as Undecided there).
+
+### Step 8b (CORE) — XMP Label Origin Policy
+
+- [ ] In Culling Assistant finalize flow, with auto-label checkbox ON, auto accept/reject rows receive Green/Red labels in XMP.
+- [ ] In Culling Assistant finalize flow, with auto-label checkbox OFF, only manual/verified culls receive Green/Red labels.
+- [ ] From timeline folder action "Write XMP Metadata", only manual/verified culls receive Green/Red labels (auto culls never do).
+
+### Step 8c (CORE) — Folder Options Reset Actions
+
+- [ ] Folder header includes a **Folder options...** action button.
+- [ ] **Reset Verified** clears only verified cull categories in that folder.
+- [ ] **Reset All** clears manual and verified cull categories in that folder.
+- [ ] Reset actions do not change star ratings.
 - [ ] "Execute" / proceed button is disabled when neither checkbox is checked.
 - [ ] "Execute" / proceed button is enabled when at least one action is checked.
 - [ ] Clicking "Execute" — with **Move Rejects** checked:

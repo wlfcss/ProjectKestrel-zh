@@ -140,6 +140,7 @@ class Api:
                 from tkinter import filedialog
                 root = tk.Tk()
                 root.withdraw()
+                root.attributes('-topmost', True)
                 folder = filedialog.askdirectory(title="Select folder containing analyzed photos")
                 root.destroy()
                 if folder:
@@ -152,7 +153,32 @@ class Api:
             print(f"[API] choose_directory() -> Error: {e}", flush=True)
             log(f"Error in choose_directory: {e}")
             return None
-    
+
+    def open_file_explorer(self, folder_path):
+        """Open a folder in the native file explorer."""
+        if not folder_path:
+            return
+        
+        try:
+            abs_path = os.path.abspath(folder_path)
+            if not os.path.exists(abs_path):
+                print(f"[API] open_file_explorer: Path does not exist {abs_path}", flush=True)
+                return
+                
+            if sys.platform.startswith('win'):
+                if hasattr(os, 'startfile'):
+                    os.startfile(abs_path)
+                else:
+                    # Fallback for Windows if startfile is somehow missing (e.g. specialized python builds)
+                    subprocess.run(['explorer', abs_path], check=False)
+            elif sys.platform == 'darwin':
+                subprocess.run(['open', abs_path], check=False)
+            else:
+                subprocess.run(['xdg-open', abs_path], check=False)
+        except Exception as e:
+            print(f"[API] open_file_explorer error: {e}", flush=True)
+            return
+
     def choose_application(self):
         """Open native file picker for choosing an application executable.
         Returns: absolute path to selected file, or None if cancelled.
@@ -194,7 +220,7 @@ class Api:
         Returns:
             dict with 'success': bool, 'data': str (CSV content), 'error': str, 'path': str, 'root': str
         """
-        print(f"[API] read_kestrel_csv() called with folder_path: {folder_path}", flush=True)
+        
         try:
             # Normalize path: remove trailing separators to ensure reliable basename detection
             folder_path = folder_path.strip()
@@ -204,26 +230,23 @@ class Api:
             if not folder_path:
                 raise ValueError("Empty folder path")
             
-            print(f"[API] Normalized folder_path: {folder_path}", flush=True)
             
             # Determine if this IS the .kestrel folder or contains one
             folder_name = os.path.basename(folder_path)
-            print(f"[API] Folder name: '{folder_name}'", flush=True)
             
             is_kestrel_folder = (folder_name == '.kestrel')
-            print(f"[API] Is .kestrel folder: {is_kestrel_folder}", flush=True)
             
             if is_kestrel_folder:
                 csv_path = os.path.join(folder_path, 'kestrel_database.csv')
                 parent_folder = os.path.dirname(folder_path)
-                print(f"[API] Selected .kestrel folder directly. Parent: {parent_folder}", flush=True)
+                
             else:
                 csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
                 parent_folder = folder_path
-                print(f"[API] Selected parent folder. Will look for .kestrel subfolder.", flush=True)
+                
             
             if not os.path.exists(csv_path):
-                print(f"[API] read_kestrel_csv() -> CSV not found at: {csv_path}", flush=True)
+                
                 return {
                     'success': False,
                     'error': f'Could not find kestrel_database.csv at: {csv_path}',
@@ -234,7 +257,7 @@ class Api:
             with open(csv_path, 'r', encoding='utf-8') as f:
                 data = f.read()
             
-            print(f"[API] read_kestrel_csv() -> Success: Read {len(data)} bytes from {csv_path}", flush=True)
+            
             return {
                 'success': True,
                 'data': data,
@@ -556,20 +579,23 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     def apply_normalization(self, folder_path: str, mode: str = None) -> dict:
-        """Compute normalized ratings for all rows in a folder's database.
+        """Compute star ratings for all rows in a folder's database using the active rating profile.
 
-        Reads the current ``rating_normalization`` setting (or uses *mode* if provided),
-        builds or retrieves the quality-score distribution, applies the chosen normalization,
-        and returns the computed map WITHOUT writing to the CSV file.
+        Reads the ``rating_profile`` setting, looks up its quality-score thresholds, and maps
+        each image's raw quality score to a 1–5 star rating without any rank-based normalization.
+        Returns the computed map WITHOUT writing to the CSV file.
 
-        Also caches the folder's quality distribution in settings.json and
-        kestrel_metadata.json so it is available for global normalization.
+        Also caches the folder's quality distribution in kestrel_metadata.json for potential
+        future use (e.g. histogram display).
+
+        The ``mode`` parameter is accepted for API compatibility but is ignored; profile
+        thresholds always apply.
 
         Returns:
             {
               'success': bool,
               'normalized_ratings': {filename: int, ...},  # 0-5 for every row
-              'mode_used': str,
+              'mode_used': str,  # the active profile name
               'error': str
             }
         """
@@ -579,13 +605,13 @@ class Api:
             try:
                 from kestrel_analyzer.ratings import (
                     compute_quality_distribution,
-                    compute_normalized_rating,
+                    get_profile_thresholds,
                     quality_to_rating,
                 )
             except ImportError:
                 from analyzer.kestrel_analyzer.ratings import (
                     compute_quality_distribution,
-                    compute_normalized_rating,
+                    get_profile_thresholds,
                     quality_to_rating,
                 )
 
@@ -598,29 +624,26 @@ class Api:
                 return {'success': False, 'error': 'No database found', 'normalized_ratings': {}, 'mode_used': ''}
 
             settings = load_persisted_settings()
-            if mode is None:
-                mode = settings.get('rating_normalization', 'none')
+            profile = settings.get('rating_profile', 'balanced')
+            thresholds = get_profile_thresholds(profile)
 
             df = pd.read_csv(csv_path)
             if df.empty:
-                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': profile, 'error': ''}
 
-            # --- Build / retrieve per-folder distribution ---
+            # --- Cache per-folder quality distribution (for potential histogram display) ---
             quality_scores = df['quality'].tolist() if 'quality' in df.columns else []
             folder_dist = compute_quality_distribution(quality_scores)
 
-            # Cache in settings.json (overwrite with fresh computation each time)
-            dist_store = settings.setdefault('quality_scores_distribution', {})
-            dist_store[folder_path] = folder_dist
-            save_persisted_settings(settings)
-
-            # Cache in kestrel_metadata.json
             try:
+                _meta = {}
                 if os.path.exists(metadata_path):
                     with open(metadata_path, 'r', encoding='utf-8') as mf:
-                        _meta = json.load(mf)
-                else:
-                    _meta = {}
+                        content = mf.read().strip()
+                        if content:
+                            loaded = json.loads(content)
+                            if isinstance(loaded, dict):
+                                _meta = loaded
                 _meta['quality_distribution'] = folder_dist
                 _meta['quality_distribution_stored'] = True
                 with open(metadata_path, 'w', encoding='utf-8') as mf:
@@ -628,73 +651,25 @@ class Api:
             except Exception:
                 pass
 
-            # --- Choose distribution and compute ratings (in memory only — no CSV write) ---
-            
-            # Convert percentage settings to percentile thresholds (0.0-1.0)
-            pct_5 = settings.get('rating_threshold_5', 12) / 100.0
-            pct_4 = settings.get('rating_threshold_4', 15) / 100.0
-            pct_3 = settings.get('rating_threshold_3', 20) / 100.0
-            pct_2 = settings.get('rating_threshold_2', 30) / 100.0
-            # pct_1 = 100 - pct_5 - pct_4 - pct_3 - pct_2 (remainder for 1-star)
-            
-            # Convert percentages to cumulative percentiles from the top
-            # pct_5 is top 12% → threshold 0.88 (top 1 - 0.12)
-            # pct_4 is next 15% → threshold 0.73 (top 1 - 0.12 - 0.15)
-            # etc.
-            threshold_5 = 1.0 - pct_5
-            threshold_4 = threshold_5 - pct_4
-            threshold_3 = threshold_4 - pct_3
-            threshold_2 = threshold_3 - pct_2
-            
-            thresholds = {
-                'five': threshold_5,
-                'four': threshold_4,
-                'three': threshold_3,
-                'two': threshold_2,
-            }
-            
-            if mode == 'none':
-                def _get_norm(q_val):
-                    try:
-                        return quality_to_rating(float(q_val), thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
-            elif mode == 'global':
-                global_dist = [0] * 100
-                for dist in settings.get('quality_scores_distribution', {}).values():
-                    if isinstance(dist, list) and len(dist) == 100:
-                        for i, v in enumerate(dist):
-                            global_dist[i] += int(v)
-                _dist = global_dist
-
-                def _get_norm(q_val):
-                    try:
-                        return compute_normalized_rating(float(q_val), _dist, thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
-            else:  # per_folder
-                _dist = folder_dist
-
-                def _get_norm(q_val):
-                    try:
-                        return compute_normalized_rating(float(q_val), _dist, thresholds)
-                    except (TypeError, ValueError):
-                        return 0
-
+            # --- Map quality scores to star ratings (in memory only — no CSV write) ---
             if 'filename' not in df.columns or 'quality' not in df.columns:
-                return {'success': True, 'normalized_ratings': {}, 'mode_used': mode, 'error': ''}
+                return {'success': True, 'normalized_ratings': {}, 'mode_used': profile, 'error': ''}
+
+            def _get_rating(q_val):
+                try:
+                    return quality_to_rating(float(q_val), thresholds)
+                except (TypeError, ValueError):
+                    return 0
 
             normalized_map = {
-                str(row['filename']): _get_norm(row['quality'])
+                str(row['filename']): _get_rating(row['quality'])
                 for _, row in df.iterrows()
             }
-            print(f'[API] apply_normalization({folder_path!r}, mode={mode!r}) -> {len(normalized_map)} ratings computed (no CSV write)', flush=True)
+            
             return {
                 'success': True,
                 'normalized_ratings': normalized_map,
-                'mode_used': mode,
+                'mode_used': profile,
                 'error': '',
             }
         except Exception as e:
@@ -717,7 +692,7 @@ class Api:
 
             if not os.path.exists(scenedata_path):
                 # Return an empty-but-valid structure; the UI will fall back to scene_count grouping
-                print(f'[API] read_kestrel_scenedata({folder_path!r}) -> not found, returning empty', flush=True)
+                
                 return {'success': True, 'data': {'version': '2.0', 'image_ratings': {}, 'scenes': {}}, 'error': ''}
 
             with open(scenedata_path, 'r', encoding='utf-8') as f:
@@ -726,7 +701,7 @@ class Api:
             data.setdefault('version', '2.0')
             data.setdefault('image_ratings', {})
             data.setdefault('scenes', {})
-            print(f'[API] read_kestrel_scenedata({folder_path!r}) -> {len(data["scenes"])} scenes', flush=True)
+            
             return {'success': True, 'data': data, 'error': ''}
         except Exception as e:
             print(f'[API] read_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
@@ -1132,8 +1107,74 @@ class Api:
             log(f'[culling] Traceback: {traceback.format_exc()}')
             return {'success': False, 'error': str(e)}
 
+    def _find_sidecar_file(self, root_path: str, filename: str, ext: str = '.xmp'):
+        """Find sidecar file with given extension for an image file.
+        
+        Checks multiple naming conventions:
+        - filename + ext (e.g., IMG_001.CR3.xmp)
+        - name_without_ext + ext (e.g., IMG_001.xmp for IMG_001.CR3)
+        
+        Returns the filename (not path) if found, None otherwise.
+        Searches in the same directory as the image.
+        """
+        # Check primary naming: filename + ext (e.g., IMG_001.CR3.xmp)
+        sidecar_path = os.path.join(root_path, filename + ext)
+        if os.path.exists(sidecar_path):
+            return filename + ext
+        
+        # Check secondary naming: name_without_ext + ext (e.g., IMG_001.xmp)
+        if '.' in filename:
+            base_name = filename.rsplit('.', 1)[0]
+            alt_sidecar_path = os.path.join(root_path, base_name + ext)
+            if os.path.exists(alt_sidecar_path):
+                return base_name + ext
+        
+        log(f'_find_sidecar_file: Not found for {filename}')
+        return None
+
+    def _move_file_with_sidecars(self, root_path: str, filename: str, reject_dir: str):
+        """Move a file and its sidecar files (.xmp) to reject directory.
+        
+        Returns (success: bool, moved_files: list[str])
+        """
+        moved_files = []
+        errors = []
+        
+        # Move main file
+        src = os.path.join(root_path, filename)
+        dst = os.path.join(reject_dir, filename)
+        try:
+            if os.path.exists(src):
+                shutil.move(src, dst)
+                moved_files.append(filename)
+            else:
+                errors.append(f'{filename}: file not found')
+        except Exception as e:
+            errors.append(f'{filename}: {e}')
+            return False, moved_files
+        
+        # Move XMP sidecar if it exists
+        xmp_sidecar = self._find_sidecar_file(root_path, filename, '.xmp')
+        if xmp_sidecar:
+            xmp_src = os.path.join(root_path, xmp_sidecar)
+            xmp_dst = os.path.join(reject_dir, xmp_sidecar)
+            try:
+                if os.path.exists(xmp_src):
+                    shutil.move(xmp_src, xmp_dst)
+                    moved_files.append(xmp_sidecar)
+                    
+                else:
+                    log(f'move_rejects: Warning - XMP detected but not found at: {xmp_src}')
+            except Exception as e:
+                # Log warning but don't fail the main move if XMP fails
+                log(f'move_rejects: Warning - Failed to move {xmp_sidecar}: {e}')
+        else:
+            log(f'move_rejects: No XMP sidecar found for: {filename}')
+        
+        return True, moved_files
+
     def move_rejects_to_folder(self, root_path: str, filenames):
-        """Move original photo files into _KESTREL_Rejects subfolder."""
+        """Move original photo files and their XMP sidecars into _KESTREL_Rejects subfolder."""
         try:
             if not root_path or not os.path.isdir(root_path):
                 return {'success': False, 'error': 'Invalid root path'}
@@ -1142,83 +1183,189 @@ class Api:
             moved = []
             errors = []
             for fn in (filenames or []):
-                src = os.path.join(root_path, fn)
-                dst = os.path.join(reject_dir, fn)
-                try:
-                    if os.path.exists(src):
-                        shutil.move(src, dst)
-                        moved.append(fn)
-                    else:
-                        errors.append(f'{fn}: file not found')
-                except Exception as e:
-                    errors.append(f'{fn}: {e}')
-            log(f'move_rejects: moved {len(moved)}, errors {len(errors)}')
+                success, moved_files = self._move_file_with_sidecars(root_path, fn, reject_dir)
+                if success:
+                    moved.extend(moved_files)
+                else:
+                    errors.append(f'{fn}: move failed')
+            log(f'move_rejects: moved {len(moved)} file(s) (including sidecars), errors {len(errors)}')
             return {'success': True, 'moved': len(moved), 'errors': errors, 'reject_folder': reject_dir}
         except Exception as e:
             log(f'move_rejects_to_folder error: {e}')
             return {'success': False, 'error': str(e)}
 
-    def write_xmp_metadata(self, root_path: str, image_data, overwrite_external: bool = False):
+    def write_xmp_metadata(self, root_path: str, image_data, overwrite_external: bool = False, use_auto_labels: bool = False):
         """Write XMP sidecar files for each image, embedding star rating and culling label."""
         if _write_xmp_metadata is None:
             return {'success': False, 'error': 'metadata_writer module not available'}
-        return _write_xmp_metadata(root_path, image_data, overwrite_external)
+        return _write_xmp_metadata(root_path, image_data, overwrite_external, use_auto_labels)
+
+    def _restore_file_with_sidecars(self, reject_dir: str, root_path: str, filename: str):
+        """Restore a file and its sidecar files (.xmp) from reject directory.
+        
+        Checks multiple XMP naming conventions to ensure compatibility.
+        Returns (success: bool, restored_files: list[str])
+        """
+        restored_files = []
+        
+        # Restore main file
+        src = os.path.join(reject_dir, filename)
+        dst = os.path.join(root_path, filename)
+        try:
+            if os.path.exists(src):
+                shutil.move(src, dst)
+                restored_files.append(filename)
+                
+            else:
+                
+                return False, restored_files
+        except Exception as e:
+            
+            return False, restored_files
+        
+        # Restore XMP sidecar - check multiple naming conventions
+        xmp_sidecar = None
+        
+        # Check primary naming: filename + .xmp (e.g., IMG_001.CR3.xmp)
+        xmp_primary = filename + '.xmp'
+        xmp_src_primary = os.path.join(reject_dir, xmp_primary)
+        if os.path.exists(xmp_src_primary):
+            xmp_sidecar = xmp_primary
+            
+        else:
+            # Check secondary naming: name_without_ext + .xmp (e.g., IMG_001.xmp)
+            if '.' in filename:
+                base_name = filename.rsplit('.', 1)[0]
+                xmp_secondary = base_name + '.xmp'
+                xmp_src_secondary = os.path.join(reject_dir, xmp_secondary)
+                if os.path.exists(xmp_src_secondary):
+                    xmp_sidecar = xmp_secondary
+                    
+        
+        if xmp_sidecar:
+            xmp_src = os.path.join(reject_dir, xmp_sidecar)
+            xmp_dst = os.path.join(root_path, xmp_sidecar)
+            try:
+                shutil.move(xmp_src, xmp_dst)
+                restored_files.append(xmp_sidecar)
+                
+            except Exception as e:
+                # Log warning but don't fail if XMP restore fails
+                log(f'undo_reject_move: Warning - Failed to restore {xmp_sidecar}: {e}')
+        else:
+            log(f'undo_reject_move: No XMP sidecar found for: {filename}')
+        
+        return True, restored_files
 
     def undo_reject_move(self, root_path: str, filenames):
-        """Move files back from _KESTREL_Rejects to the root folder."""
+        """Move files and their XMP sidecars back from _KESTREL_Rejects to the root folder."""
         try:
-            reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+            reject_dir = os.path.join(root_path, "_KESTREL_Rejects")
             if not os.path.isdir(reject_dir):
-                return {'success': False, 'error': '_KESTREL_Rejects folder not found'}
+                return {"success": False, "error": "_KESTREL_Rejects folder not found"}
             restored = []
             errors = []
             for fn in (filenames or []):
-                src = os.path.join(reject_dir, fn)
-                dst = os.path.join(root_path, fn)
-                try:
-                    if os.path.exists(src):
-                        shutil.move(src, dst)
-                        restored.append(fn)
-                    else:
-                        errors.append(f'{fn}: not found in rejects')
-                except Exception as e:
-                    errors.append(f'{fn}: {e}')
-            log(f'undo_reject_move: restored {len(restored)}, errors {len(errors)}')
-            return {'success': True, 'restored': len(restored), 'errors': errors}
+                success, restored_files = self._restore_file_with_sidecars(reject_dir, root_path, fn)
+                if success:
+                    restored.extend(restored_files)
+                else:
+                    errors.append(f"{fn}: not found in rejects")
+            log(f"undo_reject_move: restored {len(restored)} file(s) (including sidecars), errors {len(errors)}")
+            return {"success": True, "restored": len(restored), "errors": errors}
         except Exception as e:
-            log(f'undo_reject_move error: {e}')
-            return {'success': False, 'error': str(e)}
-
+            log(f"undo_reject_move error: {e}")
+            return {"success": False, "error": str(e)}
     def backup_kestrel_csv(self, root_path: str):
-        """Copy kestrel_database.csv to kestrel_database_old.csv as backup."""
+        """Copy kestrel_database.csv to kestrel_database_old.csv as backup.
+        
+        Deprecated: Use backup_kestrel_db instead for dual backup.
+        Kept for backward compatibility.
+        """
+        return self.backup_kestrel_db(root_path)
+
+    def backup_kestrel_db(self, root_path: str):
+        """Backup both kestrel_database.csv and kestrel_scenedata.json before major operations.
+        
+        Creates:
+        - .kestrel/kestrel_database_old.csv (from kestrel_database.csv)
+        - .kestrel/kestrel_scenedata_old.json (from kestrel_scenedata.json)
+        
+        Returns:
+            {"success": bool, "backup_csv": str, "backup_scenedata": str, "error": str}
+        """
         try:
-            kestrel_dir = os.path.join(root_path, '.kestrel')
-            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
+            kestrel_dir = os.path.join(root_path, ".kestrel")
+            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
+            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
+            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
+            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            
             if not os.path.exists(csv_path):
-                return {'success': False, 'error': 'kestrel_database.csv not found'}
-            shutil.copy2(csv_path, backup_path)
-            log(f'backup_kestrel_csv: backed up to {backup_path}')
-            return {'success': True, 'backup_path': backup_path}
+                return {"success": False, "error": "kestrel_database.csv not found", "backup_csv": "", "backup_scenedata": ""}
+            
+            # Backup CSV
+            shutil.copy2(csv_path, csv_backup)
+            log(f"backup_kestrel_db: CSV backed up to {csv_backup}")
+            
+            # Backup scenedata if it exists
+            scenedata_backed = False
+            if os.path.exists(scenedata_path):
+                shutil.copy2(scenedata_path, scenedata_backup)
+                scenedata_backed = True
+                log(f"backup_kestrel_db: Scenedata backed up to {scenedata_backup}")
+            
+            return {
+                "success": True,
+                "backup_csv": csv_backup,
+                "backup_scenedata": scenedata_backup if scenedata_backed else "",
+                "error": ""
+            }
         except Exception as e:
-            log(f'backup_kestrel_csv error: {e}')
-            return {'success': False, 'error': str(e)}
+            log(f"backup_kestrel_db error: {e}")
+            return {"success": False, "error": str(e), "backup_csv": "", "backup_scenedata": ""}
 
     def restore_kestrel_csv_backup(self, root_path: str):
-        """Restore kestrel_database_old.csv back to kestrel_database.csv."""
-        try:
-            kestrel_dir = os.path.join(root_path, '.kestrel')
-            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-            backup_path = os.path.join(kestrel_dir, 'kestrel_database_old.csv')
-            if not os.path.exists(backup_path):
-                return {'success': False, 'error': 'kestrel_database_old.csv not found'}
-            shutil.copy2(backup_path, csv_path)
-            log(f'restore_kestrel_csv_backup: restored from {backup_path}')
-            return {'success': True}
-        except Exception as e:
-            log(f'restore_kestrel_csv_backup error: {e}')
-            return {'success': False, 'error': str(e)}
+        """Restore kestrel_database_old.csv back to kestrel_database.csv.
+        
+        Deprecated: Use restore_kestrel_db_backup instead for dual restore.
+        Kept for backward compatibility.
+        """
+        return self.restore_kestrel_db_backup(root_path)
 
+    def restore_kestrel_db_backup(self, root_path: str):
+        """Restore both kestrel_database.csv and kestrel_scenedata.json from backups.
+        
+        Restores from:
+        - .kestrel/kestrel_database_old.csv (to kestrel_database.csv)
+        - .kestrel/kestrel_scenedata_old.json (to kestrel_scenedata.json, if backup exists)
+        
+        Returns:
+            {"success": bool, "error": str}
+        """
+        try:
+            kestrel_dir = os.path.join(root_path, ".kestrel")
+            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
+            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
+            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
+            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            
+            if not os.path.exists(csv_backup):
+                return {"success": False, "error": "kestrel_database_old.csv not found"}
+            
+            # Restore CSV
+            shutil.copy2(csv_backup, csv_path)
+            log(f"restore_kestrel_db_backup: CSV restored from {csv_backup}")
+            
+            # Restore scenedata if backup exists
+            if os.path.exists(scenedata_backup):
+                shutil.copy2(scenedata_backup, scenedata_path)
+                log(f"restore_kestrel_db_backup: Scenedata restored from {scenedata_backup}")
+            
+            return {"success": True, "error": ""}
+        except Exception as e:
+            log(f"restore_kestrel_db_backup error: {e}")
+            return {"success": False, "error": str(e)}
     def open_reject_folder(self, root_path: str):
         """Open the _KESTREL_Rejects folder in the system file browser."""
         reject_dir = os.path.join(root_path, '_KESTREL_Rejects')

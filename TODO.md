@@ -1,7 +1,9 @@
 # Project Kestrel To-Do and Changelog
 * Investigate GPU support from recent pull request #14
-* Improve version handling
 * Investigate refinements to image quality thresholding from recent pull request #14. 
+
+* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed. 
+* Fix rating system.
 
 Bugs
 
@@ -72,6 +74,7 @@ Whats working
     - Fixed bugs with inconsistent application of exposure correction algorithm
     - Fixed bugs preventing the user interface from updating to reflect newly analyzed images while analysis is in progress.
     - Fixed bugs in user interface related to the new split scene and scene tag modification system
+    - Fixed a bug where the ETA calculation would not update when resuming analysis of a folder that has previously been started
     - Improved UI by reorganizing settings menu and providing several options to customize analysis parameters.
     - Improved UI to show max star rating rather than max Quality
     - Improved UI to implement auto-save functionality by default.
@@ -93,3 +96,24 @@ Whats working
 * Improve culling.html so that default behavior on unrated scenes is to reject with user-customizable option within the culling options. 
 * refresh behavior keeps refreshing when paused.
 * Some group detection failures in low-feature-point space. (ex. scene #30 high island 2024) - fixed
+
+# Version Willow Ptarmigan Changelog
+* Major improvements to Kestrel User Interface! Kestrel now shows your scenes in a filmstrip style view, allowing you to rapidly relive your memories and select which ones to edit and share.
+    - New keyboard shortcuts let you rapidly flick through a scene and seamless advance to previous/next scenes.
+    - New accept/reject tagging system lets you make culling decisions from the scene visualizer
+    - Streamlined user interface maintains all functionality: rename the scene, edit tags, split the scene into multiple scenes, and view RAW previews.
+* Improvements to Kestrel Culling Assistant and handling of culling decisions
+    - New streamlined user interface allows you to drag and drop images in addition to using Shift+Click
+    - New buttons to reset Culling Decisions allow you to reset Accept/Reject Ratings
+* Significant improvements to Kestrel's analysis pipeline
+    - New configurable rating system lets you customize how Kestrel assigns star ratings to your scenes.
+    - New exposure compensation algorithm improves analysis options
+    - Fixed bugs with Kestrel's scene grouping algorithm.
+* Other User Interface tweaks
+    - Consolidated buttons in the main GUI
+    - Updated in-app tutorials to thoroughly explain all new features and workflows
+    - Improvements to how Kestrel writes metadata to align more consistently with visuals.
+    - Tweaks to simplify language around metadata and culling categories.
+    - Improved handling of auto-generated ratings and auto-generated culling decisions to enhance consistency and decouple the two features.
+    - Show pipeline version in addition to standard version control.
+* Substantial number of bug fixes, particularly around the user interface, settings menu, and culling assistant.

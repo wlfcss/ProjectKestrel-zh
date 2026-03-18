@@ -170,6 +170,9 @@
     }
     .scene-col.accept-col { background: rgba(46,204,113,0.03); }
     .scene-col.reject-col { background: rgba(231,76,60,0.03); }
+    .scene-col.drag-over  { outline: 2px dashed var(--brand); outline-offset: -2px; background: rgba(74,163,255,0.08); }
+    .cull-card[draggable="true"] { cursor: grab; }
+    .cull-card[draggable="true"]:active { cursor: grabbing; }
     .scene-col-divider {
       width: 1px;
       background: var(--card-border);
@@ -195,17 +198,20 @@
     .cull-card.accept-card { border-left: 3px solid var(--accept-border); }
     .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
-    .cull-card.moved-card { opacity: 0.85; }
-    .cull-card.moved-card::after {
-      content: '↔ moved';
+    .cull-card.assigned-card::after {
+      content: 'User assigned';
       position: absolute;
-      top: 2px;
-      right: 3px;
+      top: 4px;
+      right: 4px;
       font-size: 9px;
-      background: rgba(0,0,0,0.7);
-      color: #aaa;
-      padding: 1px 4px;
-      border-radius: 3px;
+      font-weight: 700;
+      background: var(--brand);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      pointer-events: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      background: #6b6f7b;
     }
     .cull-card .cull-thumb {
       width: 100%;
@@ -787,9 +793,9 @@
     .auto-cat-panel {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
-      align-items: flex-end;
-      padding: 10px 14px;
+      gap: 10px 18px;
+      align-items: center;
+      padding: 7px 14px;
       background: rgba(74,163,255,0.05);
       border-bottom: 1px solid var(--card-border);
       flex-shrink: 0;
@@ -797,8 +803,7 @@
     .auto-cat-panel .slider-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      min-width: 160px;
+      gap: 3px;
     }
     .auto-cat-panel .slider-group label {
       font-size: 11px;
@@ -811,7 +816,7 @@
       gap: 7px;
     }
     .auto-cat-panel input[type="range"] {
-      width: 110px;
+      width: 100px;
       accent-color: var(--brand);
       cursor: pointer;
     }
@@ -819,33 +824,59 @@
       font-size: 13px;
       font-weight: 700;
       color: var(--text);
-      min-width: 28px;
+      min-width: 24px;
       text-align: left;
+    }
+    .auto-cat-panel .unrated-group {
+      justify-content: flex-end;
+    }
+    .auto-cat-panel .unrated-group .slider-row label {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
     }
     .auto-cat-panel .panel-actions {
       display: flex;
       flex-direction: row;
       gap: 8px;
-      align-self: flex-end;
-      padding-bottom: 2px;
+      align-self: center;
+      margin-left: auto;
     }
     .auto-cat-panel .panel-actions .btn {
       font-size: 12px;
-      padding: 5px 12px;
+      padding: 4px 11px;
       line-height: 1.35;
       white-space: nowrap;
     }
+    #reapplyAutoBtn.needs-reapply {
+      box-shadow: 0 0 0 2px var(--brand);
+      animation: pulse-reapply 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-reapply {
+      0%, 100% { box-shadow: 0 0 0 2px var(--brand); }
+      50%       { box-shadow: 0 0 0 4px rgba(74,163,255,0.5); }
+    }
 
-    /* Scene bulk actions (Accept/Reject All) */
+    /* Scene bulk actions (Verify / Accept All / Reject All) */
     .scene-bulk-actions {
       display: flex;
       gap: 6px;
       margin-left: auto;
+      align-items: center;
     }
     .scene-bulk-actions .btn {
       font-size: 11px;
       padding: 4px 10px;
       white-space: nowrap;
+    }
+    .btn.verify {
+      background: #1a4a7a;
+      border-color: #2d6fa8;
+      color: #9dd0ff;
+    }
+    .btn.verify:hover {
+      background: #1e5a90;
+      border-color: #4d8fcc;
     }
   </style>
 </head>
@@ -875,34 +906,43 @@
       <!-- Auto-categorize toolbar -->
       <div class="culling-toolbar">
         <button class="btn auto-cat-toggle-btn" id="autoCatToggle">⚙ Auto-Categorize ▾</button>
-        <span class="toolbar-label" id="autoCatSummary">Quality ≥ ★4 · Min 0/scene · Max ∞/scene</span>
+        <span class="toolbar-label" id="autoCatSummary">Rated &gt; ★3 · Min 0 · Max ∞ · Unrated → Auto-Reject</span>
       </div>
       <!-- Auto-categorize settings panel (hidden by default) -->
       <div class="auto-cat-panel hidden" id="autoCatPanel">
         <div class="slider-group">
-          <label for="qualityCutoffSlider">Quality cutoff — auto-accept images rated ≥</label>
+          <label for="qualityCutoffSlider">Accept if rated above</label>
           <div class="slider-row">
-            <input type="range" id="qualityCutoffSlider" min="1" max="5" value="4" step="1" />
-            <span class="slider-val" id="qualityCutoffVal">★4</span>
+            <input type="range" id="qualityCutoffSlider" min="0" max="5" value="3" step="1" />
+            <span class="slider-val" id="qualityCutoffVal">★3</span>
           </div>
         </div>
         <div class="slider-group">
-          <label for="minPerSceneSlider">Min per scene — always keep at least N best images per scene</label>
+          <label for="minPerSceneSlider">Min Accepted Per Scene</label>
           <div class="slider-row">
             <input type="range" id="minPerSceneSlider" min="0" max="5" value="0" step="1" />
             <span class="slider-val" id="minPerSceneVal">0</span>
           </div>
         </div>
         <div class="slider-group">
-          <label for="maxPerSceneSlider">Max per scene — keep at most N per scene (0 = unlimited)</label>
+          <label for="maxPerSceneSlider" title="0 = no cap">Max Accepted Per Scene</label>
           <div class="slider-row">
             <input type="range" id="maxPerSceneSlider" min="0" max="20" value="0" step="1" />
             <span class="slider-val" id="maxPerSceneVal">∞</span>
           </div>
         </div>
+        <div class="slider-group unrated-group">
+          <div class="slider-row">
+            <select id="unratedDefaultSelect" class="btn" style="height:26px; padding:2px 8px; font-size:12px;">
+              <option value="reject" selected>Auto-Reject</option>
+              <option value="accept">Auto-Accept</option>
+            </select>
+            <label for="unratedDefaultSelect">unrated images</label>
+          </div>
+        </div>
         <div class="panel-actions">
-          <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current slider values; your manual Shift+Click decisions are preserved">↻ Re-apply</button>
-          <button class="btn danger" id="resetAutoBtn" title="Clear all manual overrides and re-apply from scratch">⚠ Reset All</button>
+          <button class="btn primary" id="reapplyAutoBtn" title="Re-apply using current settings; manual Shift+Click decisions are preserved">↻ Re-apply</button>
+          <button class="btn danger" id="resetAutoBtn" title="Clear all manual assignments and re-apply from scratch">⚠ Reset</button>
         </div>
       </div>
       <!-- Column headers -->
@@ -972,9 +1012,19 @@
           <input type="checkbox" id="doXmpCheck" />
           <span class="dlg-option-icon">&#x1F4DD;</span>
           <div class="dlg-option-body">
-            <b>Write XMP Metadata Files</b>
+            <b>Write XMP Sidecar Files</b>
             <span>Writes a <code>.xmp</code> sidecar file next to each original. Embeds your star rating and Accept / Reject label so you can import directly into Lightroom, Capture One, or any XMP-aware application.<br>
             <a class="dlg-help-link" id="xmpHelpLink">&#x2753; Issues reading metadata in your photo editor?</a></span>
+          </div>
+        </label>
+      </div>
+      <div class="dlg-option-card hidden" id="xmpAutoLabelCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doAutoLabelCheck" checked />
+          <span class="dlg-option-icon">&#x1F3F7;&#xFE0F;</span>
+          <div class="dlg-option-body">
+            <b>Write auto-categorized Accept/Reject decisions to XMP labels</b>
+            <span>When enabled, images given Accept or Reject by auto rules also receive Green/Red XMP color labels.</span>
           </div>
         </label>
       </div>
@@ -992,6 +1042,16 @@
           <div class="dlg-option-body">
             <b>Move Rejects to Folder</b>
             <span id="moveCardDesc">Moves rejected files into <code>_KESTREL_Rejects/</code>. A backup of <code>kestrel_database.csv</code> is saved automatically. This step is undoable.</span>
+          </div>
+        </label>
+      </div>
+      <div class="dlg-option-card" id="xmpPromoteVerifiedCard">
+        <label class="dlg-option-label">
+          <input type="checkbox" id="doPromoteVerifiedCheck" />
+          <span class="dlg-option-icon">&#x2705;</span>
+          <div class="dlg-option-body">
+            <b>Confirm auto-categorized decisions</b>
+            <span>Marks all auto-assigned Accept/Reject decisions as <em>Confirmed</em>. Confirmed decisions appear in the filmstrip and scene view just like manual ones, but can still be reset via Folder Options.</span>
           </div>
         </label>
       </div>
@@ -1043,23 +1103,23 @@
 
   </dialog>
 
-  <!-- Reset All confirmation dialog -->
+  <!-- Reset Manual Assignments confirmation dialog -->
   <dialog id="resetConfirmDlg">
     <div class="dlg-header">
       <span class="dlg-icon">&#x26A0;&#xFE0F;</span>
       <div>
-        <h2>Reset All Categorizations?</h2>
+        <h2>Reset Manual Assignments?</h2>
         <p class="dlg-subtitle">This cannot be undone.</p>
       </div>
     </div>
     <div class="dlg-divider"></div>
     <p style="padding:12px 22px 4px;font-size:13px;line-height:1.6">
-      This will clear all <b id="resetOverrideCount">your</b> manual Shift+Click overrides and re-categorize
-      every image from scratch using the current slider settings.
+      This will clear all <b id="resetOverrideCount">your</b> manual Accept/Reject decisions and re-run
+      auto-categorize from scratch using the current slider settings.
     </p>
     <div class="actions">
       <button class="btn" id="resetConfirmCancel">Cancel</button>
-      <button class="btn danger" id="resetConfirmOk">Reset All</button>
+      <button class="btn danger" id="resetConfirmOk">Reset Manual Assignments</button>
     </div>
   </dialog>
 
@@ -1109,13 +1169,13 @@
     let header = [];
     let scenes = [];            // [{id, images[], species, ...}]
     let cullingState = new Map(); // filename -> 'accept' | 'reject'
-    let manuallyMoved = new Set(); // filenames the user has shift-clicked
     let blobUrlCache = new Map();
     let _normalizedRatings = {};   // filename -> auto rating from apply_normalization()
     let _scenedata = { version: '2.0', image_ratings: {}, scenes: {} };
+    let _needsLegacyCullOriginUpgrade = false;
     let rejectFilenames = [];    // for undo after move
     let moveCompleted = false;
-    let thumbDragPixels = 0;  // how many px the mouse moved during last thumb mousedown
+
 
     // ---- URL param ----
     function getUrlParam(name) {
@@ -1236,8 +1296,49 @@
       else delete _scenedata.image_ratings[fn];
     }
 
-    function isAccept(row) {
-      return cullingState.get(row.filename) === 'accept';
+    function normalizeCullOrigin(row) {
+      const status = row?.culled === 'accept' || row?.culled === 'reject' ? row.culled : '';
+      const raw = String(row?.culled_origin || '').toLowerCase();
+      if (raw === 'manual' || raw === 'auto' || raw === 'verified') return raw;
+      // Compatibility: legacy rows with cull status but no origin should be treated as user assignments.
+      if (status) return 'manual';
+      return '';
+    }
+    function getCullOrigin(row) {
+      return normalizeCullOrigin(row);
+    }
+    function hasManualRating(row) {
+      return getOrigin(row) === 'manual' && getRating(row) > 0;
+    }
+    function isProtectedCull(row) {
+      const origin = getCullOrigin(row);
+      return origin === 'manual' || origin === 'verified';
+    }
+    function hasAnyCull(row) {
+      const state = cullingState.get(row.filename) || row?.culled || '';
+      return state === 'accept' || state === 'reject';
+    }
+    function needsRatingAttention(row) {
+      // Unrated images that are already user-assigned are considered handled.
+      if (getRating(row) > 0) return false;
+      if (isProtectedCull(row) && hasAnyCull(row)) return false;
+      return true;
+    }
+    function setCullState(row, state, origin) {
+      const nextState = state === 'accept' || state === 'reject' ? state : '';
+      const nextOrigin = nextState ? (origin || '') : '';
+      cullingState.set(row.filename, nextState);
+      row.culled = nextState;
+      row.culled_origin = nextOrigin;
+    }
+    function updateSceneDerivedFlags(scene) {
+      if (!scene?.images?.length) {
+        scene.allUnrated = false;
+        scene.hasAnyUnrated = false;
+        return;
+      }
+      scene.allUnrated = scene.images.every(r => needsRatingAttention(r));
+      scene.hasAnyUnrated = scene.images.some(r => needsRatingAttention(r));
     }
 
     // Interactive star bar (DOM-based, matching visualizer.html pattern)
@@ -1267,6 +1368,7 @@
           ev.stopPropagation();
           setRating(row, i, 'manual');
           render();
+          renderScene(row.scene_count);
           debouncedSave();
         });
         wrap.appendChild(s);
@@ -1294,12 +1396,20 @@
 
     // ---- Ensure columns ----
     function ensureColumns() {
+      _needsLegacyCullOriginUpgrade = false;
       if (!header.includes('scene_name')) header.push('scene_name');
       if (!header.includes('culled')) header.push('culled');
+      if (!header.includes('culled_origin')) header.push('culled_origin');
       if (!header.includes('exposure_correction')) header.push('exposure_correction');
       if (!header.includes('detection_scores')) header.push('detection_scores');
       for (const r of rows) {
         if (r.culled === undefined) r.culled = '';
+        if (r.culled_origin === undefined) r.culled_origin = '';
+        const prevOrigin = String(r.culled_origin || '').toLowerCase();
+        r.culled_origin = normalizeCullOrigin(r);
+        if (!prevOrigin && r.culled_origin === 'manual' && (r.culled === 'accept' || r.culled === 'reject')) {
+          _needsLegacyCullOriginUpgrade = true;
+        }
         if (r.exposure_correction === undefined) r.exposure_correction = '0';
         if (r.detection_scores === undefined) r.detection_scores = '';
       }
@@ -1323,8 +1433,8 @@
           if (r.species && r.species !== 'No Bird' && r.species !== 'Unknown') speciesSet.add(r.species);
         }
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
-        const allUnrated = arr.every(r => getRating(r) === 0);
-        const hasAnyUnrated = arr.some(r => getRating(r) === 0);
+        const allUnrated = arr.length > 0 && arr.every(r => needsRatingAttention(r));
+        const hasAnyUnrated = arr.some(r => needsRatingAttention(r));
         const hasDetections = arr.some(r => r.species && r.species !== 'No Bird' && r.species !== 'Unknown' && r.species !== '');
         list.push({
           id: sceneId,
@@ -1345,29 +1455,35 @@
 
     // ---- Auto-categorize helpers ----
     function getSliderValues() {
-      const cutoff  = parseInt(el('#qualityCutoffSlider')?.value ?? '4', 10);
+      const cutoff  = parseInt(el('#qualityCutoffSlider')?.value ?? '3', 10);
       const minKeep = parseInt(el('#minPerSceneSlider')?.value  ?? '0', 10);
       const maxRaw  = parseInt(el('#maxPerSceneSlider')?.value  ?? '0', 10);
       const maxKeep = maxRaw === 0 ? Infinity : maxRaw;
-      return { cutoff, minKeep, maxKeep };
+      const unratedDefault = (el('#unratedDefaultSelect')?.value === 'accept') ? 'accept' : 'reject';
+      return { cutoff, minKeep, maxKeep, unratedDefault };
     }
 
-    function updateSliderLabels() {
-      const { cutoff, minKeep, maxKeep } = getSliderValues();
+    let _autoRulesLoaded = false; // set true after first settings load so initial load doesn't flash
+    function updateSliderLabels(fromLoad = false) {
+      const { cutoff, minKeep, maxKeep, unratedDefault } = getSliderValues();
       const qEl   = el('#qualityCutoffVal');
       const minEl = el('#minPerSceneVal');
       const maxEl = el('#maxPerSceneVal');
       if (qEl)   qEl.textContent   = '\u2605' + cutoff;
       if (minEl) minEl.textContent = String(minKeep);
       if (maxEl) maxEl.textContent = maxKeep === Infinity ? '\u221e' : String(maxKeep);
+      const unratedLabel = unratedDefault === 'accept' ? 'Auto-Accept' : 'Auto-Reject';
       const summary = el('#autoCatSummary');
       if (summary) summary.textContent =
-        `Quality \u2265 \u2605${cutoff} \u00b7 Min ${minKeep}/scene \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep}/scene`;
+        `Rated > \u2605${cutoff} \u00b7 Min ${minKeep} \u00b7 Max ${maxKeep === Infinity ? '\u221e' : maxKeep} \u00b7 Unrated \u2192 ${unratedLabel}`;
+      // Highlight Re-apply button when rules change (but not on initial page load)
+      if (!fromLoad && _autoRulesLoaded) {
+        el('#reapplyAutoBtn')?.classList.add('needs-reapply');
+      }
     }
 
     function applyAutoCategorize(preserveManual = true) {
-      const { cutoff, minKeep, maxKeep } = getSliderValues();
-      if (!preserveManual) manuallyMoved.clear();
+      const { cutoff, minKeep, maxKeep, unratedDefault } = getSliderValues();
       for (const scene of scenes) {
         // Sort by rating desc, then quality score desc
         const sorted = scene.images.slice().sort((a, b) => {
@@ -1375,9 +1491,13 @@
           return rb !== ra ? rb - ra : parseNumber(b.quality) - parseNumber(a.quality);
         });
 
-        // Phase 1: quality cutoff — accept images at/above cutoff; unrated (0) also accepted
+        // Phase 1: quality cutoff — unrated images follow explicit default setting.
         const qualityAcceptSet = new Set(
-          sorted.filter(r => { const rt = getRating(r); return rt === 0 || rt >= cutoff; })
+          sorted.filter(r => {
+            const rt = getRating(r);
+            if (rt === 0) return unratedDefault === 'accept';
+            return rt > cutoff;
+          })
                 .map(r => r.filename)
         );
 
@@ -1406,12 +1526,11 @@
           }
         }
 
-        // Write results (skip manually moved images when preserveManual is true)
+        // Write results (manual/confirmed culling decisions are preserved by default)
         for (const r of scene.images) {
-          if (preserveManual && manuallyMoved.has(r.filename)) continue;
+          if (preserveManual && isProtectedCull(r)) continue;
           const state = finalAccepts.has(r.filename) ? 'accept' : 'reject';
-          cullingState.set(r.filename, state);
-          r.culled = state;
+          setCullState(r, state, 'auto');
         }
       }
     }
@@ -1419,26 +1538,68 @@
     // ---- Initialize culling state ----
     function initCullingState() {
       cullingState.clear();
-      manuallyMoved.clear();
-      // If any rows already have a saved culled status, restore from that
-      const anyPreset = rows.some(r => r.culled === 'accept' || r.culled === 'reject');
-      if (anyPreset) {
-        for (const r of rows) {
-          cullingState.set(r.filename, r.culled === 'reject' ? 'reject' : 'accept');
+      for (const r of rows) {
+        const origin = normalizeCullOrigin(r);
+        const state = r.culled === 'reject' ? 'reject' : (r.culled === 'accept' ? 'accept' : '');
+        if (state) {
+          setCullState(r, state, origin);
+        } else {
+          cullingState.delete(r.filename);
         }
-      } else {
-        // First time: run auto-categorize with current slider values
-        applyAutoCategorize(false);
       }
+      // Always backfill non-protected images so assistant columns include untouched rows too.
+      applyAutoCategorize(true);
     }
 
     // ---- Swap image between accept/reject ----
     function swapImage(row) {
-      const current = cullingState.get(row.filename);
+      const current = cullingState.get(row.filename) || 'accept';
       const newState = current === 'accept' ? 'reject' : 'accept';
-      cullingState.set(row.filename, newState);
-      row.culled = newState;
-      manuallyMoved.add(row.filename);
+      setCullState(row, newState, 'manual');
+    }
+
+    // ---- Wire a column element as a drag-and-drop target ----
+    function wireColDropZone(colEl, targetState) {
+      colEl.addEventListener('dragover', (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        colEl.classList.add('drag-over');
+      });
+      colEl.addEventListener('dragleave', (ev) => {
+        if (!colEl.contains(ev.relatedTarget)) colEl.classList.remove('drag-over');
+      });
+      colEl.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        colEl.classList.remove('drag-over');
+        const filename = ev.dataTransfer.getData('text/plain');
+        if (!filename) return;
+        const row = rows.find(r => r.filename === filename);
+        if (!row) return;
+        if (cullingState.get(filename) === targetState) return;
+        setCullState(row, targetState, 'manual');
+        renderScene(row.scene_count);
+        updateStats();
+        debouncedSave();
+      });
+    }
+
+    // ---- Verify all unrated images in a scene (promote current auto state to manual) ----
+    function verifyUnratedInScene(sceneId) {
+      const scene = scenes.find(s => s.id === String(sceneId));
+      if (!scene) return;
+      let verified = 0;
+      for (const row of scene.images) {
+        if (!needsRatingAttention(row)) continue;
+        const current = cullingState.get(row.filename) || 'accept';
+        setCullState(row, current, 'manual');
+        verified++;
+      }
+      if (verified > 0) {
+        renderScene(sceneId);
+        updateStats();
+        debouncedSave();
+      }
+      return verified;
     }
 
     // ---- Accept all images in a scene ----
@@ -1446,9 +1607,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        cullingState.set(row.filename, 'accept');
-        row.culled = 'accept';
-        manuallyMoved.add(row.filename);
+        setCullState(row, 'accept', 'manual');
       }
       renderScene(sceneId);
       updateStats();
@@ -1460,9 +1619,7 @@
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
       for (const row of scene.images) {
-        cullingState.set(row.filename, 'reject');
-        row.culled = 'reject';
-        manuallyMoved.add(row.filename);
+        setCullState(row, 'reject', 'manual');
       }
       renderScene(sceneId);
       updateStats();
@@ -1472,25 +1629,21 @@
     // ---- Build an image card ----
     function buildImageCard(row) {
       const rating = getRating(row);
-      const isUnrated = rating === 0;
+      // Only show yellow unrated style if unrated AND not already manually/confirmed culled
+      const isUnrated = rating === 0 && !isProtectedCull(row);
       const side = cullingState.get(row.filename) || 'accept';
       const card = document.createElement('div');
       card.className = isUnrated ? 'cull-card unrated-card' : `cull-card ${side}-card`;
-      if (manuallyMoved.has(row.filename)) card.classList.add('moved-card');
+      if (getCullOrigin(row) === 'manual' || hasManualRating(row)) card.classList.add('assigned-card');
       card.style.position = 'relative'; // for ::after badge
 
       const thumb = document.createElement('div');
       thumb.className = 'cull-thumb';
       const img = document.createElement('img');
       img.alt = row.filename || '';
+      img.draggable = false; // prevent native image drag so card-level drag-and-drop works
       lazyLoadImg(img, () => getBlobUrl(row.export_path || row.crop_path, rootPath));
       thumb.appendChild(img);
-      // Drag on thumbnail to zoom preview; Shift+drag also loads RAW
-      thumb.addEventListener('mousedown', (ev) => {
-        if (ev.button !== 0) return;
-        ev.preventDefault();
-        startZoomPreview(row, thumb, ev, true /* always loadRaw */);
-      });
       card.appendChild(thumb);
 
       const info = document.createElement('div');
@@ -1503,9 +1656,16 @@
       info.appendChild(createStarBar(row));
       card.appendChild(info);
 
-      // Shift+click (no drag) to swap; Shift+drag is handled by mousedown
+      // Drag card to other column to swap
+      card.draggable = true;
+      card.addEventListener('dragstart', (ev) => {
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', row.filename);
+      });
+
+      // Shift+click to swap Accept/Reject
       card.addEventListener('click', (ev) => {
-        if (ev.shiftKey && thumbDragPixels < 5) {
+        if (ev.shiftKey) {
           ev.preventDefault();
           swapImage(row);
           renderScene(row.scene_count);
@@ -1524,8 +1684,16 @@
     function renderScene(sceneId) {
       const scene = scenes.find(s => s.id === String(sceneId));
       if (!scene) return;
+      updateSceneDerivedFlags(scene);
       const el = document.getElementById(`scene-row-${sceneId}`);
       if (!el) return;
+      el.classList.toggle('unrated', !!scene.allUnrated);
+
+      const badge = el.querySelector('.scene-unrated-badge');
+      if (badge) badge.classList.toggle('hidden', !scene.hasAnyUnrated);
+
+      const verifyBtn = el.querySelector('.scene-verify-btn');
+      if (verifyBtn) verifyBtn.classList.toggle('hidden', !scene.hasAnyUnrated);
 
       const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
       const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
@@ -1542,6 +1710,7 @@
       container.innerHTML = '';
 
       for (const scene of scenes) {
+        updateSceneDerivedFlags(scene);
         const row = document.createElement('div');
         row.className = 'scene-row';
         row.id = `scene-row-${scene.id}`;
@@ -1554,11 +1723,20 @@
         label.innerHTML = `<b>Scene #${escapeHtml(scene.id)}</b>` +
           (scene.sceneName ? ` — ${escapeHtml(scene.sceneName)}` : '') +
           ` <span style="color:var(--muted);font-size:11px">${escapeHtml(speciesText)} · ${scene.images.length} image${scene.images.length === 1 ? '' : 's'}</span>` +
-          (scene.hasAnyUnrated ? ' <span class="unrated-badge">⚠ Contains unrated photos</span>' : '');
+          `<span class="unrated-badge scene-unrated-badge ${scene.hasAnyUnrated ? '' : 'hidden'}">⚠ Contains unrated photos</span>`;
         
         // Add bulk action buttons
         const bulkActionsDiv = document.createElement('div');
         bulkActionsDiv.className = 'scene-bulk-actions';
+
+        const verifyBtn = document.createElement('button');
+        verifyBtn.className = `btn verify scene-verify-btn${scene.hasAnyUnrated ? '' : ' hidden'}`;
+        verifyBtn.textContent = '✦ Confirm Unrated';
+        verifyBtn.title = 'Manually confirm the current placement of all unrated images, dismissing the unrated warning and locking their accept/reject status';
+        verifyBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          verifyUnratedInScene(scene.id);
+        });
         
         const acceptAllBtn = document.createElement('button');
         acceptAllBtn.className = 'btn primary';
@@ -1577,7 +1755,8 @@
           ev.stopPropagation();
           rejectAllInScene(scene.id);
         });
-        
+
+        bulkActionsDiv.appendChild(verifyBtn);
         bulkActionsDiv.appendChild(acceptAllBtn);
         bulkActionsDiv.appendChild(rejectAllBtn);
         label.appendChild(bulkActionsDiv);
@@ -1589,12 +1768,14 @@
 
         const acceptCol = document.createElement('div');
         acceptCol.className = 'scene-col accept-col';
+        wireColDropZone(acceptCol, 'accept');
 
         const divider = document.createElement('div');
         divider.className = 'scene-col-divider';
 
         const rejectCol = document.createElement('div');
         rejectCol.className = 'scene-col reject-col';
+        wireColDropZone(rejectCol, 'reject');
 
         const accepts = scene.images.filter(r => cullingState.get(r.filename) === 'accept');
         const rejects = scene.images.filter(r => cullingState.get(r.filename) === 'reject');
@@ -1612,6 +1793,8 @@
 
     // ---- Update preview pane ----
     async function updatePreview(row) {
+      if (zoomActive) return; // don't interrupt an active zoom session
+      previewRow = row;
       // Export image
       const exportBox = el('#previewExport');
       exportBox.innerHTML = '<span class="muted">Loading…</span>';
@@ -1679,6 +1862,36 @@
       saveTimer = setTimeout(() => saveCullingState(), 1500);
     }
 
+    // ---- Clean up scenedata to remove rejected files and empty scenes ----
+    function cleanupScenedataForRejects(rejectSet) {
+      "Remove rejected images from scenedata and clean up empty scenes."
+      // Remove from image_ratings
+      if (_scenedata && _scenedata.image_ratings) {
+        for (const fn of rejectSet) {
+          delete _scenedata.image_ratings[fn];
+        }
+      }
+      
+      // Remove from scenes and clean up empty ones
+      if (_scenedata && _scenedata.scenes) {
+        const scenesToRemove = [];
+        for (const [sceneId, sceneData] of Object.entries(_scenedata.scenes)) {
+          if (sceneData.images && Array.isArray(sceneData.images)) {
+            // Filter out rejected images from this scene
+            sceneData.images = sceneData.images.filter(f => !rejectSet.has(f));
+            // If scene has no images left, mark for removal
+            if (sceneData.images.length === 0) {
+              scenesToRemove.push(sceneId);
+            }
+          }
+        }
+        // Remove empty scenes
+        for (const sceneId of scenesToRemove) {
+          delete _scenedata.scenes[sceneId];
+        }
+      }
+    }
+
     async function saveCullingState() {
       try {
         // Filter out internal __ keys
@@ -1744,16 +1957,36 @@
     }
 
     function _updateExecuteBtn() {
-      const any = el('#doXmpCheck')?.checked || el('#doMoveCheck')?.checked;
+      const xmpChecked = !!el('#doXmpCheck')?.checked;
+      const any = xmpChecked || el('#doMoveCheck')?.checked || !!el('#doPromoteVerifiedCheck')?.checked;
       const btn = el('#confirmOk');
       if (btn) btn.disabled = !any;
+      const autoLabel = el('#doAutoLabelCheck');
+      const autoLabelCard = el('#xmpAutoLabelCard');
+      // Auto-label sub-option only makes sense when writing XMP; Confirm is independent
+      if (autoLabel) autoLabel.disabled = !xmpChecked;
+      if (autoLabelCard) autoLabelCard.classList.toggle('hidden', !xmpChecked);
+    }
+
+    function promoteAutoToVerified() {
+      let promoted = 0;
+      for (const r of rows) {
+        const state = cullingState.get(r.filename);
+        if (state !== 'accept' && state !== 'reject') continue;
+        if (getCullOrigin(r) !== 'auto') continue;
+        setCullState(r, state, 'verified');
+        promoted++;
+      }
+      return promoted;
     }
 
     // ---- Execute selected actions ----
     async function executeActions() {
       const doXmp  = el('#doXmpCheck')?.checked  || false;
       const doMove = el('#doMoveCheck')?.checked || false;
-      if (!doXmp && !doMove) return;
+      const doAutoLabels = doXmp && (el('#doAutoLabelCheck')?.checked ?? true);
+      const doPromoteVerified = !!el('#doPromoteVerifiedCheck')?.checked;
+      if (!doXmp && !doMove && !doPromoteVerified) return;
 
       // Switch to progress view
       el('#dlgOptions').classList.add('hidden');
@@ -1764,6 +1997,7 @@
 
       // Build ordered step list
       const stepDefs = [
+        { id: 'promote', label: 'Confirming auto-categorized decisions',  cond: doPromoteVerified },
         { id: 'save',   label: 'Saving database',                    always: true },
         { id: 'backup', label: 'Backing up kestrel_database.csv',    cond: doMove },
         { id: 'xmp',    label: 'Writing XMP sidecar files',          cond: doXmp  },
@@ -1796,15 +2030,22 @@
 
       let anyFailed = false;
       try {
-        // 1. Save
+        // 1. Optional confirm auto-categorizations
+        if (doPromoteVerified) {
+          setStep('promote', 'running');
+          const promoted = promoteAutoToVerified();
+          setStep('promote', 'done', `${promoted} image${promoted === 1 ? '' : 's'} confirmed`);
+        }
+
+        // 2. Save
         setStep('save', 'running');
         await saveCullingState();
         setStep('save', 'done');
 
-        // 2. Backup (only if moving)
+        // 3. Backup (only if moving)
         if (doMove) {
           setStep('backup', 'running');
-          const backupRes = await window.pywebview.api.backup_kestrel_csv(rootPath);
+          const backupRes = await window.pywebview.api.backup_kestrel_db(rootPath);
           if (!backupRes.success) {
             setStep('backup', 'failed', backupRes.error || '');
             throw new Error('Backup failed: ' + (backupRes.error || ''));
@@ -1812,20 +2053,21 @@
           setStep('backup', 'done');
         }
 
-        // 3. XMP
+        // 4. XMP
         if (doXmp) {
           setStep('xmp', 'running');
           const xmpPayload = rows.map(r => ({
             filename: r.filename,
             rating: getRating(r),
-            culled: cullingState.get(r.filename) || 'accept',
+            culled: cullingState.get(r.filename) || r.culled || '',
             species: r.species || '',
             family: r.family || '',
             quality: r.quality != null ? r.quality : null,
+            culled_origin: getCullOrigin(r),
           }));
 
           // First pass: detect conflicts (existing non-Kestrel XMPs)
-          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false);
+          const firstXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, false, doAutoLabels);
           if (!firstXmpRes.success) {
             setStep('xmp', 'failed', firstXmpRes.error || '');
             anyFailed = true;
@@ -1839,7 +2081,7 @@
             setStep('xmp', 'running');
             if (overwriteExternal) {
               // Second pass: overwrite the conflicting files too
-              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true);
+              const secondXmpRes = await window.pywebview.api.write_xmp_metadata(rootPath, xmpPayload, true, doAutoLabels);
               if (!secondXmpRes.success) {
                 setStep('xmp', 'failed', secondXmpRes.error || '');
                 anyFailed = true;
@@ -1857,7 +2099,7 @@
           }
         }
 
-        // 4. Move
+        // 5. Move
         let moveRes = null;
         if (doMove) {
           setStep('move', 'running');
@@ -1875,6 +2117,7 @@
           const rejectSet = new Set(rejectFilenames);
           rows = rows.filter(r => !rejectSet.has(r.filename));
           for (const fn of rejectSet) cullingState.delete(fn);
+          cleanupScenedataForRejects(rejectSet);
           await saveCullingState();
 
           try { await window.pywebview.api.open_reject_folder(rootPath); } catch (_) {}
@@ -1933,7 +2176,7 @@
         }
 
         // 2. Restore backup CSV
-        const restoreRes = await window.pywebview.api.restore_kestrel_csv_backup(rootPath);
+        const restoreRes = await window.pywebview.api.restore_kestrel_db_backup(rootPath);
         if (!restoreRes.success) {
           showToast('CSV restore failed: ' + (restoreRes.error || ''), 5000);
         }
@@ -2013,6 +2256,14 @@
       initCullingState();
       renderAllScenes();
       updateStats();
+      if (_needsLegacyCullOriginUpgrade) {
+        try {
+          await saveCullingState();
+          showToast('Upgraded legacy cull origin metadata for compatibility.', 2500);
+        } catch (e) {
+          console.warn('Legacy cull origin upgrade save failed', e);
+        }
+      }
     }
 
     // ====================================================================
@@ -2040,10 +2291,14 @@
         const qCutoff = parseInt(s.culling_quality_cutoff, 10);
         const minPS   = parseInt(s.culling_min_per_scene,  10);
         const maxPS   = parseInt(s.culling_max_per_scene,  10);
-        if (qCutoff >= 1 && qCutoff <= 5)  { const sl = el('#qualityCutoffSlider'); if (sl) sl.value = qCutoff; }
+        const unratedDefault = String(s.culling_unrated_default || 'reject').toLowerCase();
+        if (qCutoff >= 0 && qCutoff <= 5)  { const sl = el('#qualityCutoffSlider'); if (sl) sl.value = qCutoff; }
         if (minPS   >= 0 && minPS   <= 5)  { const sl = el('#minPerSceneSlider');   if (sl) sl.value = minPS; }
         if (maxPS   >= 0 && maxPS   <= 20) { const sl = el('#maxPerSceneSlider');   if (sl) sl.value = maxPS; }
-        updateSliderLabels();
+        const unratedSel = el('#unratedDefaultSelect');
+        if (unratedSel) unratedSel.value = unratedDefault === 'accept' ? 'accept' : 'reject';
+        updateSliderLabels(true);
+        _autoRulesLoaded = true;
       } catch (e) { console.warn('loadCullingSettings:', e); }
     }
 
@@ -2055,9 +2310,10 @@
           const s = (res?.success ? res.settings : {}) || {};
           s.culling_card_zoom       = parseInt(document.getElementById('cardZoomSlider')?.value, 10) || 150;
           s.culling_raw_zoom        = parseInt(document.getElementById('previewZoomSlider')?.value, 10) || 5;
-          s.culling_quality_cutoff  = parseInt(el('#qualityCutoffSlider')?.value, 10) || 4;
+          s.culling_quality_cutoff  = parseInt(el('#qualityCutoffSlider')?.value, 10) || 3;
           s.culling_min_per_scene   = parseInt(el('#minPerSceneSlider')?.value,   10) || 0;
           s.culling_max_per_scene   = parseInt(el('#maxPerSceneSlider')?.value,   10) || 0;
+          s.culling_unrated_default = (el('#unratedDefaultSelect')?.value === 'accept') ? 'accept' : 'reject';
           await window.pywebview.api.save_settings_data(s);
         } catch (e) { console.warn('saveCullingSettings:', e); }
       }, 1200);
@@ -2114,102 +2370,117 @@
       });
     })();
 
-    // ---- Preview zoom on click-drag ----
+    // ---- Preview zoom (click-drag on export preview image to pan/zoom) ----
     let zoomActive = false;
     let zoomRow = null;
-    let rawCache = new Map();   // filename -> base64 data URL
-    let rawLoading = new Set(); // filename currently loading
+    let previewRow = null;       // row currently shown in the preview pane
+    let rawCache = new Map();    // filename -> base64 data URL
+    let rawLoading = new Set();  // filename currently loading
 
     function getRawPreviewKey(row) {
       return row.filename || '';
     }
 
-    function startZoomPreview(row, thumbEl, mouseEv, loadRaw) {
-      zoomActive = true;
-      zoomRow = row;
-      thumbDragPixels = 0;
-
+    // Wire click-drag zoom directly on the export preview image (right-side preview pane).
+    // Mousedown → enter zoom; drag → pan; scroll wheel → adjust level; mouseup → exit.
+    (function setupPreviewDragZoom() {
       const exportBox = el('#previewExport');
+      if (!exportBox) return;
       const zoomSlider = el('#previewZoomSlider');
       const getScale = () => zoomSlider ? parseInt(zoomSlider.value, 10) : 5;
 
-      exportBox.classList.add('zoom-active');
+      exportBox.addEventListener('mousedown', (ev) => {
+        if (ev.button !== 0) return;
+        const row = previewRow;
+        if (!row) return;
+        ev.preventDefault();
 
-      // Ensure the best available image is shown and zoomed
-      async function applyBestImage(clientX, clientY) {
-        let img = exportBox.querySelector('img');
-        const scale = getScale();
-        const cacheKey = getRawPreviewKey(row);
-        const cachedRaw = rawCache.get(cacheKey);
+        zoomActive = true;
+        zoomRow = row;
+        exportBox.classList.add('zoom-active');
 
-        if (cachedRaw && img?.dataset?.isRaw !== '1') {
-          // Upgrade to cached RAW immediately
-          exportBox.innerHTML = '';
-          img = document.createElement('img');
-          img.src = cachedRaw;
-          img.dataset.isRaw = '1';
-          exportBox.appendChild(img);
-          exportBox.classList.add('raw-loaded');
-        } else if (!img) {
-          // No preview loaded — load export jpg
-          const url = await getBlobUrl(row.export_path, rootPath);
-          if (!zoomActive || zoomRow !== row) return;
-          if (url) {
+        // Upgrade to cached RAW if available, otherwise ensure image is present
+        async function applyBestImage(clientX, clientY) {
+          let img = exportBox.querySelector('img');
+          const scale = getScale();
+          const cacheKey = getRawPreviewKey(row);
+          const cachedRaw = rawCache.get(cacheKey);
+          if (cachedRaw && img?.dataset?.isRaw !== '1') {
             exportBox.innerHTML = '';
             img = document.createElement('img');
-            img.src = url;
+            img.src = cachedRaw;
+            img.dataset.isRaw = '1';
             exportBox.appendChild(img);
+            exportBox.classList.add('raw-loaded');
+          } else if (!img) {
+            const url = await getBlobUrl(row.export_path, rootPath);
+            if (!zoomActive || zoomRow !== row) return;
+            if (url) { exportBox.innerHTML = ''; img = document.createElement('img'); img.src = url; exportBox.appendChild(img); }
+          }
+          if (img && zoomActive && zoomRow === row) {
+            const rect = exportBox.getBoundingClientRect();
+            const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
+            const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
+            img.style.transform = `scale(${scale})`;
+            img.style.transformOrigin = `${xPct}% ${yPct}%`;
           }
         }
 
-        if (img && zoomActive && zoomRow === row) {
-          applyZoomTransform(img, thumbEl, clientX, clientY, scale);
-        }
+        applyBestImage(ev.clientX, ev.clientY);
+
+        // Kick off RAW loading
+        const cacheKey = getRawPreviewKey(row);
+        if (!rawCache.has(cacheKey) && !rawLoading.has(cacheKey)) loadRawAsync(row);
+
+        const onMove = (mev) => {
+          if (!zoomActive) return;
+          const curImg = exportBox.querySelector('img');
+          if (!curImg) return;
+          const rect = exportBox.getBoundingClientRect();
+          const xPct = Math.max(0, Math.min(1, (mev.clientX - rect.left) / rect.width)) * 100;
+          const yPct = Math.max(0, Math.min(1, (mev.clientY - rect.top) / rect.height)) * 100;
+          curImg.style.transformOrigin = `${xPct}% ${yPct}%`;
+        };
+
+        const onWheel = (wev) => {
+          if (!zoomActive) return;
+          wev.preventDefault();
+          if (!zoomSlider) return;
+          const delta = wev.deltaY < 0 ? 0.5 : -0.5;
+          zoomSlider.value = Math.max(+zoomSlider.min, Math.min(+zoomSlider.max, +zoomSlider.value + delta));
+          zoomSlider.dispatchEvent(new Event('input'));
+        };
+
+        const onUp = () => {
+          zoomActive = false;
+          zoomRow = null;
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          window.removeEventListener('wheel', onWheel);
+          exportBox.classList.remove('zoom-active', 'raw-loaded');
+          const curImg = exportBox.querySelector('img');
+          if (curImg) { curImg.style.transform = ''; curImg.style.transformOrigin = ''; delete curImg.dataset.isRaw; }
+        };
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('wheel', onWheel, { passive: false });
+      });
+    })();
+
+    // exitZoomMode: called by Escape key to abort an active zoom session
+    function exitZoomMode() {
+      if (!zoomActive) return;
+      zoomActive = false;
+      zoomRow = null;
+      const box = el('#previewExport');
+      if (box) {
+        box.classList.remove('zoom-active', 'raw-loaded');
+        const img = box.querySelector('img');
+        if (img) { img.style.transform = ''; img.style.transformOrigin = ''; delete img.dataset.isRaw; }
       }
-
-      applyBestImage(mouseEv.clientX, mouseEv.clientY);
-
-      // Trigger RAW loading only on Shift+drag
-      const cacheKey = getRawPreviewKey(row);
-      if (loadRaw && !rawCache.has(cacheKey) && !rawLoading.has(cacheKey)) {
-        loadRawAsync(row);
-      }
-
-      const startX = mouseEv.clientX, startY = mouseEv.clientY;
-      const onMove = (ev) => {
-        if (!zoomActive) return;
-        thumbDragPixels = Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY);
-        const s = getScale();
-        const curImg = el('#previewExport')?.querySelector('img');
-        if (curImg) applyZoomTransform(curImg, thumbEl, ev.clientX, ev.clientY, s);
-      };
-
-      const onUp = () => {
-        zoomActive = false;
-        zoomRow = null;
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        const box = el('#previewExport');
-        box.classList.remove('zoom-active');
-        box.classList.remove('raw-loaded');
-        const curImg = box.querySelector('img');
-        if (curImg) {
-          curImg.style.transform = '';
-          curImg.style.transformOrigin = '';
-          delete curImg.dataset.isRaw;
-        }
-      };
-
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
-    }
-
-    function applyZoomTransform(img, thumbEl, clientX, clientY, scale) {
-      const rect = thumbEl.getBoundingClientRect();
-      const xPct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * 100;
-      const yPct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)) * 100;
-      img.style.transform = `scale(${scale})`;
-      img.style.transformOrigin = `${xPct}% ${yPct}%`;
+      // Dispatch a synthetic mouseup so any active mousemove/mouseup window listeners clean up
+      window.dispatchEvent(new MouseEvent('mouseup'));
     }
 
     async function loadRawAsync(row) {
@@ -2261,57 +2532,52 @@
     // ====================================================================
     const TUTORIAL_STEPS = [
       {
-        title: 'Welcome to Culling Assistant!',
-        body: "Let\u2019s take a quick tour. You can <b>interact with the UI at any time</b> while this tour is open.<br><br>Click <b>Next</b> or press <kbd>\u2192</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
+        title: 'Welcome to the Culling Assistant',
+        body: "This assistant sorts your photos into <b>Accept</b> and <b>Reject</b> using rules you control. Tweak the rules, then use <kbd>Shift+Click</kbd> or drag to move individual photos, and hit <b>Done</b> when you’re finished.<br><br>Click <b>Next</b> or press <kbd>→</kbd> to advance, or <b>Skip Tour</b> to jump straight in.",
         target: null,
       },
       {
-        title: 'Photos, Organized by Scene',
-        body: 'Your photos are grouped into <b>scenes</b> \u2014 bursts taken close together in time. Kestrel\u2019s AI has sorted each scene by quality rating, so the best shots come first.',
+        title: 'Photos Grouped by Scene',
+        body: 'Your photos are grouped into <b>scenes</b> — bursts taken close together in time. Kestrel’s AI has sorted each scene by quality rating, so the best shots come first.<br><br>Any culling decisions you already made in Kestrel’s Scene View are carried over here.',
         target: '#cullingScroll',
         position: 'right',
       },
       {
         title: 'Accept &amp; Reject Columns',
-        body: 'Each scene has two columns: <span style="color:var(--ok)"><b>Accept</b></span> and <span style="color:var(--bad)"><b>Reject</b></span>.<br><br>Kestrel auto-categorizes images using the <b>\u2699 Auto-Categorize</b> settings (above the columns). You control the quality cutoff, how many images to guarantee per scene, and how many to cap per scene. Your cull decisions are <b>independent of star ratings</b>.<br><br>Images with <b>no rating (0\u2605)</b> show with a <span style="color:#f0c040"><b>yellow border</b></span>.',
+        body: 'Each scene has two columns: <span style="color:var(--ok)"><b>Accept</b></span> and <span style="color:var(--bad)"><b>Reject</b></span>. Images are assigned automatically when Kestrel loads — a <span style="color:var(--ok)">green</span> left border means Accept, <span style="color:var(--bad)">red</span> means Reject.',
         target: '.culling-header',
         position: 'bottom',
       },
       {
+        title: 'Setting the Rules',
+        body: 'The <b>Auto-Categorize</b> rules define how Kestrel sorts images into Accept and Reject. Set a quality cutoff, a minimum and maximum number to keep per scene, and what to do with unrated images.<br><br>When you change a setting, the <b>↻ Re-apply</b> button will pulse — click it to re-run the rules. Kestrel never overwrites your manual decisions.',
+        target: '#autoCatPanel',
+        position: 'bottom',
+        openAutoCat: true,
+      },
+      {
         title: 'Hover to Preview',
-        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop preview.',
+        body: 'Hover over any photo card to load a <b>full preview</b> in the panel on the right. Kestrel automatically detected birds in your photos and prepared a zoomed crop.',
         target: '.scene-columns',
         position: 'right',
       },
       {
-        title: 'The Preview Pane',
-        body: 'The preview pane shows the full exported image and a Kestrel bird crop. Want to inspect a specific area? <b>Click and hold, then drag</b> on any thumbnail to zoom into that part of the image. If RAW files are available, Kestrel loads the full-resolution original automatically within a few seconds for maximum detail.',
+        title: 'Preview Pane &amp; Zoom',
+        body: 'The preview pane shows the full export and a Kestrel bird crop. To zoom in, <b>click and hold anywhere on the preview image</b> then drag to pan. <b>Scroll the mouse wheel</b> while holding to adjust zoom level. Release to return to normal view. If RAW files are available, Kestrel loads the full-resolution original automatically.',
         target: '.preview-pane',
         position: 'left',
       },
       {
-        title: 'Move Photos with Shift+Click',
-        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. A <span style="color:var(--ok)">green</span> left-border means Accept; <span style="color:var(--bad)">red</span> means Reject.<br><br>All changes are <b>auto-saved as you go</b>.',
+        title: 'Moving Photos',
+        body: '<kbd>Shift+Click</kbd> any photo card to flip it between Accept and Reject. You can also <b>drag a card</b> directly from one column to the other.<br><br>All changes are <b>auto-saved as you go</b>.',
         nudge: 'Try Shift+Clicking a photo now!',
         target: '.scene-columns',
         position: 'right',
         waitFor: 'shiftClick',
       },
       {
-        title: 'Manual Star Ratings',
-        body: '<b>Click the \u2605 stars</b> on any card to set a custom rating. <span style="color:#6aa0ff">Blue stars</span> are Kestrel\u2019s AI rating; <span style="color:#f5c542">gold stars</span> mean you\u2019ve overridden it manually.',
-        target: '.cull-info',
-        position: 'top',
-      },
-      {
-        title: 'Resize &amp; Zoom Controls',
-        body: 'Use the <b>\u2212 / + buttons</b> at the bottom-left to change card size. Drag the <b>divider</b> between the columns and preview panel to resize it. The <b>RAW Zoom</b> slider in the preview header adjusts zoom magnification when dragging thumbnails.',
-        target: '.bottom-bar',
-        position: 'top',
-      },
-      {
         title: 'Done Culling',
-        body: 'When you’re ready, click <b>\u201cDone Culling, Proceed to Review\u201d</b>. You can choose to <b>write XMP metadata files</b> (star ratings + Accept/Reject label for Lightroom, Capture One, etc.), <b>move rejects to a folder</b>, or both.<br><br><strong style="color:var(--warn)">Tip:</strong> If you plan to use XMP metadata in a photo editor, write the XMP files <em>before</em> importing your photos into that application — most catalogues ignore new sidecar files once a photo is already imported.<br><br><b>Kestrel never deletes your original photos</b> — they are always safe.',
+        body: 'When you’re ready, click <b>“Done Culling, Proceed to Review”</b>. You can write <b>XMP sidecar files</b> (Accept/Reject label for Lightroom, Capture One, etc.), <b>move rejects to a subfolder</b>, or both.<br><br><b>Kestrel never deletes your original photos</b> — they are always safe.',
         target: '#doneCullingBtn',
         position: 'top',
       },
@@ -2408,35 +2674,49 @@
       var hasWaitFor = !!step.waitFor;
       nextBtn.style.display = hasWaitFor ? 'none' : '';
 
-      var target = step.target ? document.querySelector(step.target) : null;
+      // Step-specific side effects: open the auto-categorize panel if needed.
+      // Track whether it was just opened so we can defer layout measurement.
+      var needsLayoutDefer = false;
+      if (step.openAutoCat) {
+        var autoCatPanel = el('#autoCatPanel');
+        var autoCatToggle = el('#autoCatToggle');
+        if (autoCatPanel && autoCatPanel.classList.contains('hidden')) {
+          autoCatPanel.classList.remove('hidden');
+          if (autoCatToggle) autoCatToggle.textContent = '\u2699 Auto-Categorize \u25b4';
+          needsLayoutDefer = true;
+        }
+      }
 
-      if (!target) {
-        // Center-screen card, full backdrop
-        hl.style.display = 'none';
-        overlay.classList.add('has-backdrop');
-        card.style.transform = 'translate(-50%, -50%)';
-        card.style.top  = '50%';
-        card.style.left = '50%';
-      } else {
-        hl.style.display = '';
-        overlay.classList.remove('has-backdrop');
-        card.style.transform = '';
+      function _positionCard() {
+        var target = step.target ? document.querySelector(step.target) : null;
 
-        // Pulsing highlight on target
-        target.classList.add('highlight-target');
+        if (!target) {
+          // Center-screen card, full backdrop
+          hl.style.display = 'none';
+          overlay.classList.add('has-backdrop');
+          card.style.transform = 'translate(-50%, -50%)';
+          card.style.top  = '50%';
+          card.style.left = '50%';
+        } else {
+          hl.style.display = '';
+          overlay.classList.remove('has-backdrop');
+          card.style.transform = '';
 
-        var pad = 6;
-        var r = target.getBoundingClientRect();
-        hl.style.top    = (r.top  - pad) + 'px';
-        hl.style.left   = (r.left - pad) + 'px';
-        hl.style.width  = (r.width  + pad * 2) + 'px';
-        hl.style.height = (r.height + pad * 2) + 'px';
+          // Pulsing highlight on target
+          target.classList.add('highlight-target');
 
-        // Position card near target
-        var pos    = step.position || 'right';
-        var margin = 18;
-        var vw     = window.innerWidth;
-        var vh     = window.innerHeight;
+          var pad = 6;
+          var r = target.getBoundingClientRect();
+          hl.style.top    = (r.top  - pad) + 'px';
+          hl.style.left   = (r.left - pad) + 'px';
+          hl.style.width  = (r.width  + pad * 2) + 'px';
+          hl.style.height = (r.height + pad * 2) + 'px';
+
+          // Position card near target
+          var pos    = step.position || 'right';
+          var margin = 18;
+          var vw     = window.innerWidth;
+          var vh     = window.innerHeight;
         var cw     = 360 + margin;
         var ch     = card.offsetHeight || 200;
         var top, left;
@@ -2444,11 +2724,15 @@
         else if (pos === 'left')   { left = r.left - cw - margin;           top = r.top + r.height / 2 - ch / 2; }
         else if (pos === 'bottom') { left = r.left + r.width / 2 - cw / 2;  top = r.bottom + margin; }
         else                       { left = r.left + r.width / 2 - cw / 2;  top = r.top - ch - margin; }
-        left = Math.max(margin, Math.min(left, vw - cw - margin));
-        top  = Math.max(margin, Math.min(top,  vh - ch - margin));
-        card.style.left = left + 'px';
-        card.style.top  = top  + 'px';
-      }
+          left = Math.max(margin, Math.min(left, vw - cw - margin));
+          top  = Math.max(margin, Math.min(top,  vh - ch - margin));
+          card.style.left = left + 'px';
+          card.style.top  = top  + 'px';
+        }
+      } // end _positionCard
+
+      // Defer layout measurement by one frame if the panel was just opened (size was 0 before)
+      if (needsLayoutDefer) requestAnimationFrame(_positionCard); else _positionCard();
 
       // ---- Set up interactive waitFor listeners ----
       if (hasWaitFor && step.waitFor === 'hoverCard') {
@@ -2556,6 +2840,8 @@
       el('#xmpNote').classList.toggle('visible', el('#doXmpCheck').checked);
       _updateExecuteBtn();
     });
+    el('#doAutoLabelCheck').addEventListener('change', _updateExecuteBtn);
+    el('#doPromoteVerifiedCheck').addEventListener('change', _updateExecuteBtn);
     el('#doMoveCheck').addEventListener('change', _updateExecuteBtn);
 
     // Auto-categorize panel controls
@@ -2565,41 +2851,51 @@
       el('#autoCatToggle').textContent = nowHidden ? '\u2699 Auto-Categorize \u25be' : '\u2699 Auto-Categorize \u25b4';
     });
     el('#reapplyAutoBtn').addEventListener('click', () => {
+      el('#reapplyAutoBtn').classList.remove('needs-reapply');
       applyAutoCategorize(true);
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize re-applied \u2014 manual overrides preserved', 3000);
+      showToast('Auto-categorize re-applied \u2014 manual and confirmed decisions preserved', 3000);
     });
     el('#resetAutoBtn').addEventListener('click', () => {
       // Show confirmation dialog with override count
-      const overrideCount = manuallyMoved.size;
+      const overrideCount = rows.filter(r => getCullOrigin(r) === 'manual').length;
       const countEl = el('#resetOverrideCount');
       if (countEl) countEl.textContent = overrideCount > 0
-        ? `${overrideCount} manual override${overrideCount === 1 ? '' : 's'}`
+        ? `${overrideCount} manual assignment${overrideCount === 1 ? '' : 's'}`
         : 'any manual';
       el('#resetConfirmDlg').showModal();
     });
     el('#resetConfirmCancel').addEventListener('click', () => el('#resetConfirmDlg').close());
     el('#resetConfirmOk').addEventListener('click', () => {
       el('#resetConfirmDlg').close();
-      manuallyMoved.clear();
+      for (const r of rows) {
+        if (getCullOrigin(r) === 'manual') {
+          r.culled = '';
+          r.culled_origin = '';
+          cullingState.delete(r.filename);
+        }
+      }
       applyAutoCategorize(false);
       renderAllScenes();
       updateStats();
       debouncedSave();
-      showToast('Auto-categorize reset \u2014 all manual overrides cleared', 3000);
+      showToast('Auto-categorize reset \u2014 manual decisions cleared', 3000);
     });
-    // Slider live label updates
+    // Slider/select live label updates
     ['qualityCutoffSlider', 'minPerSceneSlider', 'maxPerSceneSlider'].forEach(id => {
       const sl = el('#' + id);
       if (sl) sl.addEventListener('input', () => { updateSliderLabels(); saveCullingSettings(); });
     });
+    const unratedSel = el('#unratedDefaultSelect');
+    if (unratedSel) unratedSel.addEventListener('change', () => { updateSliderLabels(); saveCullingSettings(); });
     el('#tutorialNext').addEventListener('click', function() { var step = TUTORIAL_STEPS[_tutStep]; if (step && step.waitFor) return; _tutAdvance(); });
     el('#tutorialBack').addEventListener('click', function() { _tutGoBack(); });
     el('#tutorialSkip').addEventListener('click', _closeTutorial);
-    // Keyboard navigation inside tutorial
+    // Keyboard navigation inside tutorial; Escape also exits zoom mode
     document.addEventListener('keydown', function(ev) {
+      if (ev.key === 'Escape' && zoomActive) { exitZoomMode(); return; }
       if (!el('#tutorialOverlay').classList.contains('active')) return;
       var step = TUTORIAL_STEPS[_tutStep];
       var hasWaitFor = step && step.waitFor;

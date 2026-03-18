@@ -32,7 +32,7 @@ from .database import (
 print("Importing read_image from image_utils...")
 from .image_utils import read_image, read_image_for_pipeline
 print("read_image imported successfully.")
-from .ratings import quality_to_rating
+from .ratings import quality_to_rating, get_profile_thresholds
 print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
 from .raw_exif import get_capture_time
@@ -102,10 +102,13 @@ class AnalysisPipeline:
         Returns a value in [-1.75, +2.5] where positive lifts exposure and
         negative pulls it down.
         """
-        EPS = 1e-3
-        TARGET_MID = 0.42
-        TARGET_HI_P90 = 0.90
-        TARGET_HI_P98 = 0.975
+        EPS = 1e-3        
+        #TARGET_MID = 0.42
+        #TARGET_HI_P90 = 0.90
+        #TARGET_HI_P98 = 0.975
+        TARGET_MID = 0.48
+        TARGET_HI_P90 = 0.92
+        TARGET_HI_P98 = 0.985
         TARGET_HI_P95_HOT = 0.88
         SHADOW_FLOOR_P10 = 0.06
         CLIP_THRESH = 0.985
@@ -196,6 +199,17 @@ class AnalysisPipeline:
         factor = 2.0 ** stops
         return (img.astype(np.float32) * factor).clip(0.0, 255.0).astype(np.uint8)
 
+    @staticmethod
+    def _get_image_orientation(img: np.ndarray) -> str:
+        if img is None or img.ndim < 2:
+            return "unknown"
+        h, w = img.shape[:2]
+        if h > w:
+            return "portrait"
+        if w > h:
+            return "landscape"
+        return "square"
+
     def load_models(self, status_cb: Optional[Callable[[str], None]] = None) -> None:
         if self.mask_rcnn and self.species_clf and self.quality_clf:
             return
@@ -242,20 +256,8 @@ class AnalysisPipeline:
         if callable(load_persisted_settings):
             try:
                 sett = load_persisted_settings() or {}
-                pct_5 = float(sett.get('rating_threshold_5', 12)) / 100.0
-                pct_4 = float(sett.get('rating_threshold_4', 15)) / 100.0
-                pct_3 = float(sett.get('rating_threshold_3', 20)) / 100.0
-                pct_2 = float(sett.get('rating_threshold_2', 30)) / 100.0
-                threshold_5 = 1.0 - pct_5
-                threshold_4 = threshold_5 - pct_4
-                threshold_3 = threshold_4 - pct_3
-                threshold_2 = threshold_3 - pct_2
-                rating_thresholds = {
-                    'five': threshold_5,
-                    'four': threshold_4,
-                    'three': threshold_3,
-                    'two': threshold_2,
-                }
+                profile = sett.get('rating_profile', 'balanced')
+                rating_thresholds = get_profile_thresholds(profile)
             except Exception:
                 rating_thresholds = None
 
@@ -352,6 +354,7 @@ class AnalysisPipeline:
 
             previous_image = None
             previous_image_path = None
+            previous_orientation = None
             if not database.empty:
                 last_row = database.iloc[-1]
                 last_filename = last_row["filename"]
@@ -361,6 +364,7 @@ class AnalysisPipeline:
                     if img is not None:
                         previous_image = img
                         previous_image_path = last_image_path
+                        previous_orientation = self._get_image_orientation(img)
             scene_count = database["scene_count"].max() if not database.empty else 0
 
             for idx, raw_file in enumerate(new_files, start=1):
@@ -400,6 +404,7 @@ class AnalysisPipeline:
                     "exposure_correction": 0.0,
                     "detection_scores": [],
                     "capture_time": "",
+                    "orientation": "unknown",
                 }
 
                 image_path = None
@@ -411,6 +416,9 @@ class AnalysisPipeline:
                     img, raw_obj = read_image_for_pipeline(image_path)
                     if img is None:
                         raise RuntimeError("Image read returned None")
+
+                    current_orientation = self._get_image_orientation(img)
+                    entry["orientation"] = current_orientation
 
                     try:
                         ct = get_capture_time(image_path)
@@ -432,8 +440,27 @@ class AnalysisPipeline:
                             stage=stage_ctx["stage"],
                             context={"file": raw_file, "folder": folder},
                         )
-                    
-                    if timestamp_similar is True:
+
+                    orientation_changed = (
+                        previous_orientation is not None
+                        and current_orientation != "unknown"
+                        and previous_orientation != "unknown"
+                        and current_orientation != previous_orientation
+                    )
+
+                    if orientation_changed:
+                        scene_count += 1
+                        entry.update(
+                            {
+                                "feature_similarity": -1.0,
+                                "feature_confidence": -1.0,
+                                "color_similarity": -1.0,
+                                "color_confidence": -1.0,
+                                "scene_count": scene_count,
+                                "similar": False,
+                            }
+                        )
+                    elif timestamp_similar is True:
                         # Images captured within the same second — treat as similar, skip AKAZE
                         entry.update(
                             {
@@ -461,6 +488,7 @@ class AnalysisPipeline:
                         )
                     previous_image = img.copy()
                     previous_image_path = image_path
+                    previous_orientation = current_orientation
 
                     stage_ctx["stage"] = "export_image"
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
