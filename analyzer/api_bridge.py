@@ -1113,12 +1113,28 @@ class Api:
     def _find_sidecar_file(self, root_path: str, filename: str, ext: str = '.xmp'):
         """Find sidecar file with given extension for an image file.
         
+        Checks multiple naming conventions:
+        - filename + ext (e.g., IMG_001.CR3.xmp)
+        - name_without_ext + ext (e.g., IMG_001.xmp for IMG_001.CR3)
+        
         Returns the filename (not path) if found, None otherwise.
         Searches in the same directory as the image.
         """
+        # Check primary naming: filename + ext (e.g., IMG_001.CR3.xmp)
         sidecar_path = os.path.join(root_path, filename + ext)
         if os.path.exists(sidecar_path):
+            log(f'_find_sidecar_file: Found (with full name): {filename + ext}')
             return filename + ext
+        
+        # Check secondary naming: name_without_ext + ext (e.g., IMG_001.xmp)
+        if '.' in filename:
+            base_name = filename.rsplit('.', 1)[0]
+            alt_sidecar_path = os.path.join(root_path, base_name + ext)
+            if os.path.exists(alt_sidecar_path):
+                log(f'_find_sidecar_file: Found (without ext): {base_name + ext}')
+                return base_name + ext
+        
+        log(f'_find_sidecar_file: Not found for {filename}')
         return None
 
     def _move_file_with_sidecars(self, root_path: str, filename: str, reject_dir: str):
@@ -1147,13 +1163,19 @@ class Api:
         if xmp_sidecar:
             xmp_src = os.path.join(root_path, xmp_sidecar)
             xmp_dst = os.path.join(reject_dir, xmp_sidecar)
+            log(f'move_rejects: Found XMP sidecar for {filename}: {xmp_sidecar}')
             try:
                 if os.path.exists(xmp_src):
                     shutil.move(xmp_src, xmp_dst)
                     moved_files.append(xmp_sidecar)
+                    log(f'move_rejects: Moved XMP sidecar: {xmp_sidecar}')
+                else:
+                    log(f'move_rejects: Warning - XMP detected but not found at: {xmp_src}')
             except Exception as e:
                 # Log warning but don't fail the main move if XMP fails
-                log(f'  Warning: Failed to move {xmp_sidecar}: {e}')
+                log(f'move_rejects: Warning - Failed to move {xmp_sidecar}: {e}')
+        else:
+            log(f'move_rejects: No XMP sidecar found for: {filename}')
         
         return True, moved_files
 
@@ -1183,6 +1205,40 @@ class Api:
         if _write_xmp_metadata is None:
             return {'success': False, 'error': 'metadata_writer module not available'}
         return _write_xmp_metadata(root_path, image_data, overwrite_external, use_auto_labels)
+
+    def _restore_file_with_sidecars(self, reject_dir: str, root_path: str, filename: str):
+        """Restore a file and its sidecar files (.xmp) from reject directory.
+        
+        Returns (success: bool, restored_files: list[str])
+        """
+        restored_files = []
+        
+        # Restore main file
+        src = os.path.join(reject_dir, filename)
+        dst = os.path.join(root_path, filename)
+        try:
+            if os.path.exists(src):
+                shutil.move(src, dst)
+                restored_files.append(filename)
+            else:
+                return False, restored_files
+        except Exception as e:
+            log(f'  Error restoring {filename}: {e}')
+            return False, restored_files
+        
+        # Restore XMP sidecar if it exists
+        xmp_sidecar = filename + '.xmp'
+        xmp_src = os.path.join(reject_dir, xmp_sidecar)
+        xmp_dst = os.path.join(root_path, xmp_sidecar)
+        if os.path.exists(xmp_src):
+            try:
+                shutil.move(xmp_src, xmp_dst)
+                restored_files.append(xmp_sidecar)
+            except Exception as e:
+                # Log warning but don't fail if XMP restore fails
+                log(f'  Warning: Failed to restore {xmp_sidecar}: {e}')
+        
+        return True, restored_files
 
     def undo_reject_move(self, root_path: str, filenames):
         """Move files and their XMP sidecars back from _KESTREL_Rejects to the root folder."""
