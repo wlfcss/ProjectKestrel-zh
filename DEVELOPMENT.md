@@ -12,7 +12,8 @@ ProjectKestrel/
 │   ├── models/                 # AI model files
 │   │   ├── model.onnx          # Bird species classifier (ONNX)
 │   │   ├── labels.txt          # Species labels
-│   │   ├── quality.keras       # Quality assessment model
+│   │   ├── quality.keras       # Quality assessment model (macOS-compatible re-save)
+│   │   ├── quality_old.keras   # Backup of original quality model
 │   │   ├── labels_scispecies.csv
 │   │   └── scispecies_dispname.csv
 │   └── kestrel_analyzer/       # Core analysis pipeline (no GUI)
@@ -31,6 +32,9 @@ ProjectKestrel/
 ├── visualizer/                  # Visualizer application (web-based)
 │   ├── visualizer.py           # Local web server entry
 │   └── visualizer.html         # Web UI
+│
+├── scripts/                     # Utility scripts
+│   └── resave_quality_model.py # Re-saves quality.keras for macOS compatibility
 │
 ├── packaging/                   # PyInstaller specs for EXE builds
 │   ├── analyzer/
@@ -65,7 +69,8 @@ python analyzer/main.py
 All models must be in `analyzer/models/`:
 - `model.onnx` (bird species classifier)
 - `labels.txt`, `labels_scispecies.csv`, `scispecies_dispname.csv`
-- `quality.keras` (quality assessment)
+- `quality.keras` (quality assessment — re-saved for macOS/XLA compatibility)
+- `quality_old.keras` (backup of the original quality model; not loaded by the app)
 - `mask_rcnn_resnet50_fpn_v2.pth` (object detection)
 
 **CLI Mode (headless):**
@@ -159,6 +164,26 @@ Both applications can be packaged as single-file executables:
 - CLI and GUI both import from `kestrel_analyzer` package
 - No circular dependencies
 - All ML models loaded lazily in pipeline
+
+## Reproducing the macOS-compatible Quality Model
+
+The `analyzer/models/quality.keras` file has been re-saved using `compile=False`
+and a synthetic forward pass to materialise all weights. This reduces
+TF/XLA serialization incompatibilities observed on macOS (Apple Silicon).
+The original model is preserved as `quality_old.keras`.
+
+To re-run the process (e.g. after updating the model):
+
+```bash
+# Install macOS requirements first
+pip install -r requirements-macos.txt
+
+# Run from repository root
+python scripts/resave_quality_model.py
+```
+
+The script prints the TF version, model input shape, and confirms inference
+output shape. Optional flags: `--model-dir`, `--input-name`, `--old-name`.
 
 ## Testing
 
