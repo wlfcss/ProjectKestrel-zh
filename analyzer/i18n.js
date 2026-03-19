@@ -3,6 +3,9 @@
 
   const messages = {
     "status.version_error": "版本：错误",
+    "status.version_unknown": "版本：未知",
+    "status.version_label": "版本：{version}",
+    "status.pipeline_version_label": "流水线版本：{version}",
     "update.available_title": "发现新版本：{name}",
     "update.windows_note":
       'Windows 用户：如果你通过微软商店安装，请在 1-3 天内到商店检查更新。如果你使用的是传统安装包，请访问 <a href="https://projectkestrel.org/download" target="_blank" style="color:#7ca3d9;text-decoration:underline;">projectkestrel.org/download</a> 手动更新。',
@@ -83,6 +86,15 @@
     "folder.action_write_metadata_title": "为照片写入 XMP 旁车文件，包含星级评分、接受/拒绝决定和物种标签，可被 Lightroom、Capture One、darktable 等编辑器读取。",
     "folder.action_open_culling": "<i>✂</i> 打开筛片助手",
     "folder.action_open_culling_title": "为此文件夹打开 AI 辅助筛片工作区",
+    "folder.options_title": "文件夹选项",
+    "folder.options_reset_section": "重置筛片决定",
+    "folder.options_reset_verified_title": "重置已确认决定",
+    "folder.options_reset_verified_desc": "仅清除此文件夹中通过筛片助手最终确认的接受/拒绝决定。手动指定的决定会被保留。",
+    "folder.options_reset_all_title": "重置全部决定",
+    "folder.options_reset_all_desc": "清除此文件夹中所有手动和已确认的接受/拒绝决定，使全部图片回到“未决定”状态。自动分类结果不会受影响。",
+    "common.close": "关闭",
+    "rating.click_to_set": "点击设置评分",
+    "tree.analysis_in_progress_suffix": "（分析进行中）",
     "merge.summary": "将 {count} 个场景合并到场景 {target}（共 {images} 张图片）。",
     "merge.scene_label": "场景 {id}",
     "merge.images_count": "{count} 张图片",

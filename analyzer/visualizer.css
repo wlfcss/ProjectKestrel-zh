@@ -299,6 +299,30 @@
       min-width: 0;
     }
 
+    .filter-toggle {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: start;
+      align-content: start;
+      row-gap: 4px;
+    }
+
+    .filter-toggle input[type="checkbox"] {
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .filter-toggle .muted {
+      line-height: 1.4;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .filter-toggle .help-tip {
+      margin-left: 2px;
+      align-self: start;
+    }
+
     .filter-field {
       flex-direction: column;
       align-items: flex-start;
@@ -682,20 +706,11 @@
         radial-gradient(circle at top right, rgba(139, 183, 255, 0.08), transparent 35%);
       border: 1px solid rgba(155, 186, 224, 0.14);
       border-radius: 20px;
-      /* overflow: clip 可裁切圆角，同时不会创建新的层叠上下文 */
-      overflow: clip;
+      /* WebView 上对 clip/content-visibility 的兼容性不稳定，优先保证卡片稳定显示。 */
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
-      /* content-visibility: auto 允许浏览器跳过整块渲染工作（样式、
-         layout, paint) for cards that are off-screen.  This is the single biggest
-         scroll-perf win when hundreds/thousands of scene cards are in the DOM:
-         each image-load paint invalidation stays scoped to the visible card
-         instead of triggering an O(n) walk across every card in the grid.
-         contain-intrinsic-size gives the grid a stable placeholder height so
-         scroll position and scrollbar size stay correct. */
-      content-visibility: auto;
-      contain-intrinsic-size: auto 280px;
     }
 
     .card:hover {
@@ -2360,7 +2375,7 @@
       font-weight: 700;
     }
     .tree-node-row.in-progress .tree-label::after {
-      content: ' (analysis in progress)';
+      content: '（分析进行中）';
       margin-left: 6px;
       font-size: 0.9em;
       opacity: 0.85;
@@ -3092,6 +3107,16 @@
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 18px;
+    }
+
+    .welcome-selection-note {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(95, 140, 255, 0.12);
+      border: 1px solid rgba(139, 183, 255, 0.18);
+      color: #d9e7ff;
+      font-size: 14px;
+      line-height: 1.7;
     }
 
     .welcome-insight-card {

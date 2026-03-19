@@ -30,6 +30,7 @@
       --unrated-border: #f2bf6d;
       --card-width: 162px;
       --preview-w: min(32vw, 440px);
+      --preview-meta-h: 144px;
       --radius-xl: 24px;
       --radius-lg: 18px;
       --radius-md: 14px;
@@ -300,8 +301,9 @@
       min-width: 260px;
       display: flex;
       flex-direction: column;
+      gap: 10px;
       padding: 16px;
-      overflow-y: auto;
+      overflow: hidden;
       background: rgba(11, 19, 30, 0.8);
       border: 1px solid rgba(155, 186, 224, 0.1);
       border-radius: var(--radius-xl);
@@ -321,11 +323,12 @@
       background: #0a0f15;
       border-radius: 16px;
       overflow: hidden;
-      margin-bottom: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       border: 1px solid rgba(155, 186, 224, 0.08);
+      flex: 1 1 auto;
+      min-height: 148px;
     }
     .preview-img-box img {
       max-width: 100%;
@@ -337,56 +340,189 @@
       font-size: 12px;
     }
     .preview-meta {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      font-size: 12px;
-      color: var(--text);
-      margin-top: 10px;
-      padding: 4px 0 2px;
-    }
-    .preview-meta .row {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
-      min-height: 72px;
-      padding: 12px 13px;
-      border: 1px solid rgba(155, 186, 224, 0.1);
-      border-radius: 14px;
-      background: rgba(13, 22, 34, 0.86);
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text);
+      margin-top: 0;
+      padding: 0;
+      flex: 0 0 auto;
+      height: var(--preview-meta-h);
+      min-height: 120px;
+      max-height: min(26vh, 220px);
+      overflow: auto;
     }
-    .preview-meta .row.wide {
-      grid-column: 1 / -1;
+    .preview-meta .meta-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       min-height: 0;
+      padding: 8px 10px;
+      border: 1px solid rgba(155, 186, 224, 0.08);
+      border-radius: 10px;
+      background: rgba(13, 22, 34, 0.78);
     }
-    .preview-meta .label {
+    .preview-meta .meta-key {
       color: var(--muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+      font-size: 10px;
+      letter-spacing: 0.04em;
       font-weight: 700;
+      flex: 0 0 auto;
     }
-    .preview-meta .value {
-      width: 100%;
+    .preview-meta .meta-value {
+      min-width: 0;
+      flex: 1 1 auto;
       font-weight: 650;
-      font-size: 14px;
-      line-height: 1.45;
+      font-size: 13px;
+      line-height: 1.3;
       text-align: left;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .preview-meta .value.wrap {
-      white-space: normal;
-      overflow: visible;
-      text-overflow: clip;
+    .preview-meta .filename-line .meta-value {
+      font-size: 14px;
+      font-weight: 700;
     }
-    .preview-meta .value.status-accept { color: var(--ok); }
-    .preview-meta .value.status-reject { color: var(--bad); }
-    .preview-meta .value.status-pending { color: var(--muted); }
-    .preview-meta .meta-rating-row {
+    .preview-meta .taxonomy-line {
       justify-content: space-between;
+      gap: 14px;
+    }
+    .preview-meta .taxonomy-main {
+      min-width: 0;
+      flex: 1 1 auto;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .preview-meta .taxonomy-species {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preview-meta .taxonomy-sep {
+      color: rgba(155, 186, 224, 0.36);
+      flex: 0 0 auto;
+    }
+    .preview-meta .taxonomy-family {
+      font-size: 13px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .preview-meta .meta-metrics {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .preview-meta .meta-metric {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .preview-meta .meta-metric-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .preview-meta .meta-metric-value {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .preview-meta-stars {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      flex-wrap: nowrap;
+      min-width: 0;
+      flex: 0 0 auto;
+    }
+    .preview-meta .control-line {
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .preview-meta .rating-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .preview-meta .rating-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      flex: 0 0 auto;
+    }
+    .preview-meta .meta-tail {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+    .preview-meta .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .preview-meta .meta-pill.scene-pill {
+      background: rgba(155, 186, 224, 0.1);
+      border: 1px solid rgba(155, 186, 224, 0.14);
+      color: #d7e4f7;
+    }
+    .preview-meta .meta-pill.status-accept {
+      background: rgba(109, 214, 160, 0.12);
+      border: 1px solid rgba(109, 214, 160, 0.22);
+      color: var(--ok);
+    }
+    .preview-meta .meta-pill.status-reject {
+      background: rgba(239, 125, 125, 0.12);
+      border: 1px solid rgba(239, 125, 125, 0.22);
+      color: var(--bad);
+    }
+    .preview-meta .meta-pill.status-pending {
+      background: rgba(155, 186, 224, 0.1);
+      border: 1px solid rgba(155, 186, 224, 0.14);
+      color: var(--muted);
+    }
+    .preview-meta-resizer {
+      flex: 0 0 10px;
+      height: 10px;
+      margin: -2px 0 0;
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at center, rgba(139, 183, 255, 0.42) 0 1.5px, transparent 2px) center/18px 6px no-repeat,
+        linear-gradient(180deg, rgba(139, 183, 255, 0.14), rgba(139, 183, 255, 0.03));
+      cursor: row-resize;
+      opacity: 0.78;
+      transition: opacity .15s, background .15s;
+    }
+    .preview-meta-resizer:hover,
+    .preview-meta-resizer.dragging {
+      opacity: 1;
+      background:
+        radial-gradient(circle at center, rgba(139, 183, 255, 0.72) 0 1.5px, transparent 2px) center/18px 6px no-repeat,
+        linear-gradient(180deg, rgba(139, 183, 255, 0.24), rgba(139, 183, 255, 0.08));
     }
 
     /* ---- 底部操作栏 ---- */
@@ -988,6 +1124,12 @@
         width: 100%;
         min-width: 0;
       }
+      .preview-meta {
+        max-height: none;
+      }
+      .preview-meta-resizer {
+        display: none;
+      }
 
       .topbar {
         grid-template-columns: 1fr;
@@ -1103,6 +1245,7 @@
       <div class="preview-img-box" id="previewCrop">
         <span class="muted">—</span>
       </div>
+      <div class="preview-meta-resizer" id="previewMetaResizer" title="拖动以调整信息栏高度"></div>
       <div class="preview-meta" id="previewMeta"></div>
     </div>
   </div>
@@ -1958,23 +2101,36 @@
       const statusLabel = side === 'accept' ? '接受' : side === 'reject' ? '拒绝' : '未决定';
       const statusClass = side === 'accept' ? 'status-accept' : side === 'reject' ? 'status-reject' : 'status-pending';
       const familyText = familyDisplayName(row.family || '未分类');
+      const speciesText = speciesDisplayName(row.species || '未知');
       const meta = el('#previewMeta');
       meta.innerHTML = `
-        <div class="row wide"><span class="label">文件名</span><span class="value wrap" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
-        <div class="row"><span class="label">物种</span><span class="value wrap" title="${escapeHtml(row.species || '')}">${escapeHtml(speciesDisplayName(row.species || '未知'))}</span></div>
-        <div class="row"><span class="label">科</span><span class="value wrap">${escapeHtml(familyText)}</span></div>
-        <div class="row"><span class="label">物种置信度</span><span class="value">${fmt3(row.species_confidence)}</span></div>
-        <div class="row"><span class="label">质量分数</span><span class="value">${fmt3(row.quality)}</span></div>
-        <div class="row wide meta-rating-row"><span class="label">评分</span></div>
-        <div class="row"><span class="label">状态</span><span class="value ${statusClass}">${statusLabel}</span></div>
-        <div class="row"><span class="label">场景</span><span class="value">#${escapeHtml(String(row.scene_count || ''))}</span></div>
+        <div class="meta-line filename-line"><span class="meta-key">文件名</span><span class="meta-value" title="${escapeHtml(row.filename || '')}">${escapeHtml(row.filename || '')}</span></div>
+        <div class="meta-line taxonomy-line">
+          <div class="taxonomy-main" title="${escapeHtml(speciesText)} · ${escapeHtml(familyText)}">
+            <span class="taxonomy-species">${escapeHtml(speciesText)}</span>
+            <span class="taxonomy-sep">·</span>
+            <span class="taxonomy-family">${escapeHtml(familyText)}</span>
+          </div>
+          <div class="meta-metrics">
+            <span class="meta-metric"><span class="meta-metric-label">置信度</span><span class="meta-metric-value">${fmt3(row.species_confidence)}</span></span>
+            <span class="meta-metric"><span class="meta-metric-label">质量</span><span class="meta-metric-value">${fmt3(row.quality)}</span></span>
+          </div>
+        </div>
+        <div class="meta-line control-line meta-rating-row">
+          <div class="rating-group"><span class="rating-label">评分</span></div>
+          <div class="meta-tail">
+            <span class="meta-pill ${statusClass}">${statusLabel}</span>
+            <span class="meta-pill scene-pill">#${escapeHtml(String(row.scene_count || ''))}</span>
+          </div>
+        </div>
       `;
       // 在评分行中插入交互式星级条
-      const ratingRow = meta.querySelector('.meta-rating-row');
-      if (ratingRow) {
+      const ratingGroup = meta.querySelector('.rating-group');
+      if (ratingGroup) {
         const starWrap = createStarBar(row);
-        starWrap.style.cssText = 'display:flex;gap:2px;justify-content:flex-start;flex:1;flex-wrap:wrap';
-        ratingRow.appendChild(starWrap);
+        starWrap.classList.add('preview-meta-stars');
+        starWrap.style.cssText = '';
+        ratingGroup.appendChild(starWrap);
       }
     }
 
@@ -2431,6 +2587,10 @@
           const lb = document.getElementById('previewZoomLabel');
           if (sl) { sl.value = rawZoom; if (lb) lb.textContent = rawZoom + '\u00d7'; }
         }
+        const previewMetaHeight = parseInt(s.culling_preview_meta_height, 10);
+        if (previewMetaHeight >= 120 && previewMetaHeight <= 220) {
+          document.documentElement.style.setProperty('--preview-meta-h', previewMetaHeight + 'px');
+        }
         // 自动分类滑块设置
         const qCutoff = parseInt(s.culling_quality_cutoff, 10);
         const minPS   = parseInt(s.culling_min_per_scene,  10);
@@ -2454,6 +2614,7 @@
           const s = (res?.success ? res.settings : {}) || {};
           s.culling_card_zoom       = parseInt(document.getElementById('cardZoomSlider')?.value, 10) || 150;
           s.culling_raw_zoom        = parseInt(document.getElementById('previewZoomSlider')?.value, 10) || 5;
+          s.culling_preview_meta_height = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--preview-meta-h'), 10) || 144;
           s.culling_quality_cutoff  = parseInt(el('#qualityCutoffSlider')?.value, 10) || 3;
           s.culling_min_per_scene   = parseInt(el('#minPerSceneSlider')?.value,   10) || 0;
           s.culling_max_per_scene   = parseInt(el('#maxPerSceneSlider')?.value,   10) || 0;
@@ -2511,6 +2672,44 @@
 
       divider.addEventListener('dblclick', () => {
         document.documentElement.style.setProperty('--preview-w', 'calc(100vw / 3)');
+      });
+    })();
+
+    // ---- 预览图片区与信息区之间的拖拽分隔条 ----
+    (function setupPreviewMetaResizer() {
+      const divider = document.getElementById('previewMetaResizer');
+      const pane = document.querySelector('.preview-pane');
+      if (!divider || !pane) return;
+
+      divider.addEventListener('mousedown', (e) => {
+        if (window.innerWidth <= 1180) return;
+        e.preventDefault();
+        divider.classList.add('dragging');
+        const paneRect = pane.getBoundingClientRect();
+        const onMove = (ev) => {
+          const desired = Math.round(paneRect.bottom - ev.clientY - 12);
+          const min = 120;
+          const max = Math.min(220, Math.max(144, Math.floor(paneRect.height * 0.28)));
+          const clamped = Math.min(Math.max(desired, min), max);
+          document.documentElement.style.setProperty('--preview-meta-h', clamped + 'px');
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          divider.classList.remove('dragging');
+          saveCullingSettings();
+        };
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      divider.addEventListener('dblclick', () => {
+        document.documentElement.style.setProperty('--preview-meta-h', '144px');
+        saveCullingSettings();
       });
     })();
 

@@ -235,7 +235,7 @@
       async function updateVersionBadge() {
         try {
           // 从 VERSION.txt 读取应用版本
-          let displayVersion = 'Version: unknown';
+          let displayVersion = t('status.version_unknown');
           try {
             const resp = await fetch('VERSION.txt', { cache: 'no-store' });
             if (resp.ok) {
@@ -244,9 +244,10 @@
               if (lines.length > 0) {
                 const firstLine = lines[0];
                 if (firstLine.toLowerCase().startsWith('version')) {
-                  displayVersion = firstLine;
+                  const normalized = firstLine.replace(/^version\s*:?\s*/i, '').trim();
+                  displayVersion = t('status.version_label', { version: normalized || '未知' });
                 } else {
-                  displayVersion = `Version: ${firstLine}`;
+                  displayVersion = t('status.version_label', { version: firstLine });
                 }
               }
             }
@@ -260,7 +261,7 @@
               const result = await window.pywebview.api.get_app_version();
               const pipelineVersion = result?.version || result;
               if (pipelineVersion && pipelineVersion !== 'unknown') {
-                displayVersion += ` | Pipeline Version: ${pipelineVersion}`;
+                displayVersion += ` | ${t('status.pipeline_version_label', { version: pipelineVersion })}`;
               }
             } catch (e) {
               console.error('[loadVersionBadge] Failed to fetch pipeline version:', e);
@@ -896,10 +897,7 @@
 
         const computedTags = _computeSceneTagsFromRows(arr, minSpeciesConf, includeSecondary, includeFamilies);
         let species = computedTags.species.slice();
-        if (includeFamilies) {
-          const merged = new Set([...species, ...computedTags.families]);
-          species = Array.from(merged).sort();
-        }
+        let families = computedTags.families.slice();
 
         const maxQ = Math.max(...arr.map(a => parseNumber(a.quality)));
         const captureMsList = arr.map(a => parseCaptureTimeMs(a.capture_time)).filter(Number.isFinite);
@@ -911,9 +909,8 @@
         const isApproved = !!sdScene?.user_tags?.finalized;
         // 如果该场景已有最终确认的 user_tags，则用它们作为物种/科展示内容
         if (isApproved) {
-          const utSpecies = (sdScene.user_tags.species || []).slice().sort();
-          const utFams = includeFamilies ? (sdScene.user_tags.families || []).slice().sort() : [];
-          species = utFams.length ? Array.from(new Set([...utSpecies, ...utFams])).sort() : utSpecies;
+          species = (sdScene.user_tags.species || []).slice().sort();
+          families = includeFamilies ? (sdScene.user_tags.families || []).slice().sort() : [];
         }
 
         list.push({
@@ -922,6 +919,7 @@
           representative: rep,
           imageCount: arr.length,
           species,
+          families,
           maxQuality: maxQ,
           captureTimeMs,
           sceneName,
@@ -1024,7 +1022,7 @@
         const s = document.createElement('span');
         s.className = 'star';
         s.textContent = '☆';
-        s.title = 'Click to set rating';
+        s.title = t('rating.click_to_set');
         // 这里只处理点击，悬停预览由下方的委托监听器负责
         s.addEventListener('click', (ev) => { ev.stopPropagation(); setRating(row, i, 'manual'); render(); });
         wrap.appendChild(s);
@@ -1084,6 +1082,11 @@
       // 没有加载数据时显示欢迎面板，打开文件夹后隐藏
       const _welcomePanel = document.getElementById('welcomePanel');
       if (_welcomePanel) _welcomePanel.classList.toggle('hidden', rows.length > 0);
+      const _welcomeSelectionNote = document.getElementById('welcomeSelectionNote');
+      if (_welcomeSelectionNote) {
+        const noCheckedFolders = !rows.length && !!folderTreeRootNode && checkedFolderPaths.size === 0;
+        _welcomeSelectionNote.classList.toggle('hidden', !noCheckedFolders);
+      }
 
       // 用于 Shift 点击范围选择的扁平索引
       _visibleSceneOrder = visibleScenes.map(s => String(s.id));
@@ -1174,9 +1177,11 @@
             return t('status.unknown_time');
           }
         })();
-        const primarySpeciesName = s.species.length > 0 ? getSpeciesDisplayName(s.species[0]) : '未识别物种';
-        const familyName = s.families.length > 0 ? getFamilyDisplayName(s.families[0]) : '未分类';
-        const speciesOverflow = Math.max(0, s.species.length - 1);
+        const speciesList = Array.isArray(s.species) ? s.species : [];
+        const familyList = Array.isArray(s.families) ? s.families : [];
+        const primarySpeciesName = speciesList.length > 0 ? getSpeciesDisplayName(speciesList[0]) : '未识别物种';
+        const familyName = familyList.length > 0 ? getFamilyDisplayName(familyList[0]) : '未分类';
+        const speciesOverflow = Math.max(0, speciesList.length - 1);
         const cardMetaLine = document.createElement('div');
         cardMetaLine.className = 'scene-card-topline';
         const _folderName = folderBaseName(s.representative?.__rootPath || '');
@@ -1209,18 +1214,18 @@
           card.classList.add('scene-approved');
           chips.classList.add('reviewed-tags');
         }
-        for (const sp of s.species.slice(1, 3)) {
+        for (const sp of speciesList.slice(1, 3)) {
           const c = document.createElement('span');
           c.className = s.isApproved ? 'chip manual-approved' : 'chip';
           c.textContent = getSpeciesDisplayName(sp);
           c.title = sp;
           chips.appendChild(c);
         }
-        if (s.species.length > 3) {
+        if (speciesList.length > 3) {
           const more = document.createElement('span');
           more.className = 'chip badge';
-          more.textContent = `+${s.species.length - 3} 更多`;
-          more.title = s.species.slice(3).map(getSpeciesDisplayName).join(', ');
+          more.textContent = `+${speciesList.length - 3} 更多`;
+          more.title = speciesList.slice(3).map(getSpeciesDisplayName).join(', ');
           chips.appendChild(more);
         }
         const footer = document.createElement('div');
@@ -3174,7 +3179,7 @@
           const path = await window.pywebview.api.choose_application();
           if (path) customPath.value = path;
         } else {
-          showToast('Browse is only available in the desktop app', 3000);
+          showToast(t('settings.browse_desktop_only'), 3000);
         }
       };
       document.getElementById('treeScanDepth').value = getSetting('treeScanDepth', 3);
@@ -3850,6 +3855,7 @@
             cb.className = 'tree-cb';
             cb.title = 'Include in multi-folder view';
             cb.checked = _isPathChecked(row.dataset.path);
+            cb.addEventListener('click', (e) => e.stopPropagation());
             cb.addEventListener('change', (e) => {
               e.stopPropagation();
               if (cb.checked) checkedFolderPaths.add(row.dataset.path);
@@ -3913,6 +3919,7 @@
         loadCheckbox.className = 'tree-cb';
         loadCheckbox.title = isInProgress ? 'Include in multi-folder view (analyzing now)' : 'Include in multi-folder view';
         loadCheckbox.checked = _isPathChecked(node.path);
+        loadCheckbox.addEventListener('click', (e) => e.stopPropagation());
         loadCheckbox.addEventListener('change', (e) => {
           e.stopPropagation();
           if (loadCheckbox.checked) checkedFolderPaths.add(node.path);
@@ -5425,6 +5432,7 @@
               cb.className = 'tree-cb';
               cb.title = 'Include in multi-folder view (analyzing now)';
               cb.checked = _isPathChecked(row.dataset.path);
+              cb.addEventListener('click', (e) => e.stopPropagation());
               cb.addEventListener('change', (e) => {
                 e.stopPropagation();
                 if (cb.checked) checkedFolderPaths.add(row.dataset.path);
@@ -5536,15 +5544,45 @@
     // 这里只加载单个文件夹；多文件夹加载请见 loadMultipleFolders()。
 
     // 自动加载：复选框变化后，经过短暂防抖自动触发。
-    // 如果没有勾选任何内容，则平滑清空当前视图。
+    // 如果没有勾选任何内容，则卸载当前视图并回到空状态。
+    async function clearLoadedFolderView() {
+      ++_loadFoldersVersion; // cancel any in-progress load
+      rows = [];
+      header = [];
+      scenes = [];
+      rootPath = '';
+      rootDirHandle = null;
+      rootIsKestrel = false;
+      treeActivePath = null;
+      currentSceneId = null;
+      _currentScene = null;
+      _cleanSnapshot = null;
+      dirty = false;
+      _notifyDirty(false);
+      selectedSceneIds.clear();
+      _lastSelectedIdx = -1;
+      _visibleSceneOrder = [];
+      _focusedCardId = null;
+      const mergeBtn = document.getElementById('openMerge');
+      if (mergeBtn) mergeBtn.disabled = true;
+      const saveBtn = document.getElementById('saveCsv');
+      const revertBtn = document.getElementById('revertCsv');
+      if (saveBtn) saveBtn.disabled = true;
+      if (revertBtn) revertBtn.disabled = true;
+      if (sceneDlg?.open) {
+        try { sceneDlg.close(); } catch (_) {}
+      }
+      renderFolderTree();
+      await renderScenes();
+      updateSelectionUI();
+      setStatus(t('status.no_folders_selected'));
+    }
+
     const debouncedAutoLoad = debounce(async () => {
       if (checkedFolderPaths.size > 0) {
         await loadMultipleFolders(Array.from(checkedFolderPaths));
       } else {
-        ++_loadFoldersVersion; // cancel any in-progress load
-        rows = []; header = []; scenes = [];
-        sceneGrid.innerHTML = '';
-        setStatus(t('status.no_folders_selected'));
+        await clearLoadedFolderView();
       }
     }, 400);
 
@@ -6528,12 +6566,12 @@
 
       dlg.innerHTML = `
         <div style="padding:20px 22px 14px;border-bottom:1px solid #222e45;">
-          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Folder Options</div>
+          <div style="font-size:17px;font-weight:700;margin-bottom:4px;">${t('folder.options_title')}</div>
           <div style="color:#7a90b8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(folderPath)}">${escapeHtml(folderName)}</div>
         </div>
 
         <div style="padding:14px 22px;">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">Reset Culling Decisions</div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#5a7099;margin-bottom:10px;">${t('folder.options_reset_section')}</div>
 
           <div class="folder-opt-card" id="folderOptCardVerified" style="
             display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
@@ -6541,8 +6579,8 @@
             cursor:pointer;margin-bottom:8px;transition:border-color 0.15s,background 0.15s;">
             <div style="margin-top:2px;font-size:16px;line-height:1;">↺</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">Reset Confirmed Decisions</div>
-              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">Clears only Accept/Reject decisions that were <em>Confirmed</em> via the Culling Assistant's finalize step. Manual (user-assigned) decisions are kept.</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;">${t('folder.options_reset_verified_title')}</div>
+              <div style="font-size:12px;color:#7a90b8;line-height:1.45;">${t('folder.options_reset_verified_desc')}</div>
             </div>
           </div>
 
@@ -6552,14 +6590,14 @@
             cursor:pointer;margin-bottom:0;transition:border-color 0.15s,background 0.15s;">
             <div style="margin-top:2px;font-size:16px;line-height:1;color:#ff8888;">⊘</div>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">Reset All Decisions</div>
-              <div style="font-size:12px;color:#b07878;line-height:1.45;">Clears <strong style="color:#ffaaaa">all</strong> manual and confirmed Accept/Reject decisions for this folder, returning every image to Undecided. Auto-categorized decisions are unaffected.</div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:3px;color:#ffc8c8;">${t('folder.options_reset_all_title')}</div>
+              <div style="font-size:12px;color:#b07878;line-height:1.45;">${t('folder.options_reset_all_desc')}</div>
             </div>
           </div>
         </div>
 
         <div style="padding:10px 22px 18px;display:flex;justify-content:flex-end;border-top:1px solid #1a2235;margin-top:4px;">
-          <button id="folderOptCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">Close</button>
+          <button id="folderOptCancel" style="padding:8px 16px;border:1px solid #3a465f;background:#1c2433;color:#e8f0f8;border-radius:6px;cursor:pointer;font-size:13px;">${t('common.close')}</button>
         </div>
       `;
       document.body.appendChild(dlg);
