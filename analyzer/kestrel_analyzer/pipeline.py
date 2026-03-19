@@ -30,7 +30,7 @@ from .database import (
     update_scenedata_with_database,
 )
 print("Importing read_image from image_utils...")
-from .image_utils import read_image, read_image_for_pipeline
+from .image_utils import read_image, read_image_for_pipeline, postprocess_raw
 print("read_image imported successfully.")
 from .ratings import quality_to_rating, get_profile_thresholds
 print("Importing compute_image_similarity_akaze from similarity...")
@@ -70,6 +70,8 @@ class AnalysisPipeline:
         thumbnail: np.ndarray,
         masks: Optional[np.ndarray],
         indices: Optional[list],
+        analysis_shape: Optional[tuple] = None,
+        warp_matrix: Optional[np.ndarray] = None,
         color=(255, 64, 64),
         alpha: float = 0.45,
     ) -> Optional[np.ndarray]:
@@ -81,7 +83,22 @@ class AnalysisPipeline:
         h, w = overlay.shape[:2]
         for i in indices:
             mask = masks[i].astype(np.uint8)
-            mask_small = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+            if analysis_shape is not None:
+                aw, ah = analysis_shape
+                mask_small = cv2.resize(mask, (aw, ah), interpolation=cv2.INTER_NEAREST)
+            else:
+                mask_small = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+            if warp_matrix is not None:
+                mask_small = cv2.warpAffine(
+                    mask_small,
+                    warp_matrix,
+                    (w, h),
+                    flags=cv2.INTER_NEAREST,
+                    borderMode=cv2.BORDER_CONSTANT,
+                    borderValue=0,
+                )
+            elif mask_small.shape[:2] != (h, w):
+                mask_small = cv2.resize(mask_small, (w, h), interpolation=cv2.INTER_NEAREST)
             mask_bool = mask_small.astype(bool)
             if not np.any(mask_bool):
                 continue
@@ -89,6 +106,44 @@ class AnalysisPipeline:
                 overlay[mask_bool] * (1.0 - alpha) + np.array(color, dtype=np.uint8) * alpha
             ).astype(np.uint8)
         return overlay
+
+    @staticmethod
+    def _estimate_preview_warp(analysis_img: np.ndarray, preview_img: np.ndarray) -> Optional[np.ndarray]:
+        """Estimate an affine transform that maps analysis-image coordinates onto preview coordinates."""
+        try:
+            if analysis_img is None or preview_img is None:
+                return None
+            if analysis_img.shape[:2] != preview_img.shape[:2]:
+                return None
+            gray_a = cv2.cvtColor(analysis_img, cv2.COLOR_RGB2GRAY)
+            gray_b = cv2.cvtColor(preview_img, cv2.COLOR_RGB2GRAY)
+            orb = cv2.ORB_create(2500)
+            kp_a, des_a = orb.detectAndCompute(gray_a, None)
+            kp_b, des_b = orb.detectAndCompute(gray_b, None)
+            if des_a is None or des_b is None or len(kp_a) < 12 or len(kp_b) < 12:
+                return None
+            matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+            matches = matcher.match(des_a, des_b)
+            if len(matches) < 12:
+                return None
+            matches = sorted(matches, key=lambda m: m.distance)[:200]
+            pts_a = np.float32([kp_a[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+            pts_b = np.float32([kp_b[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+            matrix, inliers = cv2.estimateAffinePartial2D(
+                pts_a,
+                pts_b,
+                method=cv2.RANSAC,
+                ransacReprojThreshold=3.0,
+                maxIters=2000,
+                confidence=0.99,
+            )
+            if matrix is None:
+                return None
+            if inliers is not None and int(inliers.sum()) < 12:
+                return None
+            return matrix.astype(np.float32)
+        except Exception:
+            return None
 
     @staticmethod
     def _compute_exposure_stops(img: np.ndarray, mask: np.ndarray) -> float:
@@ -183,21 +238,24 @@ class AnalysisPipeline:
             return img
         if raw_obj is not None:
             try:
-                # exp_shift is in linear scale: 2^stops.
-                # rawpy usable range: 0.25 (−2 stops) … 8.0 (+3 stops).
-                linear_scale = float(np.clip(2.0 ** stops, 0.25, 8.0))
-                # Preserve highlights when brightening to avoid blowing out
-                # any remaining highlight detail.
-                preserve = 0.8 if stops > 0 else 0.0
-                return raw_obj.postprocess(
-                    no_auto_bright=True,
-                    exp_shift=linear_scale,
-                    exp_preserve_highlights=preserve,
-                )
+                return postprocess_raw(raw_obj, exposure_stops=float(stops))
             except Exception:
                 pass  # fall through to pixel-level fallback below
         factor = 2.0 ** stops
         return (img.astype(np.float32) * factor).clip(0.0, 255.0).astype(np.uint8)
+
+    @staticmethod
+    def _align_preview_to_analysis(preview_img: Optional[np.ndarray], analysis_img: np.ndarray) -> np.ndarray:
+        """Resize a visual preview image to the analysis image size so masks/boxes still align."""
+        if preview_img is None:
+            return analysis_img
+        if preview_img.shape[:2] == analysis_img.shape[:2]:
+            return preview_img
+        return cv2.resize(
+            preview_img,
+            (analysis_img.shape[1], analysis_img.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
 
     @staticmethod
     def _get_image_orientation(img: np.ndarray) -> str:
@@ -413,9 +471,11 @@ class AnalysisPipeline:
                     stage_ctx["stage"] = "read_image"
                     stage_ctx["file"] = raw_file
                     image_path = os.path.join(folder, raw_file)
-                    img, raw_obj = read_image_for_pipeline(image_path)
+                    img, raw_obj, preview_img = read_image_for_pipeline(image_path)
                     if img is None:
                         raise RuntimeError("Image read returned None")
+                    preview_img = preview_img if preview_img is not None else img
+                    preview_aligned = self._align_preview_to_analysis(preview_img, img)
 
                     current_orientation = self._get_image_orientation(img)
                     entry["orientation"] = current_orientation
@@ -492,17 +552,27 @@ class AnalysisPipeline:
 
                     stage_ctx["stage"] = "export_image"
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
-                    img_small = cv2.resize(img, (1200, int(1200 * img.shape[0] / img.shape[1])))
+                    preview_small = cv2.resize(
+                        preview_aligned,
+                        (1200, int(1200 * preview_aligned.shape[0] / preview_aligned.shape[1])),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    analysis_small = cv2.resize(
+                        img,
+                        (1200, int(1200 * img.shape[0] / img.shape[1])),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    preview_warp = self._estimate_preview_warp(analysis_small, preview_small)
                     cv2.imwrite(
                         export_path,
-                        cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR),
+                        cv2.cvtColor(preview_small, cv2.COLOR_RGB2BGR),
                         [cv2.IMWRITE_JPEG_QUALITY, 70],
                     )
                     # Store relative path for cross-platform compatibility
                     export_path_rel = os.path.relpath(export_path, folder)
                     entry.update({"export_path": export_path_rel})
                     if thumbnail_cb:
-                        thumbnail_cb({"filename": raw_file, "thumbnail": img_small, "export_path": export_path_rel})
+                        thumbnail_cb({"filename": raw_file, "thumbnail": preview_small, "export_path": export_path_rel})
 
                     stage_ctx["stage"] = "mask_rcnn_prediction"
                     # MaskRCNN inference can take many seconds. Pause semantics are
@@ -514,7 +584,7 @@ class AnalysisPipeline:
                             detection_cb(
                                 {
                                     "filename": raw_file,
-                                    "overlay": self._create_mask_overlay(img_small, None, None),
+                                    "overlay": self._create_mask_overlay(preview_small, None, None),
                                     "bird_count": 0,
                                 }
                             )
@@ -530,7 +600,7 @@ class AnalysisPipeline:
                         crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
                         cv2.imwrite(
                             crop_path,
-                            cv2.cvtColor(img_small, cv2.COLOR_RGB2BGR),
+                            cv2.cvtColor(preview_small, cv2.COLOR_RGB2BGR),
                             [cv2.IMWRITE_JPEG_QUALITY, 85],
                         )
                         # Store relative path for cross-platform compatibility
@@ -555,12 +625,18 @@ class AnalysisPipeline:
                     overlay_indices = bird_indices if bird_indices else wildlife_indices[:1]
                     if detection_cb:
                         detection_cb(
-                            {
-                                "filename": raw_file,
-                                "overlay": self._create_mask_overlay(img_small, masks, overlay_indices),
-                                "bird_count": len(bird_indices),
-                            }
-                        )
+                                {
+                                    "filename": raw_file,
+                                    "overlay": self._create_mask_overlay(
+                                        preview_small,
+                                        masks,
+                                        overlay_indices,
+                                        analysis_shape=(analysis_small.shape[1], analysis_small.shape[0]),
+                                        warp_matrix=preview_warp,
+                                    ),
+                                    "bird_count": len(bird_indices),
+                                }
+                            )
 
                     def process_nonbird(primary_mask_i):
                         stage_ctx["stage"] = "process_nonbird"
@@ -568,6 +644,9 @@ class AnalysisPipeline:
                         img_src = self._apply_exposure_correction(img, stops, raw_obj)
                         quality_crop, quality_mask = self.mask_rcnn.get_square_crop(
                             masks[primary_mask_i], img_src, resize=True
+                        )
+                        visual_crop, _ = self.mask_rcnn.get_square_crop(
+                            masks[primary_mask_i], preview_aligned, resize=True
                         )
                         quality_score = self.quality_clf.classify(quality_crop, quality_mask)
                         return {
@@ -578,6 +657,7 @@ class AnalysisPipeline:
                             "quality": quality_score,
                             "rating": quality_to_rating(quality_score, rating_thresholds),
                             "quality_crop": quality_crop,
+                            "visual_crop": visual_crop,
                             "exposure_correction": round(stops, 4),
                         }
 
@@ -591,12 +671,14 @@ class AnalysisPipeline:
                             img_src = self._apply_exposure_correction(img, stops, raw_obj)
                             species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img_src)
                             quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img_src, resize=True)
+                            visual_crop, _ = self.mask_rcnn.get_square_crop(masks[i], preview_aligned, resize=True)
                             items.append(
                                 {
                                     "index": i,
                                     "confidence": float(pred_score[i]),
                                     "species_crop": species_crop,
                                     "quality_crop": quality_crop,
+                                    "visual_crop": visual_crop,
                                     "quality_mask": quality_mask,
                                     "stops": stops,
                                 }
@@ -605,7 +687,7 @@ class AnalysisPipeline:
                             crops_cb(
                                 {
                                     "filename": raw_file,
-                                    "crops": [i["quality_crop"] for i in items],
+                                    "crops": [i["visual_crop"] for i in items],
                                     "confidences": [i["confidence"] for i in items],
                                 }
                             )
@@ -680,6 +762,7 @@ class AnalysisPipeline:
                                 "quality": i["quality"],
                                 "rating": i["rating"],
                                 "quality_crop": i["quality_crop"],
+                                "visual_crop": i["visual_crop"],
                                 "exposure_correction": i.get("exposure_correction", 0.0),
                             }
                             for i in bird_items
@@ -707,7 +790,7 @@ class AnalysisPipeline:
                                 "secondary_family_scores": json.dumps(all_family_conf),
                             }
                         )
-                        crop_img = primary_bird["quality_crop"]
+                        crop_img = primary_bird["visual_crop"]
                     else:
                         if wildlife_indices:
                             primary_index = wildlife_indices[np.argmax([pred_score[i] for i in wildlife_indices])]
@@ -716,7 +799,7 @@ class AnalysisPipeline:
                                 crops_cb(
                                     {
                                         "filename": raw_file,
-                                        "crops": [result["quality_crop"]],
+                                        "crops": [result["visual_crop"]],
                                         "confidences": [float(pred_score[primary_index])],
                                     }
                                 )
@@ -751,7 +834,7 @@ class AnalysisPipeline:
                                     "exposure_correction": result["exposure_correction"],
                                 }
                             )
-                            crop_img = result["quality_crop"]
+                            crop_img = result["visual_crop"]
                         else:
                             if crops_cb:
                                 crops_cb({"filename": raw_file, "crops": [], "confidences": []})
@@ -759,7 +842,7 @@ class AnalysisPipeline:
                                 quality_cb({"filename": raw_file, "results": []})
                             if species_cb:
                                 species_cb({"filename": raw_file, "results": []})
-                            crop_img = img_small
+                            crop_img = preview_small
 
                     stage_ctx["stage"] = "write_crop"
                     crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")

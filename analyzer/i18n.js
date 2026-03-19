@@ -77,6 +77,8 @@
     "status.no_folders_selected": "未选择任何文件夹，请在目录树中勾选文件夹以加载场景",
     "status.auto_refreshed": "已自动刷新 {count} 个新分析完成的文件夹",
     "status.building_scenes": "正在从 {count} 个文件夹构建场景…",
+    "status.waiting_for_analysis_output": "所选文件夹仍在分析中，正在等待 Kestrel 数据库生成后自动加载预览",
+    "status.no_loadable_folders": "当前所选文件夹里还没有可加载的 Kestrel 数据库",
     "folder.group_unknown": "（未知文件夹）",
     "folder.action_open": "<i>📂</i> 打开",
     "folder.action_open_title": "在系统文件管理器中打开此文件夹",

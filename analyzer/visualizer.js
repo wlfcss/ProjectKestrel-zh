@@ -3827,6 +3827,17 @@
       // 颜色和计数只用于“分析文件夹”对话框中的树
     }
 
+    function findTreeNodeByPath(targetPath, node = folderTreeRootNode) {
+      if (!node || !targetPath) return null;
+      const wanted = normalizePath(targetPath);
+      if (normalizePath(node.path) === wanted) return node;
+      for (const child of (node.children || [])) {
+        const found = findTreeNodeByPath(targetPath, child);
+        if (found) return found;
+      }
+      return null;
+    }
+
     /** 在不重绘整棵树的前提下，更新主文件夹树中 `path` 对应的一行。
      *  让该节点表现为已有 kestrel 数据（图标 + 复选框），但不改动
      *  当前选择或勾选状态，从而避免打断用户当前视图。
@@ -4905,10 +4916,14 @@
           }
         }
         const prevRunningSet = _queueLastRunningSet;
+        const prevInProgressSet = new Set(_inProgressFolderPaths);
         _queueLastRunningSet = runningNow;
         
         // 更新进行中集合，并刷新树的样式
         _inProgressFolderPaths = inProgressNow;
+        for (const p of prevInProgressSet) {
+          if (!inProgressNow.has(p)) _tempKestrelPaths.delete(p);
+        }
         updateInProgressFoldersInTree();
         _updateAutoRefreshTimers();
         
@@ -5110,6 +5125,9 @@
     function openLiveAnalysisDlg() {
       _liveAnalysisDlgOpen = true;
       document.getElementById('liveAnalysisDlg').showModal();
+      const items = Array.isArray(window._lastQueueStatus?.items) ? window._lastQueueStatus.items : [];
+      const runningItem = items.find(i => i.status === 'running') || null;
+      updateLiveAnalysisDlg(runningItem || items[items.length - 1] || null);
     }
 
     /**
@@ -5148,7 +5166,25 @@
         statusEl.textContent = paused ? '⏸ Paused — ' + msg : msg;
       }
 
-      if (!item) return;
+      if (!item) {
+        const thumbEl = document.getElementById('liveDlgThumb');
+        const overlayEl = document.getElementById('liveDlgOverlay');
+        if (thumbEl) thumbEl.removeAttribute('src');
+        if (overlayEl) {
+          overlayEl.removeAttribute('src');
+          overlayEl.style.visibility = 'hidden';
+        }
+        _liveLastThumbKey = '';
+        _liveLastOverlayKey = '';
+        _liveLastCropKeys = ['', '', '', '', ''];
+        _updateLiveCropCards({
+          current_crops_rel: [],
+          current_detections: [],
+          current_quality_results: [],
+          current_species_results: [],
+        });
+        return;
+      }
 
       // 缩略图
       const thumbEl = document.getElementById('liveDlgThumb');
@@ -5377,6 +5413,8 @@
         if (changed) {
           ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
           setStatus(t('status.auto_refreshed', { count: refreshedCount }));
+        } else if (toRefresh.some(p => _inProgressFolderPaths.has(normalizePath(p)))) {
+          setStatus(t('status.waiting_for_analysis_output'));
         }
       } finally {
         _silentRefreshRunning = false;
@@ -5414,9 +5452,30 @@
     function updateInProgressFoldersInTree() {
       try {
         const norm = p => normalizePath(p);
+        const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
+        for (const row of rows) {
+          const rowPath = norm(row.dataset.path || '');
+          const stillInProgress = _inProgressFolderPaths.has(rowPath);
+          const node = findTreeNodeByPath(row.dataset.path || '');
+          const hasRealKestrel = !!node?.has_kestrel;
+          if (stillInProgress) continue;
+
+          row.classList.remove('in-progress');
+          if (!hasRealKestrel) {
+            const cb = row.querySelector('.tree-cb');
+            if (cb) cb.remove();
+            if (!row.querySelector('.tree-cb-spacer')) {
+              const spacer = document.createElement('span');
+              spacer.className = 'tree-cb-spacer';
+              const icon = row.querySelector('.tree-icon');
+              if (icon && icon.parentNode) icon.parentNode.insertBefore(spacer, icon);
+              else row.insertBefore(spacer, row.firstChild);
+            }
+          }
+        }
+
         for (const inProgPath of _inProgressFolderPaths) {
           const normPath = norm(inProgPath);
-          const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
           for (const row of rows) {
             const rp = norm(row.dataset.path || '');
             if (rp !== normPath) continue;
@@ -5521,7 +5580,7 @@
       } catch (e) { return 0; }
     }
 
-    /** Implement Case 1 logic: if first folder starts analysis and no other analyzed folders exist, auto-load it. */
+    /** Implement Case 1 logic: if first folder starts analysis and no other analyzed folders exist, auto-track it. */
     async function _handleFirstFolderAnalysisStart(folderPath) {
       try {
         if (!_isFirstQueueStart) return; // only on first start
@@ -5529,11 +5588,12 @@
         
         const analyzedCount = countAnalyzedFolders();
         if (analyzedCount === 0) {
-          // Case 1: Auto-check and auto-load the in-progress folder
+          // 首次分析时只自动勾选并等待数据库生成，避免抢先加载一个还没有 CSV 的文件夹。
           checkedFolderPaths.add(folderPath);
           renderFolderTree();
-          await debouncedAutoLoad();
-          setStatus('已自动加载正在分析中的文件夹（首次启动且当前没有其他已分析文件夹）');
+          _autoRefreshPendingPaths.add(normalizePath(folderPath));
+          _autoRefreshForcedPaths.add(normalizePath(folderPath));
+          setStatus(t('status.waiting_for_analysis_output'));
         }
       } catch (e) { console.warn('[case1] error:', e); }
     }
@@ -5673,7 +5733,12 @@
         }
       }
       if (myVer !== _loadFoldersVersion) { hideProgress(); return; }
-      if (loadedCount === 0) { hideProgress(); setStatus('No folders could be loaded'); return; }
+      if (loadedCount === 0) {
+        hideProgress();
+        const waitingOnAnalysis = paths.some(p => _inProgressFolderPaths.has(normalizePath(p)));
+        setStatus(waitingOnAnalysis ? t('status.waiting_for_analysis_output') : t('status.no_loadable_folders'));
+        return;
+      }
       showProgress(t('status.building_scenes', { count: loadedCount }), 95);
       // 为兼容单文件夹图片加载，把 rootPath 设为第一个已加载根目录。
       // 多文件夹模式下由逐行 __rootPath 在 getBlobUrlForPath 中负责处理。
@@ -5765,10 +5830,11 @@
         }
       } catch (e) {
         const errorMsg = (e.message || String(e)).replace(/^Error: /, '');
+        const isInProgress = _inProgressFolderPaths.has(normalizePath(folderPath));
         // 如果文件夹树已可见，用户可能是有意点击了父文件夹
         // （其中并没有 .kestrel）。此时给出柔和状态提示，不弹警告框。
         if (folderTreeData) {
-          setStatus(t('folder.no_database_in_tree'));
+          setStatus(isInProgress ? t('status.waiting_for_analysis_output') : t('folder.no_database_in_tree'));
         } else {
           alert(t('folder.database_missing_alert', { error: errorMsg }));
           setStatus(t('folder.load_failed'));

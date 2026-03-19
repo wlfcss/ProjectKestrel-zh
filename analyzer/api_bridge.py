@@ -42,6 +42,20 @@ try:
 except ImportError:
     _write_xmp_metadata = None  # type: ignore[assignment]
 
+try:
+    from kestrel_analyzer.image_utils import postprocess_raw as _postprocess_raw
+    from kestrel_analyzer.image_utils import RAW_POSTPROCESS_VERSION as _raw_postprocess_version
+    from kestrel_analyzer.image_utils import extract_preview_from_raw as _extract_preview_from_raw
+except ImportError:
+    try:
+        from analyzer.kestrel_analyzer.image_utils import postprocess_raw as _postprocess_raw
+        from analyzer.kestrel_analyzer.image_utils import RAW_POSTPROCESS_VERSION as _raw_postprocess_version
+        from analyzer.kestrel_analyzer.image_utils import extract_preview_from_raw as _extract_preview_from_raw
+    except ImportError:
+        _postprocess_raw = None  # type: ignore[assignment]
+        _raw_postprocess_version = 'unknown'
+        _extract_preview_from_raw = None  # type: ignore[assignment]
+
 HOST = '127.0.0.1'
 
 
@@ -1481,12 +1495,14 @@ class Api:
             debug_logging_enabled = bool(settings.get('raw_preview_debug_logging_enabled', True))
 
             cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
-            # Cache key includes relative path + extension + file identity.
-            # Exposure is intentionally excluded: the UI requests one RAW preview
-            # variant per file, already using the selected exposure correction.
+            # Cache key includes file identity, decode version, and exposure so
+            # stale previews do not survive RAW decode changes.
             file_stat = os.stat(full_path)
             rel_for_key = os.path.normpath(os.path.relpath(full_path_real, root_path_real)).replace('\\', '/')
-            key_material = f'{rel_for_key}|{ext}|{int(file_stat.st_mtime_ns)}|{int(file_stat.st_size)}'
+            key_material = (
+                f'{rel_for_key}|{ext}|{int(file_stat.st_mtime_ns)}|{int(file_stat.st_size)}'
+                f'|exp={exp_correction:+.4f}|decode={_raw_postprocess_version}'
+            )
             cache_token = hashlib.sha1(key_material.encode('utf-8')).hexdigest()[:16]
             base = os.path.splitext(os.path.basename(filename))[0]
             cache_name = f'{base}_{cache_token}_preview.jpg'
@@ -1540,17 +1556,27 @@ class Api:
                 except Exception:
                     raw_sizes = {}
                 
-                # Match pipeline postprocess flow: first call with defaults, then expose-shift if needed
-                rgb = raw.postprocess()
+                if exp_correction == 0.0 and callable(_extract_preview_from_raw):
+                    rgb = _extract_preview_from_raw(raw)
+                else:
+                    rgb = None
+                if rgb is None:
+                    if callable(_postprocess_raw):
+                        rgb = _postprocess_raw(raw)
+                    else:
+                        rgb = raw.postprocess()
                 
                 if exp_correction != 0.0:
-                    linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
-                    preserve = 0.8 if exp_correction > 0 else 0.0
-                    rgb = raw.postprocess(
-                        no_auto_bright=True,
-                        exp_shift=linear_scale,
-                        exp_preserve_highlights=preserve,
-                    )
+                    if callable(_postprocess_raw):
+                        rgb = _postprocess_raw(raw, exposure_stops=float(exp_correction))
+                    else:
+                        linear_scale = float(max(0.25, min(8.0, 2.0 ** exp_correction)))
+                        preserve = 0.8 if exp_correction > 0 else 0.0
+                        rgb = raw.postprocess(
+                            no_auto_bright=True,
+                            exp_shift=linear_scale,
+                            exp_preserve_highlights=preserve,
+                        )
 
             img = Image.fromarray(rgb)
 

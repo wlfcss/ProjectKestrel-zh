@@ -32,11 +32,63 @@ class MaskRCNNWrapper:
                 f"Mask R-CNN weights not found at: {weights_path}\n"
                 "The weights file should be bundled with the application."
             )
+        self._raise_if_lfs_pointer(weights_path)
 
         self.model = detection_models.maskrcnn_resnet50_fpn_v2(weights=None)
-        state_dict = torch.load(weights_path, map_location="cpu", weights_only=True)
+        state_dict = self._load_state_dict(weights_path)
         self.model.load_state_dict(state_dict)
         self.model.eval()
+
+    @staticmethod
+    def _load_state_dict(weights_path: Path):
+        """Load bundled Mask R-CNN weights across PyTorch versions.
+
+        PyTorch 2.6+ defaults `weights_only=True` for safety, which can reject
+        older pickled checkpoints. Our bundled model file is a trusted local
+        asset, so we first try the safe path and only fall back to
+        `weights_only=False` when required for backward compatibility.
+        """
+        try:
+            state = torch.load(weights_path, map_location="cpu", weights_only=True)
+        except Exception as exc:
+            message = str(exc)
+            if "Weights only load failed" not in message and "weights_only" not in message:
+                raise
+            print(
+                "[mask_rcnn] weights_only=True failed for bundled checkpoint; "
+                "retrying with weights_only=False for backward compatibility."
+            )
+            state = torch.load(weights_path, map_location="cpu", weights_only=False)
+
+        if isinstance(state, dict):
+            if "state_dict" in state and isinstance(state["state_dict"], dict):
+                state = state["state_dict"]
+            elif "model_state_dict" in state and isinstance(state["model_state_dict"], dict):
+                state = state["model_state_dict"]
+
+        if not isinstance(state, dict):
+            raise TypeError(
+                f"Unsupported Mask R-CNN checkpoint format at {weights_path}: "
+                f"expected dict, got {type(state).__name__}"
+            )
+
+        return state
+
+    @staticmethod
+    def _raise_if_lfs_pointer(weights_path: Path) -> None:
+        """Fail fast when the bundled model file is still a Git LFS pointer."""
+        try:
+            with open(weights_path, "rb") as handle:
+                prefix = handle.read(256)
+        except OSError:
+            return
+
+        if prefix.startswith(b"version https://git-lfs.github.com/spec/v1"):
+            raise RuntimeError(
+                f"Mask R-CNN weights at {weights_path} are a Git LFS pointer, not the real model file.\n"
+                "Please download the actual large model asset (about 186 MB) or run Git LFS pull so "
+                "that analyzer/models/mask_rcnn_resnet50_fpn_v2.pth contains binary weights."
+            )
 
     def get_prediction(self, image_data, threshold=0.75, mask_threshold=0.5):
         """Get predictions from the model.
