@@ -3,7 +3,9 @@
 
 Bugs
 * known issue that skipping to next scene works inconsistently, and the background view should scroll to match the current scene opened in the film strip.
-* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed. 
+* Add "Parent folder" button to analyze folders directory so you can walk up the folder tree if needed.
+* Loading all folders is slightly slower
+* Auto-save will save all 100+ folders rather than just the ones that have changes.
 
 Features under consideration
 - Build debug platform that runs Kestrel analysis, but saves the full output at every step for detailed troubleshooting and root-cause analysis. (Under Consideration, likely requires simple modification of CLI)
