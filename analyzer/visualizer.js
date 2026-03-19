@@ -1146,32 +1146,70 @@
           s.representative?.__rootPath
         ));
         th.appendChild(img);
+        const qualityBadge = document.createElement('span');
+        qualityBadge.className = 'badge quality';
+        qualityBadge.textContent = `Q ${fmt3(s.maxQuality)}`;
+        th.appendChild(qualityBadge);
+        const countBadge = document.createElement('span');
+        countBadge.className = 'badge count';
+        countBadge.textContent = `${s.imageCount} 张`;
+        th.appendChild(countBadge);
         card.appendChild(th);
 
         const body = document.createElement('div');
         body.className = 'body';
+        const captureLabel = (() => {
+          const ct = s.representative?.capture_time;
+          if (!ct) return t('status.unknown_time');
+          try {
+            const d = new Date(ct);
+            if (isNaN(d)) return t('status.unknown_time');
+            return d.toLocaleString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit'
+            });
+          } catch (_) {
+            return t('status.unknown_time');
+          }
+        })();
+        const primarySpeciesName = s.species.length > 0 ? getSpeciesDisplayName(s.species[0]) : '未识别物种';
+        const familyName = s.families.length > 0 ? getFamilyDisplayName(s.families[0]) : '未分类';
+        const speciesOverflow = Math.max(0, s.species.length - 1);
+        const cardMetaLine = document.createElement('div');
+        cardMetaLine.className = 'scene-card-topline';
+        const _folderName = folderBaseName(s.representative?.__rootPath || '');
+        const secondaryMeta = showFolderHeaders || !_folderName
+          ? captureLabel
+          : `${_folderName} · ${captureLabel}`;
+        cardMetaLine.textContent = secondaryMeta;
         const title = document.createElement('div');
         title.className = 'title';
         const _localNum = String(s.id).split(':').pop();
-        const _folderName = folderBaseName(s.representative?.__rootPath || '');
         // 仅在单文件夹加载时在标题中显示文件夹名；
         // 多文件夹模式下，分组头部已经会显示文件夹名。
-        const _titleHtml = (_folderName && !showFolderHeaders)
-          ? `<i class="folder-name">${escapeHtml(_folderName)}</i><span class="title-sep"> / </span><b>#${_localNum}</b>`
-          : `<b>#${_localNum}</b>`;
+        const _titleHtml = `<b>#${_localNum}</b>`;
         title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${decodeEntities(escapeHtml(s.sceneName))}</span>` : '');
         title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
-        const meta = document.createElement('div');
-        // 为标题级徽标使用专门的类名，避免影响其它 .meta 的用法
-        meta.className = 'meta title-badges';
-        meta.innerHTML = `<span class="score">★ ${fmt3(s.maxQuality)}</span><span>\ud83d\udcf8 ${s.imageCount}</span>`;
+        const primarySpecies = document.createElement('div');
+        primarySpecies.className = 'scene-card-species';
+        primarySpecies.textContent = primarySpeciesName;
+        primarySpecies.title = primarySpeciesName;
+        const subline = document.createElement('div');
+        subline.className = 'scene-card-subline';
+        subline.innerHTML = `
+          <span class="scene-card-family">${escapeHtml(familyName)}</span>
+          <span class="scene-card-sep"></span>
+          <span class="scene-card-secondary">${speciesOverflow > 0 ? `+${speciesOverflow} 个其他标签` : '单一主体'}</span>
+        `;
         const chips = document.createElement('div');
         chips.className = 'chips';
         if (s.isApproved) {
           card.classList.add('scene-approved');
           chips.classList.add('reviewed-tags');
         }
-        for (const sp of s.species.slice(0, 3)) {
+        for (const sp of s.species.slice(1, 3)) {
           const c = document.createElement('span');
           c.className = s.isApproved ? 'chip manual-approved' : 'chip';
           c.textContent = getSpeciesDisplayName(sp);
@@ -1185,13 +1223,24 @@
           more.title = s.species.slice(3).map(getSpeciesDisplayName).join(', ');
           chips.appendChild(more);
         }
-        // 标题与徽标放在同一行：左侧标题，右侧徽标
-        const titleRow = document.createElement('div');
-        titleRow.className = 'title-row';
-        titleRow.appendChild(title);
-        titleRow.appendChild(meta);
-        body.appendChild(titleRow);
-        body.appendChild(chips);
+        const footer = document.createElement('div');
+        footer.className = 'scene-card-footer';
+        const sceneStat = document.createElement('span');
+        sceneStat.className = 'scene-card-stat';
+        sceneStat.textContent = `场景 #${_localNum}`;
+        footer.appendChild(sceneStat);
+        if (s.isApproved) {
+          const reviewedStat = document.createElement('span');
+          reviewedStat.className = 'scene-card-stat reviewed';
+          reviewedStat.textContent = '已审核';
+          footer.appendChild(reviewedStat);
+        }
+        body.appendChild(cardMetaLine);
+        body.appendChild(title);
+        body.appendChild(primarySpecies);
+        body.appendChild(subline);
+        if (chips.childElementCount > 0) body.appendChild(chips);
+        body.appendChild(footer);
         card.appendChild(body);
 
         card.addEventListener('click', (ev) => {
@@ -2958,16 +3007,21 @@
           if (!rp) { failed++; continue; }
           try {
             // 将筛片/评分列写回 CSV，保证筛片助手和重新加载时读到的是权威状态。
-            if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
-              const content = rowsToCsvString(exportCols, groupRows);
-              const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
-              if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write kestrel_database.csv');
-            }
-
             const sd = _normalizeScenedataForSave(rp, groupRows);
-            const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
-            if (res.success) saved++;
-            else { failed++; console.warn('[save scenedata] Failed for', rp, res.error); }
+            const content = rowsToCsvString(exportCols, groupRows);
+            if (typeof window.pywebview.api.write_kestrel_state === 'function') {
+              const stateRes = await window.pywebview.api.write_kestrel_state(rp, content, sd);
+              if (!stateRes?.success) throw new Error(stateRes?.error || 'Failed to save Kestrel state');
+            } else {
+              // 兼容旧版后端：分别写入，但后端单文件写入也已升级为原子替换。
+              if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
+                const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
+                if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write kestrel_database.csv');
+              }
+              const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
+              if (!res?.success) throw new Error(res?.error || 'Failed to write kestrel_scenedata.json');
+            }
+            saved++;
           } catch (e) {
             failed++;
             console.warn('[save pywebview] Error for', rp, e);
@@ -3788,7 +3842,7 @@
           try { _tempKestrelPaths.add(norm(path)); } catch (e) { }
           // 更新图标
           const icon = row.querySelector('.tree-icon');
-          if (icon) icon.textContent = '📂';
+          if (icon) icon.textContent = '▣';
           // 确保复选框存在（但不要自动勾选）
           if (!row.querySelector('.tree-cb')) {
             const cb = document.createElement('input');
@@ -3871,7 +3925,7 @@
       // 文件夹图标
       const icon = document.createElement('span');
       icon.className = 'tree-icon';
-      icon.textContent = node.has_kestrel ? '📂' : '📁';
+      icon.textContent = node.has_kestrel ? '▣' : '▢';
 
       // 标签
       const label = document.createElement('span');
@@ -4682,7 +4736,7 @@
         } else if (secsPerImage !== null) {
           let totalRemaining = 0;
           for (const item of items) {
-            const sess = _queueSessionStartState.get(item.path);
+            const sess = _queueSessionStartState.get(normalizePath(item.path));
             if (item.status === 'running' && item.total > 0) {
               const remaining = Math.max(0, (item.total || 0) - (item.processed || 0));
               totalRemaining += secsPerImage * remaining;
@@ -4826,7 +4880,7 @@
 
       // 更新进行中文件夹的跟踪与界面状态（pending + running）
       try {
-        const norm = p => (p || '').replace(/\\/g, '/');
+        const norm = p => normalizePath(p);
         const inProgressNow = new Set();
         for (const item of items) {
           if (item.status === 'pending' || item.status === 'running') {
@@ -4866,13 +4920,15 @@
 
       // 移除已完成文件夹的自动刷新定时器
       try {
-        const norm = p => (p || '').replace(/\\/g, '/');
+        const norm = p => normalizePath(p);
         const nowDone = new Set(items.filter(i => i.status === 'done').map(i => norm(i.path)));
         for (const p of nowDone) {
           if (_autoRefreshTimers.has(p)) {
             clearInterval(_autoRefreshTimers.get(p));
             _autoRefreshTimers.delete(p);
           }
+          _autoRefreshForcedPaths.delete(p);
+          _autoRefreshLastProcessed.delete(p);
         }
       } catch (e) { console.warn('[timer] cleanup error:', e); }
 
@@ -4886,9 +4942,15 @@
     // 统一标准化路径：去掉结尾斜杠
     function normalizePath(p) {
       if (!p) return '';
-      let pp = String(p).trim();
+      let pp = String(p).trim().replace(/\\/g, '/');
       while (pp && pp[pp.length - 1] in {'\\': 1, '/': 1}) pp = pp.slice(0, -1);
       return pp;
+    }
+
+    function getQueueItemByPath(path) {
+      const normPath = normalizePath(path);
+      const items = Array.isArray(window._lastQueueStatus?.items) ? window._lastQueueStatus.items : [];
+      return items.find(item => normalizePath(item.path) === normPath) || null;
     }
 
     function startPollingQueue() {
@@ -4983,6 +5045,9 @@
         clearInterval(timerId);
       }
       _autoRefreshTimers.clear();
+      _autoRefreshPendingPaths.clear();
+      _autoRefreshForcedPaths.clear();
+      _autoRefreshLastProcessed.clear();
       _inProgressFolderPaths.clear();
       // 清理会话状态
       _queueSessionStartState.clear();
@@ -5217,11 +5282,16 @@
 
     let _autoRefreshTimer = null;
     let _autoRefreshPendingPaths = new Set(); // 需要静默重载的路径
+    let _autoRefreshForcedPaths = new Set();  // 无论进度是否前进都要重载的路径
+    let _autoRefreshLastProcessed = new Map(); // path -> 上次静默重载时看到的 processed 计数
     let _silentRefreshRunning = false;        // 防止 silentRefreshPending 并发执行
 
     /** 为 `path` 安排一次静默重载（当某个队列项完成时调用）。 */
     function scheduleAutoRefresh(path) {
-      _autoRefreshPendingPaths.add(path);
+      const normPath = normalizePath(path);
+      if (!normPath) return;
+      _autoRefreshPendingPaths.add(normPath);
+      _autoRefreshForcedPaths.add(normPath);
     }
 
     function startAutoRefresh() {
@@ -5243,9 +5313,16 @@
         _autoRefreshPendingPaths.clear();
         if (toRefresh.length === 0) return;
 
-        const normPath = p => (p || '').replace(/\\/g, '/');
         let changed = false;
+        let refreshedCount = 0;
         for (const p of toRefresh) {
+          const forceRefresh = _autoRefreshForcedPaths.delete(p);
+          const queueItem = getQueueItemByPath(p);
+          const currentProcessed = Number.isFinite(Number(queueItem?.processed)) ? Number(queueItem.processed) : null;
+          const lastProcessed = _autoRefreshLastProcessed.get(p);
+          if (!forceRefresh && currentProcessed !== null && lastProcessed !== undefined && currentProcessed <= lastProcessed) {
+            continue;
+          }
           try {
             if (!hasPywebviewApi || !window.pywebview?.api?.read_kestrel_csv) continue;
             const result = await window.pywebview.api.read_kestrel_csv(p);
@@ -5254,11 +5331,11 @@
             const newRows = parsed.data || [];
             const newFields = parsed.meta.fields || [];
             const root = result.root || p;
-            const rootN = normPath(root);
+            const rootN = normalizePath(root);
             for (const f of newFields) if (!header.includes(f)) header.push(f);
-            const sample = rows.find(r => normPath(r.__rootPath) === rootN);
+            const sample = rows.find(r => normalizePath(r.__rootPath) === rootN);
             const slot = sample ? sample.__folderSlot : rows.length;
-            rows = rows.filter(r => normPath(r.__rootPath) !== rootN);
+            rows = rows.filter(r => normalizePath(r.__rootPath) !== rootN);
             for (const r of newRows) { r.__rootPath = root; r.__folderSlot = slot; }
             rows = rows.concat(newRows);
             if (hasPywebviewApi && window.pywebview?.api?.read_kestrel_scenedata) {
@@ -5279,14 +5356,20 @@
               } catch (_) {}
             }
             changed = true;
+            refreshedCount++;
+            if (currentProcessed !== null) _autoRefreshLastProcessed.set(p, currentProcessed);
           } catch (e) {
             console.warn('[autorefresh]', p, e);
+            if (forceRefresh) {
+              _autoRefreshPendingPaths.add(p);
+              _autoRefreshForcedPaths.add(p);
+            }
           }
         }
 
         if (changed) {
           ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
-          setStatus(t('status.auto_refreshed', { count: toRefresh.length }));
+          setStatus(t('status.auto_refreshed', { count: refreshedCount }));
         }
       } finally {
         _silentRefreshRunning = false;
@@ -5307,7 +5390,7 @@
         // Apply any transient kestrel markings so nodes recently queued/started
         // are shown as having kestrel until the real scan state differs.
         try {
-          const norm = p => (p || '').replace(/\\/g, '/');
+          const norm = p => normalizePath(p);
           function applyTemp(n) {
             if (!n) return;
             const p = norm(n.path || '');
@@ -5323,7 +5406,7 @@
     /** Update UI to reflect in-progress folders with special styling and always-present checkboxes. */
     function updateInProgressFoldersInTree() {
       try {
-        const norm = p => (p || '').replace(/\\/g, '/');
+        const norm = p => normalizePath(p);
         for (const inProgPath of _inProgressFolderPaths) {
           const normPath = norm(inProgPath);
           const rows = Array.from(document.querySelectorAll('#folderTree .tree-node-row'));
@@ -5361,9 +5444,9 @@
 
     // Path-insensitive check: does checkedFolderPaths contain a path matching p?
     function _isPathChecked(p) {
-      const n = (p || '').replace(/\\/g, '/');
+      const n = normalizePath(p);
       for (const cp of checkedFolderPaths) {
-        if (cp.replace(/\\/g, '/') === n) return true;
+        if (normalizePath(cp) === n) return true;
       }
       return false;
     }
@@ -5373,6 +5456,9 @@
       try {
         const queueStatus = window._lastQueueStatus;
         const isPaused = queueStatus && queueStatus.paused;
+        const runningPaths = new Set((queueStatus?.items || [])
+          .filter(item => item.status === 'running')
+          .map(item => normalizePath(item.path)));
         
         if (isPaused) {
           for (const timerId of _autoRefreshTimers.values()) {
@@ -5383,7 +5469,7 @@
         }
         
         for (const [path, timerId] of _autoRefreshTimers.entries()) {
-          const isStillInProgress = _inProgressFolderPaths.has(path);
+          const isStillInProgress = runningPaths.has(path);
           const isStillChecked = _isPathChecked(path);
           if (!isStillInProgress || !isStillChecked) {
             clearInterval(timerId);
@@ -5392,10 +5478,16 @@
         }
         
         for (const inProgPath of _inProgressFolderPaths) {
+          if (!runningPaths.has(inProgPath)) continue;
           if (_isPathChecked(inProgPath) && !_autoRefreshTimers.has(inProgPath)) {
             const capturedPath = inProgPath;
             const timerId = setInterval(async () => {
               try {
+                const item = getQueueItemByPath(capturedPath);
+                if (!item || item.status !== 'running') return;
+                const processed = Number.isFinite(Number(item.processed)) ? Number(item.processed) : null;
+                const lastProcessed = _autoRefreshLastProcessed.get(capturedPath);
+                if (processed !== null && lastProcessed !== undefined && processed <= lastProcessed) return;
                 _autoRefreshPendingPaths.add(capturedPath);
                 silentRefreshPending();
               } catch (e) { console.warn('[refresh] auto-refresh error:', e); }
@@ -6264,7 +6356,7 @@
                       const initialProcessed = info.processed || 0;
                       const totalImages = info.total || 0;
                       const toAnalyze = Math.max(0, totalImages - initialProcessed);
-                      _queueSessionStartState.set(path, {
+                      _queueSessionStartState.set(normalizePath(path), {
                         initialProcessed,
                         totalImages,
                         toAnalyze
@@ -7188,6 +7280,13 @@
         startMainTutorial(1, 0);
       });
     }
+
+    document.querySelectorAll('.welcome-settings-link').forEach(function(linkEl) {
+      linkEl.addEventListener('click', function(e) {
+        e.preventDefault();
+        showSettings();
+      });
+    });
 
     // 首次启动时自动开始教程（仅 pywebview 模式）
     (async function() {

@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import webbrowser
 
 from settings_utils import load_persisted_settings, save_persisted_settings, log
@@ -71,6 +72,41 @@ class Api:
         if root_path not in self._realpath_cache:
             self._realpath_cache[root_path] = os.path.realpath(root_path)
         return self._realpath_cache[root_path]
+
+    def _path_within_root(self, root_path: str, candidate_path: str) -> bool:
+        """Return True when candidate_path resolves inside root_path."""
+        try:
+            root_real = self._root_realpath(root_path)
+            candidate_real = os.path.realpath(candidate_path)
+            return os.path.commonpath([root_real, candidate_real]) == root_real
+        except Exception:
+            return False
+
+    def _resolve_kestrel_paths(self, folder_path: str) -> tuple[str, str, str]:
+        """Resolve a folder or .kestrel path to (kestrel_dir, csv_path, scenedata_path)."""
+        normalized = str(folder_path).strip().rstrip('/\\')
+        folder_name = os.path.basename(normalized)
+        kestrel_dir = normalized if folder_name == '.kestrel' else os.path.join(normalized, '.kestrel')
+        csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
+        scenedata_path = os.path.join(kestrel_dir, 'kestrel_scenedata.json')
+        return kestrel_dir, csv_path, scenedata_path
+
+    def _atomic_write_text(self, target_path: str, content: str) -> None:
+        """Atomically replace a UTF-8 text file in-place."""
+        parent_dir = os.path.dirname(target_path)
+        fd, temp_path = tempfile.mkstemp(prefix='.kestrel_tmp_', suffix='.tmp', dir=parent_dir)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8', newline='') as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, target_path)
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise
 
     def get_legal_status(self) -> dict:
         """Check if the user has agreed to the terms and if install telemetry was sent."""
@@ -222,48 +258,36 @@ class Api:
         """
         
         try:
-            # Normalize path: remove trailing separators to ensure reliable basename detection
-            folder_path = folder_path.strip()
+            folder_path = str(folder_path).strip()
             while folder_path and folder_path[-1] in ('/', '\\'):
                 folder_path = folder_path[:-1]
-            
+
             if not folder_path:
                 raise ValueError("Empty folder path")
-            
-            
-            # Determine if this IS the .kestrel folder or contains one
-            folder_name = os.path.basename(folder_path)
-            
-            is_kestrel_folder = (folder_name == '.kestrel')
-            
-            if is_kestrel_folder:
-                csv_path = os.path.join(folder_path, 'kestrel_database.csv')
-                parent_folder = os.path.dirname(folder_path)
-                
-            else:
-                csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
-                parent_folder = folder_path
-                
-            
+
+            kestrel_dir, csv_path, _scenedata_path = self._resolve_kestrel_paths(folder_path)
+            parent_folder = os.path.dirname(kestrel_dir)
+
             if not os.path.exists(csv_path):
-                
                 return {
                     'success': False,
                     'error': f'Could not find kestrel_database.csv at: {csv_path}',
                     'path': csv_path,
                     'data': ''
                 }
-            
+
             with open(csv_path, 'r', encoding='utf-8') as f:
                 data = f.read()
-            
-            
+            csv_stat = os.stat(csv_path)
+
             return {
                 'success': True,
                 'data': data,
                 'error': '',
                 'path': csv_path,
-                'root': parent_folder
+                'root': parent_folder,
+                'mtime_ns': int(csv_stat.st_mtime_ns),
+                'size': int(csv_stat.st_size),
             }
         except Exception as e:
             print(f"[API] read_kestrel_csv() -> Error: {e}", flush=True)
@@ -439,12 +463,10 @@ class Api:
                 relative_path = relative_path.lstrip('/\\')
                 full_path = os.path.join(root_path, relative_path)
 
-            # Security check — fast path: no '..' means path cannot escape root.
-            # Slow path: resolve symlinks only when traversal sequences are present.
-            if '..' in relative_path or os.path.isabs(relative_path):
-                root_path_real = self._root_realpath(root_path)
-                if not os.path.realpath(full_path).startswith(root_path_real):
-                    return {'success': False, 'error': 'Path escapes root directory', 'data': '', 'mime': ''}
+            # Security check — only allow files that resolve inside root_path,
+            # including simple relative paths that may traverse via symlinks.
+            if not self._path_within_root(root_path, full_path):
+                return {'success': False, 'error': 'Path escapes root directory', 'data': '', 'mime': ''}
 
             # Read — let open() raise FileNotFoundError rather than a separate stat call
             try:
@@ -562,16 +584,11 @@ class Api:
     def write_kestrel_csv(self, folder_path: str, csv_content: str):
         """Write CSV content back to .kestrel/kestrel_database.csv for the given folder."""
         try:
-            folder_name = os.path.basename(folder_path)
-            if folder_name == '.kestrel':
-                csv_path = os.path.join(folder_path, 'kestrel_database.csv')
-            else:
-                csv_path = os.path.join(folder_path, '.kestrel', 'kestrel_database.csv')
+            _kestrel_dir, csv_path, _scenedata_path = self._resolve_kestrel_paths(folder_path)
             if not os.path.exists(csv_path):
                 print(f'[API] write_kestrel_csv({folder_path!r}) -> CSV not found: {csv_path}', flush=True)
                 return {'success': False, 'error': f'CSV not found: {csv_path}'}
-            with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-                f.write(csv_content)
+            self._atomic_write_text(csv_path, csv_content)
             print(f'[API] write_kestrel_csv({folder_path!r}) -> {len(csv_content)} bytes written to {csv_path}', flush=True)
             return {'success': True, 'path': csv_path}
         except Exception as e:
@@ -718,27 +735,61 @@ class Api:
             {'success': bool, 'path': str, 'error': str}
         """
         try:
-            folder_path = str(folder_path).strip().rstrip('/\\')
-            folder_name = os.path.basename(folder_path)
-            if folder_name == '.kestrel':
-                kestrel_dir = folder_path
-            else:
-                kestrel_dir = os.path.join(folder_path, '.kestrel')
+            kestrel_dir, _csv_path, scenedata_path = self._resolve_kestrel_paths(folder_path)
 
             if not os.path.isdir(kestrel_dir):
                 return {'success': False, 'error': f'.kestrel directory not found at: {kestrel_dir}', 'path': ''}
 
-            scenedata_path = os.path.join(kestrel_dir, 'kestrel_scenedata.json')
             if not isinstance(scenedata, dict):
                 return {'success': False, 'error': 'scenedata must be a dict', 'path': ''}
 
-            with open(scenedata_path, 'w', encoding='utf-8') as f:
-                json.dump(scenedata, f, indent=2)
+            self._atomic_write_text(scenedata_path, json.dumps(scenedata, indent=2, ensure_ascii=False))
             print(f'[API] write_kestrel_scenedata({folder_path!r}) -> {scenedata_path}', flush=True)
             return {'success': True, 'path': scenedata_path, 'error': ''}
         except Exception as e:
             print(f'[API] write_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e), 'path': ''}
+
+    def write_kestrel_state(self, folder_path: str, csv_content: str, scenedata: dict) -> dict:
+        """Best-effort atomic save for CSV + scenedata, with rollback on partial failure."""
+        csv_backup = None
+        scenedata_backup = None
+        csv_written = False
+        scenedata_written = False
+        try:
+            kestrel_dir, csv_path, scenedata_path = self._resolve_kestrel_paths(folder_path)
+            if not os.path.isdir(kestrel_dir):
+                return {'success': False, 'error': f'.kestrel directory not found at: {kestrel_dir}', 'csv_path': '', 'scenedata_path': ''}
+            if not os.path.exists(csv_path):
+                return {'success': False, 'error': f'CSV not found: {csv_path}', 'csv_path': csv_path, 'scenedata_path': scenedata_path}
+            if not isinstance(scenedata, dict):
+                return {'success': False, 'error': 'scenedata must be a dict', 'csv_path': csv_path, 'scenedata_path': scenedata_path}
+
+            with open(csv_path, 'r', encoding='utf-8') as handle:
+                csv_backup = handle.read()
+            if os.path.exists(scenedata_path):
+                with open(scenedata_path, 'r', encoding='utf-8') as handle:
+                    scenedata_backup = handle.read()
+
+            self._atomic_write_text(csv_path, csv_content)
+            csv_written = True
+            self._atomic_write_text(scenedata_path, json.dumps(scenedata, indent=2, ensure_ascii=False))
+            scenedata_written = True
+            print(f'[API] write_kestrel_state({folder_path!r}) -> CSV + scenedata saved', flush=True)
+            return {'success': True, 'csv_path': csv_path, 'scenedata_path': scenedata_path, 'error': ''}
+        except Exception as e:
+            if csv_written and csv_backup is not None:
+                try:
+                    self._atomic_write_text(csv_path, csv_backup)
+                except Exception as rollback_err:
+                    print(f'[API] write_kestrel_state({folder_path!r}) -> CSV rollback failed: {rollback_err}', flush=True)
+            if scenedata_written and scenedata_backup is not None:
+                try:
+                    self._atomic_write_text(scenedata_path, scenedata_backup)
+                except Exception as rollback_err:
+                    print(f'[API] write_kestrel_state({folder_path!r}) -> scenedata rollback failed: {rollback_err}', flush=True)
+            print(f'[API] write_kestrel_state({folder_path!r}) -> Error: {e}', flush=True)
+            return {'success': False, 'error': str(e), 'csv_path': csv_path if "csv_path" in locals() else '', 'scenedata_path': scenedata_path if "scenedata_path" in locals() else ''}
 
     def open_folder(self, path: str):
         """Open a folder in the system file browser (pywebview desktop mode)."""
