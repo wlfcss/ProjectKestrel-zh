@@ -5440,11 +5440,11 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
             setStatus(t('folder.opening_picker'));
             const folderPath = await window.pywebview.api.choose_directory();
             if (folderPath) {
-              // 用户确认选择后再重置已勾选项，避免取消时丢失当前视图
+              // 用户确认选择后重置已勾选项（不触发 debouncedAutoLoad，
+              // 因为接下来会直接通过 loadFolderFromPath 加载数据）
               try {
                 checkedFolderPaths.clear();
                 renderFolderTree();
-                debouncedAutoLoad();
               } catch (e) { /* ignore */ }
               // 将选中的文件夹作为树根来扫描
               // （用户可能选的是包含多个已分析子目录的父目录，也可能直接选叶子目录）。
