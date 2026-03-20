@@ -20,8 +20,8 @@ except Exception:
     # If kestrel_analyzer isn't available, fall back to reasonable defaults.
     RAW_EXTENSIONS = ['.cr2', '.cr3', '.nef', '.arw', '.dng', '.orf', '.raf', '.rw2', '.pef', '.sr2', '.x3f']
     JPEG_EXTENSIONS = ['.jpg', '.jpeg', '.png']
-    KESTREL_DIR_NAME = '.kestrel'
-    DATABASE_NAME = 'kestrel_database.csv'
+    KESTREL_DIR_NAME = '.lingjian'
+    DATABASE_NAME = 'lingjian_database.csv'
 
 
 def _list_images_in_folder(folder: str) -> list:

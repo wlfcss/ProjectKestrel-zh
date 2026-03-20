@@ -88,12 +88,12 @@ class Api:
             return False
 
     def _resolve_kestrel_paths(self, folder_path: str) -> tuple[str, str, str]:
-        """Resolve a folder or .kestrel path to (kestrel_dir, csv_path, scenedata_path)."""
+        """Resolve a folder or .lingjian path to (kestrel_dir, csv_path, scenedata_path)."""
         normalized = str(folder_path).strip().rstrip('/\\')
         folder_name = os.path.basename(normalized)
-        kestrel_dir = normalized if folder_name == '.kestrel' else os.path.join(normalized, '.kestrel')
-        csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-        scenedata_path = os.path.join(kestrel_dir, 'kestrel_scenedata.json')
+        kestrel_dir = normalized if folder_name == '.lingjian' else os.path.join(normalized, '.lingjian')
+        csv_path = os.path.join(kestrel_dir, 'lingjian_database.csv')
+        scenedata_path = os.path.join(kestrel_dir, 'lingjian_scenedata.json')
         return kestrel_dir, csv_path, scenedata_path
 
     def _atomic_write_text(self, target_path: str, content: str) -> None:
@@ -246,7 +246,7 @@ class Api:
             return None
 
     def read_kestrel_csv(self, folder_path):
-        """Read the kestrel_database.csv from the given folder path.
+        """Read the lingjian_database.csv from the given folder path.
         
         Args:
             folder_path: Absolute path to folder (may be parent folder or .kestrel folder itself)
@@ -269,7 +269,7 @@ class Api:
             if not os.path.exists(csv_path):
                 return {
                     'success': False,
-                    'error': f'Could not find kestrel_database.csv at: {csv_path}',
+                    'error': f'Could not find lingjian_database.csv at: {csv_path}',
                     'path': csv_path,
                     'data': ''
                 }
@@ -296,11 +296,11 @@ class Api:
                 'data': ''
             }
 
-    def read_kestrel_metadata(self, folder_path: str):
-        """Read kestrel_metadata.json from a folder's .kestrel directory."""
+    def read_lingjian_metadata(self, folder_path: str):
+        """Read lingjian_metadata.json from a folder's .kestrel directory."""
         try:
             folder_path = str(folder_path).strip()
-            meta_path = os.path.join(folder_path, '.kestrel', 'kestrel_metadata.json')
+            meta_path = os.path.join(folder_path, '.lingjian', 'lingjian_metadata.json')
             if not os.path.isfile(meta_path):
                 return {'success': False, 'error': 'Metadata file not found'}
             with open(meta_path, 'r', encoding='utf-8') as f:
@@ -313,7 +313,7 @@ class Api:
         """Delete the contents of the .kestrel folder within the given folder."""
         try:
             folder_path = str(folder_path).strip()
-            kestrel_dir = os.path.join(folder_path, '.kestrel')
+            kestrel_dir = os.path.join(folder_path, '.lingjian')
             if not os.path.isdir(kestrel_dir):
                 return {'success': True, 'message': 'No .kestrel folder found'}
             # Verify the .kestrel dir is actually inside folder_path (prevent path traversal)
@@ -396,7 +396,7 @@ class Api:
         """Read an image file and return it as base64-encoded data.
         
         Args:
-            relative_path: Path relative to root (e.g., ".kestrel/export/photo.jpg") 
+            relative_path: Path relative to root (e.g., ".lingjian/export/photo.jpg") 
                           OR absolute path (for backward compatibility with old databases)
             root_path: Absolute path to root folder
             
@@ -485,11 +485,11 @@ class Api:
                         continue
                     node_count[0] += 1
                     full = entry.path
-                    has_kestrel = os.path.isfile(os.path.join(full, '.kestrel', 'kestrel_database.csv'))
+                    has_kestrel = os.path.isfile(os.path.join(full, '.lingjian', 'lingjian_database.csv'))
                     kestrel_version = ''
                     if has_kestrel:
                         try:
-                            meta_path = os.path.join(full, '.kestrel', 'kestrel_metadata.json')
+                            meta_path = os.path.join(full, '.lingjian', 'lingjian_metadata.json')
                             if os.path.isfile(meta_path):
                                 with open(meta_path, 'r', encoding='utf-8') as mf:
                                     kestrel_version = json.load(mf).get('version', '')
@@ -506,11 +506,11 @@ class Api:
                 return result
 
             tree = _scan(root_path, max_depth)
-            root_has_kestrel = os.path.isfile(os.path.join(root_path, '.kestrel', 'kestrel_database.csv'))
+            root_has_kestrel = os.path.isfile(os.path.join(root_path, '.lingjian', 'lingjian_database.csv'))
             root_kestrel_version = ''
             if root_has_kestrel:
                 try:
-                    meta_path = os.path.join(root_path, '.kestrel', 'kestrel_metadata.json')
+                    meta_path = os.path.join(root_path, '.lingjian', 'lingjian_metadata.json')
                     if os.path.isfile(meta_path):
                         with open(meta_path, 'r', encoding='utf-8') as mf:
                             root_kestrel_version = json.load(mf).get('version', '')
@@ -534,7 +534,7 @@ class Api:
             return {'success': False, 'tree': [], 'error': str(e)}
 
     def write_kestrel_csv(self, folder_path: str, csv_content: str):
-        """Write CSV content back to .kestrel/kestrel_database.csv for the given folder."""
+        """Write CSV content back to .lingjian/lingjian_database.csv for the given folder."""
         try:
             _kestrel_dir, csv_path, _scenedata_path = self._resolve_kestrel_paths(folder_path)
             if not os.path.exists(csv_path):
@@ -554,7 +554,7 @@ class Api:
         each image's raw quality score to a 1–5 star rating without any rank-based normalization.
         Returns the computed map WITHOUT writing to the CSV file.
 
-        Also caches the folder's quality distribution in kestrel_metadata.json for potential
+        Also caches the folder's quality distribution in lingjian_metadata.json for potential
         future use (e.g. histogram display).
 
         The ``mode`` parameter is accepted for API compatibility but is ignored; profile
@@ -585,9 +585,9 @@ class Api:
                 )
 
             folder_path = str(folder_path).strip().rstrip('/\\')
-            kestrel_dir = os.path.join(folder_path, '.kestrel')
-            csv_path = os.path.join(kestrel_dir, 'kestrel_database.csv')
-            metadata_path = os.path.join(kestrel_dir, 'kestrel_metadata.json')
+            kestrel_dir = os.path.join(folder_path, '.lingjian')
+            csv_path = os.path.join(kestrel_dir, 'lingjian_database.csv')
+            metadata_path = os.path.join(kestrel_dir, 'lingjian_metadata.json')
 
             if not os.path.exists(csv_path):
                 return {'success': False, 'error': 'No database found', 'normalized_ratings': {}, 'mode_used': ''}
@@ -645,8 +645,8 @@ class Api:
             print(f'[API] apply_normalization() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e), 'normalized_ratings': {}, 'mode_used': ''}
 
-    def read_kestrel_scenedata(self, folder_path: str) -> dict:
-        """Read kestrel_scenedata.json from a folder's .kestrel directory.
+    def read_lingjian_scenedata(self, folder_path: str) -> dict:
+        """Read lingjian_scenedata.json from a folder's .kestrel directory.
 
         Returns:
             {'success': bool, 'data': dict, 'error': str}
@@ -654,10 +654,10 @@ class Api:
         try:
             folder_path = str(folder_path).strip().rstrip('/\\')
             folder_name = os.path.basename(folder_path)
-            if folder_name == '.kestrel':
-                scenedata_path = os.path.join(folder_path, 'kestrel_scenedata.json')
+            if folder_name == '.lingjian':
+                scenedata_path = os.path.join(folder_path, 'lingjian_scenedata.json')
             else:
-                scenedata_path = os.path.join(folder_path, '.kestrel', 'kestrel_scenedata.json')
+                scenedata_path = os.path.join(folder_path, '.lingjian', 'lingjian_scenedata.json')
 
             if not os.path.exists(scenedata_path):
                 # Return an empty-but-valid structure; the UI will fall back to scene_count grouping
@@ -673,11 +673,11 @@ class Api:
             
             return {'success': True, 'data': data, 'error': ''}
         except Exception as e:
-            print(f'[API] read_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
+            print(f'[API] read_lingjian_scenedata({folder_path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'data': {}, 'error': str(e)}
 
-    def write_kestrel_scenedata(self, folder_path: str, scenedata: dict) -> dict:
-        """Write kestrel_scenedata.json to a folder's .kestrel directory.
+    def write_lingjian_scenedata(self, folder_path: str, scenedata: dict) -> dict:
+        """Write lingjian_scenedata.json to a folder's .kestrel directory.
 
         Args:
             folder_path: Absolute path to folder (parent or .kestrel itself).
@@ -696,10 +696,10 @@ class Api:
                 return {'success': False, 'error': 'scenedata must be a dict', 'path': ''}
 
             self._atomic_write_text(scenedata_path, json.dumps(scenedata, indent=2, ensure_ascii=False))
-            print(f'[API] write_kestrel_scenedata({folder_path!r}) -> {scenedata_path}', flush=True)
+            print(f'[API] write_lingjian_scenedata({folder_path!r}) -> {scenedata_path}', flush=True)
             return {'success': True, 'path': scenedata_path, 'error': ''}
         except Exception as e:
-            print(f'[API] write_kestrel_scenedata({folder_path!r}) -> Error: {e}', flush=True)
+            print(f'[API] write_lingjian_scenedata({folder_path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e), 'path': ''}
 
     def write_kestrel_state(self, folder_path: str, csv_content: str, scenedata: dict) -> dict:
@@ -931,13 +931,13 @@ class Api:
             for name in sorted(items):
                 full = os.path.join(sample_root, name)
                 is_dir = os.path.isdir(full)
-                kestrel_dir = os.path.join(full, '.kestrel')
+                kestrel_dir = os.path.join(full, '.lingjian')
                 kestrel_exists = os.path.isdir(kestrel_dir)
                 debug_info.append(f'[api]   Item "{name}": is_dir={is_dir}, has .kestrel={kestrel_exists}')
                 
                 if is_dir and kestrel_exists:
-                    readonly_src = os.path.join(kestrel_dir, 'kestrel_database_readonly.csv')
-                    db_dst       = os.path.join(kestrel_dir, 'kestrel_database.csv')
+                    readonly_src = os.path.join(kestrel_dir, 'lingjian_database_readonly.csv')
+                    db_dst       = os.path.join(kestrel_dir, 'lingjian_database.csv')
                     readonly_exists = os.path.isfile(readonly_src)
                     debug_info.append(f'[api]     readonly_src: {readonly_src} exists={readonly_exists}')
                     
@@ -1300,7 +1300,7 @@ class Api:
             log(f"undo_reject_move error: {e}")
             return {"success": False, "error": str(e)}
     def backup_kestrel_csv(self, root_path: str):
-        """Copy kestrel_database.csv to kestrel_database_old.csv as backup.
+        """Copy lingjian_database.csv to lingjian_database_old.csv as backup.
         
         Deprecated: Use backup_kestrel_db instead for dual backup.
         Kept for backward compatibility.
@@ -1308,24 +1308,24 @@ class Api:
         return self.backup_kestrel_db(root_path)
 
     def backup_kestrel_db(self, root_path: str):
-        """Backup both kestrel_database.csv and kestrel_scenedata.json before major operations.
+        """Backup both lingjian_database.csv and lingjian_scenedata.json before major operations.
         
         Creates:
-        - .kestrel/kestrel_database_old.csv (from kestrel_database.csv)
-        - .kestrel/kestrel_scenedata_old.json (from kestrel_scenedata.json)
+        - .lingjian/lingjian_database_old.csv (from lingjian_database.csv)
+        - .lingjian/lingjian_scenedata_old.json (from lingjian_scenedata.json)
         
         Returns:
             {"success": bool, "backup_csv": str, "backup_scenedata": str, "error": str}
         """
         try:
-            kestrel_dir = os.path.join(root_path, ".kestrel")
-            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
-            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
-            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
-            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            kestrel_dir = os.path.join(root_path, ".lingjian")
+            csv_path = os.path.join(kestrel_dir, "lingjian_database.csv")
+            scenedata_path = os.path.join(kestrel_dir, "lingjian_scenedata.json")
+            csv_backup = os.path.join(kestrel_dir, "lingjian_database_old.csv")
+            scenedata_backup = os.path.join(kestrel_dir, "lingjian_scenedata_old.json")
             
             if not os.path.exists(csv_path):
-                return {"success": False, "error": "kestrel_database.csv not found", "backup_csv": "", "backup_scenedata": ""}
+                return {"success": False, "error": "lingjian_database.csv not found", "backup_csv": "", "backup_scenedata": ""}
             
             # Backup CSV
             shutil.copy2(csv_path, csv_backup)
@@ -1349,7 +1349,7 @@ class Api:
             return {"success": False, "error": str(e), "backup_csv": "", "backup_scenedata": ""}
 
     def restore_kestrel_csv_backup(self, root_path: str):
-        """Restore kestrel_database_old.csv back to kestrel_database.csv.
+        """Restore lingjian_database_old.csv back to lingjian_database.csv.
         
         Deprecated: Use restore_kestrel_db_backup instead for dual restore.
         Kept for backward compatibility.
@@ -1357,24 +1357,24 @@ class Api:
         return self.restore_kestrel_db_backup(root_path)
 
     def restore_kestrel_db_backup(self, root_path: str):
-        """Restore both kestrel_database.csv and kestrel_scenedata.json from backups.
+        """Restore both lingjian_database.csv and lingjian_scenedata.json from backups.
         
         Restores from:
-        - .kestrel/kestrel_database_old.csv (to kestrel_database.csv)
-        - .kestrel/kestrel_scenedata_old.json (to kestrel_scenedata.json, if backup exists)
+        - .lingjian/lingjian_database_old.csv (to lingjian_database.csv)
+        - .lingjian/lingjian_scenedata_old.json (to lingjian_scenedata.json, if backup exists)
         
         Returns:
             {"success": bool, "error": str}
         """
         try:
-            kestrel_dir = os.path.join(root_path, ".kestrel")
-            csv_path = os.path.join(kestrel_dir, "kestrel_database.csv")
-            csv_backup = os.path.join(kestrel_dir, "kestrel_database_old.csv")
-            scenedata_path = os.path.join(kestrel_dir, "kestrel_scenedata.json")
-            scenedata_backup = os.path.join(kestrel_dir, "kestrel_scenedata_old.json")
+            kestrel_dir = os.path.join(root_path, ".lingjian")
+            csv_path = os.path.join(kestrel_dir, "lingjian_database.csv")
+            csv_backup = os.path.join(kestrel_dir, "lingjian_database_old.csv")
+            scenedata_path = os.path.join(kestrel_dir, "lingjian_scenedata.json")
+            scenedata_backup = os.path.join(kestrel_dir, "lingjian_scenedata_old.json")
             
             if not os.path.exists(csv_backup):
-                return {"success": False, "error": "kestrel_database_old.csv not found"}
+                return {"success": False, "error": "lingjian_database_old.csv not found"}
             
             # Restore CSV
             shutil.copy2(csv_backup, csv_path)
@@ -1413,7 +1413,7 @@ class Api:
 
     def read_raw_full(self, filename: str, root_path: str, exp_correction: float = 0.0):
         """Process a RAW file and return full-resolution JPEG as base64.
-        Results are cached in {root}/.kestrel/culling_TMP/ for fast subsequent loads.
+        Results are cached in {root}/.lingjian/culling_TMP/ for fast subsequent loads.
         Falls back to read_image_file for non-RAW formats.
         
         exp_correction: exposure offset in stops applied during postprocessing.
@@ -1452,7 +1452,7 @@ class Api:
             use_cache = bool(settings.get('raw_preview_cache_enabled', True))
             debug_logging_enabled = bool(settings.get('raw_preview_debug_logging_enabled', True))
 
-            cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
+            cache_dir = os.path.join(root_path, '.lingjian', 'culling_TMP')
             # Cache key includes file identity, decode version, and exposure so
             # stale previews do not survive RAW decode changes.
             file_stat = os.stat(full_path)
@@ -1581,9 +1581,9 @@ class Api:
             return {'success': False, 'error': str(e)}
 
     def cleanup_culling_cache(self, root_path: str):
-        """Remove the .kestrel/culling_TMP folder to free up space."""
+        """Remove the .lingjian/culling_TMP folder to free up space."""
         try:
-            cache_dir = os.path.join(root_path, '.kestrel', 'culling_TMP')
+            cache_dir = os.path.join(root_path, '.lingjian', 'culling_TMP')
             if os.path.exists(cache_dir):
                 shutil.rmtree(cache_dir)
                 log(f'cleanup_culling_cache: Removed {cache_dir}')

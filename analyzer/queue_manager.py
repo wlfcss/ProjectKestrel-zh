@@ -362,7 +362,7 @@ class QueueManager:
                     overlay_np = data.get('overlay')
                     rel = ''
                     if overlay_np is not None:
-                        overlay_path = os.path.join(_it.path, '.kestrel', 'export',
+                        overlay_path = os.path.join(_it.path, '.lingjian', 'export',
                                                      '__live_overlay.jpg')
                         try:
                             os.makedirs(os.path.dirname(overlay_path), exist_ok=True)
@@ -380,7 +380,7 @@ class QueueManager:
                     crops = data.get('crops') or []
                     confidences = data.get('confidences') or []
                     saved_rels = []
-                    export_dir = os.path.join(_it.path, '.kestrel', 'export')
+                    export_dir = os.path.join(_it.path, '.lingjian', 'export')
                     try:
                         os.makedirs(export_dir, exist_ok=True)
                     except Exception:

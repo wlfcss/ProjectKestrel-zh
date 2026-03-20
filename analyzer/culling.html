@@ -1312,7 +1312,7 @@
           <span class="dlg-option-icon">&#x1F4C1;</span>
           <div class="dlg-option-body">
             <b>将拒绝项移动到文件夹</b>
-            <span id="moveCardDesc">把被拒绝的文件移动到 <code>_KESTREL_Rejects/</code>。系统会自动备份 <code>kestrel_database.csv</code>。此步骤可撤销。</span>
+            <span id="moveCardDesc">把被拒绝的文件移动到 <code>_翎鉴_Rejects/</code>。系统会自动备份 <code>lingjian_database.csv</code>。此步骤可撤销。</span>
           </div>
         </label>
       </div>
@@ -2245,8 +2245,8 @@
       // 填充摘要
       el('#dlgSubtitle').textContent = `${acceptCount} 已接受 \u00b7 ${rejectCount} 待拒绝`;
       el('#moveCardDesc').innerHTML =
-        `将 <b>${rejectCount}</b> 个被拒绝的文件移动到 <code>_KESTREL_Rejects/</code>。` +
-        `系统会自动备份 <code>kestrel_database.csv</code>，此步骤可以撤销。`;
+        `将 <b>${rejectCount}</b> 个被拒绝的文件移动到 <code>_翎鉴_Rejects/</code>。` +
+        `系统会自动备份 <code>lingjian_database.csv</code>，此步骤可以撤销。`;
 
       // 重置为选项视图
       el('#dlgOptions').classList.remove('hidden');
@@ -2300,9 +2300,9 @@
       const stepDefs = [
         { id: 'promote', label: '确认自动分类决定',  cond: doPromoteVerified },
         { id: 'save',   label: '保存数据库',                    always: true },
-        { id: 'backup', label: '备份 kestrel_database.csv',    cond: doMove },
+        { id: 'backup', label: '备份 lingjian_database.csv',    cond: doMove },
         { id: 'xmp',    label: '写入 XMP 旁车文件',          cond: doXmp  },
-        { id: 'move',   label: '将拒绝项移动到 _KESTREL_Rejects', cond: doMove },
+        { id: 'move',   label: '将拒绝项移动到 _翎鉴_Rejects', cond: doMove },
       ];
       const stepsEl = el('#dlgStepsList');
       stepsEl.innerHTML = '';

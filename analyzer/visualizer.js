@@ -3,10 +3,10 @@
     // 1. Python API 模式（桌面应用）：使用 rootPath 和 Python 后端 API 调用
     // 2. File System Access API 模式（浏览器）：使用 rootDirHandle 直接访问文件
     // getBlobUrlForPath 会自动选择当前最合适的访问方式
-    let rootDirHandle = null;      // 顶层照片文件夹（包含 .kestrel），供 File System Access API 使用
-    let rootIsKestrel = false;     // 当用户直接选择 .kestrel 文件夹时为 true
+    let rootDirHandle = null;      // 顶层照片文件夹（包含 .lingjian），供 File System Access API 使用
+    let rootIsKestrel = false;     // 当用户直接选择 .lingjian 文件夹时为 true
     let rootPath = '';             // 根目录绝对路径（供 Python API 使用）
-    let csvFileHandle = null;      // .kestrel/kestrel_database.csv
+    let csvFileHandle = null;      // .lingjian/lingjian_database.csv
     let rows = [];                 // CSV 行数据（对象）
     let _scenedata = {};           // rootPath -> kestrel_scenedata.json 内容映射
     let header = [];               // CSV 表头字段
@@ -328,8 +328,8 @@
 
     async function getHandleFromRelativePath(dirHandle, relPath) {
       relPath = sanitizePath(relPath);
-      if (rootIsKestrel && relPath.toLowerCase().startsWith('.kestrel/')) {
-        relPath = relPath.substring('.kestrel/'.length);
+      if (rootIsKestrel && relPath.toLowerCase().startsWith('.lingjian/')) {
+        relPath = relPath.substring('.lingjian/'.length);
       }
       const parts = relPath.split('/').filter(Boolean);
       let handle = dirHandle;
@@ -356,17 +356,17 @@
       const p = sanitizePath(absPath);
 
       // 检查路径是否本来就是相对路径（新格式）
-      // 相对路径以 .kestrel/ 或 kestrel/ 开头，且不带盘符或前导 /
-      if (p.toLowerCase().startsWith('.kestrel/') || p.toLowerCase().startsWith('kestrel/')) {
-        // 已经是相对路径，直接返回；若 rootIsKestrel 为真则去掉 .kestrel/ 前缀
-        return rootIsKestrel ? p.replace(/^\.?kestrel\//i, '') : p;
+      // 相对路径以 .lingjian/ 或 kestrel/ 开头，且不带盘符或前导 /
+      if (p.toLowerCase().startsWith('.lingjian/') || p.toLowerCase().startsWith('lingjian/') || p.toLowerCase().startsWith('.kestrel/') || p.toLowerCase().startsWith('kestrel/')) {
+        // 已经是相对路径，直接返回；若 rootIsKestrel 为真则去掉 .lingjian/ 前缀
+        return rootIsKestrel ? p.replace(/^\.?(?:lingjian|kestrel)\//i, '') : p;
       }
 
-      // 检查是否为嵌入 .kestrel 文件夹的绝对路径（旧格式）
-      const idx = p.toLowerCase().lastIndexOf('/.kestrel/');
+      // 检查是否为嵌入 .lingjian 文件夹的绝对路径（旧格式）
+      const idx = p.toLowerCase().lastIndexOf('/.lingjian/');
       if (idx >= 0) {
-        const rel = p.substring(idx + 1); // include .kestrel/…
-        return rootIsKestrel ? rel.replace(/^\.kestrel\//i, '') : rel;
+        const rel = p.substring(idx + 1); // include .lingjian/…
+        return rootIsKestrel ? rel.replace(/^\.lingjian\//i, '') : rel;
       }
 
       // 回退：如果只有文件名，就直接返回文件名
@@ -2734,21 +2734,21 @@
       await renderScenes();
     }
 
-    // 在所选文件夹中查找 .kestrel/kestrel_database.csv（可递归到子目录）
+    // 在所选文件夹中查找 .lingjian/lingjian_database.csv（可递归到子目录）
     async function findKestrelDatabase(dirHandle, maxDepth = 3, depth = 0) {
-      // 如果用户直接选择了 .kestrel 文件夹，则直接读取
-      if (dirHandle && dirHandle.name === '.kestrel') {
+      // 如果用户直接选择了 .lingjian 文件夹，则直接读取
+      if (dirHandle && dirHandle.name === '.lingjian') {
         try {
-          const csvHandle = await dirHandle.getFileHandle('kestrel_database.csv');
+          const csvHandle = await dirHandle.getFileHandle('lingjian_database.csv');
           return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: true };
         } catch (_) {
           // 继续走常规搜索流程
         }
       }
-      // 先检查当前文件夹下是否有 .kestrel 文件夹
+      // 先检查当前文件夹下是否有 .lingjian 文件夹
       try {
-        const kestrelDir = await dirHandle.getDirectoryHandle('.kestrel');
-        const csvHandle = await kestrelDir.getFileHandle('kestrel_database.csv');
+        const kestrelDir = await dirHandle.getDirectoryHandle('.lingjian');
+        const csvHandle = await kestrelDir.getFileHandle('lingjian_database.csv');
         return { rootHandle: dirHandle, fileHandle: csvHandle, rootIsKestrel: false };
       } catch (_) {
         // 当前层未找到，继续向下搜索
@@ -2760,7 +2760,7 @@
       try {
         for await (const entry of dirHandle.values()) {
           if (entry.kind !== 'directory') continue;
-          if (entry.name === '.kestrel') continue;
+          if (entry.name === '.lingjian') continue;
           const found = await findKestrelDatabase(entry, maxDepth, depth + 1);
           if (found) return found;
         }
@@ -2779,10 +2779,10 @@
         await loadCsvFromHandle(found.fileHandle);
         const mergeBtn = document.getElementById('openMerge');
         if (mergeBtn) mergeBtn.disabled = false;
-        const rootLabel = rootIsKestrel ? '.kestrel (selected folder)' : (rootDirHandle.name || 'selected folder');
-        setStatus(`已加载 .kestrel/kestrel_database.csv（根目录：${rootLabel}）`);
+        const rootLabel = rootIsKestrel ? '.lingjian (selected folder)' : (rootDirHandle.name || 'selected folder');
+        setStatus(`已加载 .lingjian/lingjian_database.csv（根目录：${rootLabel}）`);
       } catch (e) {
-        setStatus('当前文件夹及其子文件夹中未找到 `.kestrel/kestrel_database.csv`。你可以使用“打开文件夹…”或直接尝试打开 CSV。');
+        setStatus('当前文件夹及其子文件夹中未找到 `.lingjian/lingjian_database.csv`。你可以使用“打开文件夹…”或直接尝试打开 CSV。');
         alert(t('folder.analysis_missing_alert'));
       }
     }
@@ -2818,7 +2818,7 @@
           await writable.close();
           dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
           takeSnapshot();
-          setStatus('已保存更改到 kestrel_database.csv');
+          setStatus('已保存更改到 lingjian_database.csv');
         } catch (e) {
           console.error('[saveCsv] FSAPI write failed:', e);
           setStatus('保存失败：' + (e.message || e));
@@ -2849,7 +2849,7 @@
               // 兼容旧版后端：分别写入，但后端单文件写入也已升级为原子替换。
               if (typeof window.pywebview.api.write_kestrel_csv === 'function') {
                 const csvRes = await window.pywebview.api.write_kestrel_csv(rp, content);
-                if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write kestrel_database.csv');
+                if (!csvRes?.success) throw new Error(csvRes?.error || 'Failed to write lingjian_database.csv');
               }
               const res = await window.pywebview.api.write_kestrel_scenedata(rp, sd);
               if (!res?.success) throw new Error(res?.error || 'Failed to write kestrel_scenedata.json');
@@ -3157,26 +3157,26 @@
     }
 
 
-    // 信息对话框：从已打开的照片文件夹（.kestrel）中加载 kestrel_metadata.json
+    // 信息对话框：从已打开的照片文件夹（.lingjian）中加载 lingjian_metadata.json
     async function getMetadataHandle() {
       if (!rootDirHandle) return null;
-      try { return await getHandleFromRelativePath(rootDirHandle, '.kestrel/kestrel_metadata.json'); } catch { return null; }
+      try { return await getHandleFromRelativePath(rootDirHandle, '.lingjian/lingjian_metadata.json'); } catch { return null; }
     }
     async function readMetadata() {
       const h = await getMetadataHandle();
-      if (!h) return { error: 'kestrel_metadata.json not found. Use "Open Photo Folder…" to select your root.' };
+      if (!h) return { error: 'lingjian_metadata.json not found. Use "Open Photo Folder…" to select your root.' };
       try {
         const file = await h.getFile();
         const text = await file.text();
-        try { return JSON.parse(text); } catch { return { error: 'Failed to parse JSON in kestrel_metadata.json' }; }
-      } catch { return { error: 'Unable to read kestrel_metadata.json' }; }
+        try { return JSON.parse(text); } catch { return { error: 'Failed to parse JSON in lingjian_metadata.json' }; }
+      } catch { return { error: 'Unable to read lingjian_metadata.json' }; }
     }
 
     // 根据 CSV 中的绝对导出/裁切路径推断根目录
     function inferRootFromAbsPath(p) {
       if (!p) return null;
       const s = sanitizePath(p);
-      const i = s.toLowerCase().lastIndexOf('/.kestrel/');
+      const i = s.toLowerCase().lastIndexOf('/.lingjian/');
       if (i > 0) return s.substring(0, i);
       return null;
     }
@@ -3308,8 +3308,8 @@
 
     /** 判断某个节点的 kestrel_version 是否早于当前应用版本。 */
     function isVersionOutdated(node) {
-      if (!node || !node.has_kestrel || !node.kestrel_version || !_appVersion) return false;
-      return compareVersions(node.kestrel_version, _appVersion) < 0;
+      if (!node || !node.has_kestrel || !node.lingjian_version || !_appVersion) return false;
+      return compareVersions(node.lingjian_version, _appVersion) < 0;
     }
 
     /** 在 (x, y) 位置显示给定项目的自定义右键菜单。 */
@@ -3455,7 +3455,7 @@
       row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '') + (isInProgress ? ' in-progress' : '');
       if (node.path === treeActivePath) row.classList.add('active');
       if (isInProgress) row.title = 'Currently analyzing...';
-      else if (outdated) row.title = `分析时版本 v${node.kestrel_version}（当前 v${_appVersion}）`;
+      else if (outdated) row.title = `分析时版本 v${node.lingjian_version}（当前 v${_appVersion}）`;
 
       // 箭头展开/折叠控件
       const arrow = document.createElement('span');
@@ -3562,12 +3562,12 @@
           e.stopPropagation();
           showContextMenu(e.clientX, e.clientY, [
             {
-              label: '🗑 Clear Kestrel Analysis Data',
+              label: '🗑 清除分析数据',
               danger: true,
               action: () => {
                 clearKestrelDataForFolder(node.path, node.name, () => {
                   node.has_kestrel = false;
-                  node.kestrel_version = '';
+                  node.lingjian_version = '';
                   renderFolderTree();
                 });
               }
@@ -3671,7 +3671,7 @@
         // 辅助函数：按路径从树节点中查找 kestrel_version
         function findNodeVersion(node, targetPath) {
           if (!node) return '';
-          if (node.path === targetPath) return node.kestrel_version || '';
+          if (node.path === targetPath) return node.lingjian_version || '';
           if (node.children) {
             for (const c of node.children) {
               const v = findNodeVersion(c, targetPath);
@@ -3765,7 +3765,7 @@
       const outdated = isVersionOutdated(node);
       row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '') + (node.has_kestrel ? ' has-kestrel' : '') + (outdated ? ' version-outdated' : '');
       if (outdated) {
-        row.title = `分析时版本 v${node.kestrel_version}（当前 v${_appVersion}）. Consider re-analyzing.`;
+        row.title = `分析时版本 v${node.lingjian_version}（当前 v${_appVersion}）. Consider re-analyzing.`;
       }
 
       const arrow = document.createElement('span');
@@ -3783,7 +3783,7 @@
           if (row.classList.contains('analyzed-full')) {
             const confirmed = confirm(
               `"${node.name}" has already been fully analyzed.\n\n` +
-              `Re-analyzing will delete the existing analysis data (.kestrel folder) and process it again.\n\n` +
+              `Re-analyzing will delete the existing analysis data (.lingjian folder) and process it again.\n\n` +
               `Continue?`
             );
             if (!confirmed) { cb.checked = false; return; }
@@ -3806,13 +3806,13 @@
       label.className = 'tree-label';
       label.textContent = node.name;
       if (!outdated) label.title = node.path;
-      else label.title = `v${node.kestrel_version} → v${_appVersion}（已过时）`;
+      else label.title = `v${node.lingjian_version} → v${_appVersion}（已过时）`;
 
       // 旧版本文件夹的版本徽标
       const versionBadge = document.createElement('span');
       if (outdated) {
         versionBadge.style.cssText = 'font-size:10px;color:var(--ok);opacity:0.7;margin-left:4px;font-style:italic;';
-        versionBadge.textContent = `v${node.kestrel_version}`;
+        versionBadge.textContent = `v${node.lingjian_version}`;
       }
 
       // 记录路径供异步检查使用，并加入数量占位
@@ -3836,13 +3836,13 @@
           const folderName = node.name;
           showContextMenu(e.clientX, e.clientY, [
             {
-              label: '🗑 Clear Kestrel Analysis Data',
+              label: '🗑 清除分析数据',
               danger: true,
               action: () => {
                 clearKestrelDataForFolder(node.path, folderName, () => {
                   // 在内存中更新节点状态
                   node.has_kestrel = false;
-                  node.kestrel_version = '';
+                  node.lingjian_version = '';
                   // 重新渲染对话框树
                   const treeEl = document.getElementById('analyzeDlgTree');
                   if (treeEl && folderTreeRootNode) {
@@ -5038,7 +5038,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
             row.classList.add('in-progress');
             _tempKestrelPaths.add(normPath); // prevent checkbox removal on next rescan
             
-            // Ensure checkbox exists (even if .kestrel doesn't)
+            // Ensure checkbox exists (even if .lingjian doesn't)
             if (!row.querySelector('.tree-cb')) {
               const cb = document.createElement('input');
               cb.type = 'checkbox';
@@ -5386,7 +5386,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
         const errorMsg = (e.message || String(e)).replace(/^Error: /, '');
         const isInProgress = _inProgressFolderPaths.has(normalizePath(folderPath));
         // 如果文件夹树已可见，用户可能是有意点击了父文件夹
-        // （其中并没有 .kestrel）。此时给出柔和状态提示，不弹警告框。
+        // （其中并没有 .lingjian）。此时给出柔和状态提示，不弹警告框。
         if (folderTreeData) {
           setStatus(isInProgress ? t('status.waiting_for_analysis_output') : t('folder.no_database_in_tree'));
         } else {
@@ -5434,10 +5434,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
               // （folderTreeRootHasKestrel 会在 scanFolderTree 内部同步设置）。
               // 只有根目录本身就是已分析文件夹时，才尝试加载 CSV。
               if (treeScanned && !folderTreeRootHasKestrel) {
-                // 树扫描成功，但根目录没有 .kestrel，说明它是父目录。
+                // 树扫描成功，但根目录没有 .lingjian，说明它是父目录。
                 setStatus(t('queue.select_tree_folder'));
               } else {
-                // 要么无法扫描树，要么根目录本身就有 .kestrel，此时直接加载。
+                // 要么无法扫描树，要么根目录本身就有 .lingjian，此时直接加载。
                 await loadFolderFromPath(folderPath);
               }
               return; // Success - Python API handled everything
@@ -5456,10 +5456,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
         // 优先级 2：File System Access API（仅浏览器模式）
         // 仅在不处于 pywebview 环境时执行
         if (supportsFS) {
-          // 主路径：选择一个文件夹（根目录或 .kestrel）
+          // 主路径：选择一个文件夹（根目录或 .lingjian）
           try {
             rootDirHandle = await window.showDirectoryPicker();
-            rootIsKestrel = rootDirHandle && rootDirHandle.name === '.kestrel';
+            rootIsKestrel = rootDirHandle && rootDirHandle.name === '.lingjian';
             rootPath = ''; // Clear rootPath since we're using handle-based API
             await tryOpenDefaultCsv(rootDirHandle);
             return;
@@ -5764,7 +5764,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
     // 初始化
     loadVersionBadge();
-    setStatus('请打开包含 .kestrel 文件夹的照片目录');
+    setStatus('请打开包含 .lingjian 文件夹的照片目录');
     hydrateSettingsFromServer();
 
     // 如果页面加载前队列就在运行（例如页面刷新），则重新接上轮询逻辑
@@ -5873,7 +5873,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
           if (_dlgReanalyze.has(p)) continue; // already confirmed at selection time
           const node = folderTreeRootNode ? findNode(folderTreeRootNode, p) : null;
           if (node && isVersionOutdated(node)) {
-            outdatedPaths.push({ path: p, name: node.name, version: node.kestrel_version });
+            outdatedPaths.push({ path: p, name: node.name, version: node.lingjian_version });
           }
         }
 
@@ -5881,26 +5881,26 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
           const names = outdatedPaths.map(o => `  • ${o.name} (v${o.version})`).join('\n');
           const confirmed = confirm(t('analysis.outdated_confirm', { names, version: _appVersion }));
           if (!confirmed) return;
-          // 重新分析前，先清理旧版本文件夹中的 .kestrel
+          // 重新分析前，先清理旧版本文件夹中的 .lingjian
           for (const o of outdatedPaths) {
             try {
               await window.pywebview.api.clear_kestrel_data(o.path);
               // 更新内存中的节点状态
               const node = findNode(folderTreeRootNode, o.path);
-              if (node) { node.has_kestrel = false; node.kestrel_version = ''; }
+              if (node) { node.has_kestrel = false; node.lingjian_version = ''; }
             } catch (e) {
               console.warn('Failed to clear kestrel data for', o.path, e);
             }
           }
         }
 
-        // 对已完整分析且确认重新入队的文件夹，清理其 .kestrel
+        // 对已完整分析且确认重新入队的文件夹，清理其 .lingjian
         for (const p of _dlgReanalyze) {
           if (!paths.includes(p)) continue;
           try {
             await window.pywebview.api.clear_kestrel_data(p);
             const node = folderTreeRootNode ? findNode(folderTreeRootNode, p) : null;
-            if (node) { node.has_kestrel = false; node.kestrel_version = ''; }
+            if (node) { node.has_kestrel = false; node.lingjian_version = ''; }
           } catch (e) {
             console.warn('Failed to clear kestrel data for re-analyze', p, e);
           }

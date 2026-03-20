@@ -116,7 +116,7 @@ def _perform_db_upgrade(
     # 这样即使进程在任意步骤崩溃，原始数据也不会丢失。
     try:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        old_path = os.path.join(kestrel_dir, f"OLD_kestrel_database_{timestamp}.csv")
+        old_path = os.path.join(kestrel_dir, f"OLD_lingjian_database_{timestamp}.csv")
         tmp_path = db_path + ".new"
         cleaned = database.drop(
             columns=[c for c in LEGACY_USER_COLUMNS if c in database.columns],

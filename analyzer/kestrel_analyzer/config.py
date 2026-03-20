@@ -18,9 +18,9 @@ WILDLIFE_CATEGORIES = [
 RAW_EXTENSIONS = [".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".rw2", ".pef", ".sr2"]
 JPEG_EXTENSIONS = [".jpg", ".jpeg", ".png", '.tiff', '.tif']
 
-DATABASE_NAME = "kestrel_database.csv"
-METADATA_FILENAME = "kestrel_metadata.json"
-SCENEDATA_FILENAME = "kestrel_scenedata.json"
-KESTREL_DIR_NAME = ".kestrel"
-LOG_FILENAME_PREFIX = "kestrel_error"
+DATABASE_NAME = "lingjian_database.csv"
+METADATA_FILENAME = "lingjian_metadata.json"
+SCENEDATA_FILENAME = "lingjian_scenedata.json"
+KESTREL_DIR_NAME = ".lingjian"
+LOG_FILENAME_PREFIX = "lingjian_error"
 LOG_FILE_EXTENSION = "json"
