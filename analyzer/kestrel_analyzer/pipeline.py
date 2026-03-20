@@ -263,7 +263,7 @@ class AnalysisPipeline:
         if self.mask_rcnn and self.species_clf and self.quality_clf:
             return
         if status_cb:
-            status_cb("Loading models... This may take a while on first run.")
+            status_cb("正在加载模型…首次运行可能需要较长时间。")
         self.mask_rcnn = MaskRCNNWrapper()
         self.species_clf = BirdSpeciesClassifier(
             str(SPECIESCLASSIFIER_PATH),
@@ -276,7 +276,7 @@ class AnalysisPipeline:
             normalization_data_path=str(QUALITY_NORMALIZATION_DATA_PATH),
         )
         if status_cb:
-            status_cb("Models loaded. Processing started.")
+            status_cb("模型已加载，开始处理。")
 
     def process_folder(
         self,
@@ -350,7 +350,7 @@ class AnalysisPipeline:
             files.sort()
             if not files:
                 if status_cb:
-                    status_cb("No supported image files found.")
+                    status_cb("未找到支持的图片文件。")
                 log_event(
                     self._log_path,
                     {
@@ -390,10 +390,10 @@ class AnalysisPipeline:
             if progress_cb:
                 progress_cb(processed_count, total)
             if processed_count > 0 and status_cb:
-                status_cb("Picking up where Kestrel left off...")
+                status_cb("继续上次未完成的分析…")
             if not new_files:
                 if status_cb:
-                    status_cb("No new files to process.")
+                    status_cb("没有新文件需要处理。")
                 if progress_cb:
                     progress_cb(total, total)
                 return
@@ -427,13 +427,13 @@ class AnalysisPipeline:
                     while not pause_event.is_set():
                         if cancel_event is not None and cancel_event.is_set():
                             if status_cb:
-                                status_cb('Cancelled')
+                                status_cb('已取消')
                             return
                         # Wait with timeout to be interruptible
                         pause_event.wait(timeout=0.5)
                 if cancel_event is not None and cancel_event.is_set():
                     if status_cb:
-                        status_cb('Cancelled')
+                        status_cb('已取消')
                     return
 
                 entry = {
@@ -591,7 +591,7 @@ class AnalysisPipeline:
                         if species_cb:
                             species_cb({"filename": raw_file, "results": []})
                         if status_cb:
-                            status_cb(f"No detections in {raw_file}")
+                            status_cb(f"未在 {raw_file} 中检测到鸟类")
                         stage_ctx["stage"] = "write_crop"
                         crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
                         cv2.imwrite(
@@ -865,8 +865,8 @@ class AnalysisPipeline:
                         _q = entry.get('quality', -1)
                         _display_q = f"{float(_q):.3f}" if _q not in (None, 'N/A', -1) else '—'
                         status_cb(
-                            f"Processed {raw_file}: {entry['species']} Q={_display_q}"
-                            f" ({idx + processed_count}/{total})"
+                            f"已处理 {raw_file}：{entry['species']} 质量={_display_q}"
+                            f"（{idx + processed_count}/{total}）"
                         )
                 except Exception as e:
                     log_exception(
@@ -883,7 +883,7 @@ class AnalysisPipeline:
                     if error_cb:
                         error_cb(raw_file, e)
                     if status_cb:
-                        status_cb(f"Error {raw_file}: {e}")
+                        status_cb(f"错误 {raw_file}：{e}")
                     entry["scene_count"] = scene_count
                     entry["species"] = "Error"
                     entry["similar"] = False
@@ -988,7 +988,7 @@ class AnalysisPipeline:
                     },
                 )
                 if status_cb:
-                    status_cb("Analysis complete.")
+                    status_cb("分析完成。")
             except Exception as _post_e:
                 log_warning(
                     self._log_path,
@@ -1004,7 +1004,7 @@ class AnalysisPipeline:
                 context={"folder": folder, "analyzer": analyzer_name},
             )
             if status_cb:
-                status_cb(f"Fatal error: {e}")
+                status_cb(f"致命错误：{e}")
             if error_cb:
                 error_cb("fatal", e)
         finally:

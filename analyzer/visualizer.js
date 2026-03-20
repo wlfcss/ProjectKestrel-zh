@@ -1750,9 +1750,9 @@
         tip.innerHTML = [
           `<b>${escapeHtml(r.filename || '')}</b>`,
           `物种：${escapeHtml(getSpeciesDisplayName(r.species || 'Unknown'))} (${fmt3(r.species_confidence)})`,
-          `Quality: ${fmt3(r.quality)}`,
-          `Rating: ${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} ${origin ? `(${origin})` : ''}`,
-          cull ? `Status: ${cull === 'accept' ? '✓ Accepted' : '✗ Rejected'}` : '',
+          `质量：${fmt3(r.quality)}`,
+          `评分：${'★'.repeat(rating)}${'☆'.repeat(5 - rating)} ${origin ? `(${origin})` : ''}`,
+          cull ? `状态：${cull === 'accept' ? '✓ 已接受' : '✗ 已拒绝'}` : '',
         ].filter(Boolean).join('<br>');
         card.appendChild(tip);
 
@@ -1863,7 +1863,7 @@
       if (fnEl) { fnEl.textContent = r.filename || '—'; fnEl.title = r.filename || ''; }
 
       const qEl = el('#sceneInfoQuality');
-      if (qEl) qEl.textContent = `Quality: ${fmt3(r.quality)}`;
+      if (qEl) qEl.textContent = `质量：${fmt3(r.quality)}`;
 
       const cullToggle = el('#sceneCullToggle');
       if (cullToggle) {
@@ -2879,7 +2879,7 @@
       const analysisRunning = window.__queueRunning;
       if (dirty || analysisRunning) {
         const msg = analysisRunning
-          ? 'Analysis is still running. Closing the page will stop the analysis.'
+          ? '分析仍在进行中。关闭页面将停止分析。'
           : 'You have unsaved changes. Are you sure you want to leave?';
         e.preventDefault();
         e.returnValue = msg;
@@ -4793,21 +4793,31 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const quality = item.current_quality_results || [];
       const species = item.current_species_results || [];
 
-      // 确保始终存在 5 个卡片元素
-      while (row.children.length < 5) {
+      // 清空旧内容
+      row.innerHTML = '';
+
+      // 没有检测结果时显示提示
+      if (crops.length === 0) {
+        row.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-tertiary);font-size:13px;padding:20px 0;">暂未识别到鸟类</div>';
+        return;
+      }
+
+      // 只为实际检测到的结果创建卡片
+      for (let i = 0; i < crops.length; i++) {
+        if (!crops[i]) continue;
         const card = document.createElement('div');
         card.className = 'live-dlg-crop-card';
         card.innerHTML = `
         <img class="live-dlg-crop-img" alt="" />
         <div class="ldc-conf">–</div>
-        <div class="ldc-quality">Quality: —</div>
+        <div class="ldc-quality">质量：—</div>
         <div class="ldc-stars">☆☆☆☆☆</div>
         <div class="ldc-species">–</div>
         <div class="ldc-family">–</div>`;
         row.appendChild(card);
       }
 
-      for (let i = 0; i < 5; i++) {
+      for (let i = 0; i < row.children.length; i++) {
         const card = row.children[i];
         const imgEl = card.querySelector('.live-dlg-crop-img');
         const confEl = card.querySelector('.ldc-conf');
@@ -4815,39 +4825,25 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
         const starsEl = card.querySelector('.ldc-stars');
         const spEl = card.querySelector('.ldc-species');
         const fmEl = card.querySelector('.ldc-family');
-        const hasCrop = i < crops.length && crops[i];
 
-        card.style.opacity = hasCrop ? '1' : '0.3';
-
-        if (hasCrop) {
-          const k = crops[i] + '|' + item.path;
-          const prev = _liveLastCropKeys[i] || '';
-          const isLiveCrop = String(crops[i]).indexOf('__live_') >= 0;
-          if (isLiveCrop) {
-            _liveLastCropKeys[i] = k + '|' + Date.now();
-            _loadImg(imgEl, crops[i], item.path);
-          } else if (prev !== k) { _liveLastCropKeys[i] = k; _loadImg(imgEl, crops[i], item.path); }
-        } else {
-          if (imgEl.src) imgEl.removeAttribute('src');
-          _liveLastCropKeys[i] = '';
-          confEl.textContent = '–';
-          qualityEl.textContent = 'Quality: —';
-          starsEl.textContent = '☆☆☆☆☆';
-          spEl.textContent = '–'; spEl.className = 'ldc-species';
-          fmEl.textContent = '–'; fmEl.className = 'ldc-family';
-          continue;
-        }
+        const k = crops[i] + '|' + item.path;
+        const prev = _liveLastCropKeys[i] || '';
+        const isLiveCrop = String(crops[i]).indexOf('__live_') >= 0;
+        if (isLiveCrop) {
+          _liveLastCropKeys[i] = k + '|' + Date.now();
+          _loadImg(imgEl, crops[i], item.path);
+        } else if (prev !== k) { _liveLastCropKeys[i] = k; _loadImg(imgEl, crops[i], item.path); }
 
         // 检测置信度
         confEl.textContent = i < dets.length
-          ? `Conf: ${dets[i].confidence.toFixed(2)}`
+          ? `置信度：${dets[i].confidence.toFixed(2)}`
           : '–';
 
         const qVal = i < quality.length ? Number(quality[i].quality) : NaN;
         if (Number.isFinite(qVal) && qVal >= 0) {
-          qualityEl.textContent = `Quality: ${qVal.toFixed(3)}`;
+          qualityEl.textContent = `质量：${qVal.toFixed(3)}`;
         } else {
-          qualityEl.textContent = i < crops.length ? 'Quality: …' : 'Quality: —';
+          qualityEl.textContent = i < crops.length ? '质量：…' : '质量：—';
         }
 
         // 实时对话框故意使用原始质量阈值，而不是标准化评分。
