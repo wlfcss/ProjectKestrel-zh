@@ -195,11 +195,8 @@ header.top-bar {
   white-space: nowrap;
 }
 
-.top-bar-center {
+.top-bar-spacer {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-width: 0;
 }
 .top-bar-sort {
@@ -732,9 +729,10 @@ dialog::backdrop {
 }
 
 #sceneDlg {
-  width: 98vw;
+  width: 96vw;
   max-width: 1600px;
-  height: 95vh;
+  height: 90vh;
+  min-height: 540px;
   border-radius: var(--r-xl);
   overflow: hidden;
   background: rgba(14,18,24,0.97);
@@ -1220,13 +1218,13 @@ dialog::backdrop {
 }
 .settings-body h4,
 .settings-section-title {
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.07em !important;
   color: var(--text-tertiary) !important;
-  margin: 14px 0 8px !important;
-  padding-top: 10px !important;
+  margin: 20px 0 10px !important;
+  padding-top: 14px !important;
   border-top: 1px solid rgba(255,255,255,0.06) !important;
 }
 
@@ -1253,22 +1251,22 @@ dialog::backdrop {
 .settings-hint {
   font-size: 11px;
   color: var(--text-tertiary);
-  padding: 0 0 4px;
+  padding: 2px 0 10px;
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
+  gap: 14px;
+  padding: 8px 0;
 }
 .row label {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
   flex-shrink: 0;
-  min-width: 120px;
+  min-width: 140px;
 }
-.row select, .row input[type="text"], .row input[type="number"] { flex: 1; font-size: 12px; }
+.row select, .row input[type="text"], .row input[type="number"] { flex: 1; font-size: 13px; }
 
 .muted { color: var(--text-tertiary); font-size: 11px; }
 .detail {

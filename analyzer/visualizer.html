@@ -18,8 +18,7 @@
     <div class="top-bar-left">
       <img src="logo.png" alt="Project Kestrel" class="top-bar-logo" />
       <span class="top-bar-brand">Project Kestrel</span>
-    </div>
-    <div class="top-bar-center">
+      <span class="top-bar-divider"></span>
       <label class="top-bar-sort">
         <span class="top-bar-sort-label">排序</span>
         <select id="sortBy">
@@ -40,6 +39,7 @@
         </select>
       </label>
     </div>
+    <div class="top-bar-spacer"></div>
     <div class="top-bar-actions">
       <button id="pickFolder" class="top-bar-btn" title="打开一个已分析过的文件夹">
         <span class="top-bar-btn-icon">📂</span> 导入
@@ -227,7 +227,7 @@
       <div class="row">
         <label for="uiScale">界面缩放</label>
         <input id="uiScale" type="range" min="75" max="150" step="5" value="100" style="flex:1;max-width:160px" />
-        <span id="uiScaleLabel" style="font-size:12px;min-width:36px;text-align:right">100%</span>
+        <span id="uiScaleLabel" style="font-size:12px;min-width:36px;text-align:right;color:var(--text-primary)">100%</span>
       </div>
       <div class="muted settings-hint">按比例缩放所有界面元素和文字（75%–150%）。</div>
 
