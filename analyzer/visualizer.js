@@ -1205,6 +1205,13 @@
           const leftActions = document.createElement('div');
           leftActions.className = 'folder-group-left-actions';
 
+          const closeBtn = document.createElement('button');
+          closeBtn.className = 'action-btn';
+          closeBtn.innerHTML = '🔙 关闭';
+          closeBtn.title = '关闭此文件夹，返回主界面';
+          closeBtn.addEventListener('click', (ev) => { ev.stopPropagation(); clearLoadedFolderView(); });
+          leftActions.appendChild(closeBtn);
+
           const explorerBtn = document.createElement('button');
           explorerBtn.className = 'action-btn';
           explorerBtn.innerHTML = t('folder.action_open');
@@ -3294,8 +3301,10 @@
         renderFolderTree();
         // 启用文件夹树控制按钮，并移除空占位状态
         const treeWrap = document.getElementById('folderTreeWrap');
-        treeWrap.classList.remove('folder-tree-empty');
-        treeWrap.querySelectorAll('button[disabled]').forEach(b => b.removeAttribute('disabled'));
+        if (treeWrap) {
+          treeWrap.classList.remove('folder-tree-empty');
+          treeWrap.querySelectorAll('button[disabled]').forEach(b => b.removeAttribute('disabled'));
+        }
         return true;
       } catch (e) {
         console.error('[tree] scanFolderTree error:', e);
