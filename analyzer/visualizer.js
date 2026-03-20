@@ -875,7 +875,8 @@
       const sortBy = el('#sortBy').value;
       const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
       const groupByFolder = document.getElementById('groupByFolder')?.checked ?? getSetting('groupByFolder', true);
-      const groupByTime = document.getElementById('groupByTime')?.checked ?? getSetting('groupByTime', true);
+      const timeGranularity = document.getElementById('timeGranularity')?.value || 'day';
+      const groupByTime = timeGranularity !== 'none';
       const includeSecondaryCheckbox = document.getElementById('includeSecondarySpecies');
       const includeSecondary = includeSecondaryCheckbox ? includeSecondaryCheckbox.checked : !!getSetting('includeSecondarySpecies', false);
       const includeFamilies = true;
@@ -910,13 +911,44 @@
           const d = new Date(ct);
           if (isNaN(d)) return '';
           const pad = n => String(n).padStart(2, '0');
-          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
+          const ymd = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+          if (timeGranularity === 'hour') {
+            return `${ymd}T${pad(d.getHours())}`;
+          } else if (timeGranularity === 'week') {
+            // 按周分组：对齐到周一
+            const wd = new Date(d);
+            const dayOfWeek = wd.getDay();
+            const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            wd.setDate(wd.getDate() + diff);
+            return `W:${wd.getFullYear()}-${pad(wd.getMonth()+1)}-${pad(wd.getDate())}`;
+          }
+          // 默认按日
+          return ymd;
         } catch (_) { return ''; }
       }
-      function getBucketDay(bucket) { return bucket ? bucket.split('T')[0] : ''; }
+      function getBucketDay(bucket) {
+        if (!bucket) return '';
+        if (bucket.startsWith('W:')) return bucket; // 周粒度本身就是一个完整分组
+        return bucket.split('T')[0];
+      }
       function formatNodeTime(bucket) {
         if (!bucket) return t('status.unknown_time');
         try {
+          if (bucket.startsWith('W:')) {
+            // 周粒度：显示周起始日期
+            const d = new Date(bucket.slice(2) + 'T00:00');
+            if (isNaN(d)) return bucket;
+            const end = new Date(d); end.setDate(end.getDate() + 6);
+            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+              + ' – ' + end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+          }
+          if (timeGranularity === 'day') {
+            // 按日分组时，节点时间就是日期本身
+            const d = new Date(bucket + 'T00:00');
+            if (isNaN(d)) return bucket;
+            return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          }
+          // 按小时
           const d = new Date(bucket + ':00');
           if (isNaN(d)) return bucket;
           return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -925,6 +957,15 @@
       function formatNodeDay(bucket) {
         if (!bucket) return '';
         try {
+          if (bucket.startsWith('W:')) {
+            // 周粒度不需要日横幅（节点本身已经是周范围）
+            return '';
+          }
+          if (timeGranularity === 'day') {
+            // 按日分组不需要日横幅（节点本身就是日）
+            return '';
+          }
+          // 按小时时显示日横幅
           const d = new Date(bucket + ':00');
           if (isNaN(d)) return '';
           return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -5527,6 +5568,18 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const sortSel = document.getElementById('sortBy');
       if (!sortSel) return;
       try { sortSel.value = getSetting('sortBy', 'captureTime'); } catch { sortSel.value = 'captureTime'; }
+    })();
+
+    el('#timeGranularity')?.addEventListener('change', () => {
+      const s = loadSettings();
+      s.timeGranularity = el('#timeGranularity').value;
+      saveSettings(s);
+      renderScenes();
+    });
+    (function initTimeGranularity() {
+      const sel = document.getElementById('timeGranularity');
+      if (!sel) return;
+      try { sel.value = getSetting('timeGranularity', 'day'); } catch { sel.value = 'day'; }
     })();
 
     // 根据 localStorage 中缓存的设置，应用初始自动保存可见性

@@ -221,6 +221,13 @@ header.top-bar {
   font-size: 11px;
   padding: 4px 24px 4px 8px;
 }
+.top-bar-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.10);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
 
 .top-bar-actions {
   display: flex;
@@ -322,8 +329,11 @@ main {
 /* ── 5b. Scene Grid ──────────────────────────────────────── */
 #sceneGrid {
   --card-min: 220px;
+  display: block;
+}
+.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 220px), 1fr));
   gap: 12px;
   align-content: start;
 }
@@ -1814,7 +1824,9 @@ label.inline {
 
 /* ── 19. Folder Group (scene grid grouping by folder) ─────── */
 .folder-group {
+  grid-column: 1 / -1;
   margin-bottom: 20px;
+  min-width: 0;
 }
 
 .folder-group-header {
@@ -1829,6 +1841,8 @@ label.inline {
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
+  flex-wrap: wrap;
+  overflow: hidden;
 }
 .folder-group-header:hover { background: rgba(255,255,255,0.06); }
 .folder-group-header.collapsed .folder-group-body { display: none; }
@@ -1838,11 +1852,13 @@ label.inline {
   align-items: center;
   gap: 5px;
   flex: 1;
+  min-width: 0;
 }
 .folder-group-right-actions {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-shrink: 0;
   flex-shrink: 0;
 }
 

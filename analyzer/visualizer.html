@@ -29,6 +29,16 @@
           <option value="imageCount">图片数量</option>
         </select>
       </label>
+      <span class="top-bar-divider"></span>
+      <label class="top-bar-sort">
+        <span class="top-bar-sort-label">分组</span>
+        <select id="timeGranularity">
+          <option value="hour">按小时</option>
+          <option value="day" selected>按日</option>
+          <option value="week">按周</option>
+          <option value="none">不分组</option>
+        </select>
+      </label>
     </div>
     <div class="top-bar-actions">
       <button id="pickFolder" class="top-bar-btn" title="打开一个已分析过的文件夹">
