@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>筛片助手 — Project Kestrel</title>
+  <title>筛片助手 — 翎鉴</title>
   <link rel="icon" href="data:," />
   <script src="papaparse.local.js"></script>
   <script src="bridge_config.js"></script>
@@ -1302,7 +1302,7 @@
       <!-- XMP 抢先体验说明（勾选时显示） -->
       <div class="dlg-xmp-note" id="xmpNote">
         &#x26A0; <b>请在导入照片编辑器 <em>之前</em> 写入 XMP 文件。</b> 一旦 Lightroom 或 Capture One 之类的程序已经导入照片，它们通常会忽略后续新增的旁车文件，而改由自己的目录管理元数据。最佳做法是先写入 XMP，再导入。
-        <br>未经你的允许，Kestrel 不会覆盖其他软件生成的 XMP 文件。
+        <br>未经你的允许，翎鉴不会覆盖其他软件生成的 XMP 文件。
       </div>
 
       <!-- 移动文件选项 -->
@@ -1339,7 +1339,7 @@
         <span class="dlg-icon">&#x26A0;&#xFE0F;</span>
         <div>
           <h2>检测到外部 XMP 文件</h2>
-          <p class="dlg-subtitle">部分旁车文件并非由 Kestrel 创建。</p>
+          <p class="dlg-subtitle">部分旁车文件并非由翎鉴创建。</p>
         </div>
       </div>
       <div class="dlg-divider"></div>
@@ -1417,7 +1417,7 @@
   <script src="taxonomy.js"></script>
   <script>
     // ====================================================================
-    // Project Kestrel 筛片助手
+    // 翎鉴 筛片助手
     // ====================================================================
 
     // ---- 辅助函数 ----
@@ -2890,32 +2890,32 @@
       },
       {
         title: '按场景分组的照片',
-        body: '你的照片会按 <b>场景</b> 分组，也就是时间上相邻的连拍序列。Kestrel 的 AI 已经按质量评分为每个场景排序，因此最好的照片会排在前面。<br><br>你之前在 Kestrel 场景视图里做过的筛片决定，也会同步带到这里。',
+        body: '你的照片会按 <b>场景</b> 分组，也就是时间上相邻的连拍序列。翎鉴的 AI 已经按质量评分为每个场景排序，因此最好的照片会排在前面。<br><br>你之前在翎鉴场景视图里做过的筛片决定，也会同步带到这里。',
         target: '#cullingScroll',
         position: 'right',
       },
       {
         title: '接受与拒绝两列',
-        body: '每个场景都有两列：<span style="color:var(--ok)"><b>接受</b></span> 和 <span style="color:var(--bad)"><b>拒绝</b></span>。Kestrel 加载时会自动分配图片；左侧边框为 <span style="color:var(--ok)">绿色</span> 表示接受，为 <span style="color:var(--bad)">红色</span> 表示拒绝。',
+        body: '每个场景都有两列：<span style="color:var(--ok)"><b>接受</b></span> 和 <span style="color:var(--bad)"><b>拒绝</b></span>。翎鉴加载时会自动分配图片；左侧边框为 <span style="color:var(--ok)">绿色</span> 表示接受，为 <span style="color:var(--bad)">红色</span> 表示拒绝。',
         target: '.culling-header',
         position: 'bottom',
       },
       {
         title: '设置规则',
-        body: '<b>自动分类</b> 规则决定 Kestrel 如何把图片分到接受和拒绝。你可以设置质量阈值、每个场景最少和最多保留多少张，以及如何处理未评分图片。<br><br>当你修改设置后，<b>↻ 重新应用</b> 按钮会闪动，点击即可重新执行规则。Kestrel 不会覆盖你的手动决定。',
+        body: '<b>自动分类</b> 规则决定翎鉴如何把图片分到接受和拒绝。你可以设置质量阈值、每个场景最少和最多保留多少张，以及如何处理未评分图片。<br><br>当你修改设置后，<b>↻ 重新应用</b> 按钮会闪动，点击即可重新执行规则。翎鉴不会覆盖你的手动决定。',
         target: '#autoCatPanel',
         position: 'bottom',
         openAutoCat: true,
       },
       {
         title: '悬停即可预览',
-        body: '将鼠标悬停在任意照片卡片上，右侧面板就会加载 <b>完整预览</b>。Kestrel 已经自动检测出照片中的鸟，并准备好了放大的裁切图。',
+        body: '将鼠标悬停在任意照片卡片上，右侧面板就会加载 <b>完整预览</b>。翎鉴已经自动检测出照片中的鸟，并准备好了放大的裁切图。',
         target: '.scene-columns',
         position: 'right',
       },
       {
         title: '预览面板与缩放',
-        body: '预览面板会显示完整导出图以及 Kestrel 生成的鸟体裁切图。要放大查看，请在预览图上 <b>按住鼠标</b> 并拖动平移；按住时再 <b>滚动鼠标滚轮</b> 可以调整缩放级别。松开后会回到普通视图。如果存在 RAW 文件，Kestrel 会自动加载全分辨率原图。',
+        body: '预览面板会显示完整导出图以及翎鉴生成的鸟体裁切图。要放大查看，请在预览图上 <b>按住鼠标</b> 并拖动平移；按住时再 <b>滚动鼠标滚轮</b> 可以调整缩放级别。松开后会回到普通视图。如果存在 RAW 文件，翎鉴会自动加载全分辨率原图。',
         target: '.preview-pane',
         position: 'left',
       },
@@ -2929,7 +2929,7 @@
       },
       {
         title: '完成筛片',
-        body: '准备好后，点击 <b>“完成筛片，继续复查”</b>。你可以选择写入 <b>XMP 旁车文件</b>（供 Lightroom、Capture One 等识别接受/拒绝标签），也可以 <b>把拒绝项移动到子文件夹</b>，或者两者都做。<br><br><b>Kestrel 永远不会删除你的原始照片</b>，它们始终是安全的。',
+        body: '准备好后，点击 <b>“完成筛片，继续复查”</b>。你可以选择写入 <b>XMP 旁车文件</b>（供 Lightroom、Capture One 等识别接受/拒绝标签），也可以 <b>把拒绝项移动到子文件夹</b>，或者两者都做。<br><br><b>翎鉴永远不会删除你的原始照片</b>，它们始终是安全的。',
         target: '#doneCullingBtn',
         position: 'top',
       },

@@ -99,7 +99,7 @@ class Api:
     def _atomic_write_text(self, target_path: str, content: str) -> None:
         """Atomically replace a UTF-8 text file in-place."""
         parent_dir = os.path.dirname(target_path)
-        fd, temp_path = tempfile.mkstemp(prefix='.kestrel_tmp_', suffix='.tmp', dir=parent_dir)
+        fd, temp_path = tempfile.mkstemp(prefix='.lingjian_tmp_', suffix='.tmp', dir=parent_dir)
         try:
             with os.fdopen(fd, 'w', encoding='utf-8', newline='') as handle:
                 handle.write(content)
@@ -296,7 +296,7 @@ class Api:
                 'data': ''
             }
 
-    def read_lingjian_metadata(self, folder_path: str):
+    def read_kestrel_metadata(self, folder_path: str):
         """Read lingjian_metadata.json from a folder's .kestrel directory."""
         try:
             folder_path = str(folder_path).strip()
@@ -645,7 +645,7 @@ class Api:
             print(f'[API] apply_normalization() -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e), 'normalized_ratings': {}, 'mode_used': ''}
 
-    def read_lingjian_scenedata(self, folder_path: str) -> dict:
+    def read_kestrel_scenedata(self, folder_path: str) -> dict:
         """Read lingjian_scenedata.json from a folder's .kestrel directory.
 
         Returns:
@@ -676,7 +676,7 @@ class Api:
             print(f'[API] read_lingjian_scenedata({folder_path!r}) -> Error: {e}', flush=True)
             return {'success': False, 'data': {}, 'error': str(e)}
 
-    def write_lingjian_scenedata(self, folder_path: str, scenedata: dict) -> dict:
+    def write_kestrel_scenedata(self, folder_path: str, scenedata: dict) -> dict:
         """Write lingjian_scenedata.json to a folder's .kestrel directory.
 
         Args:
@@ -1140,11 +1140,11 @@ class Api:
         return True, moved_files
 
     def move_rejects_to_folder(self, root_path: str, filenames):
-        """Move original photo files and their XMP sidecars into _KESTREL_Rejects subfolder."""
+        """Move original photo files and their XMP sidecars into _翎鉴_Rejects subfolder."""
         try:
             if not root_path or not os.path.isdir(root_path):
                 return {'success': False, 'error': 'Invalid root path'}
-            reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+            reject_dir = os.path.join(root_path, '_翎鉴_Rejects')
             os.makedirs(reject_dir, exist_ok=True)
             moved = []
             errors = []
@@ -1281,11 +1281,11 @@ class Api:
         return True, restored_files
 
     def undo_reject_move(self, root_path: str, filenames):
-        """Move files and their XMP sidecars back from _KESTREL_Rejects to the root folder."""
+        """Move files and their XMP sidecars back from _翎鉴_Rejects to the root folder."""
         try:
-            reject_dir = os.path.join(root_path, "_KESTREL_Rejects")
+            reject_dir = os.path.join(root_path, "_翎鉴_Rejects")
             if not os.path.isdir(reject_dir):
-                return {"success": False, "error": "_KESTREL_Rejects folder not found"}
+                return {"success": False, "error": "_翎鉴_Rejects folder not found"}
             restored = []
             errors = []
             for fn in (filenames or []):
@@ -1390,11 +1390,11 @@ class Api:
             log(f"restore_kestrel_db_backup error: {e}")
             return {"success": False, "error": str(e)}
     def open_reject_folder(self, root_path: str):
-        """Open the _KESTREL_Rejects folder in the system file browser."""
-        reject_dir = os.path.join(root_path, '_KESTREL_Rejects')
+        """Open the _翎鉴_Rejects folder in the system file browser."""
+        reject_dir = os.path.join(root_path, '_翎鉴_Rejects')
         if os.path.isdir(reject_dir):
             return self.open_folder(reject_dir)
-        return {'success': False, 'error': '_KESTREL_Rejects folder not found'}
+        return {'success': False, 'error': '_翎鉴_Rejects folder not found'}
 
     def notify_main_window_refresh(self):
         """Tell the main visualizer window to reload its data."""

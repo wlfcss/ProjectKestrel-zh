@@ -20,7 +20,7 @@
     "queue.remove_from_selection": "从选择中移除",
     "queue.reanalyze": "将重新分析",
     "queue.desktop_only":
-      "分析队列仅在桌面版（pywebview 模式）中可用。\n\n请以桌面应用方式运行 Project Kestrel 以使用该功能。",
+      "分析队列仅在桌面版（pywebview 模式）中可用。\n\n请以桌面应用方式运行翎鉴以使用该功能。",
     "queue.badge_paused": "已暂停",
     "queue.badge_done": "已完成",
     "queue.badge_pending": "{count} 个等待中",
@@ -42,7 +42,7 @@
     "queue.select_tree_folder": "请从下方目录树中选择一个文件夹来加载场景",
     "queue.restore_count": "{count} 个文件夹已选中",
     "folder.loaded_from": "已加载：{path}",
-    "folder.no_database_in_tree": "该文件夹中没有 Kestrel 数据库，请选择目录树中带 📂 标记的文件夹",
+    "folder.no_database_in_tree": "该文件夹中没有翎鉴数据库，请选择目录树中带 📂 标记的文件夹",
     "folder.opening_picker": "正在打开文件夹选择器…",
     "folder.selection_cancelled": "已取消选择文件夹",
     "folder.picker_failed": "桌面版文件夹选择器失败：{message}\n\n请重启应用后重试。",
@@ -55,9 +55,9 @@
     "folder.unexpected_error": "发生了意外错误",
     "folder.load_failed": "数据库加载失败",
     "folder.database_missing_alert":
-      "无法从此文件夹加载 Kestrel 数据库。\n\n请确认：\n1. 该文件夹已经用 Kestrel 分析过\n2. `.kestrel` 文件夹存在（在 macOS 上它可能是隐藏的）\n3. 你选择的是正确的文件夹\n\n提示：在 macOS 上，`.kestrel` 默认隐藏。你可以：\n• 按 `Cmd+Shift+.` 显示 Finder 中的隐藏文件\n• 或直接选择包含 `.kestrel` 的上级文件夹\n\n错误：{error}",
+      "无法从此文件夹加载翎鉴数据库。\n\n请确认：\n1. 该文件夹已经用翎鉴分析过\n2. `.lingjian` 文件夹存在（在 macOS 上它可能是隐藏的）\n3. 你选择的是正确的文件夹\n\n提示：在 macOS 上，`.lingjian` 默认隐藏。你可以：\n• 按 `Cmd+Shift+.` 显示 Finder 中的隐藏文件\n• 或直接选择包含 `.lingjian` 的上级文件夹\n\n错误：{error}",
     "folder.analysis_missing_alert":
-      "找不到 Kestrel 分析文件。请确认该文件夹已经通过 Kestrel Analyzer 完成分析。",
+      "找不到翎鉴分析文件。请确认该文件夹已经通过翎鉴完成分析。",
     "merge.cross_folder_alert": "无法合并来自不同文件夹的场景。\n请选择同一文件夹中的场景。",
     "settings.browse_desktop_only": "“浏览”仅在桌面版应用中可用",
     "feedback.required": "⚠ 请输入描述。",
@@ -65,10 +65,10 @@
     "feedback.sent": "✓ 反馈已发送，感谢你的反馈！",
     "feedback.failed": "⚠ 发送失败，请稍后再试。",
     "feedback.failed_with_reason": "⚠ 发送失败：{message}",
-    "analysis.clear_success": "已清除此文件夹的 Kestrel 分析数据：{folder}",
+    "analysis.clear_success": "已清除此文件夹的翎鉴分析数据：{folder}",
     "analysis.clear_failed": "清除分析数据失败：\n\n{error}",
     "analysis.clear_confirm":
-      "确定要清除此文件夹的 Kestrel 分析数据吗？\n\n文件夹：{folder}\n\n这会删除 `.kestrel` 目录中的数据库、导出图和裁切图，但不会删除原始照片。",
+      "确定要清除此文件夹的翎鉴分析数据吗？\n\n文件夹：{folder}\n\n这会删除 `.lingjian` 目录中的数据库、导出图和裁切图，但不会删除原始照片。",
     "status.showing": "当前显示 {scenes} 个场景，共 {images} 张图片{filtered}{dirty}",
     "status.filtered_suffix": "（从 {all} 个场景中过滤）",
     "status.unsaved": " • 有未保存更改",
@@ -77,8 +77,8 @@
     "status.no_folders_selected": "未选择任何文件夹，请在目录树中勾选文件夹以加载场景",
     "status.auto_refreshed": "已自动刷新 {count} 个新分析完成的文件夹",
     "status.building_scenes": "正在从 {count} 个文件夹构建场景…",
-    "status.waiting_for_analysis_output": "所选文件夹仍在分析中，正在等待 Kestrel 数据库生成后自动加载预览",
-    "status.no_loadable_folders": "当前所选文件夹里还没有可加载的 Kestrel 数据库",
+    "status.waiting_for_analysis_output": "所选文件夹仍在分析中，正在等待翎鉴数据库生成后自动加载预览",
+    "status.no_loadable_folders": "当前所选文件夹里还没有可加载的翎鉴数据库",
     "folder.group_unknown": "（未知文件夹）",
     "folder.action_open": "<i>📂</i> 打开",
     "folder.action_open_title": "在系统文件管理器中打开此文件夹",
@@ -102,11 +102,11 @@
     "merge.images_count": "{count} 张图片",
     "merge.merged_status": "已将场景合并到 {target}，共更新 {changed} 行。",
     "analysis.outdated_confirm":
-      "以下文件夹由旧版本 Kestrel 分析：\n\n{names}\n\n当前版本：v{version}\n\n重新分析前会先删除现有分析数据（`.kestrel` 文件夹）。\n\n是否继续？",
+      "以下文件夹由旧版本翎鉴分析：\n\n{names}\n\n当前版本：v{version}\n\n重新分析前会先删除现有分析数据（`.lingjian` 文件夹）。\n\n是否继续？",
     "analysis.queue_started": "分析队列已启动，已加入 {count} 个文件夹",
     "analysis.queue_start_failed": "启动分析队列失败：\n\n{error}",
     "analysis.desktop_browse_only": "目录浏览仅在桌面版应用中可用。",
-    "analysis.legal_accepted": "已接受条款，欢迎使用 Project Kestrel！",
+    "analysis.legal_accepted": "已接受条款，欢迎使用翎鉴！",
     "analysis.cancel_queue_confirm": "确定要取消分析队列吗？待处理文件夹将不会继续分析。",
   };
 
