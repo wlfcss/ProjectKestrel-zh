@@ -1166,6 +1166,63 @@ class Api:
             return {'success': False, 'error': 'metadata_writer module not available'}
         return _write_xmp_metadata(root_path, image_data, overwrite_external, use_auto_labels)
 
+    def copy_photos_to_directory(self, source_root: str, filenames_json: str, dest_dir: str,
+                                    organize_by_stars: bool = False, star_ratings_json: str = None):
+        """Copy photo files to a destination directory, optionally organized by star rating."""
+        try:
+            if not source_root or not os.path.isdir(source_root):
+                return {'success': False, 'error': 'Invalid source path'}
+            if not dest_dir:
+                return {'success': False, 'error': 'No destination directory specified'}
+
+            # Path safety: dest must not be inside source
+            src_real = os.path.realpath(source_root)
+            dst_real = os.path.realpath(dest_dir)
+            if dst_real.startswith(src_real + os.sep) or dst_real == src_real:
+                return {'success': False, 'error': 'Destination cannot be inside source directory'}
+
+            import json as _json
+            filenames = _json.loads(filenames_json) if isinstance(filenames_json, str) else (filenames_json or [])
+            star_ratings = {}
+            if star_ratings_json:
+                star_ratings = _json.loads(star_ratings_json) if isinstance(star_ratings_json, str) else (star_ratings_json or {})
+
+            os.makedirs(dest_dir, exist_ok=True)
+
+            copied = 0
+            skipped = 0
+            errors = 0
+            for fn in filenames:
+                src_file = os.path.join(source_root, fn)
+                if not os.path.isfile(src_file):
+                    skipped += 1
+                    continue
+                # Path traversal guard
+                if not os.path.realpath(src_file).startswith(src_real + os.sep):
+                    errors += 1
+                    continue
+
+                if organize_by_stars and fn in star_ratings:
+                    rating = int(star_ratings[fn])
+                    sub = os.path.join(dest_dir, f'star-{rating}')
+                    os.makedirs(sub, exist_ok=True)
+                    dst_file = os.path.join(sub, os.path.basename(fn))
+                else:
+                    dst_file = os.path.join(dest_dir, os.path.basename(fn))
+
+                try:
+                    shutil.copy2(src_file, dst_file)
+                    copied += 1
+                except Exception as e:
+                    log(f'copy_photos: error copying {fn}: {e}')
+                    errors += 1
+
+            log(f'copy_photos_to_directory: copied={copied}, skipped={skipped}, errors={errors}')
+            return {'success': True, 'copied': copied, 'skipped': skipped, 'errors': errors}
+        except Exception as e:
+            log(f'copy_photos_to_directory error: {e}')
+            return {'success': False, 'error': str(e)}
+
     def _restore_file_with_sidecars(self, reject_dir: str, root_path: str, filename: str):
         """Restore a file and its sidecar files (.xmp) from reject directory.
         

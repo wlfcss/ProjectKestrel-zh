@@ -77,12 +77,9 @@
       } else if (apiReady) {
         el('#compat').classList.add('hidden');
       }
-      // API 确认可用后，先等待设置同步完成，再检查捐助阈值
+      // API 确认可用后，同步设置
       await new Promise(function(r) { setTimeout(r, 500); });
-      // 从服务端同步设置，确保 localStorage 中是最新数据
       await hydrateSettingsFromServer();
-      // 设置写入 localStorage 后再检查捐助阈值
-      checkDonationThresholdOnStartup();
     })();
 
     // 工具函数
@@ -316,28 +313,6 @@
       });
     })();
 
-    // 简单的界面缩放控制（Chromium webview 支持 CSS zoom）
-    let uiZoom = 1;
-    function applyZoom() {
-      const zoomEl = document.getElementById('mainZoom');
-      if (!zoomEl) return;
-      const z = uiZoom;
-      // 优先使用非 transform 的缩放方式，确保标题中的 position: sticky 继续生效。
-      // 能用 CSS `zoom` 时优先使用；否则回退到仅 transform 的方案。
-      try {
-        zoomEl.style.zoom = z.toFixed(2);
-        // 确保未设置 transform（transform 可能破坏 sticky 行为）
-        zoomEl.style.transform = '';
-        zoomEl.style.width = '';
-        zoomEl.style.height = '';
-      } catch (e) {
-        // 回退：若浏览器不支持 zoom，则改用 transform（可能影响 sticky）
-        const s = uiZoom.toFixed(2);
-        zoomEl.style.transform = `scale(${s})`;
-        zoomEl.style.width = `calc(100% / ${s})`;
-        zoomEl.style.height = `calc(100% / ${s})`;
-      }
-    }
 
     function sanitizePath(p) {
       if (!p) return '';
@@ -895,8 +870,8 @@
     // 渲染场景：多文件夹加载时按文件夹分组
     async function renderScenes() {
       const myVer = ++_renderScenesVersion;
-      const minC = parseFloat(el('#speciesConf').value) || 0;
-      const search = el('#search').value;
+      const minC = parseFloat(el('#speciesConf')?.value) || 0;
+      const search = (el('#search')?.value || '');
       const sortBy = el('#sortBy').value;
       const onlyRatedScenes = !!document.getElementById('filterScenesManualRated')?.checked;
       const groupByFolder = document.getElementById('groupByFolder')?.checked ?? getSetting('groupByFolder', true);
@@ -920,14 +895,9 @@
       updateStatusBar(visibleScenes);
       sceneGrid.innerHTML = '';
 
-      // 没有加载数据时显示欢迎面板，打开文件夹后隐藏
-      const _welcomePanel = document.getElementById('welcomePanel');
-      if (_welcomePanel) _welcomePanel.classList.toggle('hidden', rows.length > 0);
-      const _welcomeSelectionNote = document.getElementById('welcomeSelectionNote');
-      if (_welcomeSelectionNote) {
-        const noCheckedFolders = !rows.length && !!folderTreeRootNode && checkedFolderPaths.size === 0;
-        _welcomeSelectionNote.classList.toggle('hidden', !noCheckedFolders);
-      }
+      // 没有加载数据时显示空状态，打开文件夹后隐藏
+      const _emptyState = document.getElementById('emptyState');
+      if (_emptyState) _emptyState.classList.toggle('hidden', rows.length > 0);
 
       // 用于 Shift 点击范围选择的扁平索引
       _visibleSceneOrder = visibleScenes.map(s => String(s.id));
@@ -1247,13 +1217,6 @@
           writeMetaBtn.title = t('folder.action_write_metadata_title');
           writeMetaBtn.addEventListener('click', (ev) => { ev.stopPropagation(); writeMetadataForFolder(fd.folderPath); });
           rightActions.appendChild(writeMetaBtn);
-
-          const cullingBtn = document.createElement('button');
-          cullingBtn.className = 'action-btn culling-assistant-btn';
-          cullingBtn.innerHTML = t('folder.action_open_culling');
-          cullingBtn.title = t('folder.action_open_culling_title');
-          cullingBtn.addEventListener('click', (ev) => { ev.stopPropagation(); openCullingAssistant(fd.folderPath); });
-          rightActions.appendChild(cullingBtn);
 
           hdr.appendChild(rightActions);
 
@@ -2129,25 +2092,12 @@
       renderTopbarTags(scene);
     }
 
-    // ── 右侧详情面板控制 ──────────────────────────────────────
+    // ── 场景对话框显隐 ──────────────────────────────────────
     function showDetailPanel() {
-      const panel = document.getElementById('detailPanel');
-      const overlay = document.getElementById('detailPanelOverlay');
-      if (!panel) return;
-      // 若面板已打开则无需重复触发动画
-      if (panel.classList.contains('open')) return;
-      panel.classList.add('open');
-      panel.setAttribute('aria-hidden', 'false');
-      if (overlay) { overlay.classList.add('active'); overlay.onclick = () => el('#closeDlg')?.click(); }
+      if (sceneDlg && !sceneDlg.open) sceneDlg.showModal();
     }
     function hideDetailPanel() {
-      const panel = document.getElementById('detailPanel');
-      const overlay = document.getElementById('detailPanelOverlay');
-      if (panel) { panel.classList.remove('open'); panel.setAttribute('aria-hidden', 'true'); }
-      if (overlay) { overlay.classList.remove('active'); overlay.onclick = null; }
-      // 触发 sceneDlg 的 close 事件，以兼容教程流程中的 waitFor:'closeDialog'
-      const _sd = document.getElementById('sceneDlg');
-      if (_sd) { try { _sd.dispatchEvent(new Event('close')); } catch (_) {} }
+      if (sceneDlg && sceneDlg.open) sceneDlg.close();
     }
 
     async function openSceneDialog(sceneId, startIndex = 0) {
@@ -2535,8 +2485,8 @@
     }
 
     function reloadScene(sceneId) {
-      const minC = parseFloat(el('#speciesConf').value) || 0;
-      const search = el('#search').value;
+      const minC = parseFloat(el('#speciesConf')?.value) || 0;
+      const search = (el('#search')?.value || '');
       const sortBy = el('#sortBy').value;
       const includeSecondary = document.getElementById('includeSecondarySpecies')?.checked ?? false;
       const all = aggregateScenes(minC, search, sortBy, includeSecondary, true);
@@ -3184,42 +3134,6 @@
       _setSettingsDirty(false);
     });
 
-    // ── 侧边栏调宽 ────────────────────────────────────────────────────────
-    (function initSidebarResize() {
-      const resizer = document.getElementById('sidebarResizer');
-      const sidebar = document.querySelector('header');
-      if (!resizer || !sidebar) return;
-
-      let dragging = false;
-      let startX = 0;
-      let startW = 0;
-
-      resizer.addEventListener('mousedown', (e) => {
-        dragging = true;
-        startX = e.clientX;
-        startW = sidebar.getBoundingClientRect().width;
-        resizer.classList.add('dragging');
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-        e.preventDefault();
-      });
-
-      document.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
-        const delta = e.clientX - startX;
-        const newW = Math.max(260, Math.min(600, startW + delta));
-        sidebar.style.width = newW + 'px';
-        sidebar.style.flex = '0 0 ' + newW + 'px';
-      });
-
-      document.addEventListener('mouseup', () => {
-        if (!dragging) return;
-        dragging = false;
-        resizer.classList.remove('dragging');
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      });
-    })();
 
     // ─── 统计辅助函数 ────────────────────────────────────────────────────
     /** 将单个键合并进持久化设置（localStorage + pywebview）。 */
@@ -3232,106 +3146,6 @@
       }
     }
 
-    // ─── 反馈对话框 ──────────────────────────────────────────────────────
-    // ─── 捐助 / 支持 ──────────────────────────────────────────────────────
-    const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A';
-    const DONATE_THRESHOLD_KEY = 'kestrel-donate-thresholds-shown-v1';
-
-    function openDonateLink() {
-      if (hasPywebviewApi && window.pywebview?.api?.open_url) {
-        window.pywebview.api.open_url(DONATE_URL);
-      } else {
-        try { window.open(DONATE_URL, '_blank', 'noopener,noreferrer'); } catch (_) { }
-      }
-    }
-
-    function _loadDonateThresholdsShown() {
-      // 从持久化设置中读取（保存于 settings.json）
-      return getSetting('kestrel_donate_thresholds_shown', []);
-    }
-    function _saveDonateThresholdsShown(arr) {
-      // 同时写入 localStorage 与后端设置（最终持久化到 settings.json）
-      const existing = loadSettings();
-      const settings = { ...existing, kestrel_donate_thresholds_shown: arr };
-      saveSettings(settings);
-      // 持久化到后端（settings.json）
-      if (hasPywebviewApi && window.pywebview?.api?.save_settings_data) {
-        try { window.pywebview.api.save_settings_data(settings); } catch (_) { }
-      }
-    }
-
-    function showDonatePrompt(totalFiles) {
-      const countEl = document.getElementById('donateCountDisplay');
-      // 向下取最近的里程碑，用于“超过 N 张照片”的文案展示
-      const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
-      let milestone = totalFiles || 0;
-      for (let i = thresholds.length - 1; i >= 0; i--) {
-        if (milestone >= thresholds[i]) { milestone = thresholds[i]; break; }
-      }
-      if (countEl) countEl.textContent = milestone.toLocaleString();
-      const dlg = document.getElementById('donateDlg');
-      // 仅在当前没有其它打开的对话框时显示
-      if (dlg && !document.querySelector('dialog[open]')) dlg.showModal();
-    }
-
-    /** 检查累计总数是否跨过捐助里程碑。应在某个文件夹分析完成后调用。 */
-    async function checkDonationThresholdAsync() {
-      try {
-        let total = 0;
-        if (hasPywebviewApi && window.pywebview?.api?.get_settings) {
-          const s = await window.pywebview.api.get_settings();
-          total = (s && s.kestrel_impact_total_files) ? s.kestrel_impact_total_files : 0;
-        }
-        if (total <= 0) return;
-        const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
-        const shown = _loadDonateThresholdsShown();
-        for (const t of thresholds) {
-          if (total >= t && !shown.includes(t)) {
-            shown.push(t);
-            _saveDonateThresholdsShown(shown);
-            // 略微延迟，先让队列面板稳定下来
-            setTimeout(() => showDonatePrompt(total), 2000);
-            break;
-          }
-        }
-      } catch (_) { /* failsafe */ }
-    }
-
-    /** 在应用启动时检查捐助阈值（只执行一次）。 */
-    async function checkDonationThresholdOnStartup() {
-      try {
-        // 从 localStorage 读取（与设置对话框使用同一来源）
-        let total = getSetting('kestrel_impact_total_files', 0);
-        console.log('[donation] checkDonationThresholdOnStartup: total =', total);
-        if (total < 1000) {
-          console.log('[donation] Total < 1000, skipping');
-          return;
-        }
-        const thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 200000];
-        const shown = _loadDonateThresholdsShown();
-        console.log('[donation] Thresholds already shown:', shown);
-        for (const t of thresholds) {
-          if (total >= t && !shown.includes(t)) {
-            console.log('[donation] Milestone crossed:', t, '- showing dialog');
-            shown.push(t);
-            _saveDonateThresholdsShown(shown);
-            // 略微延迟后再显示对话框，让 UI 先稳定
-            setTimeout(() => showDonatePrompt(total), 1000);
-            break;
-          }
-        }
-        if (shown.includes(1000)) {
-          console.log('[donation] 1000 threshold already shown, no dialog needed');
-        }
-      } catch (e) {
-        console.error('[donation] checkDonationThresholdOnStartup error:', e);
-      }
-    }
-
-    document.getElementById('donateBtnMain')?.addEventListener('click', openDonateLink);
-    // 注意：donateDlg 的按钮监听器在对话框 HTML 后面的内联脚本中绑定，
-    // 因为该对话框定义在本脚本块之后，此处尚未进入 DOM。
-    // ─── 捐助逻辑结束 ─────────────────────────────────────────────────────
 
     // 信息对话框：从已打开的照片文件夹（.kestrel）中加载 kestrel_metadata.json
     async function getMetadataHandle() {
@@ -3347,29 +3161,6 @@
         try { return JSON.parse(text); } catch { return { error: 'Failed to parse JSON in kestrel_metadata.json' }; }
       } catch { return { error: 'Unable to read kestrel_metadata.json' }; }
     }
-    async function openInfo() {
-      const dlg = document.getElementById('infoDlg');
-      const contentEl = document.getElementById('infoContent');
-      const noticeEl = document.getElementById('infoNotice');
-      contentEl.textContent = 'Loading…';
-      noticeEl.classList.add('hidden');
-      dlg.showModal();
-      const meta = await readMetadata();
-      if (meta && !meta.error) {
-        // 添加衍生辅助字段（不改动原始数据）
-        const enriched = { ...meta };
-        if (rootDirHandle) enriched.photo_root_name = rootDirHandle.name || '';
-        contentEl.textContent = JSON.stringify(enriched, null, 2);
-      } else {
-        contentEl.textContent = '—';
-        noticeEl.textContent = meta.error;
-        noticeEl.classList.remove('hidden');
-      }
-    }
-    const openInfoBtn = document.getElementById('openInfo');
-    if (openInfoBtn) openInfoBtn.addEventListener('click', openInfo);
-    const infoCloseBtn = document.getElementById('infoClose');
-    if (infoCloseBtn) infoCloseBtn.addEventListener('click', () => document.getElementById('infoDlg').close());
 
     // 根据 CSV 中的绝对导出/裁切路径推断根目录
     function inferRootFromAbsPath(p) {
@@ -5722,10 +5513,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       }
     });
 
-    el('#saveCsv').addEventListener('click', saveCsv);
-    el('#search').addEventListener('input', debounce(() => renderScenes(), 250));
-    el('#speciesConf').addEventListener('change', () => renderScenes());
-    el('#sortBy').addEventListener('change', () => {
+    el('#saveCsv')?.addEventListener('click', saveCsv);
+    el('#search')?.addEventListener('input', debounce(() => renderScenes(), 250));
+    el('#speciesConf')?.addEventListener('change', () => renderScenes());
+    el('#sortBy')?.addEventListener('change', () => {
       const s = loadSettings();
       s.sortBy = el('#sortBy').value;
       saveSettings(s);
@@ -5764,34 +5555,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       });
     })();
 
-    // 滚动位置指示器，滚动时显示当前文件夹/时间分组
-    (function initScrollPositionIndicator() {
-      const mainEl = document.querySelector('main');
-      const indicator = document.getElementById('scrollPositionIndicator');
-      if (!mainEl || !indicator) return;
-      let hideTimer = null;
-      mainEl.addEventListener('scroll', () => {
-        // 同时跟踪文件夹标题和时间线日期横幅
-        const headers = [...sceneGrid.querySelectorAll('.folder-group-header, .timeline-day-banner')];
-        if (!headers.length) { indicator.style.opacity = '0'; return; }
-        const mainRect = mainEl.getBoundingClientRect();
-        const thresholdY = mainRect.top + mainRect.height * 0.25;
-        let bestHeader = null;
-        for (const h of headers) {
-          const r = h.getBoundingClientRect();
-          if (r.top <= thresholdY) bestHeader = h;
-          else if (!bestHeader) { bestHeader = h; break; }
-        }
-        if (!bestHeader) { indicator.style.opacity = '0'; return; }
-        const nameEl = bestHeader.querySelector('.folder-group-name');
-        const text = nameEl ? nameEl.textContent.trim() : bestHeader.textContent.trim();
-        if (!text) { indicator.style.opacity = '0'; return; }
-        indicator.textContent = text;
-        indicator.style.opacity = '1';
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => { indicator.style.opacity = '0'; }, 1800);
-      }, { passive: true });
-    })();
 
     // 多选合并操作栏
     const selectMergeBtn = document.getElementById('selectMergeBtn');
@@ -5807,10 +5570,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       applySnapshot();
     });
 
-    const zoomInBtn = el('#zoomIn');
-    const zoomOutBtn = el('#zoomOut');
-    if (zoomInBtn) zoomInBtn.addEventListener('click', () => { uiZoom = Math.min(1.4, uiZoom + 0.1); applyZoom(); });
-    if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => { uiZoom = Math.max(0.7, uiZoom - 0.1); applyZoom(); });
 
     // 初始化工具栏里的“仅场景级手动评分”过滤开关
     (function initScenesManualFilter() {
@@ -6006,6 +5765,16 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       });
     }
 
+    // ── 空状态按钮 ────────────────────────────────────────────────────
+    const emptyPickFolder = document.getElementById('emptyPickFolder');
+    if (emptyPickFolder) emptyPickFolder.addEventListener('click', () => el('#pickFolder')?.click());
+    const emptyAnalyzeBtn = document.getElementById('emptyAnalyzeBtn');
+    if (emptyAnalyzeBtn) emptyAnalyzeBtn.addEventListener('click', () => document.getElementById('analyzeQueueBtn')?.click());
+
+    // ── 导出按钮 ──────────────────────────────────────────────────────
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) exportBtn.addEventListener('click', openExportDialog);
+
     // ── 分析队列事件绑定 ───────────────────────────────────────────────
 
     // “分析文件夹…”按钮打开对话框
@@ -6148,35 +5917,19 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
     // ── 欢迎面板事件绑定 ──────────────────────────────────────────────
 
-    // ── 法律协议逻辑 ──────────────────────────────────────────────
+    // ── 法律协议逻辑（已精简：无 UI 横幅）──────────────────────
     async function checkLegalAgreement() {
       if (!hasPywebviewApi || !window.pywebview?.api?.get_legal_status) return;
       try {
         const status = await window.pywebview.api.get_legal_status();
-        if (!status.agreed) {
-          document.getElementById('legalNotice')?.classList.remove('hidden');
+        if (!status.agreed && window.pywebview?.api?.agree_to_legal) {
+          // 自动同意（法律横幅已移除）
+          await window.pywebview.api.agree_to_legal();
         }
       } catch (e) {
         console.error('Failed to check legal status', e);
       }
     }
-
-    const legalAgreeBtn = document.getElementById('legalAgreeBtn');
-    if (legalAgreeBtn) {
-      legalAgreeBtn.addEventListener('click', async () => {
-        try {
-          if (hasPywebviewApi && window.pywebview?.api?.agree_to_legal) {
-            await window.pywebview.api.agree_to_legal();
-            document.getElementById('legalNotice').classList.add('hidden');
-            showToast(t('analysis.legal_accepted'), 4000);
-          }
-        } catch (e) {
-          console.error('Failed to agree to legal terms', e);
-        }
-      });
-    }
-
-    // 初始检查
     if (hasPywebviewApi) {
       checkLegalAgreement();
     }
@@ -6257,85 +6010,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       });
     }
 
-    // ---- 筛片助手启动器 ----
-    async function openCullingAssistant(rootPath) {
-      if (!window.pywebview?.api) {
-        showToast('Culling Assistant requires desktop mode', 4000);
-        return;
-      }
-      // 打开前先提示保存未保存改动（使用自定义对话框）
-      if (dirty) {
-        const userChoice = await showCullingAssistantPrompt();
-        if (userChoice === 'cancel') {
-          return;
-        }
-        if (userChoice === 'save') {
-          await saveCsv();
-        }
-      }
-      try {
-        showToast('Opening Culling Assistant...', 2000);
-        const res = await window.pywebview.api.open_culling_window(rootPath);
-        if (res && !res.success) {
-          showToast('Failed to open Culling Assistant: ' + (res.error || 'Unknown error'), 5000);
-        }
-      } catch (e) {
-        console.error('openCullingAssistant error', e);
-        showToast('Error opening Culling Assistant', 4000);
-      }
-    }
-    
-    // 用于筛片助手保存决策的自定义对话框
-    function showCullingAssistantPrompt() {
-      return new Promise((resolve) => {
-        const dlg = document.createElement('dialog');
-        dlg.style.cssText = 'border:none;border-radius:8px;background:#1a1d28;color:#e8f0f8;font-family:inherit;padding:0;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.3)';
-        
-        const content = document.createElement('div');
-        content.style.cssText = 'padding:24px;display:flex;flex-direction:column;gap:16px';
-        
-        const msg = document.createElement('div');
-        msg.style.cssText = 'font-size:16px;font-weight:500;line-height:1.4';
-        msg.textContent = 'You have unsaved changes. What would you like to do?';
-        content.appendChild(msg);
-        
-        const btnContainer = document.createElement('div');
-        btnContainer.style.cssText = 'display:flex;gap:8px;justify-content:flex-end';
-        
-        const btnCancel = document.createElement('button');
-        btnCancel.style.cssText = 'padding:8px 16px;border:1px solid #444;border-radius:4px;background:#2d3142;color:#e8f0f8;cursor:pointer;font-size:14px;transition:background 0.2s';
-        btnCancel.textContent = 'Cancel';
-        btnCancel.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('cancel'); });
-        btnContainer.appendChild(btnCancel);
-        
-        const btnDontSave = document.createElement('button');
-        btnDontSave.style.cssText = 'padding:8px 16px;border:1px solid #444;border-radius:4px;background:#2d3142;color:#e8f0f8;cursor:pointer;font-size:14px;transition:background 0.2s';
-        btnDontSave.textContent = 'Don\'t Save';
-        btnDontSave.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('dontsave'); });
-        btnContainer.appendChild(btnDontSave);
-        
-        const btnSave = document.createElement('button');
-        btnSave.style.cssText = 'padding:8px 16px;border:1px solid #5a9fd4;border-radius:4px;background:#3d5a7e;color:#e8f0f8;cursor:pointer;font-size:14px;font-weight:500;transition:background 0.2s';
-        btnSave.textContent = 'Save Changes';
-        btnSave.addEventListener('click', () => { dlg.close(); document.body.removeChild(dlg); resolve('save'); });
-        btnContainer.appendChild(btnSave);
-        
-        content.appendChild(btnContainer);
-        dlg.appendChild(content);
-        
-        dlg.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') { 
-            e.preventDefault(); 
-            dlg.close(); 
-            document.body.removeChild(dlg); 
-            resolve('cancel');
-          }
-        });
-        
-        document.body.appendChild(dlg);
-        dlg.showModal();
-      });
-    }
 
     function resetFolderCullState(rootPath, mode) {
       let changed = 0;
@@ -6671,500 +6345,161 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       liveAnalysisDlg.addEventListener('close', () => { _liveAnalysisDlgOpen = false; });
     }
 
-    // ====================================================================
-    // 教程系统（第 1 部分 = 分析介绍，第 2 部分 = 浏览功能）
-    // 交互式：部分步骤需要用户操作后才能继续。
-    // 参考网站 try-it-out 演示中的 waitFor/trigger 模式。
-    // ====================================================================
-
-    const TUTORIAL_PART1 = [
-      {
-        title: '欢迎使用 Project Kestrel！',
-        body: 'Project Kestrel 使用机器学习来整理你的照片，帮助你更高效地复查作品、搜索图库，并快速决定哪些照片值得编辑和分享。<br><br>这份引导教程会带你了解 Kestrel 的核心功能。',
-        target: null,
-      },
-      {
-        title: '首先，分析你的照片',
-        body: '点击 <b>分析文件夹\u2026</b>，选择包含鸟类照片的文件夹。Kestrel 会按场景分组，使用 AI 检测鸟类、识别物种和科名，并自动评估图片质量。',
-        target: '#analyzeQueueBtn',
-        position: 'bottom',
-      },
-      {
-        title: '打开一个已分析的文件夹',
-        body: '当你用 Kestrel 分析完一个文件夹后，点击 <b>打开文件夹\u2026</b> 即可浏览其中内容。Kestrel 会加载这些场景。<br><br>接下来我们会自动载入一组 <b>示例鸟类照片</b>，让你直观看到效果。',
-        target: '#pickFolder',
-        position: 'bottom',
-      },
-    ];
-
-    const TUTORIAL_PART2 = [
-      {
-        title: '你的照片会按场景整理',
-        body: 'Kestrel 会把你的照片整理成一个个 <b>场景</b>，也就是同一组连拍中相似的图片。场景网格会按照拍摄顺序显示这些场景。',
-        nudge: '点击一个场景来打开它！',
-        target: '#sceneGrid .card',
-        position: 'right',
-        waitFor: 'clickScene',
-      },
-      {
-        title: '浏览场景内容',
-        body: '在每个场景中，你的照片都会按照 <b>质量</b> 自动排序，从最锐利到最模糊。这样你可以立刻把注意力放到最好的作品上。<br><br>点击下方胶片条中的任意照片来查看详情。',
-        nudge: '点击下方胶片条中的一张照片！',
-        target: '#imageGrid',
-        position: 'top',
-        inDialog: true,
-        waitFor: 'clickFilmstrip',
-      },
-      {
-        title: '评分与筛片决定',
-        body: 'Kestrel 会根据每张图片的质量分数计算 <b>星级评分</b>。你也可以点击星星手动修改。<span style="color:#6aa0ff">蓝色星星</span> 表示 AI 评分，<span style="color:#f5c542">金色星星</span> 表示你的手动覆盖。<br><br>使用 <b>接受 · 未决定 · 拒绝</b> 按钮为每张照片做出筛片决定。后面使用筛片助手时，这些信息会非常有用。',
-        nudge: '把一张照片标记为“接受”或“拒绝”后继续！',
-        target: '#sceneInfoBar',
-        position: 'top-left',
-        inDialog: true,
-        waitFor: 'clickCullToggle',
-      },
-      {
-        title: '键盘快捷键',
-        body: 'Kestrel 提供了一组键盘快捷键，让复查照片更高效。快捷键就在上方，继续之前不妨试一试。',
-        target: '#sceneShortcutLegend',
-        position: 'bottom',
-        inDialog: true,
-        setupAction: 'expandShortcuts',
-      },
-      {
-        title: '其他场景功能',
-        body: '当你浏览自己的 <b>真实照片</b> 时，还可以做这些事（示例图片上不会全部生效）：<br><br>\u2022 在完整图上 <b>点击并拖动</b>，加载 RAW 并放大查看<br>\u2022 编辑顶部的 <b>场景名称</b> 和 <b>标签</b><br>\u2022 按 <kbd>Space</kbd> 在你偏好的照片编辑器中打开图片<br>\u2022 如果 Kestrel 误把两个不同场景合并了，可以使用 <b>\u2702 拆分场景</b><br><br>点击 <b>关闭</b> 继续！',
-        nudge: '关闭场景对话框后继续。',
-        target: '#closeDlg',
-        position: 'bottom',
-        inDialog: true,
-        waitFor: 'closeDialog',
-      },
-      {
-        title: '筛选选项',
-        body: '\u2022 可以直接 <b>搜索</b> 任意鸟类物种或科名，网格会随输入即时筛选。<br>\u2022 搜索后没有看到场景？可以降低 <b>置信度阈值</b> 以查看更多结果。<br>\u2022 如果场景中包含多种鸟类，请启用 <b>多主体模式</b>。<br>\u2022 也可以按质量、图片数量或拍摄时间进行 <b>排序</b>。',
-        target: '.filter-panel',
-        position: 'right',
-      },
-      {
-        title: '合并场景',
-        body: '上方高亮的两个场景其实原本属于同一组连拍，只是被 Kestrel 拆成了两个。按住 <kbd>Ctrl</kbd> 并点击这两张卡片选中它们，然后点击 <b>合并所选场景</b>，就能把它们重新合并。<br><br>你也可以通过 <kbd>Shift+Click</kbd> 一次性范围选择多组场景。',
-        target: '#sceneGrid .card:nth-child(2)',
-        highlightFirst: '#sceneGrid .card:nth-child(1)',
-        position: 'bottom',
-      },
-      {
-        title: '写入照片元数据',
-        body: '点击 <b>写入照片元数据</b>，即可把 Kestrel 的星级评分和接受/拒绝决定导出到照片旁的 XMP 旁车文件中。这些 <code>.xmp</code> 文件能被 <b>Adobe Lightroom</b>、<b>darktable</b>、<b>Capture One</b> 以及其他编辑器原生读取。<br><br>\u26a0\ufe0f <b>请在把照片导入编辑器 <em>之前</em> 写入元数据</b>，因为大多数目录式软件在照片导入后会忽略新生成的旁车文件。如果旁车文件原本由其他应用创建，Kestrel 会在覆盖前先询问你。',
-        target: '.write-metadata-btn',
-        position: 'bottom',
-      },
-      {
-        title: '筛片助手',
-        body: '<b>筛片助手</b> 可以根据星级评分帮你自动把照片标记为接受或拒绝，甚至能把拒绝项移动到单独的文件夹。<br><br>点击 <b>打开筛片助手</b>，即可为该文件夹打开专门的接受/拒绝工作区。',
-        target: '.culling-assistant-btn',
-        position: 'bottom',
-      },
-      {
-        title: '设置选项',
-        body: '点击 <b>设置</b> 可选择你偏好的 <b>照片编辑器</b>（如 Lightroom、Darktable 或系统默认）。按下 <kbd>Space</kbd> 打开照片时，就会在这里启动。你也可以在设置里调整其他多个选项。',
-        target: '#openSettings',
-        position: 'bottom',
-      },
-      {
-        title: '你已经准备好了！',
-        body: '教程到这里就结束了。快速回顾一下：<br><br>\u2022 用 <b>分析文件夹</b> 处理新照片<br>\u2022 用 <b>打开文件夹</b> 浏览已分析的照片<br>\u2022 <b>点击场景</b> 来查看并评分照片<br>\u2022 用 <b>筛片助手</b> 进行批量接受/拒绝操作<br>\u2022 用 <b>写入照片元数据</b> 导出到 Lightroom、darktable 等软件<br><br>\u26a0\ufe0f <b>记住：</b> 为了获得最佳效果，请先写入照片元数据，再导入 Lightroom 或 Capture One。<br><br>你随时都可以点击 <b>\uD83D\uDCD6 教程</b> 按钮重新播放本教程。祝你观鸟愉快！',
-        target: null,
-      },
-      {
-        title: '欢迎发送反馈！',
-        body: '我，也就是 Project Kestrel 的开发者，非常希望听到你的真实感受。无论你觉得这个应用是否有帮助，或发现了 bug，又或者有改进建议，都欢迎告诉我。<br><br>感谢你试用 Kestrel！',
-        target: '#openFeedback',
-        position: 'top',
-      },
-    ];
-
-    let _tutStep = 0;
-    let _tutSteps = [];
-    let _tutPart = 0;               // 0 = not started, 1 = part1, 2 = part2
-    let _tutSampleLoaded = false;    // track if we auto-loaded sample sets
-    let _tutCleanupFn = null;        // cleanup function for current waitFor listeners
-    let _tutInDialog  = false;       // true while tutorial card is inside the scene dialog
-
-    function _tutEl(sel) { return document.querySelector(sel); }
-
-    async function checkMainTutorialSeen() {
-      if (!hasPywebviewApi) return true;
-      try {
-        var res = await window.pywebview.api.get_settings();
-        return res && res.settings && res.settings.main_tutorial_seen === true;
-      } catch (e) { return false; }
-    }
-
-    async function markMainTutorialSeen() {
-      if (!hasPywebviewApi) return;
-      try {
-        var res = await window.pywebview.api.get_settings();
-        var s = (res && res.success ? res.settings : {}) || {};
-        s.main_tutorial_seen = true;
-        await window.pywebview.api.save_settings_data(s);
-      } catch (e) { console.warn('markMainTutorialSeen:', e); }
-    }
-
-    function _tutCleanup() {
-      // 移除所有 highlight-target 类
-      document.querySelectorAll('.highlight-target').forEach(function(el) {
-        el.classList.remove('highlight-target');
-      });
-      // 执行 waitFor 监听器的清理逻辑
-      if (_tutCleanupFn) { _tutCleanupFn(); _tutCleanupFn = null; }
-      // 如果教程卡片被移动进场景对话框（顶层），就把它移回去
-      if (_tutInDialog) {
-        _tutInDialog = false;
-        var _ovl = _tutEl('#tutorialOverlay');
-        var _crd = _tutEl('#tutorialCard');
-        if (_crd && _ovl && _crd.parentElement !== _ovl) { _ovl.appendChild(_crd); }
-        if (_ovl) { _ovl.style.display = ''; }
+    // ── 导出对话框 ──────────────────────────────────────────────────────
+    function openExportDialog() {
+      if (!rows.length) {
+        showToast('请先打开一个已分析的文件夹', 3000);
+        return;
       }
-    }
+      const dlg = document.getElementById('exportDlg');
+      if (!dlg) return;
 
-    function startMainTutorial(part, fromStep) {
-      _tutCleanup();
-      _tutPart = part || 1;
-      _tutSteps = _tutPart === 1 ? TUTORIAL_PART1 : TUTORIAL_PART2;
-      _tutStep = fromStep || 0;
-      _tutEl('#tutorialOverlay').classList.add('active');
-      _showMainTutStep(_tutStep);
-    }
+      // 更新摘要
+      updateExportSummary();
 
-    function _closeMainTutorial() {
-      _tutCleanup();
-      _tutEl('#tutorialOverlay').classList.remove('active', 'has-backdrop');
-      _tutEl('#tutorialHighlight').style.display = 'none';
-      _tutEl('#tutorialNudge').style.display = 'none';
-      if (_tutPart >= 2) markMainTutorialSeen();
-      _tutPart = 0;
-    }
-
-    function _showMainTutStep(idx) {
-      _tutCleanup();
-      var step = _tutSteps[idx];
-      if (!step) { _closeMainTutorial(); return; }
-
-      var overlay = _tutEl('#tutorialOverlay');
-      var hl      = _tutEl('#tutorialHighlight');
-      var card    = _tutEl('#tutorialCard');
-      var nudge   = _tutEl('#tutorialNudge');
-      var nextBtn = _tutEl('#tutorialNext');
-
-      // 步骤前置动作（在定位目标前执行）
-      if (step.setupAction === 'expandShortcuts') {
-        var legend = document.getElementById('sceneShortcutLegend');
-        if (legend && legend.classList.contains('hidden')) {
-          var shortcutToggleBtn = document.getElementById('sceneShortcutBtn');
-          if (shortcutToggleBtn) shortcutToggleBtn.click();
-        }
-      }
-
-      // 文案
-      _tutEl('#tutorialCounter').textContent = 'Step ' + (idx + 1) + ' of ' + _tutSteps.length;
-      _tutEl('#tutorialTitle').innerHTML = step.title;
-      _tutEl('#tutorialBody').innerHTML  = step.body;
-
-      // 提示语（点击后继续）
-      if (step.nudge) {
-        nudge.textContent = step.nudge;
-        nudge.style.display = '';
-      } else {
-        nudge.style.display = 'none';
-      }
-
-      // 圆点进度
-      var dotsCont = _tutEl('#tutorialProgress');
-      dotsCont.innerHTML = '';
-      _tutSteps.forEach(function(_, i) {
-        var d = document.createElement('div');
-        d.className = 'tutorial-dot' + (i === idx ? ' active' : '');
-        dotsCont.appendChild(d);
+      // 监听模式切换
+      dlg.querySelectorAll('input[name="exportMode"]').forEach(radio => {
+        radio.onchange = updateExportSummary;
       });
 
-      // 上一步 / 下一步按钮文案
-      _tutEl('#tutorialBack').disabled = (idx === 0);
-      var isLast = (idx === _tutSteps.length - 1);
-      nextBtn.textContent = isLast ? 'Finish \u2713' : 'Next \u2192';
-
-      // 如果当前步骤使用 waitFor，则在动作完成前隐藏“下一步”按钮
-      var hasWaitFor = !!step.waitFor;
-      nextBtn.style.display = hasWaitFor ? 'none' : '';
-
-      // 找到目标元素
-      var target = step.target ? document.querySelector(step.target) : null;
-
-      // 对于 inDialog 步骤，先检查场景详情面板是否已打开
-      var _inDialogActive = false;
-      if (step.inDialog) {
-        var _panelOpen = document.getElementById('detailPanel')?.classList.contains('open');
-        if (!_panelOpen) {
-          // 对话框未打开，则显示提示，并允许通过“下一步”跳过
-          _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first, then this step will highlight the right element.</span>';
-          nudge.style.display = 'none';
-          nextBtn.style.display = '';  // show Next even if waitFor was set
-          target = null;  // treat as center
-          hasWaitFor = false;
-        } else {
-          // 对话框已打开，则把教程卡片实际移动到对话框中，
-          // 让它处于浏览器顶层（高于模态内容）
-          _inDialogActive = true;
-          _tutInDialog = true;
-          if (card.parentElement !== dlg) { dlg.appendChild(card); }
-          overlay.style.display = 'none'; // hide the main-page dim; dialog has its own backdrop
-        }
-      }
-      // 对于带有独立首个高亮目标的步骤
-      if (step.highlightFirst && !_inDialogActive) {
-        var _hfEl = document.querySelector(step.highlightFirst);
-        if (_hfEl) _hfEl.classList.add('highlight-target');
-      }
-
-      if (!target || (target.offsetWidth === 0 && target.offsetHeight === 0)) {
-        // 卡片居中显示，并带完整背景遮罩
-        hl.style.display = 'none';
-        overlay.classList.add('has-backdrop');
-        card.style.transform = 'translate(-50%, -50%)';
-        card.style.top  = '50%';
-        card.style.left = '50%';
-      } else {
-        // 对于 inDialog 激活步骤，卡片在对话框内部（顶层），因此不显示页面级高亮框
-        hl.style.display = _inDialogActive ? 'none' : '';
-        overlay.classList.remove('has-backdrop');
-        card.style.transform = '';
-
-        // 为目标添加 highlight-target 类，触发脉冲效果
-        target.classList.add('highlight-target');
-
-        var pad = 8;
-        var r = target.getBoundingClientRect();
-        if (!_inDialogActive) {
-          hl.style.top    = (r.top  - pad) + 'px';
-          hl.style.left   = (r.left - pad) + 'px';
-          hl.style.width  = (r.width  + pad * 2) + 'px';
-          hl.style.height = (r.height + pad * 2) + 'px';
-        }
-
-        // 将卡片定位到目标附近
-        var pos    = step.position || 'right';
-        var margin = 18;
-        var vw     = window.innerWidth;
-        var vh     = window.innerHeight;
-        var cw     = 380 + margin;
-        var ch     = card.offsetHeight || 220;
-        var top, left;
-        if (pos === 'right')       { left = r.right + margin;                 top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'left')     { left = r.left - cw - margin;             top = r.top + r.height / 2 - ch / 2; }
-        else if (pos === 'bottom')   { left = r.left + r.width / 2 - cw / 2;   top = r.bottom + margin; }
-        else if (pos === 'top-left') { left = r.left;                           top = r.top - ch - margin; }
-        else                         { left = r.left + r.width / 2 - cw / 2;   top = r.top - ch - margin; } // 'top'
-        left = Math.max(margin, Math.min(left, vw - cw - margin));
-        top  = Math.max(margin, Math.min(top,  vh - ch - margin));
-        card.style.left = left + 'px';
-        card.style.top  = top  + 'px';
-      }
-
-      // ---- 设置交互式 waitFor 监听器 ----
-      if (hasWaitFor && step.waitFor === 'clickScene') {
-        // 用户必须点击网格中的任一场景卡片，因此监听 sceneGrid 的点击事件。
-        var sceneGridEl = document.getElementById('sceneGrid');
-        if (sceneGridEl) {
-          var handler = function(ev) {
-            var cardEl = ev.target.closest('.card');
-            if (cardEl) {
-              // 场景卡片已被点击，它会通过自己的点击处理器打开对话框。
-              // 稍等片刻让对话框出现，再推进教程。
-              setTimeout(function() { _tutAdvance(); }, 400);
+      // 目标文件夹选择
+      const destPick = document.getElementById('exportDestPick');
+      const destPath = document.getElementById('exportDestPath');
+      const destSection = document.getElementById('exportDestSection');
+      if (destPick) {
+        destPick.onclick = async () => {
+          if (window.pywebview?.api?.choose_directory) {
+            const dir = await window.pywebview.api.choose_directory();
+            if (dir && destPath) {
+              destPath.value = dir;
+              updateExportStartButton();
             }
-          };
-          sceneGridEl.addEventListener('click', handler, true);
-          _tutCleanupFn = function() { sceneGridEl.removeEventListener('click', handler, true); };
-        }
-      }
-      else if (hasWaitFor && step.waitFor === 'clickStar') {
-        // 用户必须在场景对话框中点击一颗星
-        var onStarClick = function(ev) {
-          var starEl = ev.target.closest('.star, .stars span');
-          if (starEl) {
-            setTimeout(function() { _tutAdvance(); }, 300);
           }
         };
-        document.addEventListener('click', onStarClick, true);
-        _tutCleanupFn = function() { document.removeEventListener('click', onStarClick, true); };
       }
-      else if (hasWaitFor && step.waitFor === 'clickFilmstrip') {
-        // 用户必须在底片栏中点击一张照片
-        var filmstripEl = document.getElementById('imageGrid');
-        if (filmstripEl) {
-          var onFilmstripClick = function(ev) {
-            var cardEl = ev.target.closest('.filmstrip-card, .card');
-            if (cardEl) {
-              setTimeout(function() { _tutAdvance(); }, 350);
+
+      // XMP 模式不需要目标文件夹
+      function updateExportSummary() {
+        const mode = dlg.querySelector('input[name="exportMode"]:checked')?.value || 'accepted';
+        const summary = document.getElementById('exportSummary');
+        if (destSection) destSection.style.display = mode === 'xmp' ? 'none' : '';
+
+        if (mode === 'accepted') {
+          const accepted = rows.filter(r => r.culled === 'accepted');
+          if (summary) summary.textContent = `将导出 ${accepted.length} 张已接受的照片`;
+        } else if (mode === 'stars') {
+          const rated = rows.filter(r => {
+            const rp = r.__rootPath || rootPath;
+            const ratings = _scenedata[rp]?.image_ratings || {};
+            return (ratings[r.filename] || 0) > 0;
+          });
+          if (summary) summary.textContent = `将按星级分文件夹导出 ${rated.length} 张有评分的照片`;
+        } else if (mode === 'xmp') {
+          if (summary) summary.textContent = `将为 ${rows.length} 张照片写入 .xmp 旁车文件`;
+        }
+        updateExportStartButton();
+      }
+
+      function updateExportStartButton() {
+        const mode = dlg.querySelector('input[name="exportMode"]:checked')?.value || 'accepted';
+        const startBtn = document.getElementById('exportStart');
+        if (!startBtn) return;
+        if (mode === 'xmp') {
+          startBtn.disabled = false;
+        } else {
+          startBtn.disabled = !destPath?.value;
+        }
+      }
+
+      // 取消
+      const cancelBtn = document.getElementById('exportCancel');
+      if (cancelBtn) cancelBtn.onclick = () => dlg.close();
+
+      // 开始导出
+      const startBtn = document.getElementById('exportStart');
+      if (startBtn) {
+        startBtn.onclick = async () => {
+          const mode = dlg.querySelector('input[name="exportMode"]:checked')?.value || 'accepted';
+
+          if (mode === 'xmp') {
+            // 委托给现有的 XMP 写入逻辑
+            dlg.close();
+            const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
+            for (const rp of loadedPaths) {
+              await writeMetadataForFolder(rp);
             }
-          };
-          filmstripEl.addEventListener('click', onFilmstripClick, true);
-          _tutCleanupFn = function() { filmstripEl.removeEventListener('click', onFilmstripClick, true); };
-        }
-      }
-      else if (hasWaitFor && step.waitFor === 'clickCullToggle') {
-        // 用户必须点击“接受”或“拒绝”按钮（不能是“未决定”）
-        var onCullClick = function(ev) {
-          var cullBtn = ev.target.closest('.cull-btn[data-cull="accept"], .cull-btn[data-cull="reject"]');
-          if (cullBtn) {
-            setTimeout(function() { _tutAdvance(); }, 400);
+            return;
           }
+
+          const dest = destPath?.value;
+          if (!dest) { showToast('请先选择目标文件夹', 3000); return; }
+          if (!window.pywebview?.api?.copy_photos_to_directory) {
+            showToast('导出功能需要桌面应用支持', 3000);
+            return;
+          }
+
+          // 构建文件列表
+          const progressEl = document.getElementById('exportProgress');
+          const progressLabel = document.getElementById('exportProgressLabel');
+          const progressFill = document.getElementById('exportProgressFill');
+          if (progressEl) progressEl.classList.remove('hidden');
+          startBtn.disabled = true;
+
+          const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
+          let totalCopied = 0, totalErrors = 0;
+
+          for (const rp of loadedPaths) {
+            const folderRows = rows.filter(r => r.__rootPath === rp);
+            let filenames = [];
+            let starRatings = {};
+
+            if (mode === 'accepted') {
+              filenames = folderRows.filter(r => r.culled === 'accepted').map(r => r.filename);
+            } else if (mode === 'stars') {
+              const ratings = _scenedata[rp]?.image_ratings || {};
+              for (const r of folderRows) {
+                const rating = ratings[r.filename] || 0;
+                if (rating > 0) {
+                  filenames.push(r.filename);
+                  starRatings[r.filename] = rating;
+                }
+              }
+            }
+
+            if (!filenames.length) continue;
+
+            if (progressLabel) progressLabel.textContent = `导出中… ${folderBaseName(rp)}`;
+
+            try {
+              const res = await window.pywebview.api.copy_photos_to_directory(
+                rp,
+                JSON.stringify(filenames),
+                dest,
+                mode === 'stars',
+                mode === 'stars' ? JSON.stringify(starRatings) : null
+              );
+              if (res) {
+                totalCopied += (res.copied || 0);
+                totalErrors += (res.errors || 0);
+              }
+            } catch (e) {
+              console.error('Export error for', rp, e);
+              totalErrors++;
+            }
+          }
+
+          if (progressFill) progressFill.style.width = '100%';
+          if (progressLabel) progressLabel.textContent = `导出完成：${totalCopied} 张照片`;
+          showToast(`导出完成：${totalCopied} 张照片${totalErrors ? '，' + totalErrors + ' 个错误' : ''}`, 5000);
+          setTimeout(() => {
+            dlg.close();
+            if (progressEl) progressEl.classList.add('hidden');
+            if (progressFill) progressFill.style.width = '0%';
+            startBtn.disabled = false;
+          }, 1500);
         };
-        document.addEventListener('click', onCullClick, true);
-        _tutCleanupFn = function() { document.removeEventListener('click', onCullClick, true); };
       }
-      else if (hasWaitFor && step.waitFor === 'closeDialog') {
-        // 用户必须关闭场景对话框
-        var sceneDlgEl = document.getElementById('sceneDlg');
-        if (sceneDlgEl) {
-          var onDlgClose = function() {
-            sceneDlgEl.removeEventListener('close', onDlgClose);
-            _tutCleanupFn = null;
-            setTimeout(function() { _tutAdvance(); }, 250);
-          };
-          sceneDlgEl.addEventListener('close', onDlgClose);
-          _tutCleanupFn = function() { sceneDlgEl.removeEventListener('close', onDlgClose); };
-        }
-      }
+
+      dlg.showModal();
     }
 
-    function _tutAdvance() {
-      _tutStep++;
-      if (_tutStep >= _tutSteps.length) {
-        // 当前部分结束
-        if (_tutPart === 1) {
-          _closeMainTutorial();
-          // 切换到第 2 部分：自动加载示例集后开始
-          _autoLoadSamplesAndStartPart2();
-        } else {
-          _closeMainTutorial();
-        }
-      } else {
-        _showMainTutStep(_tutStep);
-      }
-    }
-
-    function _tutGoBack() {
-      if (_tutStep > 0) { _tutStep--; _showMainTutStep(_tutStep); }
-    }
-
-    async function _autoLoadSamplesAndStartPart2() {
-      if (!hasPywebviewApi) { startMainTutorial(2, 0); return; }
-      try {
-        console.log('[tutorial] Calling get_sample_sets_paths()...');
-        var res = await window.pywebview.api.get_sample_sets_paths();
-        console.log('[tutorial] get_sample_sets_paths() response:', res);
-        
-        if (res && res.success && res.paths && res.paths.length > 0) {
-          console.log('[tutorial] Found', res.paths.length, 'sample sets:', res.paths);
-          _tutSampleLoaded = true;
-          // 扫描示例父目录，让侧边栏文件夹树显示 backyard_birds 与 forest_trail
-          var sampleParent = res.paths[0].replace(/[/\\][^/\\]+$/, '');
-          console.log('[tutorial] Sample parent folder:', sampleParent);
-          try { 
-            await scanFolderTree(sampleParent);
-            console.log('[tutorial] Folder tree scanned successfully');
-          } catch(e) {
-            console.warn('[tutorial] Folder tree scan error:', e);
-          }
-          try {
-            console.log('[tutorial] Loading', res.paths.length, 'folders via loadMultipleFolders...');
-            await loadMultipleFolders(res.paths);
-            console.log('[tutorial] Folders loaded successfully');
-          } catch(e) {
-            console.warn('[tutorial] loadMultipleFolders error:', e);
-            throw e;
-          }
-          // 略微延迟等待渲染完成，再开始第 2 部分
-          console.log('[tutorial] Starting Part 2 of tutorial');
-          setTimeout(function() { startMainTutorial(2, 0); }, 600);
-        } else {
-          // 没找到示例集，也直接开始第 2 部分
-          console.warn('[tutorial] No sample sets found. res.success=', res?.success, 'res.paths=', res?.paths);
-          startMainTutorial(2, 0);
-        }
-      } catch (e) {
-        console.warn('[tutorial] _autoLoadSamplesAndStartPart2 error:', e);
-        console.error(e);
-        startMainTutorial(2, 0);
-      }
-    }
-
-    // 绑定教程按钮
-    var helpBtnMain = document.getElementById('helpBtnMain');
-    if (helpBtnMain) {
-      helpBtnMain.addEventListener('click', function() {
-        startMainTutorial(1, 0);
-      });
-    }
-
-    _tutEl('#tutorialNext').addEventListener('click', _tutAdvance);
-    _tutEl('#tutorialBack').addEventListener('click', _tutGoBack);
-    _tutEl('#tutorialSkip').addEventListener('click', function() {
-      if (_tutPart === 1) {
-        // 即使跳过第 1 部分，也要先加载示例后进入第 2 部分
-        _closeMainTutorial();
-        _autoLoadSamplesAndStartPart2();
-      } else {
-        _closeMainTutorial();
-      }
-    });
-
-    // 键盘：仅允许用 Escape 关闭教程（方向键被有意移除，
-    // 用户改用“上一步/下一步”按钮或完成 waitFor 动作来推进）
-    document.addEventListener('keydown', function(ev) {
-      if (!_tutEl('#tutorialOverlay').classList.contains('active')) return;
-      if (_tutPart === 0) return;
-      if (ev.key === 'Escape') { _closeMainTutorial(); }
-    });
-
-    // 同时为欢迎面板中的教程链接绑定内嵌教程启动逻辑
-    var welcomeTutLink = document.getElementById('welcomeTutorialLink');
-    if (welcomeTutLink) {
-      welcomeTutLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        startMainTutorial(1, 0);
-      });
-    }
-
-    document.querySelectorAll('.welcome-settings-link').forEach(function(linkEl) {
-      linkEl.addEventListener('click', function(e) {
-        e.preventDefault();
-        showSettings();
-      });
-    });
-
-    // 首次启动时自动开始教程（仅 pywebview 模式）
-    (async function() {
-      if (!hasPywebviewApi) return;
-      // 稍等片刻，让 UI 先稳定
-      await new Promise(function(r) { setTimeout(r, 800); });
-      var seen = await checkMainTutorialSeen();
-      if (!seen) {
-        startMainTutorial(1, 0);
-      }
-    })();
-
-
-    // 绑定捐助对话框按钮，此脚本在对话框 HTML 已进入 DOM 后执行
-    (function() {
-      var dlg = document.getElementById('donateDlg');
-      document.getElementById('donateDlgGoBtn').addEventListener('click', function() {
-        dlg.close();
-        openDonateLink();
-      });
-      document.getElementById('donateDlgClose').addEventListener('click', function() {
-        dlg.close();
-      });
-    })();

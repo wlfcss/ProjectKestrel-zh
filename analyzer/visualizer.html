@@ -12,226 +12,66 @@
 </head>
 
 <body>
-  <div id="legalNotice" class="legal-notice-banner hidden">
-    <span>使用 Project Kestrel 即表示你同意我们的 <a href="https://projectkestrel.org/terms-of-use"
-        target="_blank">使用条款</a> 和 <a href="https://projectkestrel.org/privacy-policy" target="_blank">隐私政策</a>。</span>
-    <button id="legalAgreeBtn" class="legal-notice-btn">同意并关闭</button>
-  </div>
-
   <div class="app-body">
-  <header>
-    <div class="wrap">
-      <div class="sidebar-brand">
-        <div class="brand-mark">
-          <img src="logo.png" alt="Project Kestrel" />
-        </div>
-        <div class="brand-copy">
-          <div class="brand-kicker">鸟类分析工作台</div>
-          <h1>Project Kestrel</h1>
-          <p class="brand-subtitle">将鸟类识别、场景整理与筛片流程收敛到一个专业工作台里。</p>
-        </div>
-      </div>
-
-      <div class="toolbar">
-        <section class="sidebar-section sidebar-actions">
-          <div class="section-heading">
-            <span class="section-kicker">工作区</span>
-            <h2>开始工作</h2>
-            <p>先打开已分析图库，或将新的照片文件夹加入分析队列。</p>
-          </div>
-          <div class="toolbar-row actions">
-            <button id="pickFolder" class="primary action-callout" title="打开一个已经通过 Kestrel 分析过的文件夹">
-              <span class="btn-label">打开已分析图库</span>
-              <span class="btn-note">载入包含 `.kestrel` 数据的照片文件夹</span>
-              <span class="help-tip"
-                data-tip="分析完成后，打开包含鸟类照片的文件夹。"
-                aria-label="文件夹选择帮助"
-                title="分析完成后，打开包含鸟类照片的文件夹。">?</span>
-            </button>
-            <div class="actions-secondary-row">
-              <button id="analyzeQueueBtn" class="action-secondary" title="选择要加入分析队列的文件夹">
-                <span class="btn-label">分析新文件夹</span>
-                <span class="btn-note">批量加入队列并持续跟踪进度</span>
-              </button>
-              <button id="openSettings" class="action-secondary" title="打开 Kestrel 设置">
-                <span class="btn-label">偏好设置</span>
-                <span class="btn-note">评分、编辑器与工作流选项</span>
-              </button>
-            </div>
-            <div id="saveRevertWrap" class="action-utility-row">
-              <button id="revertCsv" disabled title="放弃所有未保存的更改">还原更改</button>
-              <button id="saveCsv" disabled>保存更改</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="sidebar-section sidebar-library-section">
-          <div class="section-heading compact">
-            <span class="section-kicker">图库</span>
-            <h2>图库导航</h2>
-          </div>
-          <div id="folderTreeWrap" class="folder-tree-wrap folder-tree-empty">
-            <div class="folder-tree-header">
-              <span class="tree-title">文件夹树</span>
-              <button id="treeCheckAll" title="勾选所有文件夹" disabled>全选</button>
-              <button id="treeCheckNone" title="取消勾选所有文件夹" disabled>取消全选</button>
-              <button id="treeChangeRoot" title="选择另一个根目录进行扫描" disabled>更换根目录…</button>
-            </div>
-            <div id="folderScanProgress" class="load-progress hidden" style="margin:8px 6px 0">
-              <div class="load-progress-label" id="folderScanLabel">正在扫描文件夹…</div>
-              <div class="load-progress-track">
-                <div id="folderScanFill" class="load-progress-fill" style="width:0%"></div>
-              </div>
-            </div>
-            <div id="folderTree"></div>
-          </div>
-        </section>
-      </div>
-
-      <section class="sidebar-section sidebar-filters">
-        <div class="section-heading compact">
-          <span class="section-kicker">视图</span>
-          <h2>筛选与排序</h2>
-        </div>
-        <div class="filter-panel" aria-label="筛选与排序选项">
-          <div class="filter-search-row">
-            <input id="search" type="search" placeholder="按物种或科名搜索" />
-            <label class="inline filter-conf-row">
-              <span class="muted">置信度</span>
-              <input id="speciesConf" type="number" min="0" max="1" step="0.05" value="0.75" style="width:100px" />
-            </label>
-          </div>
-          <div class="filter-grid">
-            <div class="filter-field">
-              <span class="muted filter-sort-label">排序方式</span>
-              <select id="sortBy">
-                <option value="captureTime" selected>拍摄时间</option>
-                <option value="sceneId">场景 ID</option>
-                <option value="maxQuality">最高质量</option>
-                <option value="imageCount">图片数量</option>
-              </select>
-            </div>
-            <label class="inline filter-toggle" title="仅显示包含手动评分照片的场景。">
-              <input id="filterScenesManualRated" type="checkbox" />
-              <span class="muted">仅显示手动评分场景</span>
-            </label>
-            <label class="inline filter-toggle">
-              <input id="includeSecondarySpecies" type="checkbox" />
-              <span class="muted">多主体模式</span>
-              <span class="help-tip"
-                data-tip="如果一张照片中包含多个主体（例如多只鸟），启用此选项会提升可搜索性。"
-                aria-label="多主体模式帮助"
-                title="如果一张照片中包含多个主体（例如多只鸟），启用此选项会提升可搜索性。">?</span>
-            </label>
-            <label class="inline filter-toggle">
-              <input id="groupByTime" type="checkbox" />
-              <span class="muted">按拍摄时间分组</span>
-            </label>
-            <label class="inline filter-toggle">
-              <input id="groupByFolder" type="checkbox" checked />
-              <span class="muted">按文件夹分组</span>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <div class="spacer"></div>
-      <div class="sidebar-footer" aria-label="控制区">
-        <div class="sidebar-footer-left">
-          <div class="zoom-controls">
-            <button id="zoomOut" title="缩小">&#x2212;</button>
-            <span class="zoom-label">视图缩放</span>
-            <button id="zoomIn" title="放大">+</button>
-          </div>
-        </div>
-        <div class="sidebar-footer-right">
-          <button id="helpBtnMain" title="启动引导教程">教程</button>
-          <button id="donateBtnMain" class="donate-btn" title="支持 Project Kestrel —— 通过 PayPal 捐助">支持项目</button>
-        </div>
+  <!-- ═══ 顶栏 ═══ -->
+  <header class="top-bar">
+    <div class="top-bar-left">
+      <img src="logo.png" alt="Project Kestrel" class="top-bar-logo" />
+      <span class="top-bar-brand">Project Kestrel</span>
+    </div>
+    <div class="top-bar-center">
+      <label class="top-bar-sort">
+        <span class="top-bar-sort-label">排序</span>
+        <select id="sortBy">
+          <option value="captureTime" selected>拍摄时间</option>
+          <option value="sceneId">场景 ID</option>
+          <option value="maxQuality">最高质量</option>
+          <option value="imageCount">图片数量</option>
+        </select>
+      </label>
+    </div>
+    <div class="top-bar-actions">
+      <button id="pickFolder" class="top-bar-btn" title="打开一个已分析过的文件夹">
+        <span class="top-bar-btn-icon">📂</span> 导入
+      </button>
+      <button id="analyzeQueueBtn" class="top-bar-btn" title="选择要加入分析队列的文件夹">
+        <span class="top-bar-btn-icon">🔬</span> 分析
+      </button>
+      <button id="openSettings" class="top-bar-btn" title="打开设置">
+        <span class="top-bar-btn-icon">⚙</span> 设置
+      </button>
+      <button id="exportBtn" class="top-bar-btn primary" title="导出照片">
+        <span class="top-bar-btn-icon">📤</span> 导出
+      </button>
+      <div id="saveRevertWrap" class="save-revert-wrap hidden">
+        <button id="revertCsv" disabled title="放弃所有未保存的更改">还原</button>
+        <button id="saveCsv" disabled>保存</button>
       </div>
     </div>
   </header>
-  <div id="sidebarResizer" class="sidebar-resizer" title="拖动以调整侧边栏宽度"></div>
 
   <main>
-    <div id="mainZoom">
-      <div id="compat" class="wrap hidden">
+    <div id="mainContent">
+      <div id="compat" class="compat-notice hidden">
         <div class="notice">
-          检测到当前功能受限。若要获得完整的文件夹访问和图像预览体验，请使用以下任一方式：<br />
-          • 使用 Project Kestrel 桌面版应用（macOS 推荐）<br />
-          • 使用基于 Chromium 的浏览器（Chrome、Edge、Brave、Arc）<br />
-          你仍然可以直接加载 CSV 文件，但图像预览和在编辑器中打开文件将无法使用。
+          检测到当前功能受限。请使用 Project Kestrel 桌面版应用或基于 Chromium 的浏览器以获得完整体验。
         </div>
       </div>
 
       <section id="sceneGrid"></section>
 
-      <!-- 欢迎 / 快速开始面板，仅在未加载文件夹时显示 -->
-      <div id="welcomePanel">
-        <div class="welcome-hero">
-          <div class="welcome-hero-copy">
-            <div class="welcome-kicker">Project Kestrel 工作台</div>
-            <h2>把鸟类识别、整理与筛片收进同一个工作台</h2>
-            <p class="welcome-subtitle">载入一个已分析图库，或立即开始新的分析任务。Kestrel 会持续跟踪文件夹状态、识别物种并帮助你完成筛片。</p>
-          </div>
-          <div class="welcome-hero-actions">
-            <button class="welcome-action-btn welcome-primary-action" id="welcomeAnalyzeBtn">开始分析照片</button>
-            <button class="welcome-action-btn welcome-secondary-action" id="welcomeOpenBtn">打开已分析图库</button>
-            <button class="welcome-action-btn welcome-tertiary-action" onclick="startMainTutorial(1, 0)">浏览引导教程</button>
-          </div>
-        </div>
-        <div id="welcomeSelectionNote" class="welcome-selection-note hidden">
-          已清空当前文件夹选择。请在左侧 <b>文件夹树</b> 中重新勾选一个或多个已分析文件夹以加载场景。
-        </div>
-
-        <div class="welcome-insight-grid">
-          <div class="welcome-insight-card">
-            <div class="welcome-insight-label">工作流</div>
-            <div class="welcome-insight-title">分析、筛选、回写元数据</div>
-            <p>从文件夹扫描到 XMP 输出，所有步骤都在一个连续界面里完成。</p>
-          </div>
-          <div class="welcome-insight-card">
-            <div class="welcome-insight-label">图库视图</div>
-            <div class="welcome-insight-title">按文件夹与时间组织场景</div>
-            <p>更适合摄影工作流，而不是普通表格浏览。</p>
-          </div>
-          <div class="welcome-insight-card">
-            <div class="welcome-insight-label">识别能力</div>
-            <div class="welcome-insight-title">鸟类检测、物种判断与质量评分</div>
-            <p>快速定位最值得进一步精修的照片。</p>
-          </div>
-        </div>
-
-        <div class="welcome-tips">
-          <div class="welcome-tip">
-            <span class="welcome-tip-icon" aria-hidden="true"></span>
-            <span>支持一次加载多个文件夹。打开上级目录后，可通过左侧的 <b>文件夹树</b> 浏览整个图库。</span>
-          </div>
-          <div class="welcome-tip">
-            <span class="welcome-tip-icon" aria-hidden="true"></span>
-            <span>按住 <kbd>Ctrl</kbd> 并点击场景可进行多选，然后一键将它们合并为单个场景。</span>
-          </div>
-          <div class="welcome-tip">
-            <span class="welcome-tip-icon" aria-hidden="true"></span>
-            <span>不满意 Kestrel 的星级评分系统？可以在 <span class="welcome-link welcome-settings-link">设置&hellip;</span> 中调整。</span>
-          </div>
-          <div class="welcome-tip">
-            <span class="welcome-tip-icon" aria-hidden="true"></span>
-            <span>想在偏好的编辑器中打开照片？双击场景中的任意照片，或在 <span class="welcome-link welcome-settings-link">设置&hellip;</span> 中配置编辑器。</span>
-          </div>
-        </div>
-
-        <div class="welcome-footer">
-          需要帮助？可访问 <a id="welcomeTutorialLink" href="https://projectkestrel.org/tutorial" target="_blank"
-            rel="noopener noreferrer">projectkestrel.org/tutorial</a> 观看视频演示，或使用应用内的 <b>教程</b> 按钮。
-          <div style="margin-top:12px; font-size:11px; opacity:0.8;">
-            使用 Project Kestrel 即表示你同意 <a href="https://projectkestrel.org/terms-of-use"
-              target="_blank">使用条款</a> 和 <a href="https://projectkestrel.org/privacy-policy"
-              target="_blank">隐私政策</a>。
-          </div>
+      <!-- 空状态：未加载文件夹时显示 -->
+      <div id="emptyState" class="empty-state">
+        <img src="logo.png" alt="" class="empty-state-logo" />
+        <h2>选择文件夹开始</h2>
+        <p>打开已分析的图库，或将新文件夹加入分析队列。</p>
+        <div class="empty-state-actions">
+          <button id="emptyPickFolder" class="primary">打开文件夹</button>
+          <button id="emptyAnalyzeBtn">分析新文件夹</button>
         </div>
       </div>
     </div>
+
     <!-- 浮动多选操作栏 -->
     <div id="selectActionBar" class="select-action-bar hidden">
       <span id="selectActionLabel" class="muted">已选 0 个场景</span>
@@ -256,97 +96,6 @@
       </div>
     </div>
   </main>
-
-  <!-- ═══ 右侧详情面板（取代 sceneDlg 全屏遮罩） ═══ -->
-  <aside id="detailPanel" class="detail-panel" aria-hidden="true" role="dialog" aria-label="场景详情">
-    <div class="scene-filmstrip-layout">
-      <!-- ═══ 顶栏：场景信息 + 标签 + 操作 ═══ -->
-      <div class="scene-topbar">
-        <div class="scene-topbar-left">
-          <span class="scene-topbar-title" id="sceneTopbarTitle">—</span>
-          <button class="scene-pencil-btn" id="scenePencilBtn" title="重命名此场景">✏️</button>
-          <div class="scene-rename-inline hidden" id="sceneRenameInline">
-            <input id="sceneName" type="text" placeholder="场景名称…" />
-            <button id="sceneRenameOk" title="应用">✓</button>
-            <button id="sceneRenameCancel" title="取消">✗</button>
-          </div>
-        </div>
-        <div class="scene-topbar-tags" id="sceneTopbarTags">
-          <!-- 物种/科标签与内联 (+) 添加按钮，由 JS 渲染 -->
-        </div>
-        <div class="scene-topbar-right">
-          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="显示键盘快捷键">⌨ 快捷键</button>
-          <button id="splitSceneBtn" title="将此场景拆分为多个场景">✂ 拆分</button>
-          <button id="closeDlg" title="关闭（Escape）">✕</button>
-        </div>
-      </div>
-
-      <!-- 键盘快捷键说明（可切换显示） -->
-      <div class="scene-shortcut-legend hidden" id="sceneShortcutLegend">
-        <span><kbd>←</kbd><kbd>→</kbd> 切换图片</span>
-        <span><kbd>Ctrl</kbd>+<kbd>←</kbd><kbd>→</kbd> 跳到开头/结尾</span>
-        <span><kbd>Tab</kbd> 下一个场景</span>
-        <span><kbd>Ctrl</kbd>+<kbd>Tab</kbd> 上一个场景</span>
-        <span><kbd>Z</kbd> 接受</span>
-        <span><kbd>X</kbd> 重置</span>
-        <span><kbd>C</kbd> 拒绝</span>
-        <span><kbd>1</kbd>–<kbd>5</kbd> 评分</span>
-        <span><kbd>Space</kbd> 在编辑器中打开</span>
-        <span><kbd>Esc</kbd> 关闭</span>
-      </div>
-
-      <!-- ═══ 中部：双预览面板 ═══ -->
-      <div class="scene-main">
-        <div class="scene-previews">
-          <div class="scene-preview-panel" id="scenePreviewCrop">
-            <div class="scene-preview-label">鸟体裁切图</div>
-            <div class="scene-preview-img" id="previewCropBox">
-              <span class="muted">请选择一张图片…</span>
-            </div>
-          </div>
-          <div class="scene-preview-panel" id="scenePreviewExport">
-            <div class="scene-preview-label">完整图片</div>
-            <div class="scene-preview-img" id="previewBox" data-raw-label="RAW">
-              <span class="muted">请选择一张图片…</span>
-            </div>
-            <label class="scene-zoom-bar" id="sceneZoomWrap" title="RAW 缩放 —— 在完整图像上按住鼠标即可缩放">
-              <span class="muted" style="font-size:11px">RAW 缩放</span>
-              <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:90px">
-            </label>
-          </div>
-        </div>
-        <!-- 信息栏：位于预览区和底片栏之间 -->
-        <div class="scene-info-bar" id="sceneInfoBar">
-          <div class="scene-info-filename" id="sceneInfoFilename">—</div>
-          <div class="scene-info-stars" id="sceneInfoStars"></div>
-          <div class="scene-info-quality" id="sceneInfoQuality">—</div>
-          <div class="scene-cull-toggle" id="sceneCullToggle">
-            <button class="cull-btn accept" data-cull="accept" title="接受（Z）">✓ 接受</button>
-            <button class="cull-btn unrated" data-cull="none" title="重置（X）">未决定</button>
-            <button class="cull-btn reject" data-cull="reject" title="拒绝（C）">✗ 拒绝</button>
-          </div>
-          <div class="scene-info-meta" id="sceneInfoMeta"></div>
-        </div>
-      </div>
-
-      <!-- ═══ 底部：底片栏 ═══ -->
-      <div class="scene-filmstrip-wrap">
-        <div class="scene-filmstrip-hint scene-filmstrip-hint-left hidden" id="filmstripHintLeft">
-          ◂ 上一个场景
-        </div>
-        <div class="scene-filmstrip" id="imageGrid">
-          <!-- 底片栏卡片由 JS 渲染 -->
-        </div>
-        <div class="scene-filmstrip-hint scene-filmstrip-hint-right hidden" id="filmstripHintRight">
-          下一个场景 ▸
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- 详情面板背景遮罩（点击可关闭） -->
-  <div id="detailPanelOverlay" class="detail-panel-overlay"></div>
-
   </div><!-- /.app-body -->
 
   <footer class="app-status-bar">
@@ -362,10 +111,90 @@
     <div id="versionBadge" class="version-badge">版本：—</div>
   </footer>
 
-  <!-- sceneDlg 保留为空壳，供 JS 兼容性使用（Step 3 将彻底移除） -->
-  <dialog id="sceneDlg"></dialog>
+  <!-- ═══ 场景对话框（全屏） ═══ -->
+  <dialog id="sceneDlg">
+    <div class="scene-filmstrip-layout">
+      <!-- 顶栏：场景信息 + 标签 + 操作 -->
+      <div class="scene-topbar">
+        <div class="scene-topbar-left">
+          <span class="scene-topbar-title" id="sceneTopbarTitle">—</span>
+          <button class="scene-pencil-btn" id="scenePencilBtn" title="重命名此场景">✏️</button>
+          <div class="scene-rename-inline hidden" id="sceneRenameInline">
+            <input id="sceneName" type="text" placeholder="场景名称…" />
+            <button id="sceneRenameOk" title="应用">✓</button>
+            <button id="sceneRenameCancel" title="取消">✗</button>
+          </div>
+        </div>
+        <div class="scene-topbar-tags" id="sceneTopbarTags"></div>
+        <div class="scene-topbar-right">
+          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="显示键盘快捷键">⌨ 快捷键</button>
+          <button id="splitSceneBtn" title="将此场景拆分为多个场景">✂ 拆分</button>
+          <button id="closeDlg" title="关闭（Escape）">✕ 关闭</button>
+        </div>
+      </div>
 
-  <!-- 分析器导入模型时显示的加载遮罩 -->
+      <!-- 键盘快捷键说明 -->
+      <div class="scene-shortcut-legend hidden" id="sceneShortcutLegend">
+        <span><kbd>←</kbd><kbd>→</kbd> 切换图片</span>
+        <span><kbd>Ctrl</kbd>+<kbd>←</kbd><kbd>→</kbd> 跳到开头/结尾</span>
+        <span><kbd>Tab</kbd> 下一个场景</span>
+        <span><kbd>Ctrl</kbd>+<kbd>Tab</kbd> 上一个场景</span>
+        <span><kbd>Z</kbd> 接受</span>
+        <span><kbd>X</kbd> 重置</span>
+        <span><kbd>C</kbd> 拒绝</span>
+        <span><kbd>1</kbd>–<kbd>5</kbd> 评分</span>
+        <span><kbd>Space</kbd> 在编辑器中打开</span>
+        <span><kbd>Esc</kbd> 关闭</span>
+      </div>
+
+      <!-- 中部：双预览面板 -->
+      <div class="scene-main">
+        <div class="scene-previews">
+          <div class="scene-preview-panel" id="scenePreviewCrop">
+            <div class="scene-preview-label">鸟体裁切图</div>
+            <div class="scene-preview-img" id="previewCropBox">
+              <span class="muted">请选择一张图片…</span>
+            </div>
+          </div>
+          <div class="scene-preview-panel" id="scenePreviewExport">
+            <div class="scene-preview-label">完整图片</div>
+            <div class="scene-preview-img" id="previewBox" data-raw-label="RAW">
+              <span class="muted">请选择一张图片…</span>
+            </div>
+            <label class="scene-zoom-bar" id="sceneZoomWrap" title="RAW 缩放">
+              <span class="muted" style="font-size:11px">RAW 缩放</span>
+              <input type="range" id="sceneZoomSlider" min="2" max="12" value="5" step="0.5" style="width:90px">
+            </label>
+          </div>
+        </div>
+        <!-- 信息栏 -->
+        <div class="scene-info-bar" id="sceneInfoBar">
+          <div class="scene-info-filename" id="sceneInfoFilename">—</div>
+          <div class="scene-info-stars" id="sceneInfoStars"></div>
+          <div class="scene-info-quality" id="sceneInfoQuality">—</div>
+          <div class="scene-cull-toggle" id="sceneCullToggle">
+            <button class="cull-btn accept" data-cull="accept" title="接受（Z）">✓ 接受</button>
+            <button class="cull-btn unrated" data-cull="none" title="重置（X）">未决定</button>
+            <button class="cull-btn reject" data-cull="reject" title="拒绝（C）">✗ 拒绝</button>
+          </div>
+          <div class="scene-info-meta" id="sceneInfoMeta"></div>
+        </div>
+      </div>
+
+      <!-- 底部：底片栏 -->
+      <div class="scene-filmstrip-wrap">
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-left hidden" id="filmstripHintLeft">
+          ◂ 上一个场景
+        </div>
+        <div class="scene-filmstrip" id="imageGrid"></div>
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-right hidden" id="filmstripHintRight">
+          下一个场景 ▸
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 分析器加载遮罩 -->
   <div id="loadingOverlay" class="hidden"
     style="position:fixed;right:18px;bottom:72px;display:flex;align-items:center;justify-content:center;z-index:20010;pointer-events:none;">
     <div
@@ -378,29 +207,12 @@
   <!-- Toast 通知容器 -->
   <div id="toastContainer" style="position:fixed;right:18px;bottom:18px;z-index:20000;pointer-events:none"></div>
 
-  <!-- 教程遮罩层 -->
-  <div id="tutorialOverlay">
-    <div id="tutorialHighlight"></div>
-    <div id="tutorialCard">
-      <div class="tutorial-counter" id="tutorialCounter"></div>
-      <div class="tutorial-progress" id="tutorialProgress"></div>
-      <h3 id="tutorialTitle"></h3>
-      <div class="tutorial-body" id="tutorialBody"></div>
-      <div class="tutorial-nudge" id="tutorialNudge" style="display:none"></div>
-      <div class="tutorial-actions">
-        <button class="tutorial-skip" id="tutorialSkip">跳过教程</button>
-        <button class="tut-btn" id="tutorialBack">&larr; 上一步</button>
-        <button class="tut-btn primary" id="tutorialNext">下一步 &rarr;</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 设置对话框 -->
   <dialog id="settingsDlg" class="dlg-settings">
     <div class="settings-body">
       <h3 style="margin:0">设置</h3>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">界面与编辑器</h4>
+      <h4 class="settings-section-title">界面与编辑器</h4>
 
       <div class="row">
         <label for="editorChoice">首选编辑器</label>
@@ -424,59 +236,51 @@
           <option value="custom">自定义应用…</option>
         </select>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">选择 Kestrel 在打开原始文件时所使用的编辑器。
-        "系统默认" 将调用操作系统默认应用。</div>
+      <div class="muted settings-hint">选择 Kestrel 在打开原始文件时所使用的编辑器。</div>
       <div class="row hidden" id="customEditorRow">
         <label for="customEditorPath">应用路径</label>
         <input id="customEditorPath" type="text" placeholder="应用程序可执行文件路径…" style="flex:1" />
         <button id="customEditorBrowse" style="flex-shrink:0" title="浏览应用程序">浏览…</button>
       </div>
-      <div class="muted hidden" id="customEditorHint" style="font-size:12px;margin-top:-6px;margin-bottom:8px">
-        应用程序可执行文件的完整路径（例如 `C:\Program Files\MyEditor\editor.exe` 或 `/Applications/MyEditor.app`）。
+      <div class="muted hidden settings-hint" id="customEditorHint">
+        应用程序可执行文件的完整路径。
       </div>
 
-      <div class="row">
-        <label for="treeScanDepth">目录树扫描深度</label>
-        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" />
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">构建文件夹树时扫描多少层子目录（1–6）。</div>
-
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">星级评分系统</h4>
+      <h4 class="settings-section-title">星级评分系统</h4>
 
       <div class="row">
         <label for="ratingProfile">评分方案</label>
         <select id="ratingProfile">
-          <option value="very_strict">非常严格 &mdash; 只有最锐利的图片才能达到 4–5 星</option>
+          <option value="very_strict">非常严格</option>
           <option value="strict">严格</option>
-          <option value="balanced" selected>均衡 &mdash; 推荐大多数摄影师使用</option>
+          <option value="balanced" selected>均衡（推荐）</option>
           <option value="lenient">宽松</option>
-          <option value="very_lenient">非常宽松 &mdash; 最容易获得高星</option>
+          <option value="very_lenient">非常宽松</option>
         </select>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">控制画质分数如何转换为星级评分。</div>
+      <div class="muted settings-hint">控制画质分数如何转换为星级评分。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">分析设置</h4>
+      <h4 class="settings-section-title">分析设置</h4>
 
       <div class="row">
         <label for="detectionThreshold">检测置信度阈值</label>
         <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">鸟类检测器判定为有效检测所需达到的最低置信度（0.10–0.99）。</div>
+      <div class="muted settings-hint">鸟类检测器的最低置信度（0.10–0.99）。</div>
 
-      <div style="border-top:1px solid rgba(255,255,255,0.06);margin:4px 0 2px"></div>
       <div class="row">
-        <label for="sceneTimeThreshold">场景分组时间阈值（秒）</label>
+        <label for="sceneTimeThreshold">场景分组阈值（秒）</label>
         <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">拍摄时间相差不超过该秒数的图片会被视为同一连拍/场景。</div>
+      <div class="muted settings-hint">拍摄时间相差不超过该秒数的图片视为同一场景。</div>
 
       <div class="row">
         <label for="maskThreshold">掩码分割阈值</label>
         <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">用于掩码分割的置信度阈值（0.50–0.95）。</div>
+      <div class="muted settings-hint">掩码分割置信度阈值（0.50–0.95）。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">数据与预览</h4>
+      <h4 class="settings-section-title">数据与预览</h4>
 
       <div class="row">
         <label for="rawPreviewCacheEnabled" style="flex:1">缓存 RAW 预览图</label>
@@ -485,7 +289,7 @@
           <span class="muted">启用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">将全分辨率 RAW 预览缓存在 `.kestrel/culling_TMP` 中，以加快后续加载速度。</div>
+      <div class="muted settings-hint">缓存 RAW 预览以加快加载速度。</div>
 
       <div class="row">
         <label for="rawExposureCorrectionDisabled" style="flex:1">禁用 RAW 曝光修正</label>
@@ -494,7 +298,7 @@
           <span class="muted">禁用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">默认情况下，Kestrel 会对 RAW 预览应用计算得到的曝光补偿，以匹配处理后的 JPEG。</div>
+      <div class="muted settings-hint">查看未经曝光修正的 RAW 数据。</div>
 
       <div class="row">
         <label for="settingsAutoSave" style="flex:1">自动保存更改</label>
@@ -503,7 +307,13 @@
           <span class="muted">启用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">自动保存评分、标签和场景修改。关闭后，将使用"保存 / 还原"的工作流。</div>
+      <div class="muted settings-hint">自动保存评分、标签和场景修改。</div>
+
+      <div class="row">
+        <label for="treeScanDepth">目录树扫描深度</label>
+        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" />
+      </div>
+      <div class="muted settings-hint">分析对话框中扫描子目录的层数（1–6）。</div>
 
     </div>
     <div class="settings-footer">
@@ -525,7 +335,7 @@
       <div class="row">
         <label>目标</label>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-          <label class="inline"><input type="radio" name="mergeTargetMode" value="min" checked> <span class="muted">使用所选中的最小 ID</span></label>
+          <label class="inline"><input type="radio" name="mergeTargetMode" value="min" checked> <span class="muted">使用最小 ID</span></label>
           <label class="inline"><input type="radio" name="mergeTargetMode" value="manual"> <span class="muted">ID：</span>
             <input id="mergeTargetId" type="number" style="width:120px" />
           </label>
@@ -535,19 +345,6 @@
       <div class="row" style="justify-content:flex-end; margin-top: 4px; gap:8px">
         <button id="mergeCancel">取消</button>
         <button id="mergeApply" class="primary" disabled>合并</button>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- 信息对话框 -->
-  <dialog id="infoDlg">
-    <div class="settings" style="width:min(560px,96vw)">
-      <h3 style="margin:0">Kestrel 数据库信息</h3>
-      <div id="infoNotice" class="notice hidden" style="margin:0 0 8px"></div>
-      <div id="infoContent" class="detail"
-        style="max-height:50vh;overflow:auto;font-family:monospace;font-size:12px;white-space:pre;">—</div>
-      <div class="footer">
-        <button id="infoClose">关闭</button>
       </div>
     </div>
   </dialog>
@@ -565,7 +362,6 @@
         &nbsp;<span style="color:var(--brand);">●</span>&thinsp;未开始
         &nbsp;<span style="color:rgba(255,255,255,0.25);font-size:11px;">● 淡色 = 无照片</span></p>
       <div class="analyze-dlg-split">
-        <!-- 左侧面板：文件夹树 -->
         <div style="display:flex;flex-direction:column;gap:4px;min-height:0;">
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-size:12px;color:var(--muted);font-weight:600;flex:1;">浏览文件夹</span>
@@ -581,7 +377,6 @@
             </div>
           </div>
         </div>
-        <!-- 右侧面板：队列预览 -->
         <div class="analyze-dlg-queue-wrap">
           <h4>队列预览</h4>
           <div class="adlg-queue-section" id="adlgQueueRunning"></div>
@@ -634,26 +429,59 @@
     </div>
   </dialog>
 
-  <!-- 捐助 / 支持对话框 -->
-  <dialog id="donateDlg">
-    <div class="donate-dlg">
-      <div class="donate-dlg-icon"><img src="logo.png" alt="Kestrel Logo" /></div>
-      <h3>Kestrel 已经分析了超过 <span id="donateCountDisplay">很多</span> 张照片！</h3>
-      <p>感谢你使用 Project Kestrel！我是一个独立开发这个项目的学生兼观鸟爱好者。之所以制作 Kestrel，是因为我喜欢拍摄野生动物，却不喜欢花大量时间整理照片。如果 Kestrel 对你有帮助，欢迎支持它继续发展，或向我分享你的想法和反馈。</p>
-      <p style="font-size:12px;color:rgba(255,255,255,0.35);">Project Kestrel 是免费且开源的。每一次 <a href="https://github.com/SanjaySoniLV/ProjectKestrel" target="_blank">贡献</a> 都能帮助它持续成长。</p>
-      <div class="donate-dlg-btns">
-        <button class="donate-main-btn" id="donateDlgGoBtn">通过 PayPal 捐助</button>
+  <!-- 导出对话框 -->
+  <dialog id="exportDlg" class="dlg-compact">
+    <div class="export-dlg">
+      <h3 style="margin:0 0 12px">导出照片</h3>
+      <div class="export-options">
+        <label class="export-option">
+          <input type="radio" name="exportMode" value="accepted" checked />
+          <div class="export-option-text">
+            <span class="export-option-title">仅导出已接受的照片</span>
+            <span class="export-option-desc">导出所有标记为"接受"的照片</span>
+          </div>
+        </label>
+        <label class="export-option">
+          <input type="radio" name="exportMode" value="stars" />
+          <div class="export-option-text">
+            <span class="export-option-title">按星级分文件夹导出</span>
+            <span class="export-option-desc">创建 star-1 至 star-5 子文件夹</span>
+          </div>
+        </label>
+        <label class="export-option">
+          <input type="radio" name="exportMode" value="xmp" />
+          <div class="export-option-text">
+            <span class="export-option-title">写入 XMP 元数据</span>
+            <span class="export-option-desc">将评分和筛片结果写入 .xmp 旁车文件</span>
+          </div>
+        </label>
       </div>
-      <button id="donateDlgClose" class="donate-dlg-close-btn">关闭</button>
+      <div class="export-dest" id="exportDestSection">
+        <label>目标文件夹</label>
+        <div class="export-dest-row">
+          <input id="exportDestPath" type="text" readonly placeholder="选择目标文件夹…" />
+          <button id="exportDestPick">浏览…</button>
+        </div>
+      </div>
+      <div class="export-summary" id="exportSummary"></div>
+      <div class="export-progress hidden" id="exportProgress">
+        <div class="load-progress">
+          <div class="load-progress-label" id="exportProgressLabel">导出中…</div>
+          <div class="load-progress-track">
+            <div id="exportProgressFill" class="load-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="export-dlg-footer">
+        <button id="exportCancel">取消</button>
+        <button id="exportStart" class="primary" disabled>开始导出</button>
+      </div>
     </div>
   </dialog>
 
   <script src="i18n.js"></script>
   <script src="taxonomy.js"></script>
   <script src="visualizer.js"></script>
-
-  <!-- 滚动位置指示器：滚动时显示当前文件夹/时间分组 -->
-  <div id="scrollPositionIndicator" aria-hidden="true"></div>
 
 </body>
 
