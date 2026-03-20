@@ -713,6 +713,7 @@ dialog {
   max-height: none;
   width: auto;
   height: auto;
+  color: var(--text-primary);
 }
 dialog::backdrop {
   background: rgba(0,0,0,0.72);
@@ -734,11 +735,15 @@ dialog::backdrop {
   box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.10);
   display: flex;
   flex-direction: column;
-  animation: dlg-pop 0.28s var(--spring) forwards;
+  animation: dlg-pop-center 0.28s var(--spring) forwards;
 }
 #sceneDlg[open] { display: flex; }
 
 @keyframes dlg-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes dlg-pop-center {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
 }
@@ -1194,10 +1199,10 @@ dialog::backdrop {
   flex-direction: column;
   overflow: hidden;
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: dlg-pop 0.24s var(--spring) forwards;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  animation: dlg-pop-center 0.24s var(--spring) forwards;
 }
 .dlg-settings[open] { display: flex; }
 
@@ -1282,10 +1287,11 @@ dialog::backdrop {
   border: 1px solid rgba(255,255,255,0.10);
   box-shadow: 0 32px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.10);
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: dlg-pop 0.24s var(--spring) forwards;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  width: fit-content;
+  animation: dlg-pop-center 0.24s var(--spring) forwards;
 }
 #mergeDlg[open] { display: block; }
 
@@ -1355,10 +1361,10 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
   box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.10);
   overflow: hidden;
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: dlg-pop 0.26s var(--spring) forwards;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  animation: dlg-pop-center 0.26s var(--spring) forwards;
   display: none;
 }
 .dlg-compact[open] { display: block; }
@@ -1371,7 +1377,7 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
   padding: 20px;
   gap: 12px;
 }
-.analyze-dlg h3 { font-size: 15px; font-weight: 700; }
+.analyze-dlg h3 { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 
 .analyze-dlg-split {
   display: grid;
