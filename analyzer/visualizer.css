@@ -1043,6 +1043,7 @@ footer.app-status-bar {
 .queue-item.error .queue-item-name { color: var(--danger); }
 
 /* ── 9. Scene Dialog ─────────────────────────────────────── */
+dialog:not([open]) { display: none !important; }
 dialog {
   background: none;
   border: none;
@@ -1947,10 +1948,6 @@ dialog::backdrop {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes dlg-pop {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
 
 .welcome-hero {
   display: grid;
@@ -2717,16 +2714,18 @@ dialog::backdrop {
   pointer-events: all;
 }
 
-/* Full-height layout inside panel */
+/* Full-height layout inside panel — 宽度随父容器，不固定 */
 .detail-panel .scene-filmstrip-layout {
-  width: 580px; /* fixed width prevents layout jumping during animation */
-  min-width: 580px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
 }
 
-/* Override preview layout for narrower panel */
+/* Override preview layout for narrower single-column panel */
 .detail-panel .scene-previews {
   grid-template-columns: 1fr;
+  flex: 1;
+  min-height: 0;
   gap: 8px;
   padding: 10px;
   overflow-y: auto;

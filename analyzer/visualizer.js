@@ -2133,9 +2133,12 @@
     function showDetailPanel() {
       const panel = document.getElementById('detailPanel');
       const overlay = document.getElementById('detailPanelOverlay');
-      if (panel) { panel.classList.add('open'); panel.setAttribute('aria-hidden', 'false'); }
+      if (!panel) return;
+      // 若面板已打开则无需重复触发动画
+      if (panel.classList.contains('open')) return;
+      panel.classList.add('open');
+      panel.setAttribute('aria-hidden', 'false');
       if (overlay) { overlay.classList.add('active'); overlay.onclick = () => el('#closeDlg')?.click(); }
-      document.body.style.overflow = '';
     }
     function hideDetailPanel() {
       const panel = document.getElementById('detailPanel');
@@ -2233,7 +2236,8 @@
       }
 
       // ── 关闭 ──
-      el('#closeDlg').onclick = () => {
+      const _closeDlgBtn = el('#closeDlg');
+      if (_closeDlgBtn) _closeDlgBtn.onclick = () => {
         if (_splitMode) { exitSplitMode(); }
         const closingId = _currentScene ? String(_currentScene.id) : null;
         _sceneEditDraft = null;
@@ -2281,7 +2285,7 @@
       _sceneEditDraft = null;
       _sceneEditMode = false;
       document.removeEventListener('keydown', _sceneKeyHandler);
-      hideDetailPanel();
+      // 面板已打开时直接更新内容，无需关闭再重新打开（避免动画抖动）
       openSceneDialog(nextScene.id, startIndex);
     }
 
