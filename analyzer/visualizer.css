@@ -813,21 +813,30 @@ dialog::backdrop {
 #sceneRenameOk { color: var(--ok); }
 #sceneRenameCancel { color: var(--danger); }
 
-.scene-topbar-tags {
+.scene-info-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
   align-items: center;
-  flex: 2;
   min-width: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255,255,255,0.08);
 }
-.scene-topbar-tags .chip { font-size: 12px; padding: 4px 10px; border-radius: 6px; }
-.scene-topbar-tags .chip-input-wrap {
+.scene-info-tags .chip {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text-primary);
+}
+.scene-info-tags .chip-input-wrap {
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.scene-topbar-tags .chip-input {
+.scene-info-tags .chip-input {
   font-size: 11px;
   width: 90px;
   padding: 2px 7px;
@@ -865,8 +874,8 @@ dialog::backdrop {
   cursor: pointer;
 }
 .chip-add-btn:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
-.chip.species-chip { background: rgba(106,173,255,0.10); color: var(--accent); border-color: rgba(106,173,255,0.18); }
-.chip.family-chip  { background: rgba(111,207,151,0.10); color: var(--ok); border-color: rgba(111,207,151,0.18); }
+.chip.species-chip { background: rgba(106,173,255,0.12); color: var(--accent); border-color: rgba(106,173,255,0.22); }
+.chip.family-chip  { background: rgba(111,207,151,0.12); color: var(--ok); border-color: rgba(111,207,151,0.22); }
 
 .scene-topbar-right {
   display: flex;
