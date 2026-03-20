@@ -1,62 +1,45 @@
-Project Kestrel — Lightweight UI/UX Testing Checklist
+# 翎鉴 — 快速测试清单
 
-Purpose: a compact, pragmatic checklist you can run in ~30–90 minutes. This version assumes you'll notice obvious breakages; items focus on core workflows and observable regressions. Mark [x] = pass, [!] = noticed problem, [-] = not applicable.
-
----
-
-**CORE — Quick Run (do these in order)**
-
-Step 0 (STARTUP & tutorial)
-- [ ] Launch Kestrel; if shown, skim the Legal/Terms UI and accept.
-- [ ] Open the tutorial/help and use Skip / Enter / Arrow keys / Escape to navigate — it renders and you can complete the workflow.
-- [ ] Re-open Kestrel; the legal screen should not reappear.
-
-Step 1 (ANALYZE FOLDERS → queue → run)
-- [ ] Open Analyze Folders, pick a root, confirm folder tree loads and analyzed folders show a distinct label/state.
-- [ ] Add 2–3 folders to the queue and start analysis; confirm the queue shows the folders and a running progress for the active folder.
-- [ ] Pause/resume or cancel the active folder and confirm behavior is sensible (progress stops/resumes or folder shows cancelled).
-
-Step 2 (BROWSE SCENES & OPEN IN EDITOR)
-- [ ] Open a folder with scenes; confirm scene cards load (thumbnails/species/quality visible) and browsing/scrolling is responsive.
-- [ ] Open a scene, preview images, and double-click an image to open in the configured editor (system default or installed editor). If editor not found, app should fall back gracefully.
-
-Step 3 (RATINGS / METADATA / SAVE)
-- [ ] Change a star rating on a scene (or in a scene dialog). Confirm visual change and that saving/exporting CSV updates persisted data (you can re-open folder to verify persistence).
-- [ ] Merge two scenes quickly and confirm merged scene appears and persists.
-
-Step 4 (CULLING — quick smoke)
-- [ ] Open the Culling Assistant for a folder: confirm Accept/Reject columns appear and Auto-Categorize roughly groups images.
-- [ ] Manually move a couple of images between Accept and Reject, open the Preview pane and verify metadata shown (filename/species/quality).
-- [ ] Click "Done Culling" and exercise either Move Rejects or Write XMP (one action). Confirm the action runs and reports completion; check that physical moves or `.xmp` sidecars appear as expected.
-- [ ] If XMP conflicts appear, the conflict prompt should list files and allow Overwrite/Skip.
-
-Step 5 (SETTINGS & RESTART)
-- [ ] Open Settings, change an obvious preference (e.g., editor or zoom), save, restart the app, and confirm the change persisted.
-
-Step 6 (FEEDBACK & TELEMETRY — final check)
-- [ ] Submit a small feedback entry (can be "UI looks good") and confirm the UI shows a confirmation.
-- [ ] At the end of your run, verify telemetry endpoints fired once where expected (installation/completion/feedback). Do this as one final verification rather than per-step.
+> 约 30 分钟完成的精简测试。标记 `[x]` 通过，`[!]` 有问题。
 
 ---
 
-**GRANULAR — If you have more time (optional checks you can spot quickly)**
-- [ ] Reorder queue items and confirm analysis respects the new order.
-- [ ] Use filters (species/rating) in the scene grid and confirm filters narrow results correctly.
-- [ ] Try multi-select (Ctrl/Shift) and run Merge or other bulk actions.
-- [ ] Test Sample Sets from the Welcome panel — they should load and be browseable.
+**核心流程**
+
+Step 0 (启动)
+- [ ] 启动应用，空状态页面正常显示
+- [ ] 顶栏按钮齐全：导入、分析、设置、导出
+
+Step 1 (分析)
+- [ ] 点击"分析"，选择文件夹，开始分析
+- [ ] 进度实时更新，分析完成后场景自动加载
+
+Step 2 (浏览)
+- [ ] 打开已分析的文件夹，场景卡片正常显示
+- [ ] 点击卡片查看详情，Escape 关闭
+- [ ] 双击图片可在编辑器中打开
+
+Step 3 (筛片)
+- [ ] 修改星级评分，保存后重新打开仍保留
+- [ ] 合并场景功能正常
+
+Step 4 (文件夹操作)
+- [ ] 切换文件夹 → 数据正确更新
+- [ ] 取消选择 → 当前数据保留
+- [ ] 点击"关闭" → 回到空状态
+
+Step 5 (设置)
+- [ ] 设置修改后重启保留
 
 ---
 
-**MINOR — Spot checks (only if you notice something odd)**
-- [ ] Toasts and toasts’ dismiss behavior look reasonable and don't overlap unreadably.
-- [ ] Tutorials render without clipped text on typical displays.
-- [ ] UI remains usable at smaller window sizes (no broken buttons).
-- [ ] XMP sidecars are readable text/XML and include `xmp:Rating` for rated images.
+**可选检查**
+
+- [ ] 排序/分组切换正常
+- [ ] 多选场景和批量操作正常
+- [ ] 分析队列多文件夹场景正常
+- [ ] 写入 XMP 元数据正常
 
 ---
 
-Notes:
-- This light checklist is deliberately short — it relies on you noticing problems during normal use and marking [!] when something is wrong.
-- For telemetry/analytics, check them once at the end of the session rather than per-step.
-
-Last updated: 2026-03-04
+*最后更新: 2026-03-21*

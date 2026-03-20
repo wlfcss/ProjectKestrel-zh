@@ -1,184 +1,172 @@
-# Project Kestrel - Development & Packaging Guide
+# 翎鉴 — 开发与打包指南
 
-## Project Structure
+## 项目结构
 
 ```
-ProjectKestrel/
-├── analyzer/                    # Analyzer application (GUI + CLI)
-│   ├── gui_app.py              # PyQt6 GUI entry point
-│   ├── cli.py                  # CLI entry point (headless mode)
-│   ├── main.py                 # Default GUI launcher
-│   ├── gui_helpers.py          # GUI utilities (QImage conversion)
-│   ├── models/                 # AI model files
-│   │   ├── model.onnx          # Bird species classifier (ONNX)
-│   │   ├── labels.txt          # Species labels
-│   │   ├── quality.keras       # Quality assessment model
+ProjectKestrel-zh/
+├── analyzer/                    # 主应用
+│   ├── visualizer.py            # PyWebView 桌面应用入口
+│   ├── visualizer.html          # 主界面 HTML
+│   ├── visualizer.js            # 主界面逻辑 (状态管理、渲染、交互)
+│   ├── visualizer.css           # 主界面样式
+│   ├── api_bridge.py            # Python↔JS API 桥接层
+│   ├── queue_manager.py         # 分析队列管理器
+│   ├── metadata_writer.py       # XMP/EXIF 元数据写入
+│   ├── folder_inspector.py      # 文件夹扫描与状态检测
+│   ├── editor_launch.py         # 外部编辑器启动
+│   ├── settings_utils.py        # 设置持久化
+│   ├── taxonomy_utils.py        # 分类学工具 (IOC → 中文映射)
+│   ├── taxonomy_zh_cn.json      # 中文鸟种名数据
+│   ├── i18n.js                  # 前端国际化模块
+│   ├── taxonomy.js              # 前端分类数据
+│   ├── culling.html             # 筛片助手页面 (独立)
+│   ├── cli.py                   # CLI 入口 (无界面分析)
+│   ├── main.py                  # 启动入口
+│   ├── _test_harness.html       # 前端状态管理测试工具
+│   ├── models/                  # AI 模型文件
+│   │   ├── model.onnx           # 物种分类器 (ONNX)
+│   │   ├── labels.txt           # 物种标签
+│   │   ├── quality.keras        # 画质评估模型
 │   │   ├── labels_scispecies.csv
 │   │   └── scispecies_dispname.csv
-│   └── kestrel_analyzer/       # Core analysis pipeline (no GUI)
-│       ├── __init__.py
-│       ├── config.py           # Configuration and constants
-│       ├── database.py         # Database operations
-│       ├── pipeline.py         # Main analysis pipeline
-│       ├── image_utils.py      # Image I/O utilities
-│       ├── similarity.py       # Image similarity detection
-│       ├── ratings.py          # Quality score to rating conversion
-│       └── ml/                 # Machine learning model wrappers
-│           ├── mask_rcnn.py    # Object detection (bird localization)
-│           ├── bird_species.py # Bird species classification
-│           └── quality.py      # Image quality assessment
+│   └── kestrel_analyzer/        # 核心分析管线 (无 GUI 依赖)
+│       ├── config.py            # 配置常量 (数据目录名等)
+│       ├── pipeline.py          # 主分析管线
+│       ├── database.py          # CSV 数据库操作
+│       ├── image_utils.py       # 图像 I/O 工具
+│       ├── similarity.py        # 图像相似度检测
+│       ├── ratings.py           # 评分归一化
+│       ├── raw_exif.py          # RAW EXIF 读取
+│       ├── logging_utils.py     # 日志工具
+│       └── ml/                  # ML 模型封装
+│           ├── mask_rcnn.py     # 目标检测 (Mask R-CNN)
+│           ├── bird_species.py  # 物种分类 (ONNX)
+│           └── quality.py       # 画质评估 (Keras)
 │
-├── visualizer/                  # Visualizer application (web-based)
-│   ├── visualizer.py           # Local web server entry
-│   └── visualizer.html         # Web UI
+├── packaging/                   # PyInstaller 打包配置
+│   ├── ProjectKestrel.spec      # Windows 打包规格
+│   └── ProjectKestrel-macos.spec # macOS 打包规格
 │
-├── packaging/                   # PyInstaller specs for EXE builds
-│   ├── analyzer/
-│   │   └── kestrel_analyzer.spec
-│   └── visualizer/
-│       └── kestrel_visualizer.spec
-│
-├── requirements.txt            # Python dependencies
+├── scripts/                     # 构建/工具脚本
+├── requirements.txt             # Python 依赖
+├── requirements-win.txt         # Windows 特定依赖
 └── README.md
 ```
 
-## Development Setup
+## 开发环境搭建
 
-### 1. Clone and Install Dependencies
+### 1. 克隆并安装依赖
 
 ```bash
-git clone https://github.com/SanjaySoniLV/ProjectKestrel.git
-cd ProjectKestrel
+git clone https://github.com/wlfcss/ProjectKestrel-zh.git
+cd ProjectKestrel-zh
 pip install -r requirements.txt
 ```
 
-### 2. Running the Analyzer
+### 2. 启动应用
 
-**GUI Mode (default):**
+**桌面模式 (默认):**
 ```bash
-python analyzer/gui_app.py
-# or
-python analyzer/main.py
+python analyzer/visualizer.py
 ```
 
-**Model Files Required:**
-All models must be in `analyzer/models/`:
-- `model.onnx` (bird species classifier)
-- `labels.txt`, `labels_scispecies.csv`, `scispecies_dispname.csv`
-- `quality.keras` (quality assessment)
-- `mask_rcnn_resnet50_fpn_v2.pth` (object detection)
-
-**CLI Mode (headless):**
+**CLI 模式 (无界面):**
 ```bash
-python analyzer/cli.py "C:\path\to\photos" --no-gpu
-python analyzer/cli.py "C:\path\to\photos" --gpu
+python analyzer/cli.py "/path/to/photos" --no-gpu
+python analyzer/cli.py "/path/to/photos" --gpu
 ```
 
-### 3. Running the Visualizer
+### 3. 模型文件
 
-```bash
-python visualizer/visualizer.py --port 8765 --root "C:\path\to\analyzed\photos"
-```
+所有模型必须位于 `analyzer/models/` 目录：
+- `model.onnx` — 物种分类器
+- `labels.txt`, `labels_scispecies.csv`, `scispecies_dispname.csv` — 标签映射
+- `quality.keras` — 画质评估模型
+- `mask_rcnn_resnet50_fpn_v2.pth` — 目标检测模型 (约 177MB)
 
-## Building Executables
+## 架构说明
 
-### Prerequisites
+### 核心管线 (`kestrel_analyzer/`)
+
+核心分析管线完全独立于 GUI，零 UI 依赖：
+
+- **pipeline.py** — 主编排：检测→分类→评分→分组
+- **database.py** — CSV 数据库读写
+- **similarity.py** — 场景分组算法
+- **ml/*.py** — 各 ML 模型的封装层
+
+可被以下方式复用：
+- PyWebView 桌面应用 (当前)
+- CLI 命令行
+- Web 服务 (FastAPI/Flask)
+- 第三方工具集成
+
+### 前端架构
+
+前端是单文件 JS 应用 (`visualizer.js`)，通过 `window.pywebview.api` 与 Python 后端通信。
+
+关键状态变量：
+- `rows` / `header` — CSV 数据行
+- `scenes` — 聚合后的场景列表
+- `rootPath` — 当前加载的根目录
+- `_scenedata` — 场景元数据 (用户标签、合并信息等)
+- `checkedFolderPaths` — 文件夹树中已勾选的路径
+- `dirty` — 是否有未保存的修改
+
+### 数据目录
+
+分析结果存储在 `.lingjian` 目录中 (配置于 `config.py` 的 `KESTREL_DIR_NAME`)：
+- `lingjian_database.csv` — 主数据库
+- `export/` — 缩放预览图
+- `crop/` — 鸟类裁剪图
+- `scenedata.json` — 场景分组与用户标签
+
+## 打包
+
+### 前置要求
 
 ```bash
 pip install pyinstaller
 ```
 
-### Build Analyzer EXE
+### 构建 macOS 应用
 
 ```bash
-cd ProjectKestrel
-pyinstaller packaging/analyzer/kestrel_analyzer.spec
+pyinstaller analyzer/ProjectKestrel-macos.spec
 ```
 
-Output: `dist/kestrel_analyzer/kestrel_analyzer.exe`
-
-### Build Visualizer EXE
+### 构建 Windows 应用
 
 ```bash
-cd ProjectKestrel
-pyinstaller packaging/visualizer/kestrel_visualizer.spec
+pyinstaller analyzer/ProjectKestrel.spec
 ```
 
-Output: `dist/kestrel_visualizer/kestrel_visualizer.exe`
+## 测试
 
-## Code Organization
+### 前端状态管理测试
 
-### Core Pipeline (Reusable)
-The `analyzer/kestrel_analyzer/` package contains all business logic with **zero GUI dependencies**:
-- **pipeline.py**: Main orchestration class
-- **database.py**: CSV database operations
-- **image_utils.py, similarity.py, ratings.py**: Utility functions
-- **ml/*.py**: Model wrappers (ONNX, Keras, Torch)
+使用 `_test_harness.html` 进行前端自动化测试。该文件注入了 mock PyWebView API，可在浏览器中模拟完整的用户操作流程：
 
-This allows the pipeline to be:
-- ✅ Used by GUI (PyQt6)
-- ✅ Used by CLI (command-line)
-- ✅ Used by web services (FastAPI, Flask)
-- ✅ Used by third-party tools
+```bash
+# 启动本地服务器
+cd analyzer && python -m http.server 8765
+# 浏览器打开 http://localhost:8765/_test_harness.html
+```
 
-### GUI Layer (PyQt6)
-- **gui_app.py**: Main GUI window and worker thread
-- **gui_helpers.py**: Qt-specific utilities
-- **main.py**: Entry point that launches GUI
+### 分析管线测试
 
-### CLI Layer
-- **cli.py**: Argument parsing and CLI-specific formatting
-
-### Visualizer (Standalone Web Service)
-- **visualizer.py**: HTTP server that serves visualizer.html
-- **visualizer.html**: Web UI for browsing results
-
-## Deployment Strategy
-
-### Single-File Distribution
-Both applications can be packaged as single-file executables:
-- `kestrel_analyzer.exe` (~500MB with all dependencies)
-- `kestrel_visualizer.exe` (~50MB)
-
-### Installation Options
-1. **Portable ZIP**: Unzip and run executable
-2. **MSI Installer**: Use WiX Toolset or similar
-3. **Windows Store**: Package as MSIX
-
-## Module Dependencies
-
-**External Dependencies** (from requirements.txt):
-- torch, torchvision (Mask R-CNN)
-- tensorflow (Quality classifier)
-- onnxruntime (Bird species classifier)
-- opencv-python, pillow, wand (Image processing)
-- pandas, numpy (Data handling)
-- PyQt6 (GUI only)
-
-**Internal Imports:**
-- CLI and GUI both import from `kestrel_analyzer` package
-- No circular dependencies
-- All ML models loaded lazily in pipeline
-
-## Testing
-
-To test the CLI locally:
 ```bash
 python analyzer/cli.py test_imgs --no-gpu
 ```
 
-To test the GUI:
-```bash
-python analyzer/gui_app.py
-```
+## 主要依赖
 
-Then select `test_imgs` folder and click Start.
-
-## Migration Notes
-
-This refactoring achieves:
-- ✅ **Separation of Concerns**: Core logic separate from UI
-- ✅ **Dual Interfaces**: GUI and CLI share same pipeline
-- ✅ **Packaging Ready**: Clear structure for executables
-- ✅ **No Duplication**: One code path for both interfaces
-- ✅ **Extensibility**: Easy to add web API or other interfaces later
+| 库 | 用途 |
+|---|------|
+| torch, torchvision | Mask R-CNN 目标检测 |
+| tensorflow | 画质评估模型 |
+| onnxruntime | 物种分类模型 |
+| opencv-python, pillow, rawpy | 图像处理 |
+| pandas, numpy | 数据处理 |
+| pywebview | 桌面 GUI |
+| PyExifTool, exifread | EXIF 元数据 |
