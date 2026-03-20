@@ -882,12 +882,21 @@
       const includeFamilies = true;
       scenes = aggregateScenes(minC, search, sortBy, includeSecondary, includeFamilies);
 
+      // 版本守卫：如果在聚合期间有新的 renderScenes 被触发，放弃本次渲染
+      if (myVer !== _renderScenesVersion) return;
+
       // 重新解析 _currentScene，确保场景数组重建后
       // 当前已打开的场景对话框仍能继续工作。
       if (_currentScene) {
         const openId = String(_currentScene.id);
         const refreshed = scenes.find(s => String(s.id) === openId);
-        if (refreshed) _currentScene = refreshed;
+        if (refreshed) {
+          _currentScene = refreshed;
+          // 防止 currentImageIndex 越界（场景图片数量可能减少）
+          if (currentImageIndex >= _currentScene.images.length) {
+            currentImageIndex = Math.max(0, _currentScene.images.length - 1);
+          }
+        }
       }
 
       // 在不修改全局 scenes 的前提下应用“仅显示手动评分场景”过滤
