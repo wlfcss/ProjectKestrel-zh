@@ -225,6 +225,13 @@
       <h4 class="settings-section-title">界面与编辑器</h4>
 
       <div class="row">
+        <label for="uiScale">界面缩放</label>
+        <input id="uiScale" type="range" min="75" max="150" step="5" value="100" style="flex:1;max-width:160px" />
+        <span id="uiScaleLabel" style="font-size:12px;min-width:36px;text-align:right">100%</span>
+      </div>
+      <div class="muted settings-hint">按比例缩放所有界面元素和文字（75%–150%）。</div>
+
+      <div class="row">
         <label for="editorChoice">首选编辑器</label>
         <select id="editorChoice">
           <option value="system">系统默认</option>

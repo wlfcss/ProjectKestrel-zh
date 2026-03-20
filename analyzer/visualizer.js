@@ -5582,6 +5582,30 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       try { sel.value = getSetting('timeGranularity', 'day'); } catch { sel.value = 'day'; }
     })();
 
+    // ---- UI 缩放 ----
+    function applyUiScale(pct) {
+      document.documentElement.style.zoom = (pct / 100).toString();
+    }
+    (function initUiScale() {
+      const slider = document.getElementById('uiScale');
+      const label = document.getElementById('uiScaleLabel');
+      if (!slider) return;
+      const saved = getSetting('uiScale', 100);
+      slider.value = saved;
+      if (label) label.textContent = saved + '%';
+      applyUiScale(saved);
+      slider.addEventListener('input', () => {
+        const v = parseInt(slider.value, 10);
+        if (label) label.textContent = v + '%';
+        applyUiScale(v);
+      });
+      slider.addEventListener('change', () => {
+        const s = loadSettings();
+        s.uiScale = parseInt(slider.value, 10);
+        saveSettings(s);
+      });
+    })();
+
     // 根据 localStorage 中缓存的设置，应用初始自动保存可见性
     (function initAutoSaveVisibility() {
       _autoSaveEnabled = getSetting('auto_save_enabled', true) !== false;
