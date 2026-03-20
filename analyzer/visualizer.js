@@ -2871,7 +2871,7 @@
         return;
       }
 
-      alert('No CSV opened and no save method available.');
+      alert('未打开 CSV 文件，无法保存。');
     }
 
     // 用户尝试关闭或刷新时，对未保存改动进行提示
@@ -3204,8 +3204,8 @@
         rootToSend = inferRootFromAbsPath(row.export_path) || inferRootFromAbsPath(row.crop_path) || '';
       }
 
-      if (!origRel) { setStatus('No filename available for this row.'); return; }
-      if (!rootToSend) { setStatus('Set Local Root in Settings to enable launching originals.'); showSettings(); return; }
+      if (!origRel) { setStatus('该行没有可用的文件名。'); return; }
+      if (!rootToSend) { setStatus('请在设置中配置本地根目录以打开原始文件。'); showSettings(); return; }
       const backendUrl = getSetting('backendUrl', window.location.origin);
       const editor = getSetting('editor', 'system');
       try {
@@ -3220,11 +3220,11 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
         if (data && data.ok) {
-          setStatus('Opened in editor');
-          showToast('Opened in ' + editor, 5000, () => showSettings());
+          setStatus('已在编辑器中打开');
+          showToast('已通过 ' + editor + ' 打开', 5000, () => showSettings());
         } else throw new Error(data && data.error || 'Launch failed');
       } catch (e) {
-        setStatus('Failed to open in editor. Check Settings and server.');
+        setStatus('在编辑器中打开失败，请检查设置。');
       }
     }
 
@@ -3262,7 +3262,7 @@
 
       folderTreeRoot = rootPath;
       const depth = getSetting('treeScanDepth', 3);
-      setStatus('Scanning folder tree…');
+      setStatus('正在扫描文件夹目录树…');
       try {
         const result = await window.pywebview.api.list_subfolders(rootPath, depth);
         if (!result.success) {
@@ -3455,7 +3455,7 @@
       row.className = 'tree-node-row ' + (effectiveHasKestrel ? 'has-kestrel' : 'no-kestrel') + (outdated ? ' version-outdated' : '') + (isInProgress ? ' in-progress' : '');
       if (node.path === treeActivePath) row.classList.add('active');
       if (isInProgress) row.title = 'Currently analyzing...';
-      else if (outdated) row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion})`;
+      else if (outdated) row.title = `分析时版本 v${node.kestrel_version}（当前 v${_appVersion}）`;
 
       // 箭头展开/折叠控件
       const arrow = document.createElement('span');
@@ -3705,7 +3705,7 @@
                 const nodeVer = findNodeVersion(folderTreeRootNode, origPath);
                 if (nodeVer && _appVersion && compareVersions(nodeVer, _appVersion) < 0) {
                   row.classList.add('version-outdated');
-                  row.title = `Analyzed on Kestrel v${nodeVer} (current: v${_appVersion}). Consider re-analyzing.`;
+                  row.title = `分析时版本 v${nodeVer}（当前 v${_appVersion}），建议重新分析`;
                 }
               } else if (processedImgs > 0) {
                 row.classList.add('analyzed-partial');       // purple: started not finished
@@ -3765,7 +3765,7 @@
       const outdated = isVersionOutdated(node);
       row.className = 'adlg-node-row' + (selectedSet.has(node.path) ? ' queue-sel' : '') + (node.has_kestrel ? ' has-kestrel' : '') + (outdated ? ' version-outdated' : '');
       if (outdated) {
-        row.title = `Analyzed on Kestrel v${node.kestrel_version} (current: v${_appVersion}). Consider re-analyzing.`;
+        row.title = `分析时版本 v${node.kestrel_version}（当前 v${_appVersion}）. Consider re-analyzing.`;
       }
 
       const arrow = document.createElement('span');
@@ -3806,7 +3806,7 @@
       label.className = 'tree-label';
       label.textContent = node.name;
       if (!outdated) label.title = node.path;
-      else label.title = `v${node.kestrel_version} → v${_appVersion} (outdated)`;
+      else label.title = `v${node.kestrel_version} → v${_appVersion}（已过时）`;
 
       // 旧版本文件夹的版本徽标
       const versionBadge = document.createElement('span');
@@ -5617,7 +5617,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     const revertBtn = el('#revertCsv');
     if (revertBtn) revertBtn.addEventListener('click', () => {
       if (!_cleanSnapshot) return;
-      if (!confirm('Discard all unsaved changes and revert to the last saved state?')) return;
+      if (!confirm('确定放弃所有未保存的更改并还原到上次保存的状态吗？')) return;
       applySnapshot();
     });
 
@@ -5764,7 +5764,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
     // 初始化
     loadVersionBadge();
-    setStatus('Open your photo folder (the one that contains .kestrel) or select kestrel_database.csv');
+    setStatus('请打开包含 .kestrel 文件夹的照片目录');
     hydrateSettingsFromServer();
 
     // 如果页面加载前队列就在运行（例如页面刷新），则重新接上轮询逻辑
@@ -6158,7 +6158,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       cardVerified.addEventListener('mouseleave', () => { cardVerified.style.borderColor = '#263045'; cardVerified.style.background = '#1a2235'; });
       cardVerified.addEventListener('click', () => {
         const changed = resetFolderCullState(folderPath, 'verified');
-        showToast(changed > 0 ? `Reset ${changed} confirmed decision${changed === 1 ? '' : 's'}` : 'No confirmed decisions to reset', 3000);
+        showToast(changed > 0 ? `已重置 ${changed} 条已确认的决定` : '没有需要重置的已确认决定', 3000);
         closeAndRemove();
       });
 
@@ -6166,10 +6166,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       cardAll.addEventListener('mouseenter', () => { cardAll.style.borderColor = '#7f3f3f'; cardAll.style.background = '#361818'; });
       cardAll.addEventListener('mouseleave', () => { cardAll.style.borderColor = '#3f2020'; cardAll.style.background = '#2a1a1a'; });
       cardAll.addEventListener('click', () => {
-        const ok = confirm(`Reset ALL manual and confirmed culling decisions for "${folderName}"?\n\nThis cannot be undone.`);
+        const ok = confirm(`确定重置「${folderName}」中所有手动和已确认的筛选决定吗？\n\n此操作不可撤销。`);
         if (!ok) return;
         const changed = resetFolderCullState(folderPath, 'all');
-        showToast(changed > 0 ? `Reset ${changed} manual/confirmed decision${changed === 1 ? '' : 's'}` : 'No manual or confirmed decisions to reset', 3000);
+        showToast(changed > 0 ? `已重置 ${changed} 条手动/已确认的决定` : '没有需要重置的手动或已确认决定', 3000);
         closeAndRemove();
       });
 

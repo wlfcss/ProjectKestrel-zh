@@ -74,7 +74,7 @@ html {
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   overflow: hidden;
   height: 100vh;
@@ -188,11 +188,19 @@ header.top-bar {
   object-fit: contain;
 }
 .top-bar-brand {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
   white-space: nowrap;
+}
+.top-bar-edition {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+  vertical-align: super;
+  margin-left: 2px;
 }
 
 .top-bar-spacer {
