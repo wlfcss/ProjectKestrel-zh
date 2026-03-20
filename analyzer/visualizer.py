@@ -443,7 +443,7 @@ def main():
             log('Starting windowed UI via pywebview...')
             api = Api()  # 窗口默认最大化启动
             api._server_port = args.port
-            win = webview.create_window('翎鉴 Lite', url, js_api=api, maximized=True)
+            win = webview.create_window('翎鉴 Lite', url, js_api=api, maximized=True, background_color='#0e1218')
             api._main_window = win
 
             # 当分析队列正在运行时，拦截关闭事件并改为最小化，
