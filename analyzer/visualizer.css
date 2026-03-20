@@ -325,7 +325,7 @@ main {
 
 /* ── 5b. Scene Grid ──────────────────────────────────────── */
 #sceneGrid {
-  --card-min: 220px;
+  --card-min: 260px;
   display: block;
 }
 .grid {
@@ -424,11 +424,13 @@ article.card:hover .thumb img { transform: scale(1.04); }
 }
 
 .body {
-  padding: 10px 12px 9px;
+  padding: 10px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  flex: 1;
+  gap: 2px;
+  height: 82px;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .scene-card-topline {
@@ -467,6 +469,7 @@ article.card:hover .thumb img { transform: scale(1.04); }
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .scene-card-family { color: var(--text-secondary); font-size: 10px; }
 .scene-card-sep {
@@ -477,12 +480,7 @@ article.card:hover .thumb img { transform: scale(1.04); }
 }
 .scene-card-secondary { font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 2px;
-}
+/* chips 仅用于弹窗信息栏 */
 .chip {
   display: inline-block;
   font-size: 10px;
@@ -496,20 +494,6 @@ article.card:hover .thumb img { transform: scale(1.04); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.chip.manual-approved { background: var(--ok-dim); border-color: rgba(111,207,151,0.22); color: var(--ok); }
-.chip.badge { background: rgba(106,173,255,0.10); border-color: rgba(106,173,255,0.18); color: var(--accent); }
-.chips.reviewed-tags .chip { color: var(--ok); }
-
-.scene-card-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid rgba(255,255,255,0.055);
-}
-.scene-card-stat { font-size: 10px; color: var(--text-tertiary); }
-.scene-card-stat.reviewed { color: var(--ok); font-weight: 600; }
 
 /* ── 5d. Card Cull Progress ──────────────────────────────── */
 .card-cull-progress {

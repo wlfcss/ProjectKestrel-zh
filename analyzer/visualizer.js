@@ -1040,64 +1040,33 @@
         const secondaryMeta = showFolderHeaders || !_folderName
           ? captureLabel
           : `${_folderName} · ${captureLabel}`;
-        cardMetaLine.textContent = secondaryMeta;
+        const _localNum = String(s.id).split(':').pop();
+        cardMetaLine.textContent = `${secondaryMeta}`;
+        cardMetaLine.title = secondaryMeta;
         const title = document.createElement('div');
         title.className = 'title';
-        const _localNum = String(s.id).split(':').pop();
-        // 仅在单文件夹加载时在标题中显示文件夹名；
-        // 多文件夹模式下，分组头部已经会显示文件夹名。
-        const _titleHtml = `<b>#${_localNum}</b>`;
-        title.innerHTML = _titleHtml + (s.sceneName ? ` <span class="name">\u2014 ${decodeEntities(escapeHtml(s.sceneName))}</span>` : '');
-        title.title = (s.representative?.__rootPath || String(s.id)) + (s.sceneName ? ` \u2014 ${s.sceneName}` : '');
+        title.textContent = `#${_localNum}` + (s.sceneName ? ` — ${s.sceneName}` : '');
+        title.title = `#${_localNum}` + (s.sceneName ? ` — ${s.sceneName}` : '');
         const primarySpecies = document.createElement('div');
         primarySpecies.className = 'scene-card-species';
         primarySpecies.textContent = primarySpeciesName;
         primarySpecies.title = primarySpeciesName;
         const subline = document.createElement('div');
         subline.className = 'scene-card-subline';
+        const sublineText = `${familyName} · ${speciesOverflow > 0 ? `+${speciesOverflow} 个其他标签` : '单一主体'}`;
         subline.innerHTML = `
           <span class="scene-card-family">${escapeHtml(familyName)}</span>
           <span class="scene-card-sep"></span>
           <span class="scene-card-secondary">${speciesOverflow > 0 ? `+${speciesOverflow} 个其他标签` : '单一主体'}</span>
         `;
-        const chips = document.createElement('div');
-        chips.className = 'chips';
+        subline.title = sublineText;
         if (s.isApproved) {
           card.classList.add('scene-approved');
-          chips.classList.add('reviewed-tags');
-        }
-        for (const sp of speciesList.slice(1, 3)) {
-          const c = document.createElement('span');
-          c.className = s.isApproved ? 'chip manual-approved' : 'chip';
-          c.textContent = getSpeciesDisplayName(sp);
-          c.title = sp;
-          chips.appendChild(c);
-        }
-        if (speciesList.length > 3) {
-          const more = document.createElement('span');
-          more.className = 'chip badge';
-          more.textContent = `+${speciesList.length - 3} 更多`;
-          more.title = speciesList.slice(3).map(getSpeciesDisplayName).join(', ');
-          chips.appendChild(more);
-        }
-        const footer = document.createElement('div');
-        footer.className = 'scene-card-footer';
-        const sceneStat = document.createElement('span');
-        sceneStat.className = 'scene-card-stat';
-        sceneStat.textContent = `场景 #${_localNum}`;
-        footer.appendChild(sceneStat);
-        if (s.isApproved) {
-          const reviewedStat = document.createElement('span');
-          reviewedStat.className = 'scene-card-stat reviewed';
-          reviewedStat.textContent = '已审核';
-          footer.appendChild(reviewedStat);
         }
         body.appendChild(cardMetaLine);
         body.appendChild(title);
         body.appendChild(primarySpecies);
         body.appendChild(subline);
-        if (chips.childElementCount > 0) body.appendChild(chips);
-        body.appendChild(footer);
         card.appendChild(body);
 
         card.addEventListener('click', (ev) => {
