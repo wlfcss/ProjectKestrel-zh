@@ -2700,6 +2700,26 @@
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c])); }
     function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 
+    // 顶栏文件夹面包屑：显示当前加载的文件夹名称，提供关闭按钮
+    function updateFolderBreadcrumb() {
+      const bc = document.getElementById('folderBreadcrumb');
+      const nameEl = document.getElementById('folderBreadcrumbName');
+      if (!bc || !nameEl) return;
+      if (rows.length > 0 && rootPath) {
+        const uniqueRoots = new Set(rows.map(r => r.__rootPath || rootPath).filter(Boolean));
+        if (uniqueRoots.size === 1) {
+          nameEl.textContent = folderBaseName([...uniqueRoots][0]);
+        } else if (uniqueRoots.size > 1) {
+          nameEl.textContent = `${uniqueRoots.size} 个文件夹`;
+        } else {
+          nameEl.textContent = folderBaseName(rootPath);
+        }
+        bc.classList.remove('hidden');
+      } else {
+        bc.classList.add('hidden');
+      }
+    }
+
     // 撤销用快照辅助函数
     function takeSnapshot() {
       _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice(), scenedata: JSON.parse(JSON.stringify(_scenedata)) };
@@ -4966,6 +4986,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
         if (changed) {
           ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
+          updateFolderBreadcrumb();
           setStatus(t('status.auto_refreshed', { count: refreshedCount }));
         } else if (toRefresh.some(p => _inProgressFolderPaths.has(normalizePath(p)))) {
           setStatus(t('status.waiting_for_analysis_output'));
@@ -5134,15 +5155,11 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       } catch (e) { return 0; }
     }
 
-    /** Implement Case 1 logic: if first folder starts analysis and no other analyzed folders exist, auto-track it. */
+    /** Implement Case 1 logic: if a folder starts analysis and no data is currently loaded, auto-track it. */
     async function _handleFirstFolderAnalysisStart(folderPath) {
       try {
-        if (!_isFirstQueueStart) return; // only on first start
-        _isFirstQueueStart = false;
-        
-        const analyzedCount = countAnalyzedFolders();
-        if (analyzedCount === 0) {
-          // 首次分析时只自动勾选并等待数据库生成，避免抢先加载一个还没有 CSV 的文件夹。
+        // 当前没有加载任何数据时，自动勾选并等待分析结果
+        if (rows.length === 0 && checkedFolderPaths.size === 0) {
           checkedFolderPaths.add(folderPath);
           renderFolderTree();
           _autoRefreshPendingPaths.add(normalizePath(folderPath));
@@ -5167,9 +5184,11 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       rootPath = '';
       rootDirHandle = null;
       rootIsKestrel = false;
+      _scenedata = {};
       treeActivePath = null;
       currentSceneId = null;
       _currentScene = null;
+      currentImageIndex = 0;
       _cleanSnapshot = null;
       dirty = false;
       _notifyDirty(false);
@@ -5177,6 +5196,12 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       _lastSelectedIdx = -1;
       _visibleSceneOrder = [];
       _focusedCardId = null;
+      // 清理自动刷新相关的残留状态
+      _autoRefreshPendingPaths.clear();
+      _autoRefreshForcedPaths.clear();
+      _autoRefreshLastProcessed.clear();
+      for (const timerId of _autoRefreshTimers.values()) clearInterval(timerId);
+      _autoRefreshTimers.clear();
       const mergeBtn = document.getElementById('openMerge');
       if (mergeBtn) mergeBtn.disabled = true;
       const saveBtn = document.getElementById('saveCsv');
@@ -5189,6 +5214,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       renderFolderTree();
       await renderScenes();
       updateSelectionUI();
+      updateFolderBreadcrumb();
       setStatus(t('status.no_folders_selected'));
     }
 
@@ -5241,6 +5267,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       blobUrlCache.clear();
       rows = [];
       header = [];
+      _scenedata = {};
       let loadedCount = 0;
       let slot = 0;
       const total = paths.length;
@@ -5308,6 +5335,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       treeActivePath = paths.length === 1 ? paths[0] : null;
       renderFolderTree();
       await renderScenes();
+      updateFolderBreadcrumb();
       showProgress('Done', 100);
       await sleep(400);
       hideProgress();
@@ -5364,6 +5392,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
         // 在 rootPath 已设好的前提下进行渲染
         await renderScenes();
+        updateFolderBreadcrumb();
 
         // 同时写入设置，供打开文件时使用（统一使用 rootHint）
         const settings = loadSettings();
@@ -5409,14 +5438,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
         const ready = await waitForPywebview();
         console.log('[DEBUG] Pywebview API ready:', ready);
       }
-      // 当用户打开一个文件夹时，重置主树中所有已勾选项
-      // （等同于点击“取消全选”），避免误载入上一次根目录选择时留下的文件夹。
-      try {
-        checkedFolderPaths.clear();
-        renderFolderTree();
-        debouncedAutoLoad(); // Unload current folder (same as Check None)
-      } catch (e) { /* ignore */ }
-
       try {
         // 优先级 1：Python API（桌面应用，全平台）
         // 只要可用，就始终优先使用它以保持行为一致
@@ -5426,6 +5447,12 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
             setStatus(t('folder.opening_picker'));
             const folderPath = await window.pywebview.api.choose_directory();
             if (folderPath) {
+              // 用户确认选择后再重置已勾选项，避免取消时丢失当前视图
+              try {
+                checkedFolderPaths.clear();
+                renderFolderTree();
+                debouncedAutoLoad();
+              } catch (e) { /* ignore */ }
               // 将选中的文件夹作为树根来扫描
               // （用户可能选的是包含多个已分析子目录的父目录，也可能直接选叶子目录）。
               treeExpandedPaths.clear();
@@ -5524,6 +5551,12 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     });
 
     el('#saveCsv')?.addEventListener('click', saveCsv);
+    // 面包屑关闭按钮：卸载当前文件夹，回到空状态
+    document.getElementById('folderBreadcrumbClose')?.addEventListener('click', async () => {
+      checkedFolderPaths.clear();
+      await clearLoadedFolderView();
+    });
+
     el('#search')?.addEventListener('input', debounce(() => renderScenes(), 250));
     el('#speciesConf')?.addEventListener('change', () => renderScenes());
     el('#sortBy')?.addEventListener('change', () => {
