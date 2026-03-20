@@ -5595,7 +5595,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const slider = document.getElementById('uiScale');
       const label = document.getElementById('uiScaleLabel');
       if (!slider) return;
-      const saved = getSetting('uiScale', 100);
+      const saved = getSetting('uiScale', 120);
       slider.value = saved;
       if (label) label.textContent = saved + '%';
       applyUiScale(saved);
