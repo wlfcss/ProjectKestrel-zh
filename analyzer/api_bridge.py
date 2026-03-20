@@ -319,7 +319,10 @@ class Api:
             # Verify the .kestrel dir is actually inside folder_path (prevent path traversal)
             real_parent = os.path.realpath(folder_path)
             real_kestrel = os.path.realpath(kestrel_dir)
-            if not real_kestrel.startswith(real_parent + os.sep) and real_kestrel != os.path.join(real_parent, '.kestrel'):
+            try:
+                if os.path.commonpath([real_kestrel, real_parent]) != real_parent:
+                    return {'success': False, 'error': 'Invalid path'}
+            except ValueError:
                 return {'success': False, 'error': 'Invalid path'}
             shutil.rmtree(kestrel_dir)
             print(f"[API] clear_kestrel_data() -> Removed .kestrel from {folder_path}", flush=True)
