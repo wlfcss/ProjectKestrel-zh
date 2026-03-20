@@ -2244,6 +2244,10 @@ label.inline {
   max-width: 240px;
   line-height: 1.5;
   white-space: pre-wrap;
+  display: none;
+}
+.tooltip-layer.visible {
+  display: block;
 }
 
 /* ── 30. Responsive ──────────────────────────────────────── */
