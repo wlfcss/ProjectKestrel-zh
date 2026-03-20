@@ -2700,26 +2700,6 @@
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' }[c])); }
     function folderBaseName(path) { if (!path) return ''; return path.replace(/\\/g, '/').split('/').filter(Boolean).pop() || path; }
 
-    // 顶栏文件夹面包屑：显示当前加载的文件夹名称，提供关闭按钮
-    function updateFolderBreadcrumb() {
-      const bc = document.getElementById('folderBreadcrumb');
-      const nameEl = document.getElementById('folderBreadcrumbName');
-      if (!bc || !nameEl) return;
-      if (rows.length > 0 && rootPath) {
-        const uniqueRoots = new Set(rows.map(r => r.__rootPath || rootPath).filter(Boolean));
-        if (uniqueRoots.size === 1) {
-          nameEl.textContent = folderBaseName([...uniqueRoots][0]);
-        } else if (uniqueRoots.size > 1) {
-          nameEl.textContent = `${uniqueRoots.size} 个文件夹`;
-        } else {
-          nameEl.textContent = folderBaseName(rootPath);
-        }
-        bc.classList.remove('hidden');
-      } else {
-        bc.classList.add('hidden');
-      }
-    }
-
     // 撤销用快照辅助函数
     function takeSnapshot() {
       _cleanSnapshot = { rows: rows.map(r => ({ ...r })), header: header.slice(), scenedata: JSON.parse(JSON.stringify(_scenedata)) };
@@ -4907,6 +4887,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     function scheduleAutoRefresh(path) {
       const normPath = normalizePath(path);
       if (!normPath) return;
+      // 如果当前没有加载任何数据，确保完成的文件夹能被加载
+      if (rows.length === 0 && !checkedFolderPaths.has(path)) {
+        checkedFolderPaths.add(path);
+      }
       _autoRefreshPendingPaths.add(normPath);
       _autoRefreshForcedPaths.add(normPath);
     }
@@ -4986,7 +4970,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
         if (changed) {
           ensureSceneNameColumn();        ensureRatingColumns();        await renderScenes();
-          updateFolderBreadcrumb();
+
           setStatus(t('status.auto_refreshed', { count: refreshedCount }));
         } else if (toRefresh.some(p => _inProgressFolderPaths.has(normalizePath(p)))) {
           setStatus(t('status.waiting_for_analysis_output'));
@@ -5551,12 +5535,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     });
 
     el('#saveCsv')?.addEventListener('click', saveCsv);
-    // 面包屑关闭按钮：卸载当前文件夹，回到空状态
-    document.getElementById('folderBreadcrumbClose')?.addEventListener('click', async () => {
-      checkedFolderPaths.clear();
-      await clearLoadedFolderView();
-    });
-
     el('#search')?.addEventListener('input', debounce(() => renderScenes(), 250));
     el('#speciesConf')?.addEventListener('change', () => renderScenes());
     el('#sortBy')?.addEventListener('change', () => {
