@@ -443,7 +443,7 @@ def main():
             log('Starting windowed UI via pywebview...')
             api = Api()  # 窗口默认最大化启动
             api._server_port = args.port
-            win = webview.create_window('Project Kestrel', url, js_api=api, maximized=True)
+            win = webview.create_window('翎鉴 Lite', url, js_api=api, maximized=True)
             api._main_window = win
 
             # 当分析队列正在运行时，拦截关闭事件并改为最小化，
@@ -465,7 +465,7 @@ def main():
                             MB_ICONQUESTION = 0x00000020
                             title = '分析进行中'
                             if _queue_manager.is_paused:
-                                msg = '分析已暂停。要退出 Project Kestrel 吗？稍后重新打开后可以继续。'
+                                msg = '分析已暂停。要退出翎鉴吗？稍后重新打开后可以继续。'
                             else:
                                 msg = '分析仍在进行中。要取消分析并退出吗？'
                             resp = ctypes.windll.user32.MessageBoxW(0, msg, title, MB_YESNOCANCEL | MB_ICONQUESTION)
@@ -492,7 +492,7 @@ def main():
                             root = _tk.Tk()
                             root.withdraw()
                             if _queue_manager.is_paused:
-                                msg = '分析已暂停。要退出 Project Kestrel 吗？稍后重新打开后可以继续。'
+                                msg = '分析已暂停。要退出翎鉴吗？稍后重新打开后可以继续。'
                             else:
                                 msg = '分析仍在进行中。要取消分析并退出吗？'
                             res = _mb.askyesnocancel('分析进行中', msg)
