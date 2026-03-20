@@ -13,15 +13,6 @@ import time as _time_mod
 
 from settings_utils import load_persisted_settings, save_persisted_settings, log
 
-# 遥测模块，导入失败也不能阻塞启动
-try:
-    import kestrel_telemetry as _telemetry
-except ImportError:
-    try:
-        from analyzer import kestrel_telemetry as _telemetry
-    except ImportError:
-        _telemetry = None  # type: ignore[assignment]
-
 # ---------------------------------------------------------------------------
 # 可选依赖：同级 analyzer 模块中的 AnalysisPipeline。
 # 导入阶段只做轻量目录检查，真正的流水线/模型导入推迟到首次请求分析时，
@@ -224,15 +215,16 @@ class QueueManager:
                     new_item = _QueueItem(p, name)
                     self._items.append(new_item)
                     added += 1
-        if not self.is_running:
-            self._cancel_event.clear()
-            self._pause_event.set()
-            self._use_gpu = use_gpu
-            self._wildlife_enabled = wildlife_enabled
-            self._detection_threshold = float(detection_threshold)
-            self._scene_time_threshold = float(scene_time_threshold)
-            self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
-            self._thread.start()
+            # 在持有锁的情况下检查并启动 worker，避免多线程并发 enqueue 时重复启动。
+            if self._thread is None or not self._thread.is_alive():
+                self._cancel_event.clear()
+                self._pause_event.set()
+                self._use_gpu = use_gpu
+                self._wildlife_enabled = wildlife_enabled
+                self._detection_threshold = float(detection_threshold)
+                self._scene_time_threshold = float(scene_time_threshold)
+                self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
+                self._thread.start()
         return {'success': True, 'added': added}
 
     def pause(self) -> dict:
@@ -253,8 +245,8 @@ class QueueManager:
         return {'success': True, 'paused': False}
 
     def cancel(self) -> dict:
-        self._cancel_event.set()
-        self._pause_event.set()
+        # 先在锁内更新所有 pending 条目状态，再设置事件。
+        # 这样 worker 线程观察到 cancel 事件时，所有状态已经一致。
         with self._lock:
             for it in self._items:
                 if it.status == 'pending':
@@ -262,6 +254,8 @@ class QueueManager:
             running = next((it for it in self._items if it.status == 'running'), None)
             if running is not None:
                 running.current_status_msg = 'Cancelling\u2026'
+        self._cancel_event.set()
+        self._pause_event.set()  # 若处于暂停中则先解除暂停，让 worker 能响应 cancel
         return {'success': True}
 
     def clear_done(self) -> dict:
@@ -308,7 +302,16 @@ class QueueManager:
                             it.error = f'Pipeline unavailable: {_pipeline_import_error}'
                 log('[queue] Pipeline unavailable, aborting:', _pipeline_import_error)
                 return
-            self._pipeline = cls(use_gpu=self._use_gpu)
+            try:
+                self._pipeline = cls(use_gpu=self._use_gpu)
+            except Exception as exc:
+                with self._lock:
+                    for it in self._items:
+                        if it.status in ('pending', 'running'):
+                            it.status = 'error'
+                            it.error = f'Pipeline init failed: {exc}'
+                log('[queue] Pipeline constructor raised:', exc)
+                return
 
         while not self._cancel_event.is_set():
             with self._lock:
@@ -451,74 +454,14 @@ class QueueManager:
                         item.end_time = _time_mod.time()
                         if item.total > 0:
                             item.processed = item.total
-                self._send_folder_analytics(item)
             except Exception as exc:
                 log(f'[queue] Error processing {item.path!r}:', exc)
                 with self._lock:
                     item.status = 'error'
                     item.end_time = _time_mod.time()
                     item.error = str(exc)
-                self._send_folder_analytics(item)
 
         log('[queue] Run thread finished.')
-
-    def _send_folder_analytics(self, item):
-        """Send per-folder analytics (if opted-in) and completion telemetry (non-optional)."""
-        try:
-            if _telemetry is None:
-                return
-            settings = load_persisted_settings()
-            machine_id = _telemetry.get_machine_id(settings)
-            version = _telemetry._read_version()
-
-            files_this_session = max(0, item.processed - item.initial_processed)
-
-            elapsed = 0.0
-            if item.start_time is not None:
-                end = item.end_time if item.end_time is not None else _time_mod.time()
-                elapsed = max(0.0, (end - item.start_time) - item.paused_duration)
-
-            avg_time_per_file_s = elapsed / files_this_session if files_this_session > 0 else 0.0
-            _telemetry.send_analysis_completion_telemetry(
-                files_analyzed=files_this_session,
-                machine_id=machine_id,
-                version=version,
-                avg_time_per_file_s=avg_time_per_file_s,
-            )
-
-            settings['kestrel_impact_total_files'] = settings.get('kestrel_impact_total_files', 0) + files_this_session
-            settings['kestrel_impact_total_seconds'] = round(
-                settings.get('kestrel_impact_total_seconds', 0.0) + elapsed, 1
-            )
-            save_persisted_settings(settings)
-            print(f"[impact] total_files={settings['kestrel_impact_total_files']} total_hours={round(settings['kestrel_impact_total_seconds']/3600,2)}", flush=True)
-
-            was_cancelled = (item.status == 'cancelled')
-            stats = _telemetry.collect_folder_stats(
-                item.path, files_this_session, item.total
-            )
-
-            analytics_payload = {
-                'folder_path': item.path,
-                'files_analyzed': files_this_session,
-                'total_files': item.total,
-                'active_compute_time_s': elapsed,
-                'file_sizes_kb': stats.get('file_sizes_kb', []),
-                'file_formats': stats.get('file_formats', {}),
-                'was_cancelled': was_cancelled,
-                'machine_id': machine_id,
-                'version': version
-            }
-
-            if not settings.get('analytics_consent_shown', False):
-                settings['pending_analytics'] = analytics_payload
-                save_persisted_settings(settings)
-                print("[analytics] Consent not yet shown; cached analytics payload.", flush=True)
-            elif settings.get('analytics_opted_in', False):
-                print("[analytics] Sending folder analytics for", item.path, "files_analyzed:", files_this_session, "elapsed_s:", round(elapsed, 1), flush=True)
-                _telemetry.send_folder_analytics(**analytics_payload)
-        except Exception:
-            pass  # failsafe — never disrupt queue operation
 
 
 # Module-level singleton — shared across Api and Handler

@@ -66,18 +66,26 @@ class BirdSpeciesClassifier:
         image = np.transpose(image, (2, 0, 1))
         return np.expand_dims(image, 0)
 
+    @staticmethod
+    def _softmax(x: np.ndarray) -> np.ndarray:
+        e = np.exp(x - x.max())
+        return e / e.sum()
+
     def classify(self, image, top_k=5):
         input_tensor = self._preprocess(image)
         input_name = self.session.get_inputs()[0].name
         outputs = self.session.run(None, {input_name: input_tensor})
         logits = outputs[0][0]
 
-        top_species_indices = np.argsort(logits)[-top_k:][::-1]
+        # Convert logits to probabilities so that scores are in [0, 1]
+        probs = self._softmax(logits)
+
+        top_species_indices = np.argsort(probs)[-top_k:][::-1]
         top_species_labels = self.labels[top_species_indices]
-        top_species_scores = logits[top_species_indices].astype(float)
+        top_species_scores = probs[top_species_indices].astype(float)
 
         if self.family_matrix.shape[0] > 0:
-            family_probs = self.family_matrix @ logits
+            family_probs = self.family_matrix @ probs
             top_family_indices = np.argsort(family_probs)[-top_k:][::-1]
             top_family_labels = [self.family_display_names[i] for i in top_family_indices]
             top_family_scores = family_probs[top_family_indices].astype(float).tolist()

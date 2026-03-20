@@ -144,7 +144,6 @@
           </div>
         </div>
         <div class="sidebar-footer-right">
-          <button id="openFeedback" title="发送反馈、报告问题或提出建议">反馈</button>
           <button id="helpBtnMain" title="启动引导教程">教程</button>
           <button id="donateBtnMain" class="donate-btn" title="支持 Project Kestrel —— 通过 PayPal 捐助">支持项目</button>
         </div>
@@ -510,23 +509,6 @@
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">自动保存评分、标签和场景修改。关闭后，将使用“保存 / 还原”的工作流。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">统计与隐私</h4>
-
-      <div class="row">
-        <label style="flex:1">Kestrel 的使用成果</label>
-        <span class="muted" id="settingsTotalImpact">—</span>
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">此电脑上由 Kestrel 分析过的照片总数。</div>
-
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
-      <div class="row">
-        <label for="settingsAnalyticsOptIn" style="flex:1">分享匿名使用统计</label>
-        <label class="inline" style="gap:6px">
-          <input type="checkbox" id="settingsAnalyticsOptIn" />
-          <span class="muted" id="settingsAnalyticsLabel">同意</span>
-        </label>
-      </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">帮助改进 Kestrel。不会上传文件名、路径或图像内容。你可以随时修改此设置。</div>
     </div>
     <div class="settings-footer">
       <button id="settingsCancel">取消</button>
@@ -635,74 +617,6 @@
     </div>
   </dialog>
 
-  <!-- 反馈 / 缺陷报告对话框 -->
-  <dialog id="feedbackDlg" style="width:min(640px,96vw);height:auto;max-height:92vh;overflow-x:hidden;overflow-y:auto;">
-    <div class="feedback-dlg">
-      <h3>发送反馈</h3>
-      <div>
-        <label class="f-label" for="feedbackType">类型</label>
-        <select id="feedbackType">
-          <option value="bug">Bug 报告</option>
-          <option value="suggestion">💡 建议</option>
-          <option value="liked">我喜欢的功能</option>
-          <option value="general" selected>一般反馈</option>
-        </select>
-      </div>
-      <div>
-        <label class="f-label" for="feedbackDesc">描述 <span style="color:#e74c3c">*</span></label>
-        <textarea id="feedbackDesc"
-          placeholder="请描述你的反馈、遇到的问题，或希望看到的功能…"></textarea>
-      </div>
-      <div>
-        <label class="f-label" for="feedbackContact">联系邮箱（可选）</label>
-        <input type="email" id="feedbackContact" placeholder="your@email.com" />
-      </div>
-      <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap">
-        <label class="inline" style="font-size:13px">
-          <input type="checkbox" id="feedbackIncludeLogs" />
-          <span class="muted">附带最近的分析日志</span>
-        </label>
-        <label class="inline" style="font-size:13px">
-          <input type="checkbox" id="feedbackIncludeScreenshot" />
-          <span class="muted">附带截图</span>
-        </label>
-        <input type="file" id="feedbackScreenshotFile" accept="image/*" style="display:none" />
-      </div>
-      <img id="feedbackSsPreview" class="feedback-ss-preview" alt="screenshot preview" style="display:none" />
-      <div id="feedbackStatus" style="font-size:13px; color:var(--muted); min-height:18px"></div>
-      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px">
-        <button id="feedbackCancel">取消</button>
-        <button id="feedbackSend" class="primary">发送</button>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- 统计分析授权对话框（首次成功分析后显示一次） -->
-  <dialog id="analyticsConsentDlg"
-    style="width:min(560px,96vw);height:auto;max-height:88vh;overflow-x:hidden;overflow-y:auto;">
-    <div class="analytics-dlg">
-      <h3>帮助改进 Project Kestrel</h3>
-      <p>你愿意分享匿名使用数据来帮助改进应用吗？这完全是可选的，你可以随时更改决定。</p>
-      <p><strong style="color:var(--text)">将匿名分享的内容：</strong></p>
-      <ul>
-        <li>已分析图片的数量与大小</li>
-        <li>使用的文件格式（例如 CR3、JPG）</li>
-        <li>分析耗时</li>
-        <li>应用版本和操作系统类型</li>
-      </ul>
-      <p><strong style="color:var(--text)">绝不会分享的内容：</strong></p>
-      <ul>
-        <li>文件名、文件夹路径或图片内容</li>
-        <li>任何可识别个人身份的信息</li>
-      </ul>
-      <p class="analytics-note">你的设备仅通过一个随机 ID 识别，不会存储或发送设备名、用户名或 IP 地址。</p>
-      <div class="analytics-btns">
-        <button id="analyticsDecline">不用了</button>
-        <button id="analyticsAccept" class="primary">愿意，我想帮助改进</button>
-      </div>
-    </div>
-  </dialog>
-
   <!-- 实时分析详情对话框 -->
   <dialog id="liveAnalysisDlg" class="dlg-compact">
     <div class="live-dlg">
@@ -739,25 +653,10 @@
       <p style="font-size:12px;color:#607080;">Project Kestrel 是免费且开源的。每一次 <a href="https://github.com/SanjaySoniLV/ProjectKestrel" target="_blank">贡献</a> 都能帮助它持续成长。</p>
       <div class="donate-dlg-btns">
         <button class="donate-main-btn" id="donateDlgGoBtn">通过 PayPal 捐助</button>
-        <button class="primary" id="donateDlgFeedbackBtn" style="font-size:13px;padding:13px 20px;height:auto;">发送反馈</button>
       </div>
       <button id="donateDlgClose" class="donate-dlg-close-btn">关闭</button>
     </div>
   </dialog>
-
-  <!-- 版本更新 Toast 通知 -->
-  <div id="versionUpdateToast" style="display:none;position:fixed;bottom:20px;right:20px;max-width:380px;background:#1a2a1a;border:2px solid #4a7a4a;border-radius:8px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:9999;font-family:var(--font-family);">
-    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
-      <h3 style="margin:0;display:flex;align-items:center;gap:8px;font-size:16px;color:#6ec16e;">
-        <span id="versionUpdatePriority" style="font-size:18px;"></span>
-        <span id="versionUpdateTitle" style="flex:1;">发现新版本</span>
-      </h3>
-      <button id="versionUpdateClose" style="background:none;border:none;color:#7ca3d9;cursor:pointer;font-size:18px;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>
-    </div>
-    <ul id="versionUpdateNotes" style="margin:12px 0;padding-left:20px;font-size:13px;color:#c0c0c0;line-height:1.5;"></ul>
-    <div id="versionUpdateWindowsNote" style="font-size:12px;color:#999;margin:12px 0;padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;display:none;"></div>
-    <button id="versionUpdateDownloadBtn" style="width:100%;padding:10px 16px;margin-top:12px;background:#1a4a1a;color:#6ec16e;border:1px solid #6ec16e;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;text-decoration:none;display:block;text-align:center;">下载更新</button>
-  </div>
 
   <script src="i18n.js"></script>
   <script src="taxonomy.js"></script>

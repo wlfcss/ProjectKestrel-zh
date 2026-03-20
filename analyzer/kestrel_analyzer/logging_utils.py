@@ -1,9 +1,13 @@
 import json
 import os
+import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+# 保护日志文件的读-改-写序列，避免多线程并发写入损坏 JSON。
+_log_lock = threading.Lock()
 
 from .config import KESTREL_DIR_NAME, LOG_FILENAME_PREFIX, LOG_FILE_EXTENSION
 
@@ -52,10 +56,13 @@ def _read_log_entries(log_path: str) -> list:
 
 def log_event(log_path: str, entry: Dict[str, Any]) -> None:
     entry_with_time = {"timestamp_utc": _utc_timestamp(), **entry}
-    entries = _read_log_entries(log_path)
-    entries.append(entry_with_time)
-    with open(log_path, "w", encoding="utf-8") as handle:
-        json.dump(entries, handle, indent=2)
+    with _log_lock:
+        entries = _read_log_entries(log_path)
+        entries.append(entry_with_time)
+        tmp_path = log_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump(entries, handle, indent=2)
+        os.replace(tmp_path, log_path)
 
 
 def log_exception(

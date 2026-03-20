@@ -80,7 +80,7 @@ def _walk_ifd(f, endian: str, offset: int, tiff_start: int, _depth: int = 0) -> 
     except struct.error:
         return None
 
-    if num_entries > 256:
+    if num_entries > 1000:
         return None
 
     exif_ifd_offset = None

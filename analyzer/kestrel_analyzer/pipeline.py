@@ -29,11 +29,8 @@ from .database import (
     build_scenedata_from_database,
     update_scenedata_with_database,
 )
-print("Importing read_image from image_utils...")
 from .image_utils import read_image, read_image_for_pipeline, postprocess_raw
-print("read_image imported successfully.")
 from .ratings import quality_to_rating, get_profile_thresholds
-print("Importing compute_image_similarity_akaze from similarity...")
 from .similarity import compute_image_similarity_akaze, compute_similarity_timestamp
 from .raw_exif import get_capture_time
 from .logging_utils import get_log_path, log_event, log_exception, log_warning
@@ -46,15 +43,9 @@ except ImportError:
     except ImportError:
         load_persisted_settings = None
 
-print("Utility functions imported successfully.")
-
-print("Importing ML models... Starting with MaskRCNNWrapper...")
 from .ml.mask_rcnn import MaskRCNNWrapper
-print("MaskRCNNWrapper imported successfully. Now importing BirdSpeciesClassifier...")
 from .ml.bird_species import BirdSpeciesClassifier
-print("BirdSpeciesClassifier imported successfully. Now importing QualityClassifier...")
 from .ml.quality import QualityClassifier
-print("QualityClassifier imported successfully. All ML models imported.")
 
 
 class AnalysisPipeline:
@@ -423,7 +414,12 @@ class AnalysisPipeline:
                         previous_image = img
                         previous_image_path = last_image_path
                         previous_orientation = self._get_image_orientation(img)
-            scene_count = database["scene_count"].max() if not database.empty else 0
+            _sc_max = database["scene_count"].max() if not database.empty else 0
+            scene_count = int(_sc_max) if _sc_max == _sc_max else 0  # NaN-safe
+
+            # Accumulate new entries and flush to disk every N images to avoid O(N²) I/O.
+            _SAVE_BATCH = 10
+            _pending_entries: list = []
 
             for idx, raw_file in enumerate(new_files, start=1):
                 # Pause: wait until resume or until cancel_event is set.
@@ -856,8 +852,11 @@ class AnalysisPipeline:
                     entry.update({"crop_path": crop_path_rel})
 
                     stage_ctx["stage"] = "save_database"
-                    database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
-                    save_database(database, db_path)
+                    _pending_entries.append(entry)
+                    if len(_pending_entries) >= _SAVE_BATCH:
+                        database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                        _pending_entries.clear()
+                        save_database(database, db_path)
 
                     if image_cb:
                         image_cb(entry)
@@ -888,7 +887,11 @@ class AnalysisPipeline:
                     entry["scene_count"] = scene_count
                     entry["species"] = "Error"
                     entry["similar"] = False
-                    database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
+                    # Flush any buffered successful entries before saving the error entry,
+                    # so the CSV stays consistent even on crash.
+                    _pending_entries.append(entry)
+                    database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                    _pending_entries.clear()
                     save_database(database, db_path)
                     time.sleep(2)
 
@@ -922,6 +925,11 @@ class AnalysisPipeline:
                     except Exception: pass
                 except Exception:
                     pass
+
+            # Flush any remaining buffered entries before post-analysis.
+            if _pending_entries:
+                database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                _pending_entries.clear()
 
             # === Post-analysis: compute quality distribution and normalized ratings ===
             stage_ctx["stage"] = "post_analysis_normalization"

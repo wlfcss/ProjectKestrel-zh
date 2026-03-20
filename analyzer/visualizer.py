@@ -36,6 +36,7 @@ import os
 import sys
 import webbrowser
 
+import hmac
 import secrets
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import threading
@@ -47,15 +48,6 @@ from settings_utils import load_persisted_settings, save_persisted_settings, log
 from editor_launch import launch
 from queue_manager import _queue_manager
 from api_bridge import Api
-
-# 遥测模块，导入失败也不能阻塞启动
-try:
-    import kestrel_telemetry as _telemetry
-except ImportError:
-    try:
-        from analyzer import kestrel_telemetry as _telemetry
-    except ImportError:
-        _telemetry = None  # type: ignore[assignment]
 
 HOST = '127.0.0.1'
 
@@ -241,8 +233,6 @@ class Handler(SimpleHTTPRequestHandler):
             self.handle_open()
         elif parsed.path == '/settings':
             self.handle_settings()
-        elif parsed.path == '/feedback':
-            self.handle_feedback()
         elif parsed.path == '/shutdown':
             self.handle_shutdown()
         elif parsed.path == '/queue/start':
@@ -273,7 +263,7 @@ class Handler(SimpleHTTPRequestHandler):
     def handle_open(self):
         if AUTH_TOKEN:
             token = self.headers.get('X-Bridge-Token') or ''
-            if token != AUTH_TOKEN:
+            if not hmac.compare_digest(token, AUTH_TOKEN):
                 self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
         # 基础 Origin 校验；部分请求可能不会携带 Origin
         origin = self.headers.get('Origin')
@@ -319,7 +309,7 @@ class Handler(SimpleHTTPRequestHandler):
         # 关闭接口始终要求令牌，避免 CSRF 或外部恶意触发
         if AUTH_TOKEN:
             token = self.headers.get('X-Bridge-Token') or ''
-            if token != AUTH_TOKEN:
+            if not hmac.compare_digest(token, AUTH_TOKEN):
                 self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
         log('Received shutdown request from client; scheduling server shutdown.')
         # 先响应，再异步关闭，确保客户端能收到返回值
@@ -336,7 +326,7 @@ class Handler(SimpleHTTPRequestHandler):
     def handle_settings(self):
         if AUTH_TOKEN:
             token = self.headers.get('X-Bridge-Token') or ''
-            if token != AUTH_TOKEN:
+            if not hmac.compare_digest(token, AUTH_TOKEN):
                 self._json(401, {'ok': False, 'error': 'Unauthorized'}); return
         origin = self.headers.get('Origin')
         expected_origin = f'http://{HOST}:{self.server.server_port}'  # type: ignore[attr-defined]
@@ -356,38 +346,10 @@ class Handler(SimpleHTTPRequestHandler):
         """Return True if authenticated (or no token required). Sends 401 and returns False on failure."""
         if AUTH_TOKEN:
             token = self.headers.get('X-Bridge-Token') or ''
-            if token != AUTH_TOKEN:
+            if not hmac.compare_digest(token, AUTH_TOKEN):
                 self._json(401, {'ok': False, 'error': 'Unauthorized'})
                 return False
         return True
-    def handle_feedback(self):
-        """Accept feedback/bug report submissions (browser-mode fallback)."""
-        if not self._check_auth():
-            return
-        try:
-            payload = self._read_json()
-            if not isinstance(payload, dict):
-                self._json(400, {'ok': False, 'error': 'Invalid payload'}); return
-            if _telemetry is None:
-                self._json(200, {'ok': True, 'note': 'Telemetry unavailable'}); return
-            settings = load_persisted_settings()
-            machine_id = _telemetry.get_machine_id(settings)
-            log_tail = ''
-            if payload.get('include_logs', False):
-                log_tail = _telemetry.get_recent_log_tail()
-            _telemetry.send_feedback(
-                report_type=payload.get('type', 'general'),
-                description=payload.get('description', ''),
-                contact=payload.get('contact', ''),
-                screenshot_b64=payload.get('screenshot_b64', ''),
-                log_tail=log_tail,
-                machine_id=machine_id,
-                version=_telemetry._read_version(),
-            )
-            self._json(200, {'ok': True})
-        except Exception as e:
-            self._json(400, {'ok': False, 'error': str(e)})
-
     def handle_queue_start(self):
         if not self._check_auth():
             return
@@ -449,14 +411,11 @@ def main():
     log(f'Serving visualizer at http://{HOST}:{args.port}/  (Press Ctrl+C to stop)')
     log('Ephemeral bridge token (auto-injected):', AUTH_TOKEN[:8] + '…')
 
-    # ── 初始化设置：确保 machine_id 和 version 已持久化 ──
+    # ── 初始化设置 ──
     try:
-        if _telemetry is not None:
-            _init_settings = load_persisted_settings()
-            _telemetry.get_machine_id(_init_settings)
-            _init_settings['version'] = _telemetry._read_version()
-            _init_settings.setdefault('raw_preview_cache_enabled', True)
-            save_persisted_settings(_init_settings)
+        _init_settings = load_persisted_settings()
+        _init_settings.setdefault('raw_preview_cache_enabled', True)
+        save_persisted_settings(_init_settings)
     except Exception:
         pass  # 这里不能影响启动流程
 
@@ -626,31 +585,5 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         pass
-    except Exception as _main_exc:
-        # 顶层崩溃兜底：先尝试上报，再把异常重新抛出
-        try:
-            import traceback as _tb
-            if _telemetry is not None:
-                _crash_settings = load_persisted_settings()
-                _crash_mid = _telemetry.get_machine_id(_crash_settings)
-                
-                # 获取最近的日志尾部；如果有当前活跃文件夹，则优先取该文件夹日志
-                _folder_path = _crash_settings.get('active_analysis_path', '')
-                if _folder_path:
-                    _log_tail = _telemetry.get_recent_log_tail(folder_path=_folder_path)
-                else:
-                    _log_tail = _telemetry.get_recent_log_tail()
-                
-                _telemetry.send_crash_report(
-                    exc=_main_exc,
-                    tb_str=_tb.format_exc(),
-                    log_tail=_log_tail,
-                    machine_id=_crash_mid,
-                    version=_telemetry._read_version(),
-                )
-                # 给守护线程一点时间发出 HTTP 请求
-                import time as _t
-                _t.sleep(2)
-        except Exception:
-            pass  # 崩溃处理自身绝不能掩盖真正的异常
+    except Exception:
         raise

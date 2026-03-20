@@ -257,7 +257,9 @@ def launch(path: str, editor: str):
 
         # Fallback: try AppleScript via osascript
         try:
-            script = f'tell application "Finder" to open (POSIX file "{path}")'
+            # 转义路径中的反斜杠和双引号，防止 AppleScript 注入。
+            safe_path = path.replace('\\', '\\\\').replace('"', '\\"')
+            script = f'tell application "Finder" to open (POSIX file "{safe_path}")'
             print(f"[LAUNCH] macOS: trying osascript: {script}", flush=True)
             p = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
             print(f"[LAUNCH] macOS: osascript rc={p.returncode} stdout={p.stdout!r} stderr={p.stderr!r}", flush=True)
