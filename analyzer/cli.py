@@ -46,10 +46,9 @@ def _find_first_image(folder: str) -> str | None:
 
 
 def main():
-    log_path = get_log_path(None)
+    args = parse_args()
+    log_path = get_log_path(args.folder)
     try:
-        args = parse_args()
-        log_path = get_log_path(args.folder)
         if args.smoke:
             log_event(
                 log_path,

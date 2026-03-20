@@ -19,15 +19,6 @@ import webbrowser
 from settings_utils import load_persisted_settings, save_persisted_settings, log
 from queue_manager import _queue_manager
 
-# Telemetry — failsafe import (never blocks startup)
-try:
-    import kestrel_telemetry as _telemetry
-except ImportError:
-    try:
-        from analyzer import kestrel_telemetry as _telemetry
-    except ImportError:
-        _telemetry = None  # type: ignore[assignment]
-
 # pywebview availability
 WEBVIEW_IMPORT_SUCCESS = False
 try:
@@ -123,31 +114,24 @@ class Api:
             raise
 
     def get_legal_status(self) -> dict:
-        """Check if the user has agreed to the terms and if install telemetry was sent."""
+        """Check if the user has agreed to the terms."""
         settings = load_persisted_settings()
         agreed = settings.get('legal_agreed_version', '') != ''
-        install_sent = settings.get('installed_telemetry_sent', False)
-        log(f'[legal] get_legal_status: agreed={agreed}, install_sent={install_sent}')
-        return {
-            'agreed': agreed,
-            'install_sent': install_sent
-        }
+        log(f'[legal] get_legal_status: agreed={agreed}')
+        return {'agreed': agreed}
 
     def agree_to_legal(self):
-        """Mark legal agreement as accepted and trigger installation telemetry if needed."""
+        """Mark legal agreement as accepted."""
         settings = load_persisted_settings()
-        version = _telemetry._read_version() if _telemetry else 'unknown'
-        settings['legal_agreed_version'] = version
-        log(f'[legal] User agreed to terms (version {version})')
-        
-        # Trigger installation telemetry on first agreement
-        if not settings.get('installed_telemetry_sent', False):
-            if _telemetry:
-                mid = _telemetry.get_machine_id(settings)
-                _telemetry.send_installation_telemetry(mid, version=version)
-                settings['installed_telemetry_sent'] = True
-                log('[legal] Initial installation telemetry triggered.')
-        
+        try:
+            from kestrel_analyzer.config import VERSION
+        except Exception:
+            try:
+                from analyzer.kestrel_analyzer.config import VERSION
+            except Exception:
+                VERSION = 'unknown'
+        settings['legal_agreed_version'] = VERSION
+        log(f'[legal] User agreed to terms (version {VERSION})')
         save_persisted_settings(settings)
         return {'success': True}
     
@@ -359,55 +343,6 @@ class Api:
                 return {'success': True, 'version': VERSION}
             except Exception:
                 return {'success': True, 'version': 'unknown'}
-
-    def fetch_remote_version(self):
-        """Fetch version.json from projectkestrel.org to bypass CORS in JS."""
-        try:
-            import urllib.request
-            import urllib.error
-            import json
-            import ssl
-            import certifi
-            
-            url = "https://projectkestrel.org/version.json"
-            ctx = ssl.create_default_context(cafile=certifi.where())
-            
-            req = urllib.request.Request(
-                url,
-                headers={'User-Agent': 'ProjectKestrel/1.0'},
-                method='GET'
-            )
-            
-            with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                return {'success': True, 'data': data}
-        except Exception as e:
-            print(f"[API] fetch_remote_version() -> Error: {e}", flush=True)
-            return {'success': False, 'error': str(e)}
-
-    def get_platform_info(self):
-        """Return platform information (windows, macos, linux)."""
-        import sys
-        if sys.platform == 'darwin':
-            return {'success': True, 'platform': 'macos'}
-        elif sys.platform == 'win32':
-            return {'success': True, 'platform': 'windows'}
-        else:
-            return {'success': True, 'platform': 'linux'}
-
-    def is_windows_store_app(self):
-        """Check if running as a Windows Store app."""
-        try:
-            import sys
-            if sys.platform != 'win32':
-                return {'success': True, 'is_store': False}
-            # Check if running from Program Files\WindowsApps (typical Store app location)
-            import os
-            app_path = os.path.dirname(sys.executable)
-            is_store = 'WindowsApps' in app_path or os.environ.get('APPX_PACKAGE_ROOT') is not None
-            return {'success': True, 'is_store': is_store}
-        except Exception:
-            return {'success': True, 'is_store': False}
 
     def inspect_folder(self, folder_path: str):
         """Return lightweight folder summary (total images, processed count)."""
@@ -832,47 +767,10 @@ class Api:
             print(f'[API] open_url({url!r}) -> Error: {e}', flush=True)
             return {'success': False, 'error': str(e)}
 
-    # ------------------------------------------------------------------ #
-    #  Telemetry / Feedback API                                            #
-    # ------------------------------------------------------------------ #
-
-    def send_feedback(self, data):
-        """Send feedback / bug report (async, failsafe). Called from JS."""
-        try:
-            if _telemetry is None:
-                print('[API] send_feedback() -> telemetry unavailable', flush=True)
-                return {'success': False, 'error': 'Telemetry module not available'}
-            if not isinstance(data, dict):
-                return {'success': False, 'error': 'Invalid data'}
-            settings = load_persisted_settings()
-            machine_id = _telemetry.get_machine_id(settings)
-            log_tail = ''
-            if data.get('include_logs', False):
-                log_tail = _telemetry.get_recent_log_tail()
-            _telemetry.send_feedback(
-                report_type=data.get('type', 'general'),
-                description=data.get('description', ''),
-                contact=data.get('contact', ''),
-                screenshot_b64=data.get('screenshot_b64', ''),
-                log_tail=log_tail,
-                machine_id=machine_id,
-                version=_telemetry._read_version(),
-            )
-            print(f'[API] send_feedback() -> queued ({data.get("type", "general")})', flush=True)
-            return {'success': True}
-        except Exception as e:
-            print(f'[API] send_feedback() -> Error: {e}', flush=True)
-            return {'success': False, 'error': str(e)}
-
     def get_settings(self):
-        """Return persisted settings, ensuring machine_id and version exist."""
+        """Return persisted settings."""
         try:
             settings = load_persisted_settings()
-            if _telemetry is not None:
-                _telemetry.get_machine_id(settings)
-            if _telemetry is not None:
-                settings['version'] = _telemetry._read_version()
-            save_persisted_settings(settings)
             return {'success': True, 'settings': settings}
         except Exception as e:
             print(f'[API] get_settings() -> Error: {e}', flush=True)

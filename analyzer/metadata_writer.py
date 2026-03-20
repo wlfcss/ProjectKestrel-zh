@@ -230,8 +230,10 @@ def write_xmp_metadata(root_path: str, image_data, overwrite_external: bool = Fa
                     quality_score=quality_score,
                 )
 
-                with open(xmp_path, 'w', encoding='utf-8') as f:
+                tmp_xmp = xmp_path + '.tmp'
+                with open(tmp_xmp, 'w', encoding='utf-8') as f:
                     f.write(xmp_content)
+                os.replace(tmp_xmp, xmp_path)
 
                 written += 1
                 log(f'write_xmp: wrote {xmp_path}')

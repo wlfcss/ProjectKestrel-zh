@@ -112,16 +112,19 @@ def _perform_db_upgrade(
         else:
             print(f"Warning: failed to migrate legacy database: {e}", flush=True)
 
-    # 旧 CSV 先改名备份，再保存去掉旧列后的新文件
+    # 先把去掉旧列的新文件写到临时路径，再备份旧文件，最后原子替换。
+    # 这样即使进程在任意步骤崩溃，原始数据也不会丢失。
     try:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         old_path = os.path.join(kestrel_dir, f"OLD_kestrel_database_{timestamp}.csv")
-        os.rename(db_path, old_path)
+        tmp_path = db_path + ".new"
         cleaned = database.drop(
             columns=[c for c in LEGACY_USER_COLUMNS if c in database.columns],
             errors="ignore",
         )
-        cleaned.to_csv(db_path, index=False)
+        cleaned.to_csv(tmp_path, index=False)
+        os.rename(db_path, old_path)
+        os.replace(tmp_path, db_path)
         print(
             f"[database] Upgrade complete: backup at {os.path.basename(old_path)}, "
             f"new clean {DATABASE_NAME} saved.",
@@ -302,10 +305,12 @@ def load_scenedata(kestrel_dir: str) -> dict:
 
 
 def save_scenedata(scenedata: dict, kestrel_dir: str) -> None:
-    """Save scenedata dict to kestrel_scenedata.json."""
+    """Save scenedata dict to kestrel_scenedata.json (atomic write)."""
     scenedata_path = os.path.join(kestrel_dir, SCENEDATA_FILENAME)
-    with open(scenedata_path, "w", encoding="utf-8") as f:
+    tmp_path = scenedata_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(scenedata, f, indent=2)
+    os.replace(tmp_path, scenedata_path)
 
 
 def ensure_columns(database: pd.DataFrame) -> pd.DataFrame:

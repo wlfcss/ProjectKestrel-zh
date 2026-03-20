@@ -110,9 +110,9 @@ class MaskRCNNWrapper:
                 if (np.array(pred_score) > threshold).sum() == 0:
                     return None, None, None, None
                 pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
-                masks = (pred[0]["masks"] > mask_threshold).squeeze().detach().cpu().numpy()
-                if len(masks.shape) == 2:
-                    masks = np.expand_dims(masks, axis=0)
+                # squeeze(1) 只移除 channel 维（形状 N,1,H,W -> N,H,W），
+                # 避免 N=1 时 squeeze() 同时消除 batch 维导致形状变为 (H,W)。
+                masks = (pred[0]["masks"] > mask_threshold).squeeze(1).detach().cpu().numpy()
                 pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]["labels"].numpy())]
                 pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]["boxes"].detach().numpy())]
                 masks = masks[: pred_t + 1]

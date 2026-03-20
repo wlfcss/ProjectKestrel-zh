@@ -234,7 +234,7 @@
     .cull-card.reject-card { border-left: 3px solid var(--reject-border); }
     .cull-card.unrated-card { border-left: 3px solid #f0c040; border: 1px solid #f0c040; }
     .cull-card.assigned-card::after {
-      content: 'User assigned';
+      content: '用户指定';
       position: absolute;
       top: 4px;
       right: 4px;
@@ -2203,6 +2203,7 @@
         }
       } catch (e) {
         console.warn('Auto-save failed', e);
+        showToast('⚠️ 自动保存失败，请检查磁盘空间或文件权限。', 5000);
       }
     }
 
@@ -2717,7 +2718,15 @@
     let zoomActive = false;
     let zoomRow = null;
     let previewRow = null;       // row currently shown in the preview pane
-    let rawCache = new Map();    // filename -> base64 data URL
+    let rawCache = new Map();    // filename -> base64 data URL（有界，避免全分辨率 RAW 无限积累）
+    const _RAW_CACHE_MAX = 20;
+    function _rawCacheSet(key, url) {
+      if (rawCache.size >= _RAW_CACHE_MAX) {
+        const oldest = rawCache.keys().next().value;
+        rawCache.delete(oldest);
+      }
+      rawCache.set(key, url);
+    }
     let rawLoading = new Set();  // filename currently loading
 
     function getRawPreviewKey(row) {
@@ -2834,7 +2843,7 @@
         const res = await window.pywebview.api.read_raw_full(row.filename, rootPath, expCorr);
         if (res && res.success && res.data) {
           const url = `data:image/jpeg;base64,${res.data}`;
-          rawCache.set(cacheKey, url);
+          _rawCacheSet(cacheKey, url);
           // 如果当前行仍处于缩放状态，则切换到高分辨率图源
           if (zoomActive && zoomRow === row) {
             const img = el('#previewExport')?.querySelector('img');

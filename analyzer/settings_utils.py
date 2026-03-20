@@ -8,15 +8,6 @@ import sys
 
 SETTINGS_FILENAME = 'settings.json'
 
-# 遥测模块，导入失败也不能阻塞启动
-try:
-    import kestrel_telemetry as _telemetry
-except ImportError:
-    try:
-        from analyzer import kestrel_telemetry as _telemetry
-    except ImportError:
-        _telemetry = None  # type: ignore[assignment]
-
 
 def _get_user_data_dir() -> str:
     # 为 Project Kestrel 统一使用固定的应用数据目录名
@@ -48,17 +39,14 @@ def load_persisted_settings() -> dict:
 def save_persisted_settings(data: dict) -> None:
     if not isinstance(data, dict):
         raise ValueError('Settings payload must be an object')
-        
-    # --- 用户同意后，补发此前暂存的分析遥测 ---
-    if data.get('analytics_consent_shown', False) and 'pending_analytics' in data:
-        pending = data.pop('pending_analytics')
-        if data.get('analytics_opted_in', False) and _telemetry is not None:
-            try:
-                _telemetry.send_folder_analytics(**pending)
-                log('[analytics] Flushed pending detailed analytics after opt-in.')
-            except Exception as e:
-                log(f'[analytics] Failed to flush pending analytics: {e}')
-    # --------------------------------------
+
+    # Work on a shallow copy so we don't mutate the caller's dict.
+    data = dict(data)
+    # 清除遗留的遥测相关字段（兼容旧设置文件）
+    for _key in ('pending_analytics', 'analytics_consent_shown', 'analytics_opted_in',
+                 'installed_telemetry_sent', 'kestrel_impact_total_files',
+                 'kestrel_impact_total_seconds'):
+        data.pop(_key, None)
 
     path = _get_settings_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)

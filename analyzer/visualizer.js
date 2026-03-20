@@ -41,18 +41,6 @@
     const supportsFS = 'showDirectoryPicker' in window;
     let hasPywebviewApi = typeof window.pywebview !== 'undefined';
 
-    // 调试：记录当前可用的 API（首次检查）
-    console.log('[DEBUG] Initial API Detection:');
-    console.log('  - File System Access API (showDirectoryPicker):', supportsFS);
-    console.log('  - Pywebview API (window.pywebview):', hasPywebviewApi);
-    if (hasPywebviewApi) {
-      console.log('  - window.pywebview object:', window.pywebview);
-      console.log('  - window.pywebview.api:', window.pywebview.api);
-      if (window.pywebview.api) {
-        console.log('  - Available API methods:', Object.keys(window.pywebview.api));
-      }
-    }
-
     // pywebview API 可能异步注入，因此需要等待
     async function waitForPywebview() {
       if (typeof window.pywebview !== 'undefined' && window.pywebview.api) {
@@ -282,163 +270,6 @@
         updateVersionBadge();
       }
       
-      // 从远端 JSON 端点检查新版本，但需要先确保 pywebview 已就绪，
-      // 因此监听事件，或在已经挂载时立即执行
-      if (window.pywebview?.api) {
-        checkRemoteVersion();
-      } else {
-        window.addEventListener('pywebviewready', checkRemoteVersion);
-      }
-    }
-
-    // 检查当前是否以 Windows Store 应用方式运行
-    async function isWindowsStoreApp() {
-      try {
-        if (!window.pywebview?.api?.is_windows_store_app) return false;
-        const result = await window.pywebview.api.is_windows_store_app();
-        return result?.is_store ?? false;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    // 获取平台信息
-    async function getPlatformInfo() {
-      try {
-        if (!window.pywebview?.api?.get_platform_info) {
-          // 回退到前端侧平台检测
-          if (navigator.platform.includes('Mac')) return 'macos';
-          if (navigator.platform.includes('Win')) return 'windows';
-          return 'windows'; // default
-        }
-        const result = await window.pywebview.api.get_platform_info();
-        return result?.platform ?? 'windows';
-      } catch (e) {
-        return 'windows';
-      }
-    }
-
-    // 从 JSON 端点检查远端版本
-    async function checkRemoteVersion() {
-      try {
-        // 从 VERSION.txt 读取当前应用版本
-        let currentVer = _appVersion;
-        if (!currentVer) {
-          try {
-            const versionResp = await fetch('VERSION.txt', { cache: 'no-store' });
-            if (versionResp.ok) {
-              const text = await versionResp.text();
-              const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-              if (lines.length > 0) {
-                // 仅提取版本号部分（例如从 "Version: v(Swamp Sparrow)" 提取 "v(Swamp Sparrow)"）
-                const line = lines[0];
-                currentVer = line.toLowerCase().startsWith('version') 
-                  ? line.replace(/^version:\s*/i, '').trim()
-                  : line;
-              }
-            }
-          } catch (e) { /* ignore */ }
-        }
-        
-        let versionList;
-        if (window.pywebview?.api?.fetch_remote_version) {
-          const res = await window.pywebview.api.fetch_remote_version();
-          if (res && res.success && res.data) {
-            versionList = res.data;
-          }
-        }
-        
-        if (!versionList) {
-          const resp = await fetch('https://projectkestrel.org/version.json', { cache: 'no-store' });
-          if (!resp.ok) return;
-          versionList = await resp.json();
-        }
-        
-        if (!Array.isArray(versionList) || versionList.length === 0) return;
-        
-        const latestVersion = versionList[0]; // first entry is latest
-        
-        // 比较版本：检查最新版本名称是否与当前不同
-        if (!latestVersion.name) return;
-        const normalizedLocal = (currentVer || '').replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
-        const normalizedRemote = latestVersion.name.replace(/^v\(/ig, '').replace(/\)$/g, '').trim();
-        
-        if (normalizedRemote === normalizedLocal) return;
-        
-        // 显示更新通知
-        showVersionUpdateNotification(latestVersion);
-      } catch (e) {
-        // 网络错误或离线模式，忽略即可
-      }
-    }
-
-    // 以 toast 形式显示版本更新通知
-    async function showVersionUpdateNotification(versionInfo) {
-      console.log('[DEBUG] Showing version update notification for version:', versionInfo);
-      const toast = document.getElementById('versionUpdateToast');
-      if (!toast) return;
-      
-      const platform = await getPlatformInfo();
-      const isStore = platform === 'windows' ? await isWindowsStoreApp() : false;
-      
-      // 优先级符号
-      const priorityEl = document.getElementById('versionUpdatePriority');
-      if (priorityEl) priorityEl.textContent = versionInfo.highPriority ? '⭐' : '•';
-      
-      // 标题
-      const titleEl = document.getElementById('versionUpdateTitle');
-      if (titleEl) titleEl.textContent = t('update.available_title', { name: versionInfo.name });
-      
-      // 更新说明（显示前 3 条）
-      const notesEl = document.getElementById('versionUpdateNotes');
-      if (notesEl && versionInfo.notes && Array.isArray(versionInfo.notes)) {
-        notesEl.innerHTML = '';
-        versionInfo.notes.slice(0, 3).forEach(note => {
-          const li = document.createElement('li');
-          li.textContent = note;
-          notesEl.appendChild(li);
-        });
-      }
-      
-      // Windows 专属说明（仅对 Windows 用户显示）
-      const windowsNoteEl = document.getElementById('versionUpdateWindowsNote');
-      if (windowsNoteEl) {
-        if (platform === 'windows') {
-          windowsNoteEl.innerHTML = t('update.windows_note');
-          windowsNoteEl.style.display = 'block';
-        } else {
-          windowsNoteEl.style.display = 'none';
-        }
-      }
-      
-      // 下载按钮
-      const downloadBtn = document.getElementById('versionUpdateDownloadBtn');
-      if (downloadBtn) {
-        downloadBtn.href = `https://projectkestrel.org/download?platform=${platform}`;
-        downloadBtn.textContent = platform === 'macos' ? t('update.download_macos') : t('update.download_windows');
-        downloadBtn.onclick = (e) => {
-          e.preventDefault();
-          window.open(`https://projectkestrel.org/download?platform=${platform}`, '_blank');
-        };
-      }
-      
-      // 关闭按钮
-      const closeBtn = document.getElementById('versionUpdateClose');
-      if (closeBtn) {
-        closeBtn.onclick = () => {
-          toast.style.display = 'none';
-        };
-      }
-      
-      // 显示 toast
-      toast.style.display = 'block';
-      
-      // 10 秒后自动隐藏
-      setTimeout(() => {
-        if (toast.style.display === 'block') {
-          toast.style.display = 'none';
-        }
-      }, 60000);
     }
 
     // 提示层，确保提示信息可以显示在主图区域上方
@@ -569,8 +400,18 @@
     }
 
 
-    // 按路径缓存 Blob URL
+    // 按路径缓存 Blob URL（有界：超出上限时淘汰最早的条目并释放内存）
     const blobUrlCache = new Map();
+    const _BLOB_CACHE_MAX = 300;
+    function _blobCacheSet(key, url) {
+      if (blobUrlCache.size >= _BLOB_CACHE_MAX) {
+        const oldest = blobUrlCache.keys().next().value;
+        const oldUrl = blobUrlCache.get(oldest);
+        if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+        blobUrlCache.delete(oldest);
+      }
+      blobUrlCache.set(key, url);
+    }
 
     /** 将 base64 字符串转换为 Blob 对象 URL。
      *  与 data: URI 不同，blob: URL 会由浏览器的图片解码线程异步处理，
@@ -602,7 +443,7 @@
             // 使用 blob: URL 而不是 data: URL，让浏览器在解码线程中异步处理图片，
             // 避免主线程被同步 base64 与 JPEG/PNG 解析阻塞。
             const blobUrl = _base64ToBlobUrl(result.data, result.mime);
-            blobUrlCache.set(cacheKey, blobUrl);
+            _blobCacheSet(cacheKey, blobUrl);
             return blobUrl;
           }
         } catch (e) {
@@ -617,7 +458,7 @@
           const fileHandle = await getHandleFromRelativePath(rootDirHandle, rel);
           const file = await fileHandle.getFile();
           const url = URL.createObjectURL(file);
-          blobUrlCache.set(cacheKey, url);
+          _blobCacheSet(cacheKey, url);
           return url;
         } catch (e) {
           return null;
@@ -2988,13 +2829,18 @@
 
       // FSAPI 模式（浏览器）：单个文件句柄
       if (csvFileHandle) {
-        const content = rowsToCsvString(allCols, rows);
-        const writable = await csvFileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-        dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
-        takeSnapshot();
-        setStatus('Saved changes to kestrel_database.csv');
+        try {
+          const content = rowsToCsvString(allCols, rows);
+          const writable = await csvFileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+          dirty = false; _notifyDirty(false); el('#saveCsv').disabled = true;
+          takeSnapshot();
+          setStatus('已保存更改到 kestrel_database.csv');
+        } catch (e) {
+          console.error('[saveCsv] FSAPI write failed:', e);
+          setStatus('保存失败：' + (e.message || e));
+        }
         return;
       }
 
@@ -3198,22 +3044,6 @@
       // RAW 预览缓存
       const rawCacheCb = document.getElementById('rawPreviewCacheEnabled');
       if (rawCacheCb) rawCacheCb.checked = getSetting('raw_preview_cache_enabled', true);
-      const optedIn = getSetting('analytics_opted_in', null);
-      const consentShown = getSetting('analytics_consent_shown', false);
-      const cb = document.getElementById('settingsAnalyticsOptIn');
-      const lbl = document.getElementById('settingsAnalyticsLabel');
-      cb.checked = optedIn === true;
-      lbl.textContent = consentShown
-        ? (optedIn === true ? 'Opted in' : 'Not sharing')
-        : 'Not yet decided';
-      
-      // 显示总影响（已分析照片数量），从 localStorage 设置中读取
-      const totalPhotos = getSetting('kestrel_impact_total_files', 0);
-      const impactEl = document.getElementById('settingsTotalImpact');
-      if (impactEl) {
-        impactEl.textContent = totalPhotos > 0 ? totalPhotos.toLocaleString() + ' photos' : '0 photos';
-      }
-      
       // 自动保存设置
       const autoSaveCb = document.getElementById('settingsAutoSave');
       if (autoSaveCb) autoSaveCb.checked = getSetting('auto_save_enabled', true);
@@ -3228,7 +3058,6 @@
       const editor = editorSelect.value || 'darktable';
       const customEditorPath = document.getElementById('customEditorPath').value.trim();
       const treeScanDepth = Math.max(1, Math.min(6, parseInt(document.getElementById('treeScanDepth').value, 10) || 3));
-      const analyticsOptIn = document.getElementById('settingsAnalyticsOptIn').checked;
       const profileEl = document.getElementById('ratingProfile');
       const ratingProfile = profileEl ? profileEl.value : 'balanced';
       const dtEl2 = document.getElementById('detectionThreshold');
@@ -3241,12 +3070,11 @@
       const rawPreviewCacheEnabled = rawCacheCb2 ? rawCacheCb2.checked : true;
       const autoSaveCb = document.getElementById('settingsAutoSave');
       const autoSaveEnabled = autoSaveCb ? autoSaveCb.checked : true;
-      // 合并到现有设置中，保留 machine_id / analytics_consent_shown 等键
+      // 合并到现有设置中
       const existing = loadSettings();
       const prevProfile = existing.rating_profile || 'balanced';
       const settings = {
         ...existing, editor, customEditorPath, treeScanDepth,
-        analytics_opted_in: analyticsOptIn, analytics_consent_shown: true,
         rating_profile: ratingProfile,
         detection_threshold: detectionThreshold,
         scene_time_threshold: sceneTimeThreshold,
@@ -3383,110 +3211,6 @@
     }
 
     // ─── 反馈对话框 ──────────────────────────────────────────────────────
-    function openFeedbackDialog() {
-      document.getElementById('feedbackDesc').value = '';
-      document.getElementById('feedbackContact').value = '';
-      document.getElementById('feedbackStatus').textContent = '';
-      document.getElementById('feedbackIncludeLogs').checked = false;
-      document.getElementById('feedbackIncludeScreenshot').checked = false;
-      document.getElementById('feedbackScreenshotFile').value = '';
-      const preview = document.getElementById('feedbackSsPreview');
-      preview.src = ''; preview.style.display = 'none'; preview.dataset.b64 = '';
-      document.getElementById('feedbackDlg').showModal();
-    }
-
-    // 当反馈类型为缺陷报告时，自动勾选日志
-    document.getElementById('feedbackType').addEventListener('change', function () {
-      document.getElementById('feedbackIncludeLogs').checked = (this.value === 'bug');
-    });
-
-    // 截图文件选择器绑定逻辑
-    document.getElementById('feedbackIncludeScreenshot').addEventListener('change', function () {
-      if (this.checked) {
-        document.getElementById('feedbackScreenshotFile').click();
-      } else {
-        const preview = document.getElementById('feedbackSsPreview');
-        preview.src = ''; preview.style.display = 'none'; preview.dataset.b64 = '';
-        document.getElementById('feedbackScreenshotFile').value = '';
-      }
-    });
-    document.getElementById('feedbackScreenshotFile').addEventListener('change', function () {
-      const file = this.files[0];
-      if (!file) { document.getElementById('feedbackIncludeScreenshot').checked = false; return; }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const b64 = (e.target.result || '').split(',')[1] || '';
-        const preview = document.getElementById('feedbackSsPreview');
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        preview.dataset.b64 = b64;
-        document.getElementById('feedbackIncludeScreenshot').checked = true;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    async function submitFeedback() {
-      const desc = document.getElementById('feedbackDesc').value.trim();
-      if (!desc) {
-        document.getElementById('feedbackStatus').textContent = t('feedback.required');
-        document.getElementById('feedbackDesc').focus();
-        return;
-      }
-      const sendBtn = document.getElementById('feedbackSend');
-      sendBtn.disabled = true;
-      document.getElementById('feedbackStatus').textContent = t('feedback.sending');
-      const data = {
-        type: document.getElementById('feedbackType').value,
-        description: desc,
-        contact: document.getElementById('feedbackContact').value.trim(),
-        include_logs: document.getElementById('feedbackIncludeLogs').checked,
-        screenshot_b64: document.getElementById('feedbackSsPreview').dataset.b64 || '',
-      };
-      try {
-        let result;
-        if (hasPywebviewApi && window.pywebview?.api?.send_feedback) {
-          result = await window.pywebview.api.send_feedback(data);
-        } else {
-          const backendUrl = (getSetting('backendUrl', window.location.origin) || window.location.origin).replace(/\/$/, '');
-          const headers = { 'Content-Type': 'application/json', ...(window.__BRIDGE_TOKEN ? { 'X-Bridge-Token': window.__BRIDGE_TOKEN } : {}) };
-          const res = await fetch(backendUrl + '/feedback', { method: 'POST', headers, body: JSON.stringify(data) });
-          result = await res.json();
-        }
-        if (result && result.success !== false) {
-          document.getElementById('feedbackStatus').textContent = t('feedback.sent');
-          setTimeout(() => { try { document.getElementById('feedbackDlg').close(); } catch (_) { } }, 1200);
-        } else {
-          document.getElementById('feedbackStatus').textContent = t('feedback.failed');
-        }
-      } catch (e) {
-        document.getElementById('feedbackStatus').textContent = t('feedback.failed_with_reason', { message: e.message || e });
-      } finally {
-        sendBtn.disabled = false;
-      }
-    }
-
-    document.getElementById('openFeedback').addEventListener('click', openFeedbackDialog);
-    document.getElementById('feedbackCancel').addEventListener('click', () => document.getElementById('feedbackDlg').close());
-    document.getElementById('feedbackSend').addEventListener('click', submitFeedback);
-
-    // ─── 统计分析授权对话框 ─────────────────────────────────────────────
-    function showAnalyticsConsentDialog() {
-      if (_analyticsConsentPending) return;
-      if (getSetting('analytics_consent_shown', false)) return;
-      _analyticsConsentPending = true;
-      document.getElementById('analyticsConsentDlg').showModal();
-    }
-
-    function handleAnalyticsConsent(optedIn) {
-      mergeSetting('analytics_opted_in', optedIn);
-      mergeSetting('analytics_consent_shown', true);
-      try { document.getElementById('analyticsConsentDlg').close(); } catch (_) { }
-      _analyticsConsentPending = false;
-    }
-
-    document.getElementById('analyticsAccept').addEventListener('click', () => handleAnalyticsConsent(true));
-    document.getElementById('analyticsDecline').addEventListener('click', () => handleAnalyticsConsent(false));
-
     // ─── 捐助 / 支持 ──────────────────────────────────────────────────────
     const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=CXH4FE5AKZD3A';
     const DONATE_THRESHOLD_KEY = 'kestrel-donate-thresholds-shown-v1';
@@ -4592,8 +4316,7 @@
     let _queueLastDoneSet = new Set(); // 记录刚完成的文件夹，用于自动刷新树
     let _queueLastRunningSet = new Set(); // 记录刚开始运行的文件夹，用于更新树
     let _tempKestrelPaths = new Set(); // 临时标记路径，避免 UI 闪烁
-    let _analyticsConsentPending = false; // 防止统计授权对话框重复弹出
-    let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
+let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
     
     // 记录进行中的文件夹，并为实时更新控制自动刷新
     let _inProgressFolderPaths = new Set(); // 处于 pending/running 状态的文件夹
@@ -4607,7 +4330,17 @@
     // ETA 平滑处理：使用指数移动平均，避免每张图的波动过大
     let _etaSmoothed = null;   // 平滑后的每张图耗时
     let _etaLastPath = null;   // 文件夹变化时重置 EMA
-    const _thumbCache = new Map();    // relPath+'|'+rootPath -> dataUrl（避免重载闪烁）
+    const _thumbCache = new Map();    // relPath+'|'+rootPath -> blobUrl（避免重载闪烁）
+    const _THUMB_CACHE_MAX = 500;
+    function _thumbCacheSet(key, url) {
+      if (_thumbCache.size >= _THUMB_CACHE_MAX) {
+        const oldest = _thumbCache.keys().next().value;
+        const oldUrl = _thumbCache.get(oldest);
+        if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+        _thumbCache.delete(oldest);
+      }
+      _thumbCache.set(key, url);
+    }
     let _liveAnalysisDlgOpen = false;
     let _liveLastThumbKey = '';
     let _liveLastOverlayKey = '';
@@ -4874,7 +4607,7 @@
           const result = await window.pywebview.api.read_image_file(rel, root);
           if (result && result.success && result.data) {
             const url = _base64ToBlobUrl(result.data, result.mime);
-            if (!isLive) _thumbCache.set(key, url);
+            if (!isLive) _thumbCacheSet(key, url);
             img.src = url;
           }
         } catch (_) { }
@@ -4887,8 +4620,6 @@
         if (!_queueLastDoneSet.has(p)) {
           treeRescanNeeded = true;
           scheduleAutoRefresh(p);
-          // 首次有文件夹分析完成时，如果还未询问过，则弹出统计授权
-          if (!getSetting('analytics_consent_shown', false)) showAnalyticsConsentDialog();
         }
       }
       if (treeRescanNeeded) {
@@ -5143,7 +4874,7 @@
         const r = await window.pywebview.api.read_image_file(relPath, rootPath);
         if (r && r.success && r.data) {
           const url = _base64ToBlobUrl(r.data, r.mime);
-          if (!isLive) _thumbCache.set(key, url);
+          if (!isLive) _thumbCacheSet(key, url);
           imgEl.src = url;
         }
       } catch (_) { }
@@ -7410,12 +7141,6 @@
       document.getElementById('donateDlgGoBtn').addEventListener('click', function() {
         dlg.close();
         openDonateLink();
-      });
-      document.getElementById('donateDlgFeedbackBtn').addEventListener('click', function() {
-        dlg.close();
-        setTimeout(function() {
-          document.getElementById('feedbackDlg').showModal();
-        }, 150);
       });
       document.getElementById('donateDlgClose').addEventListener('click', function() {
         dlg.close();
