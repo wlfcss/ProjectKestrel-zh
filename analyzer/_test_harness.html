@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>State Management Test Harness</title>
+<script>
+// ═══ Mock PyWebView API — 必须在 visualizer.js 加载之前注入 ═══
+
+const MOCK_CSV_FOLDER_A = `filename,species,species_confidence,family,family_confidence,quality,export_path,crop_path,scene_count,feature_similarity,feature_confidence,color_similarity,color_confidence,similar,secondary_species_list,secondary_species_scores,secondary_family_list,secondary_family_scores,exposure_correction,detection_scores,capture_time,orientation
+IMG_001.jpg,Eastern Towhee,0.85,Sparrow sp.,0.9,0.75,.lingjian/export/IMG_001_export.jpg,.lingjian/crop/IMG_001_crop.jpg,1,-1,-1,-1,-1,False,[],[],[],[],0.0,[0.99],2026-03-07T09:56:24,landscape
+IMG_002.jpg,Blue Jay,0.72,Corvid sp.,0.88,0.82,.lingjian/export/IMG_002_export.jpg,.lingjian/crop/IMG_002_crop.jpg,2,-1,-1,-1,-1,False,[],[],[],[],0.0,[0.95],2026-03-07T10:15:30,landscape
+IMG_003.jpg,Blue Jay,0.68,Corvid sp.,0.85,0.60,.lingjian/export/IMG_003_export.jpg,.lingjian/crop/IMG_003_crop.jpg,2,-1,-1,-1,-1,True,[],[],[],[],0.0,[0.91],2026-03-07T10:15:32,landscape
+IMG_004.jpg,Cardinal,0.90,Cardinal sp.,0.95,0.88,.lingjian/export/IMG_004_export.jpg,.lingjian/crop/IMG_004_crop.jpg,3,-1,-1,-1,-1,False,[],[],[],[],0.0,[0.97],2026-03-07T14:20:10,landscape`;
+
+const MOCK_CSV_FOLDER_B = `filename,species,species_confidence,family,family_confidence,quality,export_path,crop_path,scene_count,feature_similarity,feature_confidence,color_similarity,color_confidence,similar,secondary_species_list,secondary_species_scores,secondary_family_list,secondary_family_scores,exposure_correction,detection_scores,capture_time,orientation
+BIRD_A.jpg,Robin,0.91,Thrush sp.,0.93,0.80,.lingjian/export/BIRD_A_export.jpg,.lingjian/crop/BIRD_A_crop.jpg,1,-1,-1,-1,-1,False,[],[],[],[],0.0,[0.98],2026-04-01T08:30:00,landscape
+BIRD_B.jpg,Robin,0.88,Thrush sp.,0.90,0.70,.lingjian/export/BIRD_B_export.jpg,.lingjian/crop/BIRD_B_crop.jpg,1,-1,-1,-1,-1,True,[],[],[],[],0.0,[0.96],2026-04-01T08:30:02,landscape`;
+
+function makeScenedata(csv) {
+  const lines = csv.trim().split('\n').slice(1);
+  const scenes = {};
+  for (const line of lines) {
+    const cols = line.split(',');
+    const fn = cols[0], sc = cols[8];
+    if (!scenes[sc]) scenes[sc] = { scene_id: sc, image_filenames: [], name: '', status: 'pending', user_tags: { species: [], families: [], finalized: false } };
+    scenes[sc].image_filenames.push(fn);
+  }
+  return { version: '2.0', image_ratings: {}, scenes };
+}
+
+// 控制 mock 行为的全局状态
+window.__mockState = {
+  nextFolder: '/mock/folder_A',   // choose_directory 返回值
+  cancelNext: false,               // choose_directory 是否返回 null（模拟取消）
+  csvMap: {
+    '/mock/folder_A': MOCK_CSV_FOLDER_A,
+    '/mock/folder_B': MOCK_CSV_FOLDER_B,
+  },
+  // 分析队列模拟
+  queueItems: [],
+  queueRunning: false,
+  analysisTimer: null,
+};
+
+window.pywebview = {
+  api: {
+    choose_directory: () => {
+      if (window.__mockState.cancelNext) {
+        window.__mockState.cancelNext = false;
+        return Promise.resolve(null);
+      }
+      return Promise.resolve(window.__mockState.nextFolder);
+    },
+    read_kestrel_csv: (path) => {
+      const root = path.replace(/\/.lingjian$/, '');
+      const csv = window.__mockState.csvMap[root];
+      if (!csv) return Promise.resolve({ success: false, error: 'Not found', path: '', data: '' });
+      return Promise.resolve({ success: true, data: csv, error: '', path: root + '/.lingjian/lingjian_database.csv', root });
+    },
+    read_kestrel_scenedata: (root) => {
+      const csv = window.__mockState.csvMap[root];
+      if (!csv) return Promise.resolve({ success: false });
+      return Promise.resolve({ success: true, data: makeScenedata(csv) });
+    },
+    apply_normalization: () => Promise.resolve({ success: true, normalized_ratings: {} }),
+    read_image_file: () => Promise.resolve({ success: false }),
+    list_subfolders: (root) => Promise.resolve({
+      success: true, root_has_kestrel: true,
+      items: [{ name: root.split('/').pop(), path: root, is_dir: true, has_kestrel: true }]
+    }),
+    inspect_folder: () => Promise.resolve({ success: true, total: 4, processed: 4, has_kestrel: true }),
+    inspect_folders: (paths) => {
+      const results = {};
+      for (const p of (typeof paths === 'string' ? JSON.parse(paths) : paths))
+        results[p] = { total: 4, processed: 4, has_kestrel: true };
+      return Promise.resolve({ success: true, results });
+    },
+    write_kestrel_scenedata: () => Promise.resolve({ success: true }),
+    save_csv: () => Promise.resolve({ success: true }),
+    get_queue_status: () => Promise.resolve({
+      running: window.__mockState.queueRunning,
+      paused: false,
+      items: window.__mockState.queueItems.map(i => ({ ...i })),
+    }),
+    start_analysis_queue: (pathsJson) => {
+      const paths = JSON.parse(pathsJson);
+      window.__mockState.queueItems = paths.map(p => ({ path: p, status: 'running', processed: 0, total: 4 }));
+      window.__mockState.queueRunning = true;
+      // 模拟 3 秒后分析完成
+      let step = 0;
+      window.__mockState.analysisTimer = setInterval(() => {
+        step++;
+        for (const item of window.__mockState.queueItems) {
+          item.processed = Math.min(item.total, step);
+          if (item.processed >= item.total) item.status = 'done';
+        }
+        if (window.__mockState.queueItems.every(i => i.status === 'done')) {
+          window.__mockState.queueRunning = false;
+          clearInterval(window.__mockState.analysisTimer);
+        }
+      }, 750);
+      return Promise.resolve({ success: true });
+    },
+    pause_queue: () => Promise.resolve({ success: true }),
+    resume_queue: () => Promise.resolve({ success: true }),
+    cancel_queue: () => {
+      window.__mockState.queueRunning = false;
+      window.__mockState.queueItems = [];
+      clearInterval(window.__mockState.analysisTimer);
+      return Promise.resolve({ success: true });
+    },
+    clear_completed: () => {
+      window.__mockState.queueItems = window.__mockState.queueItems.filter(i => i.status !== 'done');
+      return Promise.resolve({ success: true });
+    },
+  }
+};
+window.pywebviewReady = true;
+</script>
+</head>
+<body>
+<!-- 加载真实的应用页面内容 -->
+<script>
+// 通过 fetch 加载 visualizer.html 的 body 内容，注入到当前页面
+(async function() {
+  const resp = await fetch('visualizer.html');
+  const html = await resp.text();
+  // 提取 <body> 内容
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if (bodyMatch) {
+    document.body.innerHTML = bodyMatch[1];
+  }
+  // 加载 CSS
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'visualizer.css';
+  document.head.appendChild(link);
+  // 加载依赖脚本
+  const papa = document.createElement('script');
+  papa.src = 'papaparse.local.js';
+  document.head.appendChild(papa);
+  papa.onload = () => {
+    // bridge_config 不需要（mock已注入）
+    // 加载 i18n
+    const i18n = document.createElement('script');
+    i18n.src = 'i18n.js';
+    document.head.appendChild(i18n);
+    i18n.onload = () => {
+      // 加载 taxonomy
+      const tax = document.createElement('script');
+      tax.src = 'taxonomy.js';
+      document.head.appendChild(tax);
+      tax.onload = () => {
+        // 最后加载主逻辑
+        const main = document.createElement('script');
+        main.src = 'visualizer.js';
+        document.body.appendChild(main);
+        // 触发 pywebviewready 事件
+        setTimeout(() => window.dispatchEvent(new Event('pywebviewready')), 500);
+      };
+    };
+  };
+})();
+</script>
+</body>
+</html>

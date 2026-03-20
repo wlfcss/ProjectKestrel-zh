@@ -5207,7 +5207,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       renderFolderTree();
       await renderScenes();
       updateSelectionUI();
-      updateFolderBreadcrumb();
       setStatus(t('status.no_folders_selected'));
     }
 
@@ -5328,7 +5327,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       treeActivePath = paths.length === 1 ? paths[0] : null;
       renderFolderTree();
       await renderScenes();
-      updateFolderBreadcrumb();
       showProgress('Done', 100);
       await sleep(400);
       hideProgress();
@@ -5385,8 +5383,7 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
         // 在 rootPath 已设好的前提下进行渲染
         await renderScenes();
-        updateFolderBreadcrumb();
-
+  
         // 同时写入设置，供打开文件时使用（统一使用 rootHint）
         const settings = loadSettings();
         settings.rootHint = rootPath;
