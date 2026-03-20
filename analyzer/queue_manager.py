@@ -223,13 +223,14 @@ class QueueManager:
                 self._wildlife_enabled = wildlife_enabled
                 self._detection_threshold = float(detection_threshold)
                 self._scene_time_threshold = float(scene_time_threshold)
+                self._mask_threshold = float(mask_threshold)
                 self._thread = threading.Thread(target=self._run, daemon=True, name='kestrel-queue')
                 self._thread.start()
         return {'success': True, 'added': added}
 
     def pause(self) -> dict:
-        self._pause_event.clear()
         with self._lock:
+            self._pause_event.clear()
             running = next((it for it in self._items if it.status == 'running'), None)
             if running is not None and running.pause_start_time is None:
                 running.pause_start_time = _time_mod.time()
