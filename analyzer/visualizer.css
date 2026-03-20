@@ -1190,7 +1190,7 @@ dialog::backdrop {
 /* ── 10. Settings Dialog ─────────────────────────────────── */
 .dlg-settings {
   width: min(580px, 96vw);
-  max-height: 90vh;
+  height: min(600px, 85vh);
   border-radius: var(--r-xl);
   background: rgba(14,18,24,0.98);
   border: 1px solid rgba(255,255,255,0.10);
@@ -1201,7 +1201,6 @@ dialog::backdrop {
   position: fixed;
   inset: 0;
   margin: auto;
-  height: fit-content;
   animation: dlg-pop-center 0.24s var(--spring) forwards;
 }
 .dlg-settings[open] { display: flex; }
@@ -1354,7 +1353,7 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
 /* ── 13. Analyze Queue Dialog ─────────────────────────────── */
 .dlg-compact {
   width: min(800px, 96vw);
-  max-height: 90vh;
+  height: min(600px, 80vh);
   border-radius: var(--r-xl);
   background: rgba(12,16,22,0.98);
   border: 1px solid rgba(255,255,255,0.10);
@@ -1363,7 +1362,6 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
   position: fixed;
   inset: 0;
   margin: auto;
-  height: fit-content;
   animation: dlg-pop-center 0.26s var(--spring) forwards;
   display: none;
 }
