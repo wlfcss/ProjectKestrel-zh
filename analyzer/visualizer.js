@@ -4607,6 +4607,10 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
           }
 
           if (!status.running && (status.items || []).every(i => i.status !== 'pending' && i.status !== 'running')) {
+            // 在停止轮询前执行最后一次刷新，确保完成的文件夹数据已加载
+            if (_autoRefreshPendingPaths.size > 0) {
+              await silentRefreshPending();
+            }
             stopPollingQueue();
           }
         } catch (_) { }
