@@ -17,6 +17,7 @@
         target="_blank">使用条款</a> 和 <a href="https://projectkestrel.org/privacy-policy" target="_blank">隐私政策</a>。</span>
     <button id="legalAgreeBtn" class="legal-notice-btn">同意并关闭</button>
   </div>
+
   <div class="app-body">
   <header>
     <div class="wrap">
@@ -255,22 +256,9 @@
       </div>
     </div>
   </main>
-  </div><!-- /.app-body -->
 
-  <footer class="app-status-bar">
-    <div id="status" class="status">空闲</div>
-    <div class="hidden" id="loadProgressRow">
-      <div class="load-progress">
-        <div id="loadProgressLabel" class="load-progress-label">加载中…</div>
-        <div class="load-progress-track">
-          <div id="loadProgressFill" class="load-progress-fill"></div>
-        </div>
-      </div>
-    </div>
-    <div id="versionBadge" class="version-badge">版本：—</div>
-  </footer>
-
-  <dialog id="sceneDlg">
+  <!-- ═══ 右侧详情面板（取代 sceneDlg 全屏遮罩） ═══ -->
+  <aside id="detailPanel" class="detail-panel" aria-hidden="true" role="dialog" aria-label="场景详情">
     <div class="scene-filmstrip-layout">
       <!-- ═══ 顶栏：场景信息 + 标签 + 操作 ═══ -->
       <div class="scene-topbar">
@@ -287,15 +275,15 @@
           <!-- 物种/科标签与内联 (+) 添加按钮，由 JS 渲染 -->
         </div>
         <div class="scene-topbar-right">
-          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="显示键盘快捷键">⌨ 显示快捷键</button>
-          <button id="splitSceneBtn" title="将此场景拆分为多个场景">✂ 拆分场景</button>
-          <button id="closeDlg" title="关闭（Escape）">✕ 关闭</button>
+          <button class="scene-shortcut-btn" id="sceneShortcutBtn" title="显示键盘快捷键">⌨ 快捷键</button>
+          <button id="splitSceneBtn" title="将此场景拆分为多个场景">✂ 拆分</button>
+          <button id="closeDlg" title="关闭（Escape）">✕</button>
         </div>
       </div>
 
       <!-- 键盘快捷键说明（可切换显示） -->
       <div class="scene-shortcut-legend hidden" id="sceneShortcutLegend">
-        <span><kbd>←</kbd><kbd>→</kbd> 切换图片（可越过边界）</span>
+        <span><kbd>←</kbd><kbd>→</kbd> 切换图片</span>
         <span><kbd>Ctrl</kbd>+<kbd>←</kbd><kbd>→</kbd> 跳到开头/结尾</span>
         <span><kbd>Tab</kbd> 下一个场景</span>
         <span><kbd>Ctrl</kbd>+<kbd>Tab</kbd> 上一个场景</span>
@@ -304,11 +292,8 @@
         <span><kbd>C</kbd> 拒绝</span>
         <span><kbd>1</kbd>–<kbd>5</kbd> 评分</span>
         <span><kbd>Space</kbd> 在编辑器中打开</span>
-        <span><kbd>M1</kbd> RAW 缩放（滚轮缩放）</span>
         <span><kbd>Esc</kbd> 关闭</span>
       </div>
-
-
 
       <!-- ═══ 中部：双预览面板 ═══ -->
       <div class="scene-main">
@@ -330,7 +315,7 @@
             </label>
           </div>
         </div>
-        <!-- 位于预览区和底片栏之间的信息栏 -->
+        <!-- 信息栏：位于预览区和底片栏之间 -->
         <div class="scene-info-bar" id="sceneInfoBar">
           <div class="scene-info-filename" id="sceneInfoFilename">—</div>
           <div class="scene-info-stars" id="sceneInfoStars"></div>
@@ -357,7 +342,28 @@
         </div>
       </div>
     </div>
-  </dialog>
+  </aside>
+
+  <!-- 详情面板背景遮罩（点击可关闭） -->
+  <div id="detailPanelOverlay" class="detail-panel-overlay"></div>
+
+  </div><!-- /.app-body -->
+
+  <footer class="app-status-bar">
+    <div id="status" class="status">空闲</div>
+    <div class="hidden" id="loadProgressRow">
+      <div class="load-progress">
+        <div id="loadProgressLabel" class="load-progress-label">加载中…</div>
+        <div class="load-progress-track">
+          <div id="loadProgressFill" class="load-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+    <div id="versionBadge" class="version-badge">版本：—</div>
+  </footer>
+
+  <!-- sceneDlg 保留为空壳，供 JS 兼容性使用（Step 3 将彻底移除） -->
+  <dialog id="sceneDlg"></dialog>
 
   <!-- 分析器导入模型时显示的加载遮罩 -->
   <div id="loadingOverlay" class="hidden"
@@ -394,7 +400,7 @@
     <div class="settings-body">
       <h3 style="margin:0">设置</h3>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">界面与编辑器</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">界面与编辑器</h4>
 
       <div class="row">
         <label for="editorChoice">首选编辑器</label>
@@ -419,7 +425,7 @@
         </select>
       </div>
       <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">选择 Kestrel 在打开原始文件时所使用的编辑器。
-        “系统默认” 将调用操作系统默认应用。</div>
+        "系统默认" 将调用操作系统默认应用。</div>
       <div class="row hidden" id="customEditorRow">
         <label for="customEditorPath">应用路径</label>
         <input id="customEditorPath" type="text" placeholder="应用程序可执行文件路径…" style="flex:1" />
@@ -431,13 +437,11 @@
 
       <div class="row">
         <label for="treeScanDepth">目录树扫描深度</label>
-        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px"
-          title="How many folder levels to scan when building the folder tree (1–6)" />
+        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">构建文件夹树时扫描多少层子目录（1–6）。
-        数值越大，扫描时间可能越长。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">构建文件夹树时扫描多少层子目录（1–6）。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">星级评分系统</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">星级评分系统</h4>
 
       <div class="row">
         <label for="ratingProfile">评分方案</label>
@@ -449,37 +453,30 @@
           <option value="very_lenient">非常宽松 &mdash; 最容易获得高星</option>
         </select>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">控制画质分数如何转换为星级评分。
-        每个方案都使用固定阈值；越严格的方案，获得 4 或 5 星所需的分数越高。更改会立即作用于已加载的文件夹。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">控制画质分数如何转换为星级评分。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">分析设置</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">分析设置</h4>
 
       <div class="row">
         <label for="detectionThreshold">检测置信度阈值</label>
-        <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75"
-          style="width:80px" title="Minimum MaskRCNN confidence score (0.10–0.99) required to count as a true detection" />
+        <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">鸟类检测器判定为有效检测所需达到的最低置信度
-        （0.10–0.99）。降低该数值可能会增加复杂图像中的<b>误检</b>。需要重新分析后生效，同时也会影响场景对话框中显示的物种和科标签。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">鸟类检测器判定为有效检测所需达到的最低置信度（0.10–0.99）。</div>
 
-      <div style="border-top:1px solid #1d2230;margin:4px 0 2px"></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.06);margin:4px 0 2px"></div>
       <div class="row">
         <label for="sceneTimeThreshold">场景分组时间阈值（秒）</label>
-        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0"
-          style="width:80px" title="Images captured within this many seconds of each other are considered part of the same scene burst" />
+        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">拍摄时间相差不超过该秒数的图片会被视为同一连拍/场景
-        （基于 EXIF 时间戳）。需要重新分析后生效。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">拍摄时间相差不超过该秒数的图片会被视为同一连拍/场景。</div>
 
       <div class="row">
         <label for="maskThreshold">掩码分割阈值</label>
-        <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5"
-          style="width:80px" title="Pixel confidence threshold for bird mask segmentation (0.50–0.95). Higher = tighter masks." />
+        <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5" style="width:80px" />
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">用于掩码分割的置信度阈值（0.50–0.95）。
-        更高的值会产生更紧的鸟体掩码，更低的值则更宽松。需要重新分析后生效。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">用于掩码分割的置信度阈值（0.50–0.95）。</div>
 
-      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid #1d2230;color:#a0a8b8;font-size:13px;text-transform:uppercase;letter-spacing:0.5px">数据与预览</h4>
+      <h4 style="margin:12px 0 8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">数据与预览</h4>
 
       <div class="row">
         <label for="rawPreviewCacheEnabled" style="flex:1">缓存 RAW 预览图</label>
@@ -488,8 +485,7 @@
           <span class="muted">启用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">将全分辨率 RAW 预览缓存在
-        `.kestrel/culling_TMP` 中，以加快后续加载速度。关闭可节省磁盘空间（每次都会重新生成预览）。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">将全分辨率 RAW 预览缓存在 `.kestrel/culling_TMP` 中，以加快后续加载速度。</div>
 
       <div class="row">
         <label for="rawExposureCorrectionDisabled" style="flex:1">禁用 RAW 曝光修正</label>
@@ -498,7 +494,7 @@
           <span class="muted">禁用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">默认情况下，Kestrel 会对 RAW 预览应用计算得到的曝光补偿，以匹配处理后的 JPEG。启用此项可查看未经修正的 RAW 数据。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">默认情况下，Kestrel 会对 RAW 预览应用计算得到的曝光补偿，以匹配处理后的 JPEG。</div>
 
       <div class="row">
         <label for="settingsAutoSave" style="flex:1">自动保存更改</label>
@@ -507,7 +503,7 @@
           <span class="muted">启用</span>
         </label>
       </div>
-      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">自动保存评分、标签和场景修改。关闭后，将使用“保存 / 还原”的工作流。</div>
+      <div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:8px">自动保存评分、标签和场景修改。关闭后，将使用"保存 / 还原"的工作流。</div>
 
     </div>
     <div class="settings-footer">
@@ -522,20 +518,15 @@
       <h3 style="margin:0">合并场景</h3>
       <div class="row" style="align-items:flex-start">
         <label style="margin-top:6px">选择场景</label>
-        <div
-          style="flex:1; max-height: 320px; overflow:auto; border:1px solid #1f2533; border-radius:10px; padding:8px; background:#10131a">
-          <!-- 调整网格，加入缩略图列 -->
-          <div id="mergeList" style="display:grid; grid-template-columns: 120px 1fr auto; gap:6px; align-items:center">
-          </div>
+        <div style="flex:1; max-height: 320px; overflow:auto; border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:8px; background:rgba(255,255,255,0.025)">
+          <div id="mergeList" style="display:grid; grid-template-columns: 120px 1fr auto; gap:6px; align-items:center"></div>
         </div>
       </div>
       <div class="row">
         <label>目标</label>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-          <label class="inline"><input type="radio" name="mergeTargetMode" value="min" checked> <span
-              class="muted">使用所选中的最小 ID</span></label>
-          <label class="inline"><input type="radio" name="mergeTargetMode" value="manual"> <span
-              class="muted">ID：</span>
+          <label class="inline"><input type="radio" name="mergeTargetMode" value="min" checked> <span class="muted">使用所选中的最小 ID</span></label>
+          <label class="inline"><input type="radio" name="mergeTargetMode" value="manual"> <span class="muted">ID：</span>
             <input id="mergeTargetId" type="number" style="width:120px" />
           </label>
         </div>
@@ -572,7 +563,7 @@
         &nbsp;<span style="color:var(--ok);font-style:italic;">●</span>&thinsp;<i>版本过旧</i>
         &nbsp;<span style="color:#b36bff;">●</span>&thinsp;分析中
         &nbsp;<span style="color:var(--brand);">●</span>&thinsp;未开始
-        &nbsp;<span style="color:#555;font-size:11px;">● 淡色 = 无照片</span></p>
+        &nbsp;<span style="color:rgba(255,255,255,0.25);font-size:11px;">● 淡色 = 无照片</span></p>
       <div class="analyze-dlg-split">
         <!-- 左侧面板：文件夹树 -->
         <div style="display:flex;flex-direction:column;gap:4px;min-height:0;">
@@ -610,7 +601,7 @@
       </div>
       <div class="analyze-dlg-footer">
         <span class="analyze-dlg-selected-count" id="analyzeDlgCount">已选 0 个文件夹</span>
-        <button id="analyzeDlgRestoreQueue" style="display:none;font-size:11px;padding:4px 8px;background:#5a4a7a;color:#d0b8ff;border:1px solid #7a6a9a;" title="恢复上次取消时的队列">恢复队列？</button>
+        <button id="analyzeDlgRestoreQueue" style="display:none" title="恢复上次取消时的队列">恢复队列？</button>
         <button id="analyzeDlgCancel">取消</button>
         <button id="analyzeDlgAdd" class="primary" disabled>加入队列</button>
       </div>
@@ -643,14 +634,13 @@
     </div>
   </dialog>
 
-
   <!-- 捐助 / 支持对话框 -->
   <dialog id="donateDlg">
     <div class="donate-dlg">
       <div class="donate-dlg-icon"><img src="logo.png" alt="Kestrel Logo" /></div>
       <h3>Kestrel 已经分析了超过 <span id="donateCountDisplay">很多</span> 张照片！</h3>
       <p>感谢你使用 Project Kestrel！我是一个独立开发这个项目的学生兼观鸟爱好者。之所以制作 Kestrel，是因为我喜欢拍摄野生动物，却不喜欢花大量时间整理照片。如果 Kestrel 对你有帮助，欢迎支持它继续发展，或向我分享你的想法和反馈。</p>
-      <p style="font-size:12px;color:#607080;">Project Kestrel 是免费且开源的。每一次 <a href="https://github.com/SanjaySoniLV/ProjectKestrel" target="_blank">贡献</a> 都能帮助它持续成长。</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.35);">Project Kestrel 是免费且开源的。每一次 <a href="https://github.com/SanjaySoniLV/ProjectKestrel" target="_blank">贡献</a> 都能帮助它持续成长。</p>
       <div class="donate-dlg-btns">
         <button class="donate-main-btn" id="donateDlgGoBtn">通过 PayPal 捐助</button>
       </div>

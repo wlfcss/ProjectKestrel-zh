@@ -2129,6 +2129,24 @@
       renderTopbarTags(scene);
     }
 
+    // ── 右侧详情面板控制 ──────────────────────────────────────
+    function showDetailPanel() {
+      const panel = document.getElementById('detailPanel');
+      const overlay = document.getElementById('detailPanelOverlay');
+      if (panel) { panel.classList.add('open'); panel.setAttribute('aria-hidden', 'false'); }
+      if (overlay) { overlay.classList.add('active'); overlay.onclick = () => el('#closeDlg')?.click(); }
+      document.body.style.overflow = '';
+    }
+    function hideDetailPanel() {
+      const panel = document.getElementById('detailPanel');
+      const overlay = document.getElementById('detailPanelOverlay');
+      if (panel) { panel.classList.remove('open'); panel.setAttribute('aria-hidden', 'true'); }
+      if (overlay) { overlay.classList.remove('active'); overlay.onclick = null; }
+      // 触发 sceneDlg 的 close 事件，以兼容教程流程中的 waitFor:'closeDialog'
+      const _sd = document.getElementById('sceneDlg');
+      if (_sd) { try { _sd.dispatchEvent(new Event('close')); } catch (_) {} }
+    }
+
     async function openSceneDialog(sceneId, startIndex = 0) {
       const scene = scenes.find(s => String(s.id) === String(sceneId));
       if (!scene) return;
@@ -2222,7 +2240,7 @@
         _sceneEditMode = false;
         _currentScene = null;
         document.removeEventListener('keydown', _sceneKeyHandler);
-        sceneDlg.close();
+        hideDetailPanel();
         if (closingId) _focusGridCard(closingId);
       };
 
@@ -2245,8 +2263,8 @@
       document.removeEventListener('keydown', _sceneKeyHandler);
       document.addEventListener('keydown', _sceneKeyHandler);
 
-      // ── 显示对话框并选中起始图片 ──
-      sceneDlg.showModal();
+      // ── 显示右侧详情面板并选中起始图片 ──
+      showDetailPanel();
       await selectFilmstripImage(startIndex, scene);
     }
 
@@ -2263,7 +2281,7 @@
       _sceneEditDraft = null;
       _sceneEditMode = false;
       document.removeEventListener('keydown', _sceneKeyHandler);
-      sceneDlg.close();
+      hideDetailPanel();
       openSceneDialog(nextScene.id, startIndex);
     }
 
@@ -5360,8 +5378,8 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const revertBtn = document.getElementById('revertCsv');
       if (saveBtn) saveBtn.disabled = true;
       if (revertBtn) revertBtn.disabled = true;
-      if (sceneDlg?.open) {
-        try { sceneDlg.close(); } catch (_) {}
+      if (document.getElementById('detailPanel')?.classList.contains('open')) {
+        hideDetailPanel();
       }
       renderFolderTree();
       await renderScenes();
@@ -6879,11 +6897,11 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       // 找到目标元素
       var target = step.target ? document.querySelector(step.target) : null;
 
-      // 对于 inDialog 步骤，先检查场景对话框是否已打开
+      // 对于 inDialog 步骤，先检查场景详情面板是否已打开
       var _inDialogActive = false;
       if (step.inDialog) {
-        var dlg = document.getElementById('sceneDlg');
-        if (!dlg || !dlg.open) {
+        var _panelOpen = document.getElementById('detailPanel')?.classList.contains('open');
+        if (!_panelOpen) {
           // 对话框未打开，则显示提示，并允许通过“下一步”跳过
           _tutEl('#tutorialBody').innerHTML = step.body + '<br><br><span style="color:var(--brand);font-weight:600">Open a scene first, then this step will highlight the right element.</span>';
           nudge.style.display = 'none';
