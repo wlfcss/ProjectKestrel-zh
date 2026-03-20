@@ -5584,7 +5584,12 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
     // ---- UI 缩放 ----
     function applyUiScale(pct) {
-      document.documentElement.style.zoom = (pct / 100).toString();
+      // 只缩放主体区域，不影响 dialog 定位
+      const appBody = document.querySelector('.app-body');
+      const statusBar = document.querySelector('.app-status-bar');
+      const zoom = (pct / 100).toString();
+      if (appBody) appBody.style.zoom = zoom;
+      if (statusBar) statusBar.style.zoom = zoom;
     }
     (function initUiScale() {
       const slider = document.getElementById('uiScale');

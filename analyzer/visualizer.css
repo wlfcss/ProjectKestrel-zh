@@ -729,9 +729,11 @@ dialog::backdrop {
 }
 
 #sceneDlg {
-  width: 96vw;
-  max-width: 1600px;
-  height: 90vh;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(96vw, 1600px);
+  height: min(90vh, calc(100vh - 60px));
   min-height: 540px;
   border-radius: var(--r-xl);
   overflow: hidden;
@@ -740,17 +742,13 @@ dialog::backdrop {
   box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.10);
   display: flex;
   flex-direction: column;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   animation: dlg-pop 0.28s var(--spring) forwards;
 }
 #sceneDlg[open] { display: flex; }
 
 @keyframes dlg-pop {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 .scene-filmstrip-layout {
