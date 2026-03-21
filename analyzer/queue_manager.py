@@ -154,7 +154,7 @@ class QueueManager:
         self._pipeline = None
         self._use_gpu = True
         self._wildlife_enabled = True
-        self._detection_threshold = 0.75
+        self._detection_threshold = 0.40
         self._scene_time_threshold = 1.0
         self._mask_threshold = 0.5
 
@@ -180,7 +180,7 @@ class QueueManager:
 
     # ---- 队列控制 ----
 
-    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True, detection_threshold: float = 0.75, scene_time_threshold: float = 1.0, mask_threshold: float = 0.5) -> dict:
+    def enqueue(self, paths: list, use_gpu: bool = True, wildlife_enabled: bool = True, detection_threshold: float = 0.40, scene_time_threshold: float = 1.0, mask_threshold: float = 0.5) -> dict:
         if not _PIPELINE_AVAILABLE:
             return {'success': False, 'error': f'Analyzer unavailable: {_pipeline_import_error}'}
         with self._lock:

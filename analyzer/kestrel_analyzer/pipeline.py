@@ -44,7 +44,7 @@ except ImportError:
     except ImportError:
         load_persisted_settings = None
 
-from .ml.mask_rcnn import MaskRCNNWrapper
+from .ml.yolo_seg import YOLOSegWrapper
 from .ml.bird_species import BirdSpeciesClassifier
 from .ml.quality import QualityClassifier
 
@@ -78,7 +78,7 @@ class _ImagePreloader:
 class AnalysisPipeline:
     def __init__(self, use_gpu: bool):
         self.use_gpu = use_gpu
-        self.mask_rcnn: Optional[MaskRCNNWrapper] = None
+        self.detector: Optional[YOLOSegWrapper] = None
         self.species_clf: Optional[BirdSpeciesClassifier] = None
         self.quality_clf: Optional[QualityClassifier] = None
         self._log_path: Optional[str] = None
@@ -287,11 +287,11 @@ class AnalysisPipeline:
         return "square"
 
     def load_models(self, status_cb: Optional[Callable[[str], None]] = None) -> None:
-        if self.mask_rcnn and self.species_clf and self.quality_clf:
+        if self.detector and self.species_clf and self.quality_clf:
             return
         if status_cb:
             status_cb("正在加载模型…首次运行可能需要较长时间。")
-        self.mask_rcnn = MaskRCNNWrapper()
+        self.detector = YOLOSegWrapper()
         self.species_clf = BirdSpeciesClassifier(
             str(SPECIESCLASSIFIER_PATH),
             str(SPECIESCLASSIFIER_LABELS),
@@ -313,7 +313,7 @@ class AnalysisPipeline:
         callbacks: Optional[Dict[str, Callable]] = None,
         analyzer_name: str = "pipeline",
         wildlife_enabled: bool = True,
-        detection_threshold: float = 0.75,
+        detection_threshold: float = 0.40,
         scene_time_threshold: float = 1.0,
         mask_threshold: float = 0.5,
     ) -> None:
@@ -611,11 +611,11 @@ class AnalysisPipeline:
                     if thumbnail_cb:
                         thumbnail_cb({"filename": raw_file, "thumbnail": preview_small, "export_path": export_path_rel})
 
-                    stage_ctx["stage"] = "mask_rcnn_prediction"
-                    # MaskRCNN inference can take many seconds. Pause semantics are
+                    stage_ctx["stage"] = "yolo_seg_prediction"
+                    # Detection inference. Pause semantics are
                     # handled at the start of each image loop so we do not check
                     # repeatedly inside the image processing path.
-                    masks, pred_boxes, pred_class, pred_score = self.mask_rcnn.get_prediction(img, threshold=detection_threshold, mask_threshold=mask_threshold)
+                    masks, pred_boxes, pred_class, pred_score = self.detector.get_prediction(img, threshold=detection_threshold, mask_threshold=mask_threshold)
                     if masks is None or len(masks) == 0:
                         if detection_cb:
                             detection_cb(
@@ -652,7 +652,7 @@ class AnalysisPipeline:
                             progress_cb(idx + processed_count, total)
                         continue
 
-                    # Store top-5 raw MaskRCNN detection confidence scores
+                    # Store top-5 detection confidence scores
                     entry["detection_scores"] = json.dumps([float(s) for s in sorted(pred_score, reverse=True)[:5]])
 
                     wildlife_indices = [i for i, c in enumerate(pred_class) if c in active_wildlife_categories]
@@ -679,10 +679,10 @@ class AnalysisPipeline:
                         stage_ctx["stage"] = "process_nonbird"
                         stops = self._compute_exposure_stops(img, masks[primary_mask_i])
                         img_src = self._apply_exposure_correction(img, stops, raw_obj)
-                        quality_crop, quality_mask = self.mask_rcnn.get_square_crop(
+                        quality_crop, quality_mask = self.detector.get_square_crop(
                             masks[primary_mask_i], img_src, resize=True
                         )
-                        visual_crop, _ = self.mask_rcnn.get_square_crop(
+                        visual_crop, _ = self.detector.get_square_crop(
                             masks[primary_mask_i], preview_aligned, resize=True
                         )
                         quality_score = self.quality_clf.classify(quality_crop, quality_mask)
@@ -706,9 +706,9 @@ class AnalysisPipeline:
                             # top of the image loop so we avoid pausing mid-image.
                             stops = self._compute_exposure_stops(img, masks[i])
                             img_src = self._apply_exposure_correction(img, stops, raw_obj)
-                            species_crop = self.mask_rcnn.get_species_crop(pred_boxes[i], img_src)
-                            quality_crop, quality_mask = self.mask_rcnn.get_square_crop(masks[i], img_src, resize=True)
-                            visual_crop, _ = self.mask_rcnn.get_square_crop(masks[i], preview_aligned, resize=True)
+                            species_crop = self.detector.get_species_crop(pred_boxes[i], img_src)
+                            quality_crop, quality_mask = self.detector.get_square_crop(masks[i], img_src, resize=True)
+                            visual_crop, _ = self.detector.get_square_crop(masks[i], preview_aligned, resize=True)
                             items.append(
                                 {
                                     "index": i,
