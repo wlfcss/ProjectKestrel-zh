@@ -643,7 +643,7 @@ class AnalysisPipeline:
                             detection_cb(
                                 {
                                     "filename": raw_file,
-                                    "overlay": self._create_mask_overlay(analysis_small, None, None),
+                                    "overlay": self._create_mask_overlay(preview_small, None, None),
                                     "bird_count": 0,
                                 }
                             )
@@ -687,9 +687,10 @@ class AnalysisPipeline:
                                 {
                                     "filename": raw_file,
                                     "overlay": self._create_mask_overlay(
-                                        analysis_small,
+                                        preview_small,
                                         masks,
                                         overlay_indices,
+                                        analysis_shape=(analysis_small.shape[1], analysis_small.shape[0]),
                                     ),
                                     "bird_count": len(bird_indices),
                                 }
