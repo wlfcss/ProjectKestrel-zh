@@ -85,38 +85,42 @@ class AnalysisPipeline:
 
     @staticmethod
     def _create_mask_overlay(
-        thumbnail: np.ndarray,
+        base: np.ndarray,
         masks: Optional[np.ndarray],
         indices: Optional[list],
-        analysis_shape: Optional[tuple] = None,
-        warp_matrix: Optional[np.ndarray] = None,
+        color_ref: Optional[np.ndarray] = None,
         color=(255, 64, 64),
         alpha: float = 0.45,
     ) -> Optional[np.ndarray]:
-        if thumbnail is None:
+        """Create a mask overlay on *base* (analysis-space image).
+
+        If *color_ref* is provided (e.g. the camera-JPEG preview), the base
+        image colours are shifted to match the reference so the overlay looks
+        natural while keeping mask coordinates perfectly aligned.
+        """
+        if base is None:
             return None
-        overlay = thumbnail.copy()
+        overlay = base.copy()
+        # Colour-correct the base image to match the camera preview
+        if color_ref is not None:
+            ref = color_ref
+            if ref.shape[:2] != overlay.shape[:2]:
+                ref = cv2.resize(ref, (overlay.shape[1], overlay.shape[0]), interpolation=cv2.INTER_AREA)
+            for c in range(3):
+                s_mean = float(overlay[:, :, c].mean())
+                s_std = float(overlay[:, :, c].std()) or 1.0
+                t_mean = float(ref[:, :, c].mean())
+                t_std = float(ref[:, :, c].std()) or 1.0
+                overlay[:, :, c] = np.clip(
+                    (overlay[:, :, c].astype(np.float32) - s_mean) * (t_std / s_std) + t_mean,
+                    0, 255,
+                ).astype(np.uint8)
         if masks is None or not indices:
             return overlay
         h, w = overlay.shape[:2]
         for i in indices:
             mask = masks[i].astype(np.uint8)
-            if analysis_shape is not None:
-                aw, ah = analysis_shape
-                mask_small = cv2.resize(mask, (aw, ah), interpolation=cv2.INTER_NEAREST)
-            else:
-                mask_small = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
-            if warp_matrix is not None:
-                mask_small = cv2.warpAffine(
-                    mask_small,
-                    warp_matrix,
-                    (w, h),
-                    flags=cv2.INTER_NEAREST,
-                    borderMode=cv2.BORDER_CONSTANT,
-                    borderValue=0,
-                )
-            elif mask_small.shape[:2] != (h, w):
-                mask_small = cv2.resize(mask_small, (w, h), interpolation=cv2.INTER_NEAREST)
+            mask_small = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
             mask_bool = mask_small.astype(bool)
             if not np.any(mask_bool):
                 continue
@@ -643,7 +647,7 @@ class AnalysisPipeline:
                             detection_cb(
                                 {
                                     "filename": raw_file,
-                                    "overlay": self._create_mask_overlay(preview_small, None, None),
+                                    "overlay": self._create_mask_overlay(analysis_small, None, None, color_ref=preview_small),
                                     "bird_count": 0,
                                 }
                             )
@@ -687,10 +691,10 @@ class AnalysisPipeline:
                                 {
                                     "filename": raw_file,
                                     "overlay": self._create_mask_overlay(
-                                        preview_small,
+                                        analysis_small,
                                         masks,
                                         overlay_indices,
-                                        analysis_shape=(analysis_small.shape[1], analysis_small.shape[0]),
+                                        color_ref=preview_small,
                                     ),
                                     "bird_count": len(bird_indices),
                                 }
