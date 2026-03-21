@@ -27,3 +27,4 @@ analyzer/models/quality_set4_ep4.keras
 analyzer/models/quality_set4_ep6.keras
 analyzer/models/quality_set6_ep1.keras
 analyzer/models/current.md
+analyzer/models/mask_rcnn_backbone.mlpackage/

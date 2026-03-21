@@ -2,6 +2,7 @@ import json
 import os
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Callable, Dict, Optional
 
 import cv2
@@ -46,6 +47,32 @@ except ImportError:
 from .ml.mask_rcnn import MaskRCNNWrapper
 from .ml.bird_species import BirdSpeciesClassifier
 from .ml.quality import QualityClassifier
+
+
+class _ImagePreloader:
+    """Pre-read the next image in a background thread to overlap I/O with GPU inference."""
+
+    def __init__(self):
+        self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="img-preload")
+        self._future: Optional[Future] = None
+
+    def submit(self, path: str) -> None:
+        self._future = self._pool.submit(read_image_for_pipeline, path)
+
+    def get(self):
+        """Block until the pre-loaded image is ready and return (img, raw_obj, preview_img).
+
+        Returns ``(None, None, None)`` when no image was submitted
+        (e.g. after a prior failure skipped the submit call).
+        """
+        if self._future is None:
+            return None, None, None
+        result = self._future.result()
+        self._future = None
+        return result
+
+    def shutdown(self):
+        self._pool.shutdown(wait=False)
 
 
 class AnalysisPipeline:
@@ -421,6 +448,11 @@ class AnalysisPipeline:
             _SAVE_BATCH = 10
             _pending_entries: list = []
 
+            # Pre-load the first image so that I/O overlaps with inference.
+            preloader = _ImagePreloader()
+            if new_files:
+                preloader.submit(os.path.join(folder, new_files[0]))
+
             for idx, raw_file in enumerate(new_files, start=1):
                 # Pause: wait until resume or until cancel_event is set.
                 if pause_event is not None:
@@ -428,12 +460,14 @@ class AnalysisPipeline:
                         if cancel_event is not None and cancel_event.is_set():
                             if status_cb:
                                 status_cb('已取消')
+                            preloader.shutdown()
                             return
                         # Wait with timeout to be interruptible
                         pause_event.wait(timeout=0.5)
                 if cancel_event is not None and cancel_event.is_set():
                     if status_cb:
                         status_cb('已取消')
+                    preloader.shutdown()
                     return
 
                 entry = {
@@ -467,7 +501,14 @@ class AnalysisPipeline:
                     stage_ctx["stage"] = "read_image"
                     stage_ctx["file"] = raw_file
                     image_path = os.path.join(folder, raw_file)
-                    img, raw_obj, preview_img = read_image_for_pipeline(image_path)
+                    try:
+                        img, raw_obj, preview_img = preloader.get()
+                    except Exception:
+                        img, raw_obj, preview_img = None, None, None
+                    finally:
+                        # Always pre-load the next image, even if this one failed.
+                        if idx < len(new_files):
+                            preloader.submit(os.path.join(folder, new_files[idx]))
                     if img is None:
                         raise RuntimeError("Image read returned None")
                     preview_img = preview_img if preview_img is not None else img
@@ -687,31 +728,38 @@ class AnalysisPipeline:
                                     "confidences": [i["confidence"] for i in items],
                                 }
                             )
+                        # Batch species classification for all bird detections.
+                        bird_items = [it for it in items if pred_class[it["index"]] == "bird"]
+                        if bird_items:
+                            stage_ctx["stage"] = "species_batch"
+                            batch_results = self.species_clf.classify_batch(
+                                [it["species_crop"] for it in bird_items]
+                            )
+                            for it, sr in zip(bird_items, batch_results):
+                                it["species"] = (
+                                    sr["top_species_labels"][0]
+                                    if len(sr["top_species_labels"])
+                                    else "Unknown"
+                                )
+                                it["species_confidence"] = (
+                                    float(sr["top_species_scores"][0])
+                                    if len(sr["top_species_scores"])
+                                    else 0.0
+                                )
+                                it["family"] = (
+                                    sr["top_family_labels"][0]
+                                    if len(sr["top_family_labels"])
+                                    else "Unknown"
+                                )
+                                it["family_confidence"] = (
+                                    float(sr["top_family_scores"][0])
+                                    if len(sr["top_family_scores"])
+                                    else 0.0
+                                )
+
                         for item in items:
                             i = item["index"]
-                            if pred_class[i] == "bird":
-                                species_result = self.species_clf.classify(item["species_crop"])
-                                item["species"] = (
-                                    species_result["top_species_labels"][0]
-                                    if len(species_result["top_species_labels"])
-                                    else "Unknown"
-                                )
-                                item["species_confidence"] = (
-                                    float(species_result["top_species_scores"][0])
-                                    if len(species_result["top_species_scores"])
-                                    else 0.0
-                                )
-                                item["family"] = (
-                                    species_result["top_family_labels"][0]
-                                    if len(species_result["top_family_labels"])
-                                    else "Unknown"
-                                )
-                                item["family_confidence"] = (
-                                    float(species_result["top_family_scores"][0])
-                                    if len(species_result["top_family_scores"])
-                                    else 0.0
-                                )
-                            else:
+                            if pred_class[i] != "bird":
                                 item["species"] = pred_class[i]
                                 item["species_confidence"] = float(pred_score[i])
                                 item["family"] = "N/A"
@@ -1008,4 +1056,5 @@ class AnalysisPipeline:
             if error_cb:
                 error_cb("fatal", e)
         finally:
+            preloader.shutdown()
             warnings.showwarning = original_showwarning

@@ -1,4 +1,7 @@
+import platform
+import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import cv2
@@ -7,10 +10,53 @@ import torch
 import torchvision.models.detection as detection_models
 import torchvision.transforms as T
 
-from ..config import MASK_RCNN_WEIGHTS_PATH
+from ..config import MASK_RCNN_WEIGHTS_PATH, MODELS_DIR
+
+
+def _is_apple_silicon():
+    return sys.platform == "darwin" and platform.machine() == "arm64"
+
+
+def _convert_backbone_to_coreml(backbone, cache_path):
+    """Trace the FPN backbone and convert to CoreML for Neural Engine acceleration."""
+    import coremltools as ct
+
+    class _BackboneWrapper(torch.nn.Module):
+        def __init__(self, b):
+            super().__init__()
+            self.backbone = b
+
+        def forward(self, x):
+            return tuple(self.backbone(x).values())
+
+    wrapper = _BackboneWrapper(backbone)
+    wrapper.eval()
+    # Mask R-CNN's internal transform resizes to min=800 / max=1333.
+    # For landscape 3:2 images this yields (800, 1216).
+    trace_shape = (1, 3, 800, 1216)
+    traced = torch.jit.trace(wrapper, torch.randn(trace_shape), strict=False)
+    mlmodel = ct.convert(
+        traced,
+        inputs=[ct.TensorType(name="image", shape=trace_shape)],
+        compute_units=ct.ComputeUnit.ALL,
+        minimum_deployment_target=ct.target.macOS12,
+    )
+    mlmodel.save(str(cache_path))
+    return mlmodel, trace_shape
 
 
 class MaskRCNNWrapper:
+    # Maximum long-edge size fed into the model.  Larger images are
+    # downscaled before inference and results are mapped back to the
+    # original resolution.  This dramatically reduces computation on
+    # high-megapixel cameras (e.g. 45 MP Canon R5).
+    _MAX_INFERENCE_SIZE = 1600
+
+    # Reduce RPN proposals from the default 1000.  Bird photography
+    # scenes rarely contain more than a handful of objects, so 256
+    # proposals is more than sufficient and halves RPN+ROI time.
+    _RPN_PROPOSALS = 256
+
     def __init__(self):
         self.COCO_INSTANCE_CATEGORY_NAMES = [
             "__background__", "person", "bicycle", "car", "motorcycle", "airplane", "bus",
@@ -34,20 +80,114 @@ class MaskRCNNWrapper:
             )
         self._raise_if_lfs_pointer(weights_path)
 
+        self.device = torch.device("cpu")
         self.model = detection_models.maskrcnn_resnet50_fpn_v2(weights=None)
         state_dict = self._load_state_dict(weights_path)
         self.model.load_state_dict(state_dict)
         self.model.eval()
 
+        # Reduce proposals for faster RPN + ROI head
+        self.model.rpn._pre_nms_top_n['testing'] = self._RPN_PROPOSALS
+        self.model.rpn._post_nms_top_n['testing'] = self._RPN_PROPOSALS
+
+        # Try to accelerate backbone with CoreML on Apple Silicon
+        self._coreml_backbone = None
+        self._coreml_shape = None
+        self._backbone_feature_keys = None
+        self._coreml_output_names = None
+        if _is_apple_silicon():
+            self._init_coreml_backbone()
+
+        print(f"[mask_rcnn] Model loaded (coreml_backbone={'yes' if self._coreml_backbone else 'no'}, "
+              f"proposals={self._RPN_PROPOSALS})")
+
+    def _init_coreml_backbone(self):
+        """Convert and cache the FPN backbone as a CoreML model."""
+        cache_path = MODELS_DIR / "mask_rcnn_backbone.mlpackage"
+        try:
+            import coremltools as ct
+
+            # Get feature keys and reference shapes from PyTorch backbone
+            dummy = torch.randn(1, 3, 800, 1216)
+            with torch.no_grad():
+                ref_out = self.model.backbone(dummy)
+            self._backbone_feature_keys = list(ref_out.keys())
+            ref_shapes = {k: tuple(v.shape) for k, v in ref_out.items()}
+
+            if cache_path.exists():
+                mlmodel = ct.models.MLModel(str(cache_path), compute_units=ct.ComputeUnit.ALL)
+                self._coreml_shape = (1, 3, 800, 1216)
+            else:
+                print("[mask_rcnn] Converting backbone to CoreML (one-time)...")
+                mlmodel, self._coreml_shape = _convert_backbone_to_coreml(
+                    self.model.backbone, cache_path
+                )
+
+            # Map CoreML output names to backbone feature keys by matching
+            # tensor shapes, so we are robust to spec output reordering.
+            warmup_input = np.zeros(self._coreml_shape, dtype=np.float32)
+            cml_out = mlmodel.predict({"image": warmup_input})
+            cml_shapes = {name: np.array(val).shape for name, val in cml_out.items()}
+
+            key_to_cml_name = {}
+            for fkey, fshape in ref_shapes.items():
+                for cname, cshape in cml_shapes.items():
+                    if cshape == fshape and cname not in key_to_cml_name.values():
+                        key_to_cml_name[fkey] = cname
+                        break
+            if len(key_to_cml_name) != len(self._backbone_feature_keys):
+                raise RuntimeError(
+                    f"Could not match all backbone outputs: matched {key_to_cml_name}, "
+                    f"expected keys {self._backbone_feature_keys}"
+                )
+            self._coreml_output_names = [key_to_cml_name[k] for k in self._backbone_feature_keys]
+            self._coreml_backbone = mlmodel
+        except Exception as exc:
+            print(f"[mask_rcnn] CoreML backbone init failed, using PyTorch CPU: {exc}")
+            self._coreml_backbone = None
+
+    def _predict_with_coreml(self, img_tensor, image_data_shape):
+        """Run inference using CoreML backbone + PyTorch RPN/ROI heads.
+
+        Returns None if the transformed image doesn't fit the CoreML
+        model's fixed input shape (e.g. portrait orientation), signalling
+        the caller to fall back to pure PyTorch.
+        """
+        images, _ = self.model.transform([img_tensor], None)
+        inp_np = images.tensors.numpy()
+
+        # CoreML backbone was traced with a fixed shape.  If the
+        # transformed tensor exceeds that shape on any spatial dimension
+        # (e.g. portrait photos) we cannot use CoreML for this image.
+        _, _, th, tw = inp_np.shape
+        _, _, ch, cw = self._coreml_shape
+        if th > ch or tw > cw:
+            return None  # caller falls back to PyTorch
+
+        # Pad smaller images to the fixed shape (common for slight
+        # rounding differences).
+        if th != ch or tw != cw:
+            padded = np.zeros(self._coreml_shape, dtype=np.float32)
+            padded[:, :, :th, :tw] = inp_np
+            inp_np = padded
+
+        cml_out = self._coreml_backbone.predict({"image": inp_np})
+        features = OrderedDict()
+        for key, cml_name in zip(self._backbone_feature_keys, self._coreml_output_names):
+            features[key] = torch.from_numpy(np.array(cml_out[cml_name]))
+
+        with torch.no_grad():
+            proposals, _ = self.model.rpn(images, features)
+            detections, _ = self.model.roi_heads(features, proposals, images.image_sizes)
+            detections = self.model.transform.postprocess(
+                detections, images.image_sizes, [image_data_shape]
+            )
+
+        return detections[0]
+
     @staticmethod
     def _load_state_dict(weights_path: Path):
-        """Load bundled Mask R-CNN weights across PyTorch versions.
-
-        PyTorch 2.6+ defaults `weights_only=True` for safety, which can reject
-        older pickled checkpoints. Our bundled model file is a trusted local
-        asset, so we first try the safe path and only fall back to
-        `weights_only=False` when required for backward compatibility.
-        """
+        """Load bundled Mask R-CNN weights across PyTorch versions."""
         try:
             state = torch.load(weights_path, map_location="cpu", weights_only=True)
         except Exception as exc:
@@ -92,37 +232,76 @@ class MaskRCNNWrapper:
 
     def get_prediction(self, image_data, threshold=0.75, mask_threshold=0.5):
         """Get predictions from the model.
-        
+
         Args:
             image_data: Input image array (RGB).
-            threshold: Detection confidence threshold (0.1-0.99). Objects with lower confidence are filtered.
-            mask_threshold: Pixel confidence threshold for mask segmentation (0.5-0.95). 
-                          Controls tightness of bird masks. Higher = tighter masks.
+            threshold: Detection confidence threshold (0.1-0.99).
+            mask_threshold: Pixel confidence threshold for mask segmentation (0.5-0.95).
         """
         mask_threshold = max(0.5, min(0.95, float(mask_threshold)))
+        orig_h, orig_w = image_data.shape[:2]
+
+        # Downscale large images to _MAX_INFERENCE_SIZE for faster inference.
+        scale = 1.0
+        inp = image_data
+        long_edge = max(orig_h, orig_w)
+        if long_edge > self._MAX_INFERENCE_SIZE:
+            scale = self._MAX_INFERENCE_SIZE / long_edge
+            new_w = int(orig_w * scale)
+            new_h = int(orig_h * scale)
+            inp = cv2.resize(image_data, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        inp_h, inp_w = inp.shape[:2]
+
         for attempt in range(3):
             try:
                 transform = T.Compose([T.ToTensor()])
-                img = transform(image_data)
-                with torch.no_grad():
-                    pred = self.model([img])
-                pred_score = list(pred[0]["scores"].detach().numpy())
+                img = transform(inp)
+
+                pred = None
+                if self._coreml_backbone is not None:
+                    pred = self._predict_with_coreml(img, (inp_h, inp_w))
+                if pred is None:
+                    with torch.no_grad():
+                        pred = self.model([img.to(self.device)])[0]
+
+                pred_score = list(pred["scores"].detach().cpu().numpy())
                 if (np.array(pred_score) > threshold).sum() == 0:
                     return None, None, None, None
                 pred_t = [pred_score.index(x) for x in pred_score if x > threshold][-1]
-                # squeeze(1) 只移除 channel 维（形状 N,1,H,W -> N,H,W），
-                # 避免 N=1 时 squeeze() 同时消除 batch 维导致形状变为 (H,W)。
-                masks = (pred[0]["masks"] > mask_threshold).squeeze(1).detach().cpu().numpy()
-                pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred[0]["labels"].numpy())]
-                pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred[0]["boxes"].detach().numpy())]
+                masks = (pred["masks"] > mask_threshold).squeeze(1).detach().cpu().numpy()
+                pred_class = [self.COCO_INSTANCE_CATEGORY_NAMES[i] for i in list(pred["labels"].cpu().numpy())]
+                pred_boxes = [[(i[0], i[1]), (i[2], i[3])] for i in list(pred["boxes"].detach().cpu().numpy())]
                 masks = masks[: pred_t + 1]
                 pred_boxes = pred_boxes[: pred_t + 1]
                 pred_class = pred_class[: pred_t + 1]
                 pred_score = pred_score[: pred_t + 1]
+
+                # Map results back to original resolution when downscaled.
+                if scale < 1.0:
+                    inv_scale = 1.0 / scale
+                    pred_boxes = [
+                        [(b[0][0] * inv_scale, b[0][1] * inv_scale),
+                         (b[1][0] * inv_scale, b[1][1] * inv_scale)]
+                        for b in pred_boxes
+                    ]
+                    upscaled = np.empty((len(masks), orig_h, orig_w), dtype=masks.dtype)
+                    for mi in range(len(masks)):
+                        upscaled[mi] = cv2.resize(
+                            masks[mi].astype(np.uint8), (orig_w, orig_h),
+                            interpolation=cv2.INTER_NEAREST,
+                        ).astype(masks.dtype)
+                    masks = upscaled
+
                 return self.filter_overlapping_detections(masks, pred_boxes, pred_class, pred_score)
             except Exception as e:
                 if attempt < 2:
-                    print(f"Prediction attempt {attempt + 1} failed: {e}. Retrying...")
+                    # If CoreML fails, fall back to pure PyTorch
+                    if self._coreml_backbone is not None:
+                        print(f"[mask_rcnn] CoreML inference failed: {e}. Falling back to PyTorch CPU.")
+                        self._coreml_backbone = None
+                    else:
+                        print(f"Prediction attempt {attempt + 1} failed: {e}. Retrying...")
                     time.sleep(0.1)
                 else:
                     print("Error occurred while getting prediction after 3 attempts:", e)
