@@ -1514,17 +1514,16 @@ class Api:
                 except Exception:
                     raw_sizes = {}
                 
-                if exp_correction == 0.0 and callable(_extract_preview_from_raw):
-                    rgb = _extract_preview_from_raw(raw)
-                else:
+                if exp_correction == 0.0:
+                    # No exposure correction — prefer the embedded camera JPEG
                     rgb = None
-                if rgb is None:
-                    if callable(_postprocess_raw):
-                        rgb = _postprocess_raw(raw)
-                    else:
-                        rgb = raw.postprocess()
-                
-                if exp_correction != 0.0:
+                    if callable(_extract_preview_from_raw):
+                        rgb = _extract_preview_from_raw(raw)
+                    if rgb is None:
+                        rgb = _postprocess_raw(raw) if callable(_postprocess_raw) else raw.postprocess()
+                else:
+                    # Exposure correction requested — must decode from raw sensor data
+                    # (single postprocess call to avoid corrupting rawpy internal state)
                     if callable(_postprocess_raw):
                         rgb = _postprocess_raw(raw, exposure_stops=float(exp_correction))
                     else:

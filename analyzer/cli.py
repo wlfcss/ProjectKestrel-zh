@@ -14,8 +14,8 @@ from kestrel_analyzer.config import RAW_EXTENSIONS, JPEG_EXTENSIONS
 def parse_args():
     parser = argparse.ArgumentParser(description="Kestrel Analyzer CLI")
     parser.add_argument("folder", help="Folder with RAW/JPEG images")
-    parser.add_argument("--gpu", dest="use_gpu", action="store_true", help="Use GPU (DirectML) for ONNX")
-    parser.add_argument("--no-gpu", dest="use_gpu", action="store_false", help="Force CPU for ONNX")
+    parser.add_argument("--gpu", dest="use_gpu", action="store_true", help="Enable CoreML hardware acceleration")
+    parser.add_argument("--no-gpu", dest="use_gpu", action="store_false", help="Force CPU-only inference")
     parser.add_argument(
         "--smoke",
         action="store_true",

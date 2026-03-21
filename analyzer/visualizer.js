@@ -4914,7 +4914,9 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
       // 没有检测结果时显示提示
       if (crops.length === 0) {
-        row.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-tertiary);font-size:13px;padding:20px 0;">暂未识别到鸟类</div>';
+        const hasOverlay = !!(item.current_overlay_rel);
+        const msg = hasOverlay ? '未在此图中检测到鸟类' : '正在检测…';
+        row.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-tertiary);font-size:13px;padding:20px 0;">${msg}</div>`;
         return;
       }
 

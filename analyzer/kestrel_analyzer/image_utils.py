@@ -6,7 +6,7 @@ import rawpy
 from PIL import Image, ImageOps
 
 
-RAW_POSTPROCESS_VERSION = 'embedded-preview-v1'
+RAW_POSTPROCESS_VERSION = 'embedded-preview-v2'
 
 
 RAW_POSTPROCESS_BASE_KWARGS = {

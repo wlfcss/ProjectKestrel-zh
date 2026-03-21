@@ -10,7 +10,7 @@ SPECIESCLASSIFIER_LABELS = MODELS_DIR / "labels.txt"
 QUALITYCLASSIFIER_PATH = MODELS_DIR / "quality.keras"
 QUALITY_NORMALIZATION_DATA_PATH = MODELS_DIR / "quality_normalization_data.csv"
 MASK_RCNN_WEIGHTS_PATH = MODELS_DIR / "mask_rcnn_resnet50_fpn_v2.pth"
-YOLO_SEG_WEIGHTS_PATH = MODELS_DIR / "yolo26s-seg.pt"
+YOLO_SEG_WEIGHTS_PATH = MODELS_DIR / "yolo26x-seg.pt"
 
 WILDLIFE_CATEGORIES = [
     "cat", "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "bird"

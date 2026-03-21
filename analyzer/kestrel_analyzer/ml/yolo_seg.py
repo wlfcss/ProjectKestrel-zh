@@ -16,6 +16,15 @@ def _is_apple_silicon():
     return sys.platform == "darwin" and platform.machine() == "arm64"
 
 
+def _mps_available():
+    """Check if MPS (Metal Performance Shaders) backend is usable."""
+    try:
+        import torch
+        return torch.backends.mps.is_available() and torch.backends.mps.is_built()
+    except Exception:
+        return False
+
+
 class YOLOSegWrapper:
     def __init__(self):
         from ultralytics import YOLO
@@ -28,33 +37,54 @@ class YOLOSegWrapper:
             )
         self._raise_if_lfs_pointer(weights_path)
 
-        self._use_coreml = False
+        self._backend = "cpu"
+        self._device = None
+        self.model = None
+
+        # Priority: MPS > CoreML > CPU
         if _is_apple_silicon():
-            coreml_path = MODELS_DIR / "yolo26s-seg.mlpackage"
-            try:
-                if coreml_path.exists():
-                    self.model = YOLO(str(coreml_path))
-                    self._use_coreml = True
-                else:
-                    print("[yolo_seg] Converting to CoreML (one-time)...")
-                    pt_model = YOLO(str(weights_path))
-                    pt_model.export(format="coreml", imgsz=640)
-                    # export saves to same directory as .pt with .mlpackage suffix
-                    exported = weights_path.with_suffix(".mlpackage")
-                    if exported.exists() and exported != coreml_path:
-                        exported.rename(coreml_path)
-                    self.model = YOLO(str(coreml_path))
-                    self._use_coreml = True
-            except Exception as exc:
-                print(f"[yolo_seg] CoreML init failed, using PyTorch CPU: {exc}")
-                self.model = YOLO(str(weights_path))
-        else:
+            # Try MPS first (fastest on Apple Silicon)
+            if _mps_available():
+                try:
+                    self.model = YOLO(str(weights_path))
+                    self.model.to("mps")
+                    self._backend = "mps"
+                    self._device = "mps"
+                except Exception as exc:
+                    print(f"[yolo_seg] MPS init failed: {exc}")
+                    self.model = None
+
+            # Fall back to CoreML
+            if self.model is None:
+                coreml_path = weights_path.with_suffix(".mlpackage")
+                try:
+                    if coreml_path.exists():
+                        self.model = YOLO(str(coreml_path))
+                        self._backend = "coreml"
+                    else:
+                        print("[yolo_seg] Converting to CoreML (one-time, may take a few minutes)...")
+                        pt_model = YOLO(str(weights_path))
+                        pt_model.export(format="coreml", imgsz=640)
+                        exported = weights_path.with_suffix(".mlpackage")
+                        if exported.exists() and exported != coreml_path:
+                            exported.rename(coreml_path)
+                        if coreml_path.exists():
+                            self.model = YOLO(str(coreml_path))
+                            self._backend = "coreml"
+                        else:
+                            raise RuntimeError("CoreML export produced no output")
+                except Exception as exc:
+                    print(f"[yolo_seg] CoreML init failed: {exc}")
+                    self.model = None
+
+        # Final fallback: CPU
+        if self.model is None:
             self.model = YOLO(str(weights_path))
 
         # Build COCO class name list compatible with pipeline's string comparisons
         self.COCO_INSTANCE_CATEGORY_NAMES = list(self.model.names.values())
 
-        print(f"[yolo_seg] Model loaded (coreml={'yes' if self._use_coreml else 'no'})")
+        print(f"[yolo_seg] Model loaded: {weights_path.stem} (backend={self._backend})")
 
     @staticmethod
     def _raise_if_lfs_pointer(weights_path: Path) -> None:
@@ -86,11 +116,13 @@ class YOLOSegWrapper:
         mask_threshold = max(0.5, min(0.95, float(mask_threshold)))
         orig_h, orig_w = image_data.shape[:2]
 
+        predict_kwargs = dict(conf=threshold, verbose=False)
+        if self._device:
+            predict_kwargs["device"] = self._device
+
         for attempt in range(3):
             try:
-                results = self.model.predict(
-                    image_data, conf=threshold, verbose=False
-                )
+                results = self.model.predict(image_data, **predict_kwargs)
                 r = results[0]
 
                 if r.boxes is None or len(r.boxes) == 0:
@@ -123,11 +155,14 @@ class YOLOSegWrapper:
                 )
             except Exception as e:
                 if attempt < 2:
-                    if self._use_coreml:
-                        print(f"[yolo_seg] CoreML inference failed: {e}. Falling back to PyTorch CPU.")
+                    if self._backend in ("coreml", "mps"):
+                        old_backend = self._backend
+                        print(f"[yolo_seg] {old_backend} inference failed: {e}. Falling back to CPU.")
                         from ultralytics import YOLO
                         self.model = YOLO(str(YOLO_SEG_WEIGHTS_PATH))
-                        self._use_coreml = False
+                        self._backend = "cpu"
+                        self._device = None
+                        predict_kwargs.pop("device", None)
                     else:
                         print(f"Prediction attempt {attempt + 1} failed: {e}. Retrying...")
                     time.sleep(0.1)

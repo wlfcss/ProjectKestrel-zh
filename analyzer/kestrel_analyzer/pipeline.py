@@ -189,6 +189,16 @@ class AnalysisPipeline:
         MAX_DARKEN = -1.75
         MAX_BRIGHTEN = 2.5
         try:
+            # Downscale large images for faster percentile computation;
+            # statistical results are virtually identical at lower resolution.
+            _max_dim = 1600
+            h, w = img.shape[:2]
+            if max(h, w) > _max_dim:
+                _scale = _max_dim / max(h, w)
+                _nw, _nh = int(w * _scale), int(h * _scale)
+                img = cv2.resize(img, (_nw, _nh), interpolation=cv2.INTER_AREA)
+                if mask is not None:
+                    mask = cv2.resize(mask.astype(np.uint8), (_nw, _nh), interpolation=cv2.INTER_NEAREST)
             img_f = img.astype(np.float32) / 255.0
             mask_bool = mask.astype(bool) if mask is not None else None
             if (
@@ -274,6 +284,19 @@ class AnalysisPipeline:
             (analysis_img.shape[1], analysis_img.shape[0]),
             interpolation=cv2.INTER_AREA,
         )
+
+    @staticmethod
+    def _downscale_for_similarity(img: np.ndarray, max_dim: int = 1600) -> np.ndarray:
+        """Pre-downscale image to the target size used by AKAZE similarity.
+
+        Storing the small version as previous_image avoids passing 48MP arrays
+        into similarity computation and avoids a full-resolution copy each frame.
+        """
+        h, w = img.shape[:2]
+        scale = max_dim / max(h, w)
+        if scale < 1.0:
+            return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        return img
 
     @staticmethod
     def _get_image_orientation(img: np.ndarray) -> str:
@@ -428,7 +451,7 @@ class AnalysisPipeline:
             stage_ctx["stage"] = "load_models"
             self.load_models(status_cb=status_cb)
 
-            previous_image = None
+            previous_image_small = None
             previous_image_path = None
             previous_orientation = None
             if not database.empty:
@@ -438,7 +461,7 @@ class AnalysisPipeline:
                 if os.path.exists(last_image_path):
                     img = read_image(last_image_path)
                     if img is not None:
-                        previous_image = img
+                        previous_image_small = self._downscale_for_similarity(img)
                         previous_image_path = last_image_path
                         previous_orientation = self._get_image_orientation(img)
             _sc_max = database["scene_count"].max() if not database.empty else 0
@@ -512,7 +535,6 @@ class AnalysisPipeline:
                     if img is None:
                         raise RuntimeError("Image read returned None")
                     preview_img = preview_img if preview_img is not None else img
-                    preview_aligned = self._align_preview_to_analysis(preview_img, img)
 
                     current_orientation = self._get_image_orientation(img)
                     entry["orientation"] = current_orientation
@@ -570,7 +592,8 @@ class AnalysisPipeline:
                             }
                         )
                     else:
-                        similarity = compute_image_similarity_akaze(previous_image, img)
+                        img_small = self._downscale_for_similarity(img)
+                        similarity = compute_image_similarity_akaze(previous_image_small, img_small)
                         if not similarity["similar"]:
                             scene_count += 1
                         entry.update(
@@ -583,15 +606,15 @@ class AnalysisPipeline:
                                 "similar": similarity["similar"],
                             }
                         )
-                    previous_image = img.copy()
+                    previous_image_small = self._downscale_for_similarity(img)
                     previous_image_path = image_path
                     previous_orientation = current_orientation
 
                     stage_ctx["stage"] = "export_image"
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
                     preview_small = cv2.resize(
-                        preview_aligned,
-                        (1200, int(1200 * preview_aligned.shape[0] / preview_aligned.shape[1])),
+                        preview_img,
+                        (1200, int(1200 * preview_img.shape[0] / preview_img.shape[1])),
                         interpolation=cv2.INTER_AREA,
                     )
                     analysis_small = cv2.resize(
@@ -599,7 +622,6 @@ class AnalysisPipeline:
                         (1200, int(1200 * img.shape[0] / img.shape[1])),
                         interpolation=cv2.INTER_AREA,
                     )
-                    preview_warp = self._estimate_preview_warp(analysis_small, preview_small)
                     cv2.imwrite(
                         export_path,
                         cv2.cvtColor(preview_small, cv2.COLOR_RGB2BGR),
@@ -621,7 +643,7 @@ class AnalysisPipeline:
                             detection_cb(
                                 {
                                     "filename": raw_file,
-                                    "overlay": self._create_mask_overlay(preview_small, None, None),
+                                    "overlay": self._create_mask_overlay(analysis_small, None, None),
                                     "bird_count": 0,
                                 }
                             )
@@ -665,11 +687,9 @@ class AnalysisPipeline:
                                 {
                                     "filename": raw_file,
                                     "overlay": self._create_mask_overlay(
-                                        preview_small,
+                                        analysis_small,
                                         masks,
                                         overlay_indices,
-                                        analysis_shape=(analysis_small.shape[1], analysis_small.shape[0]),
-                                        warp_matrix=preview_warp,
                                     ),
                                     "bird_count": len(bird_indices),
                                 }
@@ -678,13 +698,11 @@ class AnalysisPipeline:
                     def process_nonbird(primary_mask_i):
                         stage_ctx["stage"] = "process_nonbird"
                         stops = self._compute_exposure_stops(img, masks[primary_mask_i])
-                        img_src = self._apply_exposure_correction(img, stops, raw_obj)
                         quality_crop, quality_mask = self.detector.get_square_crop(
-                            masks[primary_mask_i], img_src, resize=True
+                            masks[primary_mask_i], img, resize=True
                         )
-                        visual_crop, _ = self.detector.get_square_crop(
-                            masks[primary_mask_i], preview_aligned, resize=True
-                        )
+                        quality_crop = self._apply_exposure_correction(quality_crop, stops)
+                        visual_crop = quality_crop
                         quality_score = self.quality_clf.classify(quality_crop, quality_mask)
                         return {
                             "species": pred_class[primary_mask_i],
@@ -705,10 +723,10 @@ class AnalysisPipeline:
                             # Process per-crop results. Pause is checked at the
                             # top of the image loop so we avoid pausing mid-image.
                             stops = self._compute_exposure_stops(img, masks[i])
-                            img_src = self._apply_exposure_correction(img, stops, raw_obj)
-                            species_crop = self.detector.get_species_crop(pred_boxes[i], img_src)
-                            quality_crop, quality_mask = self.detector.get_square_crop(masks[i], img_src, resize=True)
-                            visual_crop, _ = self.detector.get_square_crop(masks[i], preview_aligned, resize=True)
+                            species_crop = self.detector.get_species_crop(pred_boxes[i], img)
+                            quality_crop, quality_mask = self.detector.get_square_crop(masks[i], img, resize=True)
+                            quality_crop = self._apply_exposure_correction(quality_crop, stops)
+                            visual_crop = quality_crop
                             items.append(
                                 {
                                     "index": i,
