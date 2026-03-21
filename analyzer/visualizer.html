@@ -15,10 +15,14 @@
   <div class="app-body">
   <!-- ═══ 顶栏 ═══ -->
   <header class="top-bar">
+    <!-- 左：品牌标识 -->
     <div class="top-bar-left">
       <img src="logo.png" alt="翎鉴" class="top-bar-logo" />
       <span class="top-bar-brand">翎鉴 <span class="top-bar-edition">Lite</span></span>
-      <span class="top-bar-divider"></span>
+    </div>
+
+    <!-- 中：排序 / 分组 / 搜索 -->
+    <div class="top-bar-center">
       <label class="top-bar-sort">
         <span class="top-bar-sort-label">排序</span>
         <select id="sortBy">
@@ -38,27 +42,64 @@
           <option value="none">不分组</option>
         </select>
       </label>
+      <span class="top-bar-divider"></span>
+      <div class="top-bar-search-wrap">
+        <span class="top-bar-search-icon"></span><!-- JS 注入 SVG -->
+        <input id="search" class="top-bar-search-input"
+               type="search" placeholder="搜索物种…" autocomplete="off" />
+      </div>
     </div>
-    <div class="top-bar-spacer"></div>
+
+    <!-- 右：操作按钮 -->
     <div class="top-bar-actions">
-      <button id="pickFolder" class="top-bar-btn" title="打开一个已分析过的文件夹">
-        <span class="top-bar-btn-icon">📂</span> 导入
-      </button>
-      <button id="analyzeQueueBtn" class="top-bar-btn" title="选择要加入分析队列的文件夹">
-        <span class="top-bar-btn-icon">🔬</span> 分析
-      </button>
-      <button id="openSettings" class="top-bar-btn" title="打开设置">
-        <span class="top-bar-btn-icon">⚙</span> 设置
-      </button>
-      <button id="exportBtn" class="top-bar-btn primary" title="导出照片">
-        <span class="top-bar-btn-icon">📤</span> 导出
-      </button>
+      <button id="pickFolder" class="top-bar-btn" title="打开一个已分析过的文件夹"></button>
+      <button id="analyzeQueueBtn" class="top-bar-btn" title="选择要加入分析队列的文件夹"></button>
+      <button id="openSettings" class="top-bar-btn" title="打开设置"></button>
+      <button id="exportBtn" class="top-bar-btn primary" title="导出照片"></button>
       <div id="saveRevertWrap" class="save-revert-wrap hidden">
-        <button id="revertCsv" disabled title="放弃所有未保存的更改">还原</button>
-        <button id="saveCsv" disabled>保存</button>
+        <button id="revertCsv" class="save-revert-btn" disabled title="放弃所有未保存的更改"></button>
+        <button id="saveCsv" class="save-revert-btn save-btn" disabled></button>
       </div>
     </div>
   </header>
+
+  <!-- ═══ 筛选栏 ═══ -->
+  <div id="filterBar" class="filter-bar">
+    <!-- speciesConf 滑块：JS 已引用此 ID，保留为隐藏元素 -->
+    <input id="speciesConf" type="range" min="0" max="0.99" step="0.05"
+           value="0" class="visually-hidden" />
+    <!-- 筛片状态快速筛选 -->
+    <div class="filter-bar-chips">
+      <button class="filter-chip active" id="filterChipAll">全部</button>
+      <button class="filter-chip" id="filterChipAccepted">已接受</button>
+      <button class="filter-chip" id="filterChipRejected">已拒绝</button>
+      <button class="filter-chip" id="filterChipUnrated">未处理</button>
+    </div>
+    <span class="filter-bar-sep"></span>
+    <!-- 星级筛选 -->
+    <div class="filter-bar-stars">
+      <span class="filter-bar-label">星级</span>
+      <button class="filter-chip filter-chip-star" data-stars="1">★</button>
+      <button class="filter-chip filter-chip-star" data-stars="2">★★</button>
+      <button class="filter-chip filter-chip-star" data-stars="3">★★★</button>
+      <button class="filter-chip filter-chip-star" data-stars="4">★★★★</button>
+      <button class="filter-chip filter-chip-star" data-stars="5">★★★★★</button>
+    </div>
+    <span class="filter-bar-sep"></span>
+    <!-- 其他过滤选项（JS 已有对这些 ID 的引用） -->
+    <label class="filter-toggle-wrap" title="仅显示手动评分场景">
+      <input type="checkbox" id="filterScenesManualRated" />
+      <span class="filter-bar-label">手动评分</span>
+    </label>
+    <label class="filter-toggle-wrap" title="包含次级物种">
+      <input type="checkbox" id="includeSecondarySpecies" />
+      <span class="filter-bar-label">次级物种</span>
+    </label>
+    <label class="filter-toggle-wrap" title="按文件夹分组">
+      <input type="checkbox" id="groupByFolder" checked />
+      <span class="filter-bar-label">文件夹分组</span>
+    </label>
+  </div>
 
   <main>
     <div id="mainContent">
@@ -72,12 +113,14 @@
 
       <!-- 空状态：未加载文件夹时显示 -->
       <div id="emptyState" class="empty-state">
-        <img src="logo.png" alt="" class="empty-state-logo" />
+        <div class="empty-state-logo-wrap">
+          <img src="logo.png" alt="" class="empty-state-logo" />
+        </div>
         <h2>选择文件夹开始</h2>
         <p>打开已分析的图库，或将新文件夹加入分析队列。</p>
         <div class="empty-state-actions">
-          <button id="emptyPickFolder" class="primary">打开文件夹</button>
-          <button id="emptyAnalyzeBtn">分析新文件夹</button>
+          <button id="emptyPickFolder" class="primary"></button>
+          <button id="emptyAnalyzeBtn"></button>
         </div>
       </div>
     </div>
@@ -118,6 +161,7 @@
         </div>
       </div>
     </div>
+    <div id="statusFolderPath" class="status-folder-path hidden"></div>
     <div id="versionBadge" class="version-badge">版本：—</div>
   </footer>
 
@@ -193,24 +237,18 @@
 
       <!-- 底部：底片栏 -->
       <div class="scene-filmstrip-wrap">
-        <div class="scene-filmstrip-hint scene-filmstrip-hint-left hidden" id="filmstripHintLeft">
-          ◂ 上一个场景
-        </div>
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-left hidden" id="filmstripHintLeft"></div>
         <div class="scene-filmstrip" id="imageGrid"></div>
-        <div class="scene-filmstrip-hint scene-filmstrip-hint-right hidden" id="filmstripHintRight">
-          下一个场景 ▸
-        </div>
+        <div class="scene-filmstrip-hint scene-filmstrip-hint-right hidden" id="filmstripHintRight"></div>
       </div>
     </div>
   </dialog>
 
   <!-- 分析器加载遮罩 -->
-  <div id="loadingOverlay" class="hidden"
-    style="position:fixed;right:18px;bottom:72px;display:flex;align-items:center;justify-content:center;z-index:20010;pointer-events:none;">
-    <div
-      style="background:rgba(10,12,15,0.96);border:1px solid #2a3040;padding:10px 14px;border-radius:10px;color:var(--text);pointer-events:auto;box-shadow:0 6px 18px rgba(0,0,0,.5);min-width:240px;">
-      <div style="font-weight:700;margin-bottom:4px;font-size:13px">正在加载翎鉴…</div>
-      <div style="color:var(--muted);font-size:12px">模型正在加载，分析即将开始。</div>
+  <div id="loadingOverlay" class="hidden">
+    <div class="loading-overlay-card">
+      <div class="loading-overlay-title">正在加载翎鉴…</div>
+      <div class="loading-overlay-sub">模型正在加载，分析即将开始。</div>
     </div>
   </div>
 
@@ -219,119 +257,125 @@
 
   <!-- 设置对话框 -->
   <dialog id="settingsDlg" class="dlg-settings">
-    <div class="settings-body">
-      <h3 style="margin:0">设置</h3>
-
-      <h4 class="settings-section-title">界面与编辑器</h4>
-
-      <div class="row">
-        <label for="uiScale">界面缩放</label>
-        <input id="uiScale" type="range" min="75" max="150" step="5" value="100" style="flex:1;max-width:160px" />
-        <span id="uiScaleLabel" style="font-size:12px;min-width:36px;text-align:right;color:var(--text-primary)">100%</span>
+    <div class="settings-layout">
+      <!-- 侧边导航 -->
+      <nav class="settings-nav">
+        <button class="settings-nav-item active" data-section="interface">界面</button>
+        <button class="settings-nav-item" data-section="rating">评分</button>
+        <button class="settings-nav-item" data-section="analysis">分析</button>
+        <button class="settings-nav-item" data-section="data">数据</button>
+      </nav>
+      <!-- 内容面板 -->
+      <div class="settings-content">
+        <!-- 面板：界面与编辑器 -->
+        <div class="settings-panel active" data-panel="interface">
+          <h4 class="settings-section-title" style="margin-top:0;border-top:none;padding-top:0">界面与编辑器</h4>
+          <div class="row">
+            <label for="uiScale">界面缩放</label>
+            <input id="uiScale" type="range" min="75" max="150" step="5" value="100" class="settings-input-range" />
+            <span id="uiScaleLabel" class="settings-scale-label">100%</span>
+          </div>
+          <div class="muted settings-hint">按比例缩放所有界面元素和文字（75%–150%）。</div>
+          <div class="row">
+            <label for="editorChoice">首选编辑器</label>
+            <select id="editorChoice">
+              <option value="system">系统默认</option>
+              <option value="darktable" selected>Darktable</option>
+              <option value="lightroom">Adobe Lightroom Classic</option>
+              <option value="photoshop">Adobe Photoshop</option>
+              <option value="capture_one">Capture One</option>
+              <option value="affinity">Affinity Photo</option>
+              <option value="gimp">GIMP</option>
+              <option value="rawtherapee">RawTherapee</option>
+              <option value="luminar">Luminar Neo</option>
+              <option value="dxo">DxO PhotoLab</option>
+              <option value="on1">ON1 Photo RAW</option>
+              <option value="acdsee">ACDSee</option>
+              <option value="paintshop">PaintShop Pro</option>
+              <option value="faststone">FastStone Image Viewer</option>
+              <option value="xnview">XnView MP</option>
+              <option value="irfanview">IrfanView</option>
+              <option value="custom">自定义应用…</option>
+            </select>
+          </div>
+          <div class="muted settings-hint">选择 Kestrel 在打开原始文件时所使用的编辑器。</div>
+          <div class="row hidden" id="customEditorRow">
+            <label for="customEditorPath">应用路径</label>
+            <input id="customEditorPath" type="text" placeholder="应用程序可执行文件路径…" class="settings-input-path" />
+            <button id="customEditorBrowse" class="settings-browse-btn" title="浏览应用程序">浏览…</button>
+          </div>
+          <div class="muted hidden settings-hint" id="customEditorHint">
+            应用程序可执行文件的完整路径。
+          </div>
+        </div>
+        <!-- 面板：星级评分系统 -->
+        <div class="settings-panel" data-panel="rating">
+          <h4 class="settings-section-title" style="margin-top:0;border-top:none;padding-top:0">星级评分系统</h4>
+          <div class="row">
+            <label for="ratingProfile">评分方案</label>
+            <select id="ratingProfile">
+              <option value="very_strict">非常严格</option>
+              <option value="strict">严格</option>
+              <option value="balanced" selected>均衡（推荐）</option>
+              <option value="lenient">宽松</option>
+              <option value="very_lenient">非常宽松</option>
+            </select>
+          </div>
+          <div class="muted settings-hint">控制画质分数如何转换为星级评分。</div>
+        </div>
+        <!-- 面板：分析设置 -->
+        <div class="settings-panel" data-panel="analysis">
+          <h4 class="settings-section-title" style="margin-top:0;border-top:none;padding-top:0">分析设置</h4>
+          <div class="row">
+            <label for="detectionThreshold">检测置信度阈值</label>
+            <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75" class="settings-input-narrow" />
+          </div>
+          <div class="muted settings-hint">鸟类检测器的最低置信度（0.10–0.99）。</div>
+          <div class="row">
+            <label for="sceneTimeThreshold">场景分组阈值（秒）</label>
+            <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0" class="settings-input-narrow" />
+          </div>
+          <div class="muted settings-hint">拍摄时间相差不超过该秒数的图片视为同一场景。</div>
+          <div class="row">
+            <label for="maskThreshold">掩码分割阈值</label>
+            <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5" class="settings-input-narrow" />
+          </div>
+          <div class="muted settings-hint">掩码分割置信度阈值（0.50–0.95）。</div>
+        </div>
+        <!-- 面板：数据与预览 -->
+        <div class="settings-panel" data-panel="data">
+          <h4 class="settings-section-title" style="margin-top:0;border-top:none;padding-top:0">数据与预览</h4>
+          <div class="row">
+            <label for="rawPreviewCacheEnabled" class="settings-label-flex">缓存 RAW 预览图</label>
+            <label class="inline" style="gap:6px">
+              <input type="checkbox" id="rawPreviewCacheEnabled" checked />
+              <span class="muted">启用</span>
+            </label>
+          </div>
+          <div class="muted settings-hint">缓存 RAW 预览以加快加载速度。</div>
+          <div class="row">
+            <label for="rawExposureCorrectionDisabled" class="settings-label-flex">禁用 RAW 曝光修正</label>
+            <label class="inline" style="gap:6px">
+              <input type="checkbox" id="rawExposureCorrectionDisabled" />
+              <span class="muted">禁用</span>
+            </label>
+          </div>
+          <div class="muted settings-hint">查看未经曝光修正的 RAW 数据。</div>
+          <div class="row">
+            <label for="settingsAutoSave" class="settings-label-flex">自动保存更改</label>
+            <label class="inline" style="gap:6px">
+              <input type="checkbox" id="settingsAutoSave" checked />
+              <span class="muted">启用</span>
+            </label>
+          </div>
+          <div class="muted settings-hint">自动保存评分、标签和场景修改。</div>
+          <div class="row">
+            <label for="treeScanDepth">目录树扫描深度</label>
+            <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" class="settings-input-narrow" />
+          </div>
+          <div class="muted settings-hint">分析对话框中扫描子目录的层数（1–6）。</div>
+        </div>
       </div>
-      <div class="muted settings-hint">按比例缩放所有界面元素和文字（75%–150%）。</div>
-
-      <div class="row">
-        <label for="editorChoice">首选编辑器</label>
-        <select id="editorChoice">
-          <option value="system">系统默认</option>
-          <option value="darktable" selected>Darktable</option>
-          <option value="lightroom">Adobe Lightroom Classic</option>
-          <option value="photoshop">Adobe Photoshop</option>
-          <option value="capture_one">Capture One</option>
-          <option value="affinity">Affinity Photo</option>
-          <option value="gimp">GIMP</option>
-          <option value="rawtherapee">RawTherapee</option>
-          <option value="luminar">Luminar Neo</option>
-          <option value="dxo">DxO PhotoLab</option>
-          <option value="on1">ON1 Photo RAW</option>
-          <option value="acdsee">ACDSee</option>
-          <option value="paintshop">PaintShop Pro</option>
-          <option value="faststone">FastStone Image Viewer</option>
-          <option value="xnview">XnView MP</option>
-          <option value="irfanview">IrfanView</option>
-          <option value="custom">自定义应用…</option>
-        </select>
-      </div>
-      <div class="muted settings-hint">选择 Kestrel 在打开原始文件时所使用的编辑器。</div>
-      <div class="row hidden" id="customEditorRow">
-        <label for="customEditorPath">应用路径</label>
-        <input id="customEditorPath" type="text" placeholder="应用程序可执行文件路径…" style="flex:1" />
-        <button id="customEditorBrowse" style="flex-shrink:0" title="浏览应用程序">浏览…</button>
-      </div>
-      <div class="muted hidden settings-hint" id="customEditorHint">
-        应用程序可执行文件的完整路径。
-      </div>
-
-      <h4 class="settings-section-title">星级评分系统</h4>
-
-      <div class="row">
-        <label for="ratingProfile">评分方案</label>
-        <select id="ratingProfile">
-          <option value="very_strict">非常严格</option>
-          <option value="strict">严格</option>
-          <option value="balanced" selected>均衡（推荐）</option>
-          <option value="lenient">宽松</option>
-          <option value="very_lenient">非常宽松</option>
-        </select>
-      </div>
-      <div class="muted settings-hint">控制画质分数如何转换为星级评分。</div>
-
-      <h4 class="settings-section-title">分析设置</h4>
-
-      <div class="row">
-        <label for="detectionThreshold">检测置信度阈值</label>
-        <input id="detectionThreshold" type="number" min="0.1" max="0.99" step="0.05" value="0.75" style="width:80px" />
-      </div>
-      <div class="muted settings-hint">鸟类检测器的最低置信度（0.10–0.99）。</div>
-
-      <div class="row">
-        <label for="sceneTimeThreshold">场景分组阈值（秒）</label>
-        <input id="sceneTimeThreshold" type="number" min="0" max="60" step="0.5" value="1.0" style="width:80px" />
-      </div>
-      <div class="muted settings-hint">拍摄时间相差不超过该秒数的图片视为同一场景。</div>
-
-      <div class="row">
-        <label for="maskThreshold">掩码分割阈值</label>
-        <input id="maskThreshold" type="number" min="0.5" max="0.95" step="0.05" value="0.5" style="width:80px" />
-      </div>
-      <div class="muted settings-hint">掩码分割置信度阈值（0.50–0.95）。</div>
-
-      <h4 class="settings-section-title">数据与预览</h4>
-
-      <div class="row">
-        <label for="rawPreviewCacheEnabled" style="flex:1">缓存 RAW 预览图</label>
-        <label class="inline" style="gap:6px">
-          <input type="checkbox" id="rawPreviewCacheEnabled" checked />
-          <span class="muted">启用</span>
-        </label>
-      </div>
-      <div class="muted settings-hint">缓存 RAW 预览以加快加载速度。</div>
-
-      <div class="row">
-        <label for="rawExposureCorrectionDisabled" style="flex:1">禁用 RAW 曝光修正</label>
-        <label class="inline" style="gap:6px">
-          <input type="checkbox" id="rawExposureCorrectionDisabled" />
-          <span class="muted">禁用</span>
-        </label>
-      </div>
-      <div class="muted settings-hint">查看未经曝光修正的 RAW 数据。</div>
-
-      <div class="row">
-        <label for="settingsAutoSave" style="flex:1">自动保存更改</label>
-        <label class="inline" style="gap:6px">
-          <input type="checkbox" id="settingsAutoSave" checked />
-          <span class="muted">启用</span>
-        </label>
-      </div>
-      <div class="muted settings-hint">自动保存评分、标签和场景修改。</div>
-
-      <div class="row">
-        <label for="treeScanDepth">目录树扫描深度</label>
-        <input id="treeScanDepth" type="number" min="1" max="6" step="1" value="3" style="width:80px" />
-      </div>
-      <div class="muted settings-hint">分析对话框中扫描子目录的层数（1–6）。</div>
-
     </div>
     <div class="settings-footer">
       <button id="settingsCancel">取消</button>

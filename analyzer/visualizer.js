@@ -27,6 +27,44 @@
 
     const el = (sel) => document.querySelector(sel);
     const t = (key, vars) => window.KestrelI18n?.t ? window.KestrelI18n.t(key, vars) : key;
+
+    // ── Lucide SVG 图标系统 ───────────────────────────────────────
+    const LUCIDE_PATHS = {
+      'folder-open':   'M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h4a2 2 0 0 1 2 2v1M5 19h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2z',
+      'scan-search':   'M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M11 11a3 3 0 1 0 6 0 3 3 0 0 0-6 0M16.5 16.5L19 19',
+      'settings-2':    'M20 7h-9M14 17H5M17 17a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7 7a3 3 0 1 0 0 6A3 3 0 0 0 7 7z',
+      'upload':        'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
+      'save':          'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8',
+      'rotate-ccw':    'M3 2v6h6M3.51 9a9 9 0 1 0 .49-4',
+      'pencil':        'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z',
+      'scissors':      'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12',
+      'x':             'M18 6L6 18M6 6l12 12',
+      'check':         'M20 6L9 17l-5-5',
+      'minus':         'M5 12h14',
+      'search':        'M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z',
+      'filter':        'M22 3H2l8 9.46V19l4 2v-8.54L22 3z',
+      'chevron-left':  'M15 18l-6-6 6-6',
+      'chevron-right': 'M9 18l6-6-6-6',
+      'chevron-up':    'M18 15l-6-6-6 6',
+      'chevron-down':  'M6 9l6 6 6-6',
+      'keyboard':      'M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zM8 10h.01M12 10h.01M16 10h.01M8 14h8',
+      'star':          'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+      'pause':         'M6 4h4v16H6zM14 4h4v16h-4z',
+      'x-circle':      'M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0zM15 9l-6 6M9 9l6 6',
+      'trash-2':       'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6',
+      'activity':      'M22 12h-4l-3 9L9 3l-3 9H2',
+      'folder':        'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',
+    };
+
+    function icon(name, size = 16, extraClass = '') {
+      const d = LUCIDE_PATHS[name];
+      if (!d) return '';
+      const cls = extraClass ? ` class="icon-svg ${extraClass}"` : ' class="icon-svg"';
+      // 每个独立路径以 'M' 开头，分割后重新组装为多个 <path> 元素
+      const segs = d.split(/(?=M)/).filter(Boolean);
+      const paths = segs.map(seg => `<path d="${seg.trim()}"/>`).join('');
+      return `<svg${cls} width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+    }
     const getSpeciesDisplayName = (name) => window.KestrelTaxonomy?.speciesDisplayName ? window.KestrelTaxonomy.speciesDisplayName(name) : String(name || '');
     const getFamilyDisplayName = (name) => window.KestrelTaxonomy?.familyDisplayName ? window.KestrelTaxonomy.familyDisplayName(name) : String(name || '');
     const speciesMatchesQuery = (name, query) => window.KestrelTaxonomy?.speciesMatchesQuery
@@ -899,8 +937,30 @@
         }
       }
 
-      // 在不修改全局 scenes 的前提下应用“仅显示手动评分场景”过滤
-      const visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
+      // 在不修改全局 scenes 的前提下应用”仅显示手动评分场景”过滤
+      let visibleScenes = onlyRatedScenes ? scenes.filter(s => s.images.some(isManualRated)) : scenes;
+
+      // 应用筛片状态快速筛选（筛选栏芯片）
+      const _cf = window._cullFilter?.() || 'all';
+      if (_cf === 'accepted') {
+        visibleScenes = visibleScenes.filter(s => s.isApproved);
+      } else if (_cf === 'rejected') {
+        visibleScenes = visibleScenes.filter(s => s.images.length > 0 && s.images.every(r => (r.cull || '').toLowerCase() === 'reject'));
+      } else if (_cf === 'unrated') {
+        visibleScenes = visibleScenes.filter(s => !s.isApproved && s.images.some(r => !(r.cull || '')));
+      }
+
+      // 应用星级筛选
+      const _sf = window._starsFilter?.() || 0;
+      if (_sf > 0) {
+        visibleScenes = visibleScenes.filter(s => {
+          const maxR = (s.images || []).reduce((max, r) => {
+            const v = parseInt(r.__normalized_rating || r.rating || 0, 10);
+            return isNaN(v) ? max : Math.max(max, v);
+          }, 0);
+          return maxR >= _sf;
+        });
+      }
 
       updateStatusBar(visibleScenes);
       sceneGrid.innerHTML = '';
@@ -1018,6 +1078,21 @@
         countBadge.className = 'badge count';
         countBadge.textContent = `${s.imageCount} 张`;
         th.appendChild(countBadge);
+        // 筛片状态徽章（角标）
+        (function() {
+          const imgs = s.images || [];
+          const accepted = imgs.filter(r => (r.cull || '').toLowerCase() === 'accept').length;
+          const rejected = imgs.filter(r => (r.cull || '').toLowerCase() === 'reject').length;
+          let cullStatus = null;
+          if (accepted > 0 && rejected === 0) cullStatus = 'accepted';
+          else if (rejected > 0 && accepted === 0) cullStatus = 'rejected';
+          if (cullStatus) {
+            const badge = document.createElement('div');
+            badge.className = `card-cull-badge ${cullStatus}`;
+            badge.innerHTML = cullStatus === 'accepted' ? icon('check', 10) : icon('x', 10);
+            th.appendChild(badge);
+          }
+        })();
         card.appendChild(th);
 
         const body = document.createElement('div');
@@ -1076,6 +1151,25 @@
         body.appendChild(title);
         body.appendChild(primarySpecies);
         body.appendChild(subline);
+        // 星级评分展示
+        (function() {
+          const imgs = s.images || [];
+          const maxStars = imgs.reduce((max, r) => {
+            const v = parseInt(r.__normalized_rating || r.rating || 0, 10);
+            return isNaN(v) ? max : Math.max(max, v);
+          }, 0);
+          if (maxStars > 0) {
+            const starsEl = document.createElement('div');
+            starsEl.className = 'card-stars';
+            for (let i = 1; i <= 5; i++) {
+              const sp = document.createElement('span');
+              sp.className = 's' + (i <= maxStars ? ' on' : '');
+              sp.textContent = '★';
+              starsEl.appendChild(sp);
+            }
+            body.appendChild(starsEl);
+          }
+        })();
         card.appendChild(body);
 
         card.addEventListener('click', (ev) => {
@@ -5341,6 +5435,16 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       hideProgress();
       const label = loadedCount === 1 ? paths[0].replace(/.*[/\\]/, '') : `${loadedCount} folders`;
       setStatus(`已加载 ${label} —— ${rows.length} 张图片`);
+      // 状态栏显示当前目录路径（最后两级）
+      (function updateStatusFolderPath() {
+        const pathEl = document.getElementById('statusFolderPath');
+        if (!pathEl) return;
+        const displayPath = loadedCount === 1
+          ? paths[0].replace(/\\/g, '/').split('/').slice(-2).join('/')
+          : `${loadedCount} 个文件夹`;
+        pathEl.textContent = displayPath;
+        pathEl.classList.remove('hidden');
+      })();
     }
 
     async function loadFolderFromPath(folderPath) {
@@ -6579,4 +6683,116 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
 
       dlg.showModal();
     }
+
+    // ── 设置对话框侧边栏 Tab 切换 ────────────────────────────────
+    (function initSettingsTabs() {
+      const dlg = document.getElementById('settingsDlg');
+      if (!dlg) return;
+      dlg.querySelectorAll('.settings-nav-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          dlg.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('active'));
+          dlg.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          const panel = dlg.querySelector(`.settings-panel[data-panel="${btn.dataset.section}"]`);
+          if (panel) panel.classList.add('active');
+        });
+      });
+    })();
+
+    // ── 队列面板按钮图标注入 ─────────────────────────────────────
+    (function initQueuePanelIcons() {
+      [
+        ['queuePauseBtn',  'pause',   '暂停'],
+        ['queueCancelBtn', 'x-circle','取消'],
+        ['queueClearBtn',  'trash-2', '清除'],
+        ['queueLiveBtn',   'activity','实时'],
+      ].forEach(([id, i, l]) => {
+        const b = document.getElementById(id);
+        if (b) b.innerHTML = `${icon(i, 12)}<span>${l}</span>`;
+      });
+      const toggle = document.getElementById('queuePanelToggle');
+      if (toggle) toggle.innerHTML = icon('chevron-up', 12);
+    })();
+
+    // ── 筛选栏状态芯片逻辑 ───────────────────────────────────────
+    (function initCullFilterChips() {
+      let active = 'all';
+      const chipIds = {
+        all: 'filterChipAll', accepted: 'filterChipAccepted',
+        rejected: 'filterChipRejected', unrated: 'filterChipUnrated',
+      };
+      function setFilter(f) {
+        active = f;
+        for (const [k, id] of Object.entries(chipIds)) {
+          document.getElementById(id)?.classList.toggle('active', k === f);
+        }
+        renderScenes();
+      }
+      for (const [k, id] of Object.entries(chipIds)) {
+        document.getElementById(id)?.addEventListener('click', () => setFilter(k));
+      }
+      // 星级筛选芯片
+      let activeStars = 0;
+      document.querySelectorAll('.filter-chip-star').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const stars = parseInt(btn.dataset.stars, 10);
+          if (activeStars === stars) {
+            activeStars = 0;
+            document.querySelectorAll('.filter-chip-star').forEach(b => b.classList.remove('active'));
+          } else {
+            activeStars = stars;
+            document.querySelectorAll('.filter-chip-star').forEach(b =>
+              b.classList.toggle('active', parseInt(b.dataset.stars, 10) === stars));
+          }
+          renderScenes();
+        });
+      });
+      window._cullFilter  = () => active;
+      window._starsFilter = () => activeStars;
+    })();
+
+    // ── 顶栏按钮图标注入 ─────────────────────────────────────────
+    (function initTopBarIcons() {
+      const defs = [
+        { id: 'pickFolder',      i: 'folder-open',  l: '导入' },
+        { id: 'analyzeQueueBtn', i: 'scan-search',  l: '分析' },
+        { id: 'openSettings',    i: 'settings-2',   l: '设置' },
+        { id: 'exportBtn',       i: 'upload',       l: '导出' },
+        { id: 'revertCsv',       i: 'rotate-ccw',   l: '还原' },
+        { id: 'saveCsv',         i: 'save',         l: '保存' },
+        { id: 'emptyPickFolder', i: 'folder-open',  l: '打开文件夹' },
+        { id: 'emptyAnalyzeBtn', i: 'scan-search',  l: '分析新文件夹' },
+      ];
+      for (const d of defs) {
+        const btn = document.getElementById(d.id);
+        if (btn) btn.innerHTML = `${icon(d.i, 14)}<span>${d.l}</span>`;
+      }
+      const searchIconEl = document.querySelector('.top-bar-search-icon');
+      if (searchIconEl) searchIconEl.innerHTML = icon('search', 13);
+    })();
+
+    // ── 场景对话框图标注入 ───────────────────────────────────────
+    function initSceneDlgIcons() {
+      const map = [
+        ['#scenePencilBtn',    icon('pencil', 13)],
+        ['#splitSceneBtn',     `${icon('scissors', 13)} <span>拆分</span>`],
+        ['#closeDlg',          `${icon('x', 13)} <span>关闭</span>`],
+        ['#sceneShortcutBtn',  `${icon('keyboard', 13)} <span>快捷键</span>`],
+        ['#filmstripHintLeft', icon('chevron-left', 18)],
+        ['#filmstripHintRight',icon('chevron-right', 18)],
+        ['#sceneRenameOk',     icon('check', 12)],
+        ['#sceneRenameCancel', icon('x', 12)],
+      ];
+      for (const [sel, html] of map) {
+        const elem = document.querySelector(sel);
+        if (elem) elem.innerHTML = html;
+      }
+      const acceptBtn  = document.querySelector('.cull-btn.accept');
+      const rejectBtn  = document.querySelector('.cull-btn.reject');
+      const unratedBtn = document.querySelector('.cull-btn.unrated');
+      if (acceptBtn)  acceptBtn.innerHTML  = `${icon('check', 13)} <span>接受</span>`;
+      if (rejectBtn)  rejectBtn.innerHTML  = `${icon('x', 13)} <span>拒绝</span>`;
+      if (unratedBtn) unratedBtn.innerHTML = `${icon('minus', 13)} <span>未决定</span>`;
+    }
+    initSceneDlgIcons();
 
