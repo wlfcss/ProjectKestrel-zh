@@ -18,12 +18,12 @@ jobs:
           echo "Downloading model files from GitHub release..."
           mkdir -p analyzer/models
 
-          curl -L -o analyzer/models/mask_rcnn_resnet50_fpn_v2.pth \
-            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/mask_rcnn_resnet50_fpn_v2.pth"
+          curl -L -o analyzer/models/yolo26s-seg.pt \
+            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/yolo26s-seg.pt"
 
-          FILE_SIZE=$(stat -f%z analyzer/models/mask_rcnn_resnet50_fpn_v2.pth 2>/dev/null || stat -c%s analyzer/models/mask_rcnn_resnet50_fpn_v2.pth)
+          FILE_SIZE=$(stat -f%z analyzer/models/yolo26s-seg.pt 2>/dev/null || stat -c%s analyzer/models/yolo26s-seg.pt)
           echo "Downloaded: ${FILE_SIZE} bytes"
-          if [ "${FILE_SIZE}" -lt 100000 ]; then
+          if [ "${FILE_SIZE}" -lt 1000000 ]; then
             echo "ERROR: Downloaded file too small (${FILE_SIZE} bytes)"
             exit 1
           fi

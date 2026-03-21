@@ -3126,7 +3126,7 @@
       if (profileSelect) profileSelect.value = getSetting('rating_profile', 'balanced');
       // 检测置信度阈值
       const dtEl = document.getElementById('detectionThreshold');
-      if (dtEl) dtEl.value = getSetting('detection_threshold', 0.75);
+      if (dtEl) dtEl.value = getSetting('detection_threshold', 0.40);
       // 场景分组时间阈值
       const sttEl = document.getElementById('sceneTimeThreshold');
       if (sttEl) sttEl.value = getSetting('scene_time_threshold', 1.0);
@@ -3153,7 +3153,7 @@
       const profileEl = document.getElementById('ratingProfile');
       const ratingProfile = profileEl ? profileEl.value : 'balanced';
       const dtEl2 = document.getElementById('detectionThreshold');
-      const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.75)) : 0.75;
+      const detectionThreshold = dtEl2 ? Math.max(0.1, Math.min(0.99, parseFloat(dtEl2.value) || 0.40)) : 0.40;
       const sttEl2 = document.getElementById('sceneTimeThreshold');
       const sceneTimeThreshold = sttEl2 ? Math.max(0, parseFloat(sttEl2.value) || 1.0) : 1.0;
       const maskThEl2 = document.getElementById('maskThreshold');
