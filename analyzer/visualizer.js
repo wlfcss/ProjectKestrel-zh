@@ -6535,6 +6535,11 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const dlg = document.getElementById('exportDlg');
       if (!dlg) return;
 
+      // 目标文件夹选择（必须在 updateExportSummary 之前声明，避免 TDZ 报错）
+      const destPick = document.getElementById('exportDestPick');
+      const destPath = document.getElementById('exportDestPath');
+      const destSection = document.getElementById('exportDestSection');
+
       // 更新摘要
       updateExportSummary();
 
@@ -6542,11 +6547,6 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       dlg.querySelectorAll('input[name="exportMode"]').forEach(radio => {
         radio.onchange = updateExportSummary;
       });
-
-      // 目标文件夹选择
-      const destPick = document.getElementById('exportDestPick');
-      const destPath = document.getElementById('exportDestPath');
-      const destSection = document.getElementById('exportDestSection');
       if (destPick) {
         destPick.onclick = async () => {
           if (window.pywebview?.api?.choose_directory) {
