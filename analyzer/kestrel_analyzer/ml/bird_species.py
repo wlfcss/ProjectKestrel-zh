@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from ..config import MODELS_DIR
+from ..device_utils import get_onnx_providers
 
 
 class BirdSpeciesClassifier:
@@ -17,9 +18,11 @@ class BirdSpeciesClassifier:
             ) from e
         with open(labels_path, "r") as f:
             self.labels = np.array([l.strip() for l in f.readlines()])
-        providers = ["DmlExecutionProvider", "CPUExecutionProvider"] if use_gpu else ["CPUExecutionProvider"]
+        providers = get_onnx_providers(use_gpu)
         try:
             self.session = ort.InferenceSession(model_path, providers=providers)
+            active = self.session.get_providers()
+            print(f"[bird_species] ONNX session using providers: {active}")
         except Exception as e:
             print(f"Warning: Failed to load ONNX model with specified providers: {e}")
             self.session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
@@ -71,13 +74,8 @@ class BirdSpeciesClassifier:
         e = np.exp(x - x.max())
         return e / e.sum()
 
-    def classify(self, image, top_k=5):
-        input_tensor = self._preprocess(image)
-        input_name = self.session.get_inputs()[0].name
-        outputs = self.session.run(None, {input_name: input_tensor})
-        logits = outputs[0][0]
-
-        # Convert logits to probabilities so that scores are in [0, 1]
+    def _postprocess(self, logits, top_k=5):
+        """Convert raw logits to a result dict with top-k species and families."""
         probs = self._softmax(logits)
 
         top_species_indices = np.argsort(probs)[-top_k:][::-1]
@@ -98,3 +96,21 @@ class BirdSpeciesClassifier:
             "top_family_labels": top_family_labels,
             "top_family_scores": top_family_scores,
         }
+
+    def classify(self, image, top_k=5):
+        input_tensor = self._preprocess(image)
+        input_name = self.session.get_inputs()[0].name
+        outputs = self.session.run(None, {input_name: input_tensor})
+        return self._postprocess(outputs[0][0], top_k)
+
+    def classify_batch(self, images, top_k=5):
+        """Classify multiple images, reusing the same session setup."""
+        if not images:
+            return []
+        input_name = self.session.get_inputs()[0].name
+        results = []
+        for img in images:
+            inp = self._preprocess(img)
+            outputs = self.session.run(None, {input_name: inp})
+            results.append(self._postprocess(outputs[0][0], top_k))
+        return results

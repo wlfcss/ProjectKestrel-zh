@@ -8,6 +8,11 @@ import tensorflow as tf
 
 class QualityClassifier:
     def __init__(self, model_path: str, normalization_data_path: str = None):
+        gpus = tf.config.list_physical_devices("GPU")
+        if gpus:
+            print(f"[quality] TensorFlow GPU devices available: {[g.name for g in gpus]}")
+        else:
+            print("[quality] No TensorFlow GPU detected, using CPU")
         self.model = tf.keras.models.load_model(model_path)
         self._norm_qualities = None
         self._norm_percentiles = None

@@ -1,8 +1,9 @@
 # Core ML/AI Dependencies
 torch==2.6.0
 torchvision==0.21.0
-tensorflow
+tensorflow  # 质量评估模型；Apple Silicon 上 GPU 加速不可用（tensorflow-metal 已停止维护），CPU 足够快
 onnxruntime==1.23.2
+coremltools; sys_platform == "darwin" and platform_machine == "arm64"
 
 numpy==2.1.3
 
