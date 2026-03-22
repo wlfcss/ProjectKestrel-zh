@@ -75,6 +75,41 @@ class _ImagePreloader:
         self._pool.shutdown(wait=False)
 
 
+class _AsyncCropWriter:
+    """Write crop JPEG files in a background thread so the main loop isn't blocked by disk I/O."""
+
+    def __init__(self):
+        self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="crop-writer")
+        self._futures: list = []
+
+    @staticmethod
+    def _write(path: str, rgb: np.ndarray, quality: int = 85) -> None:
+        try:
+            cv2.imwrite(path, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, quality])
+        except Exception as exc:
+            print(f"[crop-writer] Failed to write {path}: {exc}")
+
+    def submit(self, path: str, rgb: np.ndarray, quality: int = 85) -> None:
+        # Make a copy so the caller can safely release the array.
+        fut = self._pool.submit(self._write, path, rgb.copy(), quality)
+        self._futures.append(fut)
+        # Prune completed futures to avoid unbounded list growth.
+        self._futures = [f for f in self._futures if not f.done()]
+
+    def flush(self) -> None:
+        """Block until all pending writes are finished."""
+        for f in self._futures:
+            try:
+                f.result()
+            except Exception:
+                pass
+        self._futures.clear()
+
+    def shutdown(self) -> None:
+        self.flush()
+        self._pool.shutdown(wait=False)
+
+
 class AnalysisPipeline:
     def __init__(self, use_gpu: bool):
         self.use_gpu = use_gpu
@@ -88,33 +123,17 @@ class AnalysisPipeline:
         base: np.ndarray,
         masks: Optional[np.ndarray],
         indices: Optional[list],
-        color_ref: Optional[np.ndarray] = None,
         color=(255, 64, 64),
         alpha: float = 0.45,
     ) -> Optional[np.ndarray]:
-        """Create a mask overlay on *base* (analysis-space image).
+        """Create a mask overlay on *base* (preview image).
 
-        If *color_ref* is provided (e.g. the camera-JPEG preview), the base
-        image colours are shifted to match the reference so the overlay looks
-        natural while keeping mask coordinates perfectly aligned.
+        Masks and base must be in the same coordinate space (both from
+        preview_img or both from the same source image).
         """
         if base is None:
             return None
         overlay = base.copy()
-        # Colour-correct the base image to match the camera preview
-        if color_ref is not None:
-            ref = color_ref
-            if ref.shape[:2] != overlay.shape[:2]:
-                ref = cv2.resize(ref, (overlay.shape[1], overlay.shape[0]), interpolation=cv2.INTER_AREA)
-            for c in range(3):
-                s_mean = float(overlay[:, :, c].mean())
-                s_std = float(overlay[:, :, c].std()) or 1.0
-                t_mean = float(ref[:, :, c].mean())
-                t_std = float(ref[:, :, c].std()) or 1.0
-                overlay[:, :, c] = np.clip(
-                    (overlay[:, :, c].astype(np.float32) - s_mean) * (t_std / s_std) + t_mean,
-                    0, 255,
-                ).astype(np.uint8)
         if masks is None or not indices:
             return overlay
         h, w = overlay.shape[:2]
@@ -128,44 +147,6 @@ class AnalysisPipeline:
                 overlay[mask_bool] * (1.0 - alpha) + np.array(color, dtype=np.uint8) * alpha
             ).astype(np.uint8)
         return overlay
-
-    @staticmethod
-    def _estimate_preview_warp(analysis_img: np.ndarray, preview_img: np.ndarray) -> Optional[np.ndarray]:
-        """Estimate an affine transform that maps analysis-image coordinates onto preview coordinates."""
-        try:
-            if analysis_img is None or preview_img is None:
-                return None
-            if analysis_img.shape[:2] != preview_img.shape[:2]:
-                return None
-            gray_a = cv2.cvtColor(analysis_img, cv2.COLOR_RGB2GRAY)
-            gray_b = cv2.cvtColor(preview_img, cv2.COLOR_RGB2GRAY)
-            orb = cv2.ORB_create(2500)
-            kp_a, des_a = orb.detectAndCompute(gray_a, None)
-            kp_b, des_b = orb.detectAndCompute(gray_b, None)
-            if des_a is None or des_b is None or len(kp_a) < 12 or len(kp_b) < 12:
-                return None
-            matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-            matches = matcher.match(des_a, des_b)
-            if len(matches) < 12:
-                return None
-            matches = sorted(matches, key=lambda m: m.distance)[:200]
-            pts_a = np.float32([kp_a[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-            pts_b = np.float32([kp_b[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-            matrix, inliers = cv2.estimateAffinePartial2D(
-                pts_a,
-                pts_b,
-                method=cv2.RANSAC,
-                ransacReprojThreshold=3.0,
-                maxIters=2000,
-                confidence=0.99,
-            )
-            if matrix is None:
-                return None
-            if inliers is not None and int(inliers.sum()) < 12:
-                return None
-            return matrix.astype(np.float32)
-        except Exception:
-            return None
 
     @staticmethod
     def _compute_exposure_stops(img: np.ndarray, mask: np.ndarray) -> float:
@@ -386,6 +367,11 @@ class AnalysisPipeline:
 
         warnings.showwarning = _showwarning
 
+        preloader = None
+        crop_writer = None
+        _pending_entries: list = []
+        database = None
+        db_path = None
         try:
             stage_ctx["stage"] = "list_files"
             files = [
@@ -455,6 +441,16 @@ class AnalysisPipeline:
             stage_ctx["stage"] = "load_models"
             self.load_models(status_cb=status_cb)
 
+            log_event(
+                self._log_path,
+                {
+                    "level": "info",
+                    "event": "models_loaded",
+                    "yolo_backend": self.detector.backend,
+                    "yolo_load_ms": round(self.detector.load_time_ms, 1),
+                },
+            )
+
             previous_image_small = None
             previous_image_path = None
             previous_orientation = None
@@ -475,8 +471,13 @@ class AnalysisPipeline:
             _SAVE_BATCH = 10
             _pending_entries: list = []
 
+            # Per-stage timing accumulator for analysis_complete summary.
+            _timing_accum: dict = {}  # stage_name -> list of ms values
+            _TIMING_SAMPLE_INTERVAL = 50  # log every N images
+
             # Pre-load the first image so that I/O overlaps with inference.
             preloader = _ImagePreloader()
+            crop_writer = _AsyncCropWriter()
             if new_files:
                 preloader.submit(os.path.join(folder, new_files[0]))
 
@@ -488,6 +489,7 @@ class AnalysisPipeline:
                             if status_cb:
                                 status_cb('已取消')
                             preloader.shutdown()
+                            crop_writer.shutdown()
                             return
                         # Wait with timeout to be interruptible
                         pause_event.wait(timeout=0.5)
@@ -495,6 +497,7 @@ class AnalysisPipeline:
                     if status_cb:
                         status_cb('已取消')
                     preloader.shutdown()
+                    crop_writer.shutdown()
                     return
 
                 entry = {
@@ -524,10 +527,12 @@ class AnalysisPipeline:
 
                 image_path = None
                 raw_obj = None
+                _img_timings = {}  # per-stage timing for this image
                 try:
                     stage_ctx["stage"] = "read_image"
                     stage_ctx["file"] = raw_file
                     image_path = os.path.join(folder, raw_file)
+                    _t0 = time.perf_counter()
                     try:
                         img, raw_obj, preview_img = preloader.get()
                     except Exception:
@@ -536,6 +541,7 @@ class AnalysisPipeline:
                         # Always pre-load the next image, even if this one failed.
                         if idx < len(new_files):
                             preloader.submit(os.path.join(folder, new_files[idx]))
+                    _img_timings["read_image"] = round((time.perf_counter() - _t0) * 1000, 1)
                     if img is None:
                         raise RuntimeError("Image read returned None")
                     preview_img = preview_img if preview_img is not None else img
@@ -550,6 +556,7 @@ class AnalysisPipeline:
                         pass
 
                     stage_ctx["stage"] = "compute_similarity"
+                    _t0 = time.perf_counter()
                     timestamp_similar = None
                     try:
                         timestamp_similar = compute_similarity_timestamp(
@@ -613,41 +620,40 @@ class AnalysisPipeline:
                     previous_image_small = self._downscale_for_similarity(img)
                     previous_image_path = image_path
                     previous_orientation = current_orientation
+                    _img_timings["similarity"] = round((time.perf_counter() - _t0) * 1000, 1)
 
                     stage_ctx["stage"] = "export_image"
+                    _t0 = time.perf_counter()
                     export_path = os.path.join(export_dir, f"{os.path.splitext(raw_file)[0]}_export.jpg")
                     preview_small = cv2.resize(
                         preview_img,
                         (1200, int(1200 * preview_img.shape[0] / preview_img.shape[1])),
                         interpolation=cv2.INTER_AREA,
                     )
-                    analysis_small = cv2.resize(
-                        img,
-                        (1200, int(1200 * img.shape[0] / img.shape[1])),
-                        interpolation=cv2.INTER_AREA,
-                    )
-                    cv2.imwrite(
-                        export_path,
-                        cv2.cvtColor(preview_small, cv2.COLOR_RGB2BGR),
-                        [cv2.IMWRITE_JPEG_QUALITY, 70],
-                    )
+
+                    # Async export write — don't block main loop on disk I/O
+                    crop_writer.submit(export_path, preview_small, quality=70)
                     # Store relative path for cross-platform compatibility
                     export_path_rel = os.path.relpath(export_path, folder)
                     entry.update({"export_path": export_path_rel})
                     if thumbnail_cb:
                         thumbnail_cb({"filename": raw_file, "thumbnail": preview_small, "export_path": export_path_rel})
+                    _img_timings["export"] = round((time.perf_counter() - _t0) * 1000, 1)
 
                     stage_ctx["stage"] = "yolo_seg_prediction"
+                    _t0 = time.perf_counter()
                     # Detection inference. Pause semantics are
                     # handled at the start of each image loop so we do not check
                     # repeatedly inside the image processing path.
-                    masks, pred_boxes, pred_class, pred_score = self.detector.get_prediction(img, threshold=detection_threshold, mask_threshold=mask_threshold)
+                    masks, pred_boxes, pred_class, pred_score = self.detector.get_prediction(preview_img, threshold=detection_threshold, mask_threshold=mask_threshold)
+                    _img_timings["yolo_inference"] = round((time.perf_counter() - _t0) * 1000, 1)
+
                     if masks is None or len(masks) == 0:
                         if detection_cb:
                             detection_cb(
                                 {
                                     "filename": raw_file,
-                                    "overlay": self._create_mask_overlay(analysis_small, None, None, color_ref=preview_small),
+                                    "overlay": self._create_mask_overlay(preview_small, None, None),
                                     "bird_count": 0,
                                 }
                             )
@@ -660,23 +666,41 @@ class AnalysisPipeline:
                         if status_cb:
                             status_cb(f"未在 {raw_file} 中检测到鸟类")
                         stage_ctx["stage"] = "write_crop"
+                        _t0 = time.perf_counter()
                         crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
-                        cv2.imwrite(
-                            crop_path,
-                            cv2.cvtColor(preview_small, cv2.COLOR_RGB2BGR),
-                            [cv2.IMWRITE_JPEG_QUALITY, 85],
-                        )
+                        crop_writer.submit(crop_path, preview_small)
                         # Store relative path for cross-platform compatibility
                         crop_path_rel = os.path.relpath(crop_path, folder)
                         entry.update({"crop_path": crop_path_rel})
+                        _img_timings["submit_crop"] = round((time.perf_counter() - _t0) * 1000, 1)
                         stage_ctx["stage"] = "save_database"
-                        database = pd.concat([database, pd.DataFrame([entry])], ignore_index=True)
-                        save_database(database, db_path)
+                        _pending_entries.append(entry)
+                        if len(_pending_entries) >= _SAVE_BATCH:
+                            database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                            _pending_entries.clear()
+                            save_database(database, db_path)
                         if image_cb:
                             image_cb(entry)
+                        # Accumulate timings for no-detection images
+                        for _k, _v in _img_timings.items():
+                            _timing_accum.setdefault(_k, []).append(_v)
+                        if idx % _TIMING_SAMPLE_INTERVAL == 0:
+                            log_event(
+                                self._log_path,
+                                {
+                                    "level": "info",
+                                    "event": "image_timing_sample",
+                                    "image_index": idx + processed_count,
+                                    "filename": raw_file,
+                                    "timings": _img_timings,
+                                    "total_ms": round(sum(_img_timings.values()), 1),
+                                },
+                            )
                         if progress_cb:
                             progress_cb(idx + processed_count, total)
                         continue
+
+                    _t0 = time.perf_counter()  # start timing post-detection processing
 
                     # Store top-5 detection confidence scores
                     entry["detection_scores"] = json.dumps([float(s) for s in sorted(pred_score, reverse=True)[:5]])
@@ -691,10 +715,9 @@ class AnalysisPipeline:
                                 {
                                     "filename": raw_file,
                                     "overlay": self._create_mask_overlay(
-                                        analysis_small,
+                                        preview_small,
                                         masks,
                                         overlay_indices,
-                                        color_ref=preview_small,
                                     ),
                                     "bird_count": len(bird_indices),
                                 }
@@ -702,9 +725,9 @@ class AnalysisPipeline:
 
                     def process_nonbird(primary_mask_i):
                         stage_ctx["stage"] = "process_nonbird"
-                        stops = self._compute_exposure_stops(img, masks[primary_mask_i])
+                        stops = self._compute_exposure_stops(preview_img, masks[primary_mask_i])
                         quality_crop, quality_mask = self.detector.get_square_crop(
-                            masks[primary_mask_i], img, resize=True
+                            masks[primary_mask_i], preview_img, resize=True
                         )
                         quality_crop = self._apply_exposure_correction(quality_crop, stops)
                         visual_crop = quality_crop
@@ -727,9 +750,9 @@ class AnalysisPipeline:
                         for i in indices:
                             # Process per-crop results. Pause is checked at the
                             # top of the image loop so we avoid pausing mid-image.
-                            stops = self._compute_exposure_stops(img, masks[i])
-                            species_crop = self.detector.get_species_crop(pred_boxes[i], img)
-                            quality_crop, quality_mask = self.detector.get_square_crop(masks[i], img, resize=True)
+                            stops = self._compute_exposure_stops(preview_img, masks[i])
+                            species_crop = self.detector.get_species_crop(pred_boxes[i], preview_img)
+                            quality_crop, quality_mask = self.detector.get_square_crop(masks[i], preview_img, resize=True)
                             quality_crop = self._apply_exposure_correction(quality_crop, stops)
                             visual_crop = quality_crop
                             items.append(
@@ -911,16 +934,16 @@ class AnalysisPipeline:
                                 species_cb({"filename": raw_file, "results": []})
                             crop_img = preview_small
 
+                    _img_timings["post_detection"] = round((time.perf_counter() - _t0) * 1000, 1)
+
                     stage_ctx["stage"] = "write_crop"
+                    _t0 = time.perf_counter()
                     crop_path = os.path.join(crop_dir, f"{os.path.splitext(raw_file)[0]}_crop.jpg")
-                    cv2.imwrite(
-                        crop_path,
-                        cv2.cvtColor(crop_img, cv2.COLOR_RGB2BGR),
-                        [cv2.IMWRITE_JPEG_QUALITY, 85],
-                    )
+                    crop_writer.submit(crop_path, crop_img)
                     # Store relative path for cross-platform compatibility
                     crop_path_rel = os.path.relpath(crop_path, folder)
                     entry.update({"crop_path": crop_path_rel})
+                    _img_timings["submit_crop"] = round((time.perf_counter() - _t0) * 1000, 1)
 
                     stage_ctx["stage"] = "save_database"
                     _pending_entries.append(entry)
@@ -966,6 +989,23 @@ class AnalysisPipeline:
                     save_database(database, db_path)
                     time.sleep(2)
 
+                # Accumulate per-stage timings
+                for _k, _v in _img_timings.items():
+                    _timing_accum.setdefault(_k, []).append(_v)
+                # Log sampled timing every N images
+                if idx % _TIMING_SAMPLE_INTERVAL == 0:
+                    log_event(
+                        self._log_path,
+                        {
+                            "level": "info",
+                            "event": "image_timing_sample",
+                            "image_index": idx + processed_count,
+                            "filename": raw_file,
+                            "timings": _img_timings,
+                            "total_ms": round(sum(_img_timings.values()), 1),
+                        },
+                    )
+
                 if progress_cb:
                     progress_cb(idx + processed_count, total)
 
@@ -997,7 +1037,8 @@ class AnalysisPipeline:
                 except Exception:
                     pass
 
-            # Flush any remaining buffered entries before post-analysis.
+            # Flush pending async crop writes and buffered DB entries before post-analysis.
+            crop_writer.flush()
             if _pending_entries:
                 database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
                 _pending_entries.clear()
@@ -1049,6 +1090,17 @@ class AnalysisPipeline:
                             stage="post_analysis_normalization",
                         )
 
+                # Build per-stage timing summary (avg/min/max)
+                _timing_summary = {}
+                for _stage, _vals in _timing_accum.items():
+                    if _vals:
+                        _timing_summary[_stage] = {
+                            "avg_ms": round(sum(_vals) / len(_vals), 1),
+                            "min_ms": round(min(_vals), 1),
+                            "max_ms": round(max(_vals), 1),
+                            "count": len(_vals),
+                        }
+
                 log_event(
                     self._log_path,
                     {
@@ -1056,6 +1108,7 @@ class AnalysisPipeline:
                         "event": "analysis_complete",
                         "folder": folder,
                         "total_files": len(database),
+                        "timing_summary": _timing_summary,
                     },
                 )
                 if status_cb:
@@ -1079,5 +1132,16 @@ class AnalysisPipeline:
             if error_cb:
                 error_cb("fatal", e)
         finally:
-            preloader.shutdown()
+            # Flush any buffered entries that weren't saved yet.
+            try:
+                if _pending_entries and database is not None and db_path is not None:
+                    database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                    _pending_entries.clear()
+                    save_database(database, db_path)
+            except Exception:
+                pass
+            if crop_writer is not None:
+                crop_writer.shutdown()
+            if preloader is not None:
+                preloader.shutdown()
             warnings.showwarning = original_showwarning

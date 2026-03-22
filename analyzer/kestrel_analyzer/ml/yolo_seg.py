@@ -39,7 +39,10 @@ class YOLOSegWrapper:
 
         self._backend = "cpu"
         self._device = None
+        self._load_time_ms = 0.0
         self.model = None
+
+        _t_load_start = time.perf_counter()
 
         # Priority: MPS > CoreML > CPU
         if _is_apple_silicon():
@@ -84,7 +87,18 @@ class YOLOSegWrapper:
         # Build COCO class name list compatible with pipeline's string comparisons
         self.COCO_INSTANCE_CATEGORY_NAMES = list(self.model.names.values())
 
-        print(f"[yolo_seg] Model loaded: {weights_path.stem} (backend={self._backend})")
+        self._load_time_ms = (time.perf_counter() - _t_load_start) * 1000
+        print(f"[yolo_seg] Model loaded: {weights_path.stem} (backend={self._backend}, {self._load_time_ms:.0f}ms)")
+
+    @property
+    def backend(self) -> str:
+        """Return the active inference backend name ('mps', 'coreml', or 'cpu')."""
+        return self._backend
+
+    @property
+    def load_time_ms(self) -> float:
+        """Return model loading time in milliseconds."""
+        return self._load_time_ms
 
     @staticmethod
     def _raise_if_lfs_pointer(weights_path: Path) -> None:

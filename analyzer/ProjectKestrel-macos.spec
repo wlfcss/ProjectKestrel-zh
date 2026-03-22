@@ -50,7 +50,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ProjectKestrel',
+    name='LingjianLite',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -71,13 +71,13 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name='ProjectKestrel',
+    name='LingjianLite',
     icon='../assets/logo.ico',
 )
 
 app = BUNDLE(
     coll,
-    name='Project Kestrel.app',
+    name='翎鉴 Lite.app',
     icon='../assets/logo.ico',
-    bundle_identifier='org.ProjectKestrel',
+    bundle_identifier='org.lingjian-lite',
 )

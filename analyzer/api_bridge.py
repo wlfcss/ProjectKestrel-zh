@@ -1514,12 +1514,16 @@ class Api:
                 except Exception:
                     raw_sizes = {}
                 
+                # Extract embedded preview for color reference (always attempt)
+                preview_ref = None
+                if callable(_extract_preview_from_raw):
+                    preview_ref = _extract_preview_from_raw(raw)
+
                 if exp_correction == 0.0:
                     # No exposure correction — prefer the embedded camera JPEG
-                    rgb = None
-                    if callable(_extract_preview_from_raw):
-                        rgb = _extract_preview_from_raw(raw)
-                    if rgb is None:
+                    if preview_ref is not None:
+                        rgb = preview_ref
+                    else:
                         rgb = _postprocess_raw(raw) if callable(_postprocess_raw) else raw.postprocess()
                 else:
                     # Exposure correction requested — must decode from raw sensor data
@@ -1534,6 +1538,29 @@ class Api:
                             exp_shift=linear_scale,
                             exp_preserve_highlights=preserve,
                         )
+                    # Apply color correction so rawpy output matches camera colors
+                    if preview_ref is not None:
+                        try:
+                            import cv2 as _cv2
+                            import numpy as _np
+                            # Downscale both for fast stats computation
+                            _h, _w = rgb.shape[:2]
+                            _scale = min(1.0, 600.0 / max(_h, _w))
+                            if _scale < 1.0:
+                                _src_s = _cv2.resize(rgb, (int(_w * _scale), int(_h * _scale)), interpolation=_cv2.INTER_AREA)
+                            else:
+                                _src_s = rgb
+                            _ref_s = _cv2.resize(preview_ref, (_src_s.shape[1], _src_s.shape[0]), interpolation=_cv2.INTER_AREA)
+                            rgb_f = rgb.astype(_np.float32)
+                            for _c in range(3):
+                                _sm = float(_src_s[:, :, _c].mean())
+                                _ss = float(_src_s[:, :, _c].std()) or 1.0
+                                _tm = float(_ref_s[:, :, _c].mean())
+                                _ts = float(_ref_s[:, :, _c].std()) or 1.0
+                                rgb_f[:, :, _c] = (rgb_f[:, :, _c] - _sm) * (_ts / _ss) + _tm
+                            rgb = _np.clip(rgb_f, 0, 255).astype(_np.uint8)
+                        except Exception:
+                            pass  # Fall back to uncorrected if cv2 unavailable
 
             img = Image.fromarray(rgb)
 

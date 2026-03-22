@@ -26,6 +26,8 @@ A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/Pr
 | 数据目录 Data Dir | `.kestrel` | `.lingjian` |
 | 分类数据 Taxonomy | English species names | 中文鸟种名 Chinese (IOC 15.1) |
 | 应用入口 Entry | Separate GUI + Visualizer | Unified PyWebView app |
+| 检测模型 Detection | Mask R-CNN | YOLO26x-seg + MPS 加速 |
+| 处理速度 Speed | ~4s/张 | ~1s/张 (Apple Silicon MPS) |
 | 遥测 Telemetry | 匿名使用统计 Anonymous telemetry | 已移除 Removed |
 
 > **关于遥测 | About Telemetry:**

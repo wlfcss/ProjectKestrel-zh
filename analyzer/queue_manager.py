@@ -89,7 +89,7 @@ class _QueueItem:
                  'current_filename', 'current_export_path', 'current_status_msg',
                  'current_overlay_rel', 'current_crops_rel', 'current_detections',
                  'current_quality_results', 'current_species_results',
-                 'initial_processed')
+                 'initial_processed', 'backend')
 
     def __init__(self, path: str, name: str):
         self.path = path
@@ -111,6 +111,7 @@ class _QueueItem:
         self.current_quality_results: list = []
         self.current_species_results: list = []
         self.initial_processed: int = 0  # 本轮开始前已经处理完成的文件数
+        self.backend: str = ''
 
     def to_dict(self) -> dict:
         elapsed = 0.0
@@ -138,6 +139,7 @@ class _QueueItem:
             'current_detections': list(self.current_detections),
             'current_quality_results': list(self.current_quality_results),
             'current_species_results': list(self.current_species_results),
+            'backend': self.backend,
         }
 
 
@@ -208,6 +210,7 @@ class QueueManager:
                         existing_item.current_quality_results = []
                         existing_item.current_species_results = []
                         existing_item.initial_processed = 0
+                        existing_item.backend = ''
                         added += 1
                     # If already pending/running, leave it alone
                 else:
@@ -344,6 +347,12 @@ class QueueManager:
                 def _on_status(msg, _it=item):
                     with self._lock:
                         _it.current_status_msg = msg
+                        # Set backend after models are loaded
+                        if not _it.backend and self._pipeline is not None:
+                            try:
+                                _it.backend = self._pipeline.detector.backend
+                            except Exception:
+                                pass
                     log(f'[queue:{_it.name}]', msg)
 
                 def _on_thumbnail(data, _it=item):

@@ -97,13 +97,18 @@ def read_image(path: str):
 
 def read_image_for_pipeline(path: str):
     """
-    Like read_image, but for RAW files returns the rawpy.RawPy object *open*
-    alongside the postprocessed RGB array so that the pipeline can request a
-    re-processed image with different exposure settings without re-reading the
-    file from disk.
+    Preview-first loader for the analysis pipeline.
+
+    For RAW files we **only** extract the embedded JPEG preview (very fast,
+    ~50 ms) and keep the rawpy object open.  The expensive full-sensor
+    demosaicing (~1500 ms) is deferred until the pipeline actually needs it
+    (i.e. when a bird is detected and high-quality crops are required).
 
     Returns: (ndarray | None, rawpy.RawPy | None, ndarray | None)
-      - For RAW files: (rgb_array, raw_obj, preview_rgb)
+      - For RAW files: (preview_rgb, raw_obj, preview_rgb)
+            ``preview_rgb`` is the embedded camera JPEG preview.
+            The caller can later call ``postprocess_raw(raw_obj)`` for a
+            full-resolution decode when needed.
       - For non-RAW:   (rgb_array, None, rgb_array)
       - On failure:    (None, None, None)
     """
@@ -114,9 +119,14 @@ def read_image_for_pipeline(path: str):
         if ext in raw_extensions:
             # Do NOT use a context manager — we intentionally keep the object open.
             raw = rawpy.imread(path)
-            rgb = postprocess_raw(raw)
             preview_rgb = extract_preview_from_raw(raw)
-            return rgb, raw, preview_rgb
+            if preview_rgb is not None:
+                # Fast path: use embedded preview for detection, defer full decode
+                return preview_rgb, raw, preview_rgb
+            else:
+                # Fallback: no embedded preview, must do full decode now
+                rgb = postprocess_raw(raw)
+                return rgb, raw, rgb
         else:
             rgb = read_image(path)
             return rgb, None, rgb

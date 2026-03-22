@@ -54,9 +54,9 @@ pushd analyzer || exit 1
 python -m PyInstaller ProjectKestrel-macos.spec
 popd
 
-DIST_DIR="analyzer/dist/ProjectKestrel"
-if [[ ! -f "${DIST_DIR}/ProjectKestrel" ]]; then
-  echo "[ERROR] ProjectKestrel binary not found after build."
+DIST_DIR="analyzer/dist/LingjianLite"
+if [[ ! -f "${DIST_DIR}/LingjianLite" ]]; then
+  echo "[ERROR] LingjianLite binary not found after build."
   exit 1
 fi
 echo "[OK] PyInstaller onedir build complete: ${DIST_DIR}/"
@@ -68,7 +68,7 @@ printf "%s\n" "========================================"
 echo
 
 # Copy to .app bundle Resources directory (includes hidden files with cp -R)
-APP_BUNDLE="analyzer/dist/Project Kestrel.app"
+APP_BUNDLE="analyzer/dist/翎鉴 Lite.app"
 if [[ -d "${APP_BUNDLE}" ]]; then
   RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
   mkdir -p "${RESOURCES_DIR}"

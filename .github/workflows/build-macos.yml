@@ -18,10 +18,10 @@ jobs:
           echo "Downloading model files from GitHub release..."
           mkdir -p analyzer/models
 
-          curl -L -o analyzer/models/yolo26s-seg.pt \
-            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/yolo26s-seg.pt"
+          curl -L -o analyzer/models/yolo26x-seg.pt \
+            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/yolo26x-seg.pt"
 
-          FILE_SIZE=$(stat -f%z analyzer/models/yolo26s-seg.pt 2>/dev/null || stat -c%s analyzer/models/yolo26s-seg.pt)
+          FILE_SIZE=$(stat -f%z analyzer/models/yolo26x-seg.pt 2>/dev/null || stat -c%s analyzer/models/yolo26x-seg.pt)
           echo "Downloaded: ${FILE_SIZE} bytes"
           if [ "${FILE_SIZE}" -lt 1000000 ]; then
             echo "ERROR: Downloaded file too small (${FILE_SIZE} bytes)"
@@ -55,7 +55,7 @@ jobs:
         run: |
           brew install create-dmg
 
-          APP_PATH="analyzer/dist/Project Kestrel.app"
+          APP_PATH="analyzer/dist/翎鉴 Lite.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: .app not found at $APP_PATH"
             exit 1
@@ -64,13 +64,13 @@ jobs:
           mkdir -p artifact
 
           create-dmg \
-            --volname "翎鉴 Project Kestrel" \
+            --volname "翎鉴 Lite" \
             --window-size 540 380 \
             --icon-size 128 \
-            --icon "Project Kestrel.app" 140 190 \
+            --icon "翎鉴 Lite.app" 140 190 \
             --app-drop-link 400 190 \
-            --hide-extension "Project Kestrel.app" \
-            "artifact/ProjectKestrel.dmg" \
+            --hide-extension "翎鉴 Lite.app" \
+            "artifact/LingjianLite.dmg" \
             "$APP_PATH"
 
           echo "DMG created:"
@@ -80,7 +80,7 @@ jobs:
         shell: bash
         run: |
           cd analyzer/dist
-          ditto -c -k --keepParent "Project Kestrel.app" "../../artifact/ProjectKestrel-macOS.zip"
+          ditto -c -k --keepParent "翎鉴 Lite.app" "../../artifact/LingjianLite-macOS.zip"
           cd ../..
           echo "ZIP created:"
           ls -lh artifact/
@@ -89,19 +89,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: artifact/ProjectKestrel.dmg
+          path: artifact/LingjianLite.dmg
 
       - name: Upload ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-zip
-          path: artifact/ProjectKestrel-macOS.zip
+          path: artifact/LingjianLite-macOS.zip
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifact/ProjectKestrel.dmg
-            artifact/ProjectKestrel-macOS.zip
+            artifact/LingjianLite.dmg
+            artifact/LingjianLite-macOS.zip
           generate_release_notes: true

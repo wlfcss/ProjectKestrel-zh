@@ -4830,6 +4830,14 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const statusEl = document.getElementById('liveDlgStatus');
       if (folderEl) folderEl.textContent = item ? item.name : '–';
       if (fnameEl) fnameEl.textContent = item ? (item.current_filename || '') : '';
+      // Backend indicator
+      const backendEl = document.getElementById('liveDlgBackend');
+      if (backendEl) {
+        const activeBackend = item ? (item.backend || '') : '';
+        backendEl.querySelectorAll('.backend-chip').forEach(chip => {
+          chip.classList.toggle('active', chip.dataset.backend === activeBackend);
+        });
+      }
       if (statusEl) {
         const msg = item ? (item.current_status_msg || '') : '';
         const paused = item && item.is_paused;
