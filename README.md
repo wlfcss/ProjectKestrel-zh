@@ -4,7 +4,7 @@
 
 A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/ProjectKestrel). Uses machine learning to automatically group, rank by sharpness, and tag bird photos by species — turning your photo collection into a searchable, sortable smart library.
 
-![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-GPLv3-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey.svg)
 
@@ -15,6 +15,8 @@ A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/Pr
 - **画质排序 | Quality Ranking** — 按锐度自动排序，跳过数小时的手动筛片 / Auto-sort by sharpness, skip hours of manual culling
 - **物种搜索 | Species Search** — 通过鸟种或科名关键词即时检索 / Instantly search by species or family keywords
 - **场景分组 | Scene Grouping** — 连拍自动归组，同场景并排比较 / Bursts auto-grouped for side-by-side comparison
+- **星级评分 | Star Rating** — AI 自动评分 + 手动覆盖，支持按星级分文件夹导出 / AI auto-rating + manual override, export by star rating
+- **XMP 元数据 | XMP Metadata** — 写入 .xmp 旁车文件，兼容 Lightroom/Capture One/darktable / Write .xmp sidecars for Lightroom/Capture One/darktable
 - **100% 本地 | 100% Local** — 所有处理在本地完成，照片不上传 / All processing on-device, no uploads
 
 ## 与上游的差异 | Differences from Upstream
@@ -26,8 +28,10 @@ A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/Pr
 | 数据目录 Data Dir | `.kestrel` | `.lingjian` |
 | 分类数据 Taxonomy | English species names | 中文鸟种名 Chinese (IOC 15.1) |
 | 应用入口 Entry | Separate GUI + Visualizer | Unified PyWebView app |
-| 检测模型 Detection | Mask R-CNN | YOLO26x-seg + MPS 加速 |
+| 检测模型 Detection | Mask R-CNN | YOLO26x-seg 实例分割 |
+| 硬件加速 Acceleration | CPU / CUDA | MPS (Apple Silicon) / CUDA / CPU |
 | 处理速度 Speed | ~4s/张 | ~1s/张 (Apple Silicon MPS) |
+| 导出功能 Export | 无 | 按星级分文件夹导出 + XMP 写入 |
 | 遥测 Telemetry | 匿名使用统计 Anonymous telemetry | 已移除 Removed |
 
 > **关于遥测 | About Telemetry:**
@@ -40,14 +44,15 @@ A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/Pr
 ## 快速开始 | Quick Start
 
 ### 环境要求 | Prerequisites
-- Python 3.12+
-- Git
+- Python 3.11+
+- Git (含 Git LFS)
 
 ### 安装 | Installation
 
 ```bash
 git clone https://github.com/wlfcss/ProjectKestrel-zh.git
 cd ProjectKestrel-zh
+git lfs pull          # 拉取模型文件 (~200MB)
 pip install -r requirements.txt
 ```
 
@@ -65,28 +70,28 @@ The app launches as a PyWebView desktop window with integrated analysis and brow
 1. **导入 Import** — 点击"导入"选择照片文件夹 / Click "Import" to select a photo folder
 2. **分析 Analyze** — 点击"分析"加入队列，等待 AI 处理 / Click "Analyze" to queue folders for AI processing
 3. **浏览 Browse** — 场景卡片按画质排序，点击查看详情 / Scene cards sorted by quality; click for details
-4. **筛片 Cull** — 标记接受/拒绝 / Mark accept/reject on each scene
-5. **导出 Export** — 导出筛选结果或写入 XMP 元数据 / Export selections or write XMP metadata
+4. **筛片 Cull** — 标记接受/拒绝，手动评分星级 / Mark accept/reject, assign star ratings
+5. **导出 Export** — 按星级分文件夹导出、或写入 XMP 元数据 / Export by star rating or write XMP metadata
 
 ---
 
 ## 技术原理 | How It Works
 
 ### 鸟类检测 | Bird Detection
-使用 PyTorch Mask R-CNN ResNet50 FPN v2 模型检测并分割图像中的鸟类，生成精确的遮罩区域。
-Uses PyTorch Mask R-CNN ResNet50 FPN v2 to detect and segment birds, generating precise masks.
+使用 YOLO26x-seg 实例分割模型检测并分割图像中的鸟类，生成精确的遮罩区域。在 Apple Silicon 上通过 MPS 加速推理，回退链为 MPS → CoreML → CPU。
+Uses YOLO26x-seg instance segmentation to detect and segment birds, generating precise masks. On Apple Silicon, inference is accelerated via MPS, with fallback chain: MPS → CoreML → CPU.
 
 ### 物种分类 | Species Classification
-基于 ONNX 的自定义模型进行鸟种识别。当前模型主要针对北美洲鸟类训练，对亚洲鸟类置信度较低。
-Custom ONNX model for bird species identification. Currently trained on North American birds; lower confidence on Asian species.
+基于 ONNX 的自定义模型进行鸟种识别，输出 Top-5 物种及科级预测。当前模型主要针对北美洲鸟类训练，对亚洲鸟类置信度较低。
+Custom ONNX model for bird species identification, outputting top-5 species and family predictions. Currently trained on North American birds; lower confidence on Asian species.
 
 ### 画质评估 | Quality Assessment
-自定义模型综合评估噪点、运动模糊、失焦等因素，仅对鸟类区域打分，不受背景影响。
-Custom model evaluates noise, motion blur, and focus — scoring only the bird region, not the background.
+Keras 模型综合评估噪点、运动模糊、失焦等因素，仅对鸟类区域打分，不受背景影响。评分经百分位归一化后映射为 1-5 星。
+Keras model evaluates noise, motion blur, and focus — scoring only the bird region, not the background. Scores are percentile-normalized then mapped to 1-5 stars.
 
 ### 场景分组 | Scene Grouping
-自定义图像相似度算法自动将连拍归组，便于同场景画质横向比较。
-Custom similarity algorithm auto-groups bursts for easy within-scene quality comparison.
+基于 AKAZE 特征匹配和颜色直方图比较的自定义相似度算法，结合 EXIF 时间戳，自动将连拍归组。
+Custom similarity algorithm combining AKAZE feature matching, color histogram comparison, and EXIF timestamps to auto-group bursts.
 
 ---
 
@@ -100,18 +105,30 @@ ProjectKestrel-zh/
 │   ├── api_bridge.py            # Python↔JS API bridge
 │   ├── queue_manager.py         # 分析队列 Analysis queue
 │   ├── metadata_writer.py       # XMP 写入 XMP writer
+│   ├── folder_inspector.py      # 文件夹扫描 Folder inspector
+│   ├── settings_utils.py        # 设置持久化 Settings persistence
+│   ├── editor_launch.py         # 外部编辑器 External editor
 │   ├── i18n.js                  # 前端国际化 Frontend i18n
 │   ├── taxonomy.js              # 前端分类数据 Taxonomy data
 │   ├── taxonomy_zh_cn.json      # 中文鸟种名 Chinese bird names
 │   ├── cli.py                   # CLI 入口 CLI entry
 │   ├── models/                  # AI 模型 Model files
+│   │   ├── yolo26x-seg.pt       # YOLO 实例分割 (主模型)
+│   │   ├── model.onnx           # 物种分类器 Species classifier
+│   │   ├── quality.keras        # 画质评估 Quality model
+│   │   └── ...                  # 标签映射、归一化数据等
 │   └── kestrel_analyzer/        # 核心管线 Core pipeline
 │       ├── pipeline.py          # 主管线 Main pipeline
 │       ├── database.py          # CSV 数据库 Database ops
 │       ├── image_utils.py       # 图像 I/O Image utils
 │       ├── similarity.py        # 相似度 Similarity
-│       ├── ratings.py           # 评分 Ratings
+│       ├── ratings.py           # 评分归一化 Ratings
+│       ├── device_utils.py      # 设备检测 Device detection
 │       └── ml/                  # ML 封装 Model wrappers
+│           ├── yolo_seg.py      # YOLO 分割 YOLO segmentation
+│           ├── mask_rcnn.py     # Mask R-CNN (legacy)
+│           ├── bird_species.py  # 物种分类 Species classifier
+│           └── quality.py       # 画质评估 Quality model
 ├── packaging/                   # PyInstaller 打包 Packaging
 ├── requirements.txt             # Python 依赖 Dependencies
 └── README.md
@@ -123,29 +140,35 @@ ProjectKestrel-zh/
 Quality model is trained on RAW; may be less accurate on JPEGs.
 
 **RAW 格式 (推荐 Preferred)**:
-Canon `.cr2` `.cr3` | Nikon `.nef` | Sony `.arw` | Adobe `.dng` | Olympus `.orf` | Fuji `.raf` | Panasonic `.rw2` | Pentax `.pef` | Samsung `.sr2` | Sigma `.x3f`
+Canon `.cr2` `.cr3` | Nikon `.nef` | Sony `.arw` | Adobe `.dng` | Olympus `.orf` | Panasonic `.rw2` | Pentax `.pef` | Samsung `.sr2`
 
-**标准格式 Standard**: `.jpg` `.jpeg` `.png`
+**标准格式 Standard**: `.jpg` `.jpeg` `.png` `.tiff`
 
 > 如果你的 RAW 格式不在列表中，欢迎提交 Issue。
 > If your RAW format is missing, please open an Issue.
 
 ## GPU 加速 | GPU Acceleration
 
-- **GPU 模式 GPU Mode**: Windows DirectML (需兼容 GPU / requires compatible GPU)
-- **CPU 模式 CPU Mode**: 兼容所有系统 / Works on all systems
+| 平台 Platform | 检测模型 Detection | 物种分类 Species | 画质评估 Quality |
+|------|------|------|------|
+| **macOS (Apple Silicon)** | MPS → CoreML → CPU | CPU | CPU |
+| **Windows (NVIDIA)** | CUDA | DirectML | CUDA |
+| **CPU 模式** | CPU | CPU | CPU |
 
-> GPU 加速处于 Beta 阶段，如遇不稳定请用 CPU 模式。
-> GPU acceleration is in beta; fall back to CPU mode if unstable.
+> macOS 上 YOLO 优先使用 MPS 加速（约 1s/张），自动回退至 CoreML 或 CPU。
+> On macOS, YOLO uses MPS acceleration (~1s/image) with automatic fallback to CoreML or CPU.
 
 ## 输出结构 | Output Structure
 
 ```
 your_photos/
 ├── .lingjian/
+│   ├── lingjian_database.csv    # 分析结果 Analysis results
+│   ├── lingjian_scenedata.json  # 场景分组与用户标签 Scene data & user edits
+│   ├── lingjian_metadata.json   # 分析元数据 Analysis metadata
 │   ├── export/                  # JPEG 预览 Resized previews
 │   ├── crop/                    # 鸟类裁剪 Bird crops
-│   └── lingjian_database.csv    # 分析结果 Analysis results
+│   └── preview_analysis/        # 检测覆层 Detection overlays
 └── [原始照片 Original photos]
 ```
 
@@ -164,6 +187,7 @@ This project is forked from **Sanjay Soni**'s [Project Kestrel](https://github.c
 
 ### 开源依赖 | Open Source Dependencies
 
+- [Ultralytics](https://github.com/ultralytics/ultralytics) — YOLO 实例分割 / YOLO instance segmentation
 - [rawpy](https://github.com/letmaik/rawpy) — RAW 图像处理 / RAW image processing
 - [PyInstaller](https://pyinstaller.org) — Python 打包 / App packaging
 - [PyWebView](https://pywebview.flowrl.com) — 桌面 WebView / Desktop WebView
