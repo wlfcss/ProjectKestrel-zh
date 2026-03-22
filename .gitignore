@@ -28,4 +28,9 @@ analyzer/models/quality_set4_ep6.keras
 analyzer/models/quality_set6_ep1.keras
 analyzer/models/current.md
 analyzer/models/mask_rcnn_backbone.mlpackage/
+analyzer/models/mask_rcnn_resnet50_fpn_v2.pth
+analyzer/models/yolo26s-seg.pt
 analyzer/models/yolo26s-seg.mlpackage/
+analyzer/models/yolo26m-seg.pt
+analyzer/models/yolo26l-seg.pt
+analyzer/models/yolo26x-seg.mlpackage/

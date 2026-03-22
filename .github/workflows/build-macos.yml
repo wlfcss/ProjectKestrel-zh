@@ -12,22 +12,12 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Download model files
+      - name: Pull LFS model files
         shell: bash
         run: |
-          echo "Downloading model files from GitHub release..."
-          mkdir -p analyzer/models
-
-          curl -L -o analyzer/models/yolo26x-seg.pt \
-            "https://github.com/SanjaySoniLV/ProjectKestrel/releases/download/test/yolo26x-seg.pt"
-
-          FILE_SIZE=$(stat -f%z analyzer/models/yolo26x-seg.pt 2>/dev/null || stat -c%s analyzer/models/yolo26x-seg.pt)
-          echo "Downloaded: ${FILE_SIZE} bytes"
-          if [ "${FILE_SIZE}" -lt 1000000 ]; then
-            echo "ERROR: Downloaded file too small (${FILE_SIZE} bytes)"
-            exit 1
-          fi
-          ls -lh analyzer/models/
+          git lfs pull
+          echo "Model files:"
+          ls -lh analyzer/models/*.pt analyzer/models/*.keras analyzer/models/*.onnx 2>/dev/null || true
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
