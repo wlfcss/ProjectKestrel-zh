@@ -49,6 +49,14 @@ from .ml.bird_species import BirdSpeciesClassifier
 from .ml.quality import QualityClassifier
 
 
+def _concat_pending(database: pd.DataFrame, pending: list) -> pd.DataFrame:
+    """Concat pending entries into database, suppressing pandas FutureWarning."""
+    new_df = pd.DataFrame(pending)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning, message=".*empty or all-NA")
+        return pd.concat([database, new_df], ignore_index=True)
+
+
 class _ImagePreloader:
     """Pre-read the next image in a background thread to overlap I/O with GPU inference."""
 
@@ -676,7 +684,7 @@ class AnalysisPipeline:
                         stage_ctx["stage"] = "save_database"
                         _pending_entries.append(entry)
                         if len(_pending_entries) >= _SAVE_BATCH:
-                            database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                            database = _concat_pending(database, _pending_entries)
                             _pending_entries.clear()
                             save_database(database, db_path)
                         if image_cb:
@@ -948,7 +956,7 @@ class AnalysisPipeline:
                     stage_ctx["stage"] = "save_database"
                     _pending_entries.append(entry)
                     if len(_pending_entries) >= _SAVE_BATCH:
-                        database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                        database = _concat_pending(database, _pending_entries)
                         _pending_entries.clear()
                         save_database(database, db_path)
 
@@ -984,7 +992,7 @@ class AnalysisPipeline:
                     # Flush any buffered successful entries before saving the error entry,
                     # so the CSV stays consistent even on crash.
                     _pending_entries.append(entry)
-                    database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                    database = _concat_pending(database, _pending_entries)
                     _pending_entries.clear()
                     save_database(database, db_path)
                     time.sleep(2)
@@ -1040,7 +1048,7 @@ class AnalysisPipeline:
             # Flush pending async crop writes and buffered DB entries before post-analysis.
             crop_writer.flush()
             if _pending_entries:
-                database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                database = _concat_pending(database, _pending_entries)
                 _pending_entries.clear()
 
             # === Post-analysis: compute quality distribution and normalized ratings ===
@@ -1135,7 +1143,7 @@ class AnalysisPipeline:
             # Flush any buffered entries that weren't saved yet.
             try:
                 if _pending_entries and database is not None and db_path is not None:
-                    database = pd.concat([database, pd.DataFrame(_pending_entries)], ignore_index=True)
+                    database = _concat_pending(database, _pending_entries)
                     _pending_entries.clear()
                     save_database(database, db_path)
             except Exception:

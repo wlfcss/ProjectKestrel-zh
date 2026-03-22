@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # ========================================
-# Project Kestrel macOS Builder (Headless)
-# Builds unified ProjectKestrel onedir bundle + .pkg installer
+# LingjianLite macOS Builder (Headless)
+# Builds unified LingjianLite onedir bundle + .pkg installer
 # Called by CI (GitHub Actions) or run locally
 # ========================================
 
 echo
 printf "%s\n" "========================================"
-printf "%s\n" "Project Kestrel macOS Builder (Headless)"
+printf "%s\n" "LingjianLite macOS Builder (Headless)"
 printf "%s\n" "========================================"
 echo
 
@@ -26,7 +26,7 @@ if [[ -f "VERSION.txt" ]]; then
 else
   echo "[WARNING] VERSION.txt not found in repo root, generating one..."
   RELEASE_TS="${RELEASE_TS:-$(date "+%Y.%m.%d.%H.%M")}"
-  RELEASE_NAME="${RELEASE_NAME:-Project Kestrel a${RELEASE_TS}}"
+  RELEASE_NAME="${RELEASE_NAME:-LingjianLite a${RELEASE_TS}}"
   APP_VERSION="${APP_VERSION:-alpha-${RELEASE_TS}}"
   {
     echo "${APP_VERSION}"
@@ -37,12 +37,12 @@ fi
 # ----------------------------------------
 # Activate Python virtual environment
 # ----------------------------------------
-if [[ -f ".venv2/bin/activate" ]]; then
+if [[ -f ".venv/bin/activate" ]]; then
   # shellcheck disable=SC1091
-  source ".venv2/bin/activate"
-  echo "[OK] Activated .venv2"
+  source ".venv/bin/activate"
+  echo "[OK] Activated .venv"
 else
-  echo "[WARNING] .venv2 not found - using system/activated Python"
+  echo "[WARNING] .venv not found - using system/activated Python"
 fi
 
 echo
@@ -52,12 +52,12 @@ printf "%s\n" "========================================"
 echo
 
 pushd analyzer || exit 1
-python -m PyInstaller ProjectKestrel-macos.spec
+python -m PyInstaller LingjianLite-macos.spec
 popd
 
-DIST_DIR="analyzer/dist/ProjectKestrel"
-if [[ ! -f "${DIST_DIR}/ProjectKestrel" ]]; then
-  echo "[ERROR] ProjectKestrel binary not found after build."
+DIST_DIR="analyzer/dist/LingjianLite"
+if [[ ! -f "${DIST_DIR}/LingjianLite" ]]; then
+  echo "[ERROR] LingjianLite binary not found after build."
   exit 1
 fi
 echo "[OK] PyInstaller onedir build complete: ${DIST_DIR}/"
@@ -69,7 +69,7 @@ printf "%s\n" "========================================"
 echo
 
 # Copy to .app bundle Resources directory (includes hidden files with cp -R)
-APP_BUNDLE="analyzer/dist/Project Kestrel.app"
+APP_BUNDLE="analyzer/dist/翎鉴 Lite.app"
 if [[ -d "${APP_BUNDLE}" ]]; then
   RESOURCES_DIR="${APP_BUNDLE}/Contents/Resources"
   mkdir -p "${RESOURCES_DIR}"

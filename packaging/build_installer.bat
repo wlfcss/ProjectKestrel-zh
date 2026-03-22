@@ -1,13 +1,13 @@
 @echo off
 REM ========================================
-REM Project Kestrel - Interactive Installer Builder
+REM LingjianLite - Interactive Installer Builder
 REM ========================================
 
 setlocal enabledelayedexpansion
 
 echo.
 echo ========================================
-echo Project Kestrel Installer Builder
+echo LingjianLite Installer Builder
 echo ========================================
 echo.
 
@@ -16,7 +16,7 @@ set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 
 REM Build default release name and version
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format \"yyyy.MM.dd.HH.mm\""') do set "RELEASE_TS=%%I"
-set "DEFAULT_RELEASE_NAME=Project Kestrel a%RELEASE_TS%"
+set "DEFAULT_RELEASE_NAME=LingjianLite a%RELEASE_TS%"
 set "DEFAULT_APP_VERSION=alpha-%RELEASE_TS%"
 
 set "RELEASE_NAME="

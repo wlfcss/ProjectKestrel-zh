@@ -2,14 +2,14 @@
 set -euo pipefail
 
 # ========================================
-# Project Kestrel macOS App Builder (Headless)
-# Builds unified ProjectKestrel onedir bundle (PyInstaller only)
+# LingjianLite macOS App Builder (Headless)
+# Builds unified LingjianLite onedir bundle (PyInstaller only)
 # No .pkg installer - for faster CI builds
 # ========================================
 
 echo
 printf "%s\n" "========================================"
-printf "%s\n" "Project Kestrel macOS App Builder"
+printf "%s\n" "LingjianLite macOS App Builder"
 printf "%s\n" "========================================"
 echo
 
@@ -36,12 +36,12 @@ fi
 # ----------------------------------------
 # Activate Python virtual environment
 # ----------------------------------------
-if [[ -f ".venv2/bin/activate" ]]; then
+if [[ -f ".venv/bin/activate" ]]; then
   # shellcheck disable=SC1091
-  source ".venv2/bin/activate"
-  echo "[OK] Activated .venv2"
+  source ".venv/bin/activate"
+  echo "[OK] Activated .venv"
 else
-  echo "[WARNING] .venv2 not found - using system/activated Python"
+  echo "[WARNING] .venv not found - using system/activated Python"
 fi
 
 echo
@@ -51,7 +51,7 @@ printf "%s\n" "========================================"
 echo
 
 pushd analyzer || exit 1
-python -m PyInstaller ProjectKestrel-macos.spec
+python -m PyInstaller LingjianLite-macos.spec
 popd
 
 DIST_DIR="analyzer/dist/LingjianLite"

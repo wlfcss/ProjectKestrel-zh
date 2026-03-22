@@ -1,7 +1,7 @@
 @echo off
 REM ========================================
-REM Project Kestrel - Headless Build Script (Windows)
-REM Builds unified ProjectKestrel onedir bundle + Inno Setup installer
+REM LingjianLite - Headless Build Script (Windows)
+REM Builds unified LingjianLite onedir bundle + Inno Setup installer
 REM Called by CI (GitHub Actions) or run locally without prompts
 REM ========================================
 
@@ -9,7 +9,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo ========================================
-echo Project Kestrel Headless Builder (Windows) - PYINSTALLER STEP
+echo LingjianLite Headless Builder (Windows) - PYINSTALLER STEP
 echo ========================================
 echo.
 
@@ -20,7 +20,7 @@ REM Allow caller to inject version strings; otherwise auto-generate
 if not defined RELEASE_TS (
     for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format \"yyyy.MM.dd.HH.mm\""') do set "RELEASE_TS=%%I"
 )
-if not defined RELEASE_NAME set "RELEASE_NAME=Project Kestrel a%RELEASE_TS%"
+if not defined RELEASE_NAME set "RELEASE_NAME=LingjianLite a%RELEASE_TS%"
 if not defined APP_VERSION   set "APP_VERSION=alpha-%RELEASE_TS%"
 
 echo Using release name: %RELEASE_NAME%
@@ -46,11 +46,11 @@ if exist "VERSION.txt" (
 REM ----------------------------------------
 REM Activate Python virtual environment
 REM ----------------------------------------
-if exist ".venv2\Scripts\activate.bat" (
-    call ".venv2\Scripts\activate.bat"
-    echo [OK] Activated .venv2
+if exist ".venv\Scripts\activate.bat" (
+    call ".venv\Scripts\activate.bat"
+    echo [OK] Activated .venv
 ) else (
-    echo [WARNING] .venv2 not found - using system/activated Python
+    echo [WARNING] .venv not found - using system/activated Python
 )
 
 echo.
@@ -60,7 +60,7 @@ echo ========================================
 echo.
 
 pushd analyzer || exit /b 1
-python -m PyInstaller ProjectKestrel.spec
+python -m PyInstaller LingjianLite.spec
 popd
 
 if %ERRORLEVEL% NEQ 0 (
@@ -69,10 +69,10 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-if not exist "analyzer\dist\ProjectKestrel\ProjectKestrel.exe" (
-    echo [ERROR] ProjectKestrel.exe not found after build.
+if not exist "analyzer\dist\LingjianLite\LingjianLite.exe" (
+    echo [ERROR] LingjianLite.exe not found after build.
     exit /b 1
 )
-echo [OK] PyInstaller onedir build complete: analyzer\dist\ProjectKestrel\
+echo [OK] PyInstaller onedir build complete: analyzer\dist\LingjianLite\
 
 

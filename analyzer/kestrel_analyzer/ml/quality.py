@@ -80,12 +80,16 @@ class QualityClassifier:
         return images
 
     def classify(self, cropped_image, cropped_mask, retry=5):
+        last_exc = None
         for _ in range(retry):
             try:
                 input_data = self._preprocess(cropped_image, cropped_mask)
                 output_value = self.model.predict(np.expand_dims(input_data, axis=0), verbose=0)
                 raw_quality = float(output_value[0][0])
                 return self._normalize_quality_to_percentile(raw_quality)
-            except Exception:
+            except Exception as e:
+                last_exc = e
                 time.sleep(0.05)
+        if last_exc is not None:
+            print(f"[quality] classify failed after {retry} retries: {last_exc}")
         return -1.0

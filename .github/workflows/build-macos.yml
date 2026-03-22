@@ -28,8 +28,8 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          python -m venv .venv2
-          source .venv2/bin/activate
+          python -m venv .venv
+          source .venv/bin/activate
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller

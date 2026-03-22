@@ -1,0 +1,104 @@
+name: Build Windows Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Pull LFS model files
+        shell: bash
+        run: |
+          git lfs pull
+          echo "Model files:"
+          ls -lh analyzer/models/*.pt analyzer/models/*.keras analyzer/models/*.onnx 2>/dev/null || true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements-win.txt"
+
+      - name: Install dependencies
+        shell: cmd
+        run: |
+          python -m venv .venv
+          call .venv\Scripts\activate.bat
+          python -m pip install --upgrade pip
+          pip install -r requirements-win.txt
+          pip install pyinstaller
+
+      - name: Read version from VERSION.txt
+        id: version
+        shell: bash
+        run: |
+          if [ -f VERSION.txt ]; then
+            VER=$(cat VERSION.txt | tr -d '[:space:]')
+          else
+            VER="alpha-$(date +%Y.%m.%d.%H.%M)"
+          fi
+          echo "app_version=$VER" >> "$GITHUB_OUTPUT"
+          echo "release_name=LingjianLite-${VER}" >> "$GITHUB_OUTPUT"
+          echo "Version: $VER"
+
+      - name: Build with PyInstaller
+        shell: cmd
+        env:
+          RELEASE_NAME: ${{ steps.version.outputs.release_name }}
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          call .venv\Scripts\activate.bat
+          call packaging\build_installer_headless.bat
+          if %ERRORLEVEL% NEQ 0 exit /b 1
+
+      - name: Build Inno Setup installer
+        shell: cmd
+        env:
+          RELEASE_NAME: ${{ steps.version.outputs.release_name }}
+          APP_VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          call .venv\Scripts\activate.bat
+          call packaging\build_installer_headless_part2.bat
+          if %ERRORLEVEL% NEQ 0 exit /b 1
+
+      - name: Create ZIP archive
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cd analyzer/dist
+          7z a "../../artifact/LingjianLite-Windows.zip" "LingjianLite/" -r
+          cd ../..
+          # Copy installer exe to artifact
+          cp dist/installer/*.exe artifact/ 2>/dev/null || true
+          echo "Artifacts:"
+          ls -lh artifact/
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: artifact/*-Setup.exe
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: artifact/LingjianLite-Windows.zip
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifact/*-Setup.exe
+            artifact/LingjianLite-Windows.zip
+          generate_release_notes: true

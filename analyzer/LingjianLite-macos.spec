@@ -6,29 +6,17 @@ from PyInstaller.utils.hooks import collect_all
 # tree is already imported by pyinstaller runtime environment.
 
 
-# See if sample_sets exists
-print(os.listdir("sample_sets"))
 # Build datas list with proper sample_sets bundling using Tree()
-datas = [('models', 'models'), ('folder_inspector.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('visualizer.css', '.'), ('visualizer.js', '.'), ('i18n.js', '.'), ('taxonomy.js', '.'), ('taxonomy_zh_cn.json', '.'), ('papaparse.local.js', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.'), ('settings_utils.py', '.'), ('editor_launch.py', '.'), ('queue_manager.py', '.'), ('api_bridge.py', '.'), ('metadata_writer.py', '.')]
+datas = [('models', 'models'), ('folder_inspector.py', '.'), ('cli.py', '.'), ('VERSION.txt', '.'), ('kestrel_analyzer', 'kestrel_analyzer'), ('visualizer.html', '.'), ('visualizer.css', '.'), ('visualizer.js', '.'), ('i18n.js', '.'), ('taxonomy.js', '.'), ('taxonomy_zh_cn.json', '.'), ('papaparse.local.js', '.'), ('culling.html', '.'), ('logo.png', '.'), ('logo.ico', '.'), ('settings_utils.py', '.'), ('editor_launch.py', '.'), ('queue_manager.py', '.'), ('api_bridge.py', '.'), ('metadata_writer.py', '.'), ('taxonomy_utils.py', '.')]
 
 # Add sample_sets using Tree() - convert 3-element tuples to 2-element format for datas
 sample_sets_tree = Tree('sample_sets', prefix='sample_sets')
 datas += [(item[0], item[1]) for item in sample_sets_tree]  # Only use first 2 elements of each tuple
 binaries = []
-hiddenimports = ['pywebview', 'certifi','PIL','exifread','settings_utils','editor_launch','queue_manager','api_bridge','metadata_writer','folder_inspector']
+hiddenimports = ['pywebview', 'certifi','PIL','exifread','settings_utils','editor_launch','queue_manager','api_bridge','metadata_writer','taxonomy_utils','folder_inspector']
 binaries += collect_dynamic_libs('torch')
 binaries += collect_dynamic_libs('onnxruntime')
 binaries += collect_dynamic_libs('tensorflow')
-
-# After your datas definition, add:
-print("=== Verifying source files exist ===")
-for src, dst in datas:
-    exists = os.path.exists(src)
-    print(f"  {src} -> {dst} | exists: {exists}")
-    if os.path.isdir(src):
-        contents = os.listdir(src)
-        print(f"    contents: {contents}")
-
 
 a = Analysis(
     ['visualizer.py'],

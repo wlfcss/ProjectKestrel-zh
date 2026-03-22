@@ -1,17 +1,17 @@
-; Kestrel Project Installer - Inno Setup Script
-; Packages Kestrel Analyzer and Visualizer
+; LingjianLite Installer - Inno Setup Script
+; Packages Lingjian Analyzer and Visualizer
 
-#define MyAppName "Project Kestrel"
-#define MyAppPublisher "Project Kestrel"
-#define MyAppURL "https://github.com/sirspongelord/ProjectKestrel"
-#define TutorialURL "https://projectkestrel.org/#tutorial"
+#define MyAppName "翎鉴 Lite"
+#define MyAppPublisher "翎鉴 / Lingjian"
+#define MyAppURL "https://github.com/wlfcss/ProjectKestrel-zh"
+; #define TutorialURL ""
 
 #ifndef AppVersion
   #define AppVersion "alpha-YYYY.MM.DD.HH.MM"
 #endif
 
 #ifndef ReleaseName
-  #define ReleaseName "Project Kestrel aYYYY.MM.DD.HH.MM"
+  #define ReleaseName "LingjianLite aYYYY.MM.DD.HH.MM"
 #endif
 
 #ifndef ReleaseDir
@@ -21,7 +21,7 @@
 ; WebView2 runtime installation removed to reduce installer failures
 
 [Setup]
-AppId=org.ProjectKestrel
+AppId=org.lingjian-lite
 AppName={#MyAppName}
 AppVersion={#AppVersion}
 AppPublisher={#MyAppPublisher}
@@ -44,14 +44,15 @@ WizardImageFile=..\assets\logo.png
 WizardSmallImageFile=..\assets\logo.png
 
 [Languages]
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon_projectkestrel"; Description: "Create desktop shortcut for Project Kestrel"; GroupDescription: "Desktop shortcuts:"; Flags: checkedonce
+Name: "desktopicon_lingjian"; Description: "创建桌面快捷方式"; GroupDescription: "桌面快捷方式:"; Flags: checkedonce
 
 [Files]
-; Unified Project Kestrel bundle (one-dir from PyInstaller)
-Source: "..\analyzer\dist\ProjectKestrel\*"; DestDir: "{app}\ProjectKestrel"; Flags: recursesubdirs createallsubdirs ignoreversion
+; LingjianLite bundle (one-dir from PyInstaller)
+Source: "..\analyzer\dist\LingjianLite\*"; DestDir: "{app}\LingjianLite"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 ; Documentation
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -59,18 +60,15 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu icon (single unified app)
-Name: "{group}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; IconFilename: "{app}\ProjectKestrel\_internal\\logo.ico"
+Name: "{group}\翎鉴 Lite"; Filename: "{app}\LingjianLite\LingjianLite.exe"; WorkingDir: "{app}\LingjianLite"; IconFilename: "{app}\LingjianLite\_internal\\logo.ico"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 
 ; Desktop icon
-Name: "{autodesktop}\Project Kestrel"; Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; WorkingDir: "{app}\ProjectKestrel"; Tasks: desktopicon_projectkestrel; IconFilename: "{app}\ProjectKestrel\_internal\\logo.ico"
+Name: "{autodesktop}\翎鉴 Lite"; Filename: "{app}\LingjianLite\LingjianLite.exe"; WorkingDir: "{app}\LingjianLite"; Tasks: desktopicon_lingjian; IconFilename: "{app}\LingjianLite\_internal\\logo.ico"
 
 [Run]
-; Open tutorial webpage after install
-Filename: "{#TutorialURL}"; Description: "View online tutorial"; Flags: shellexec postinstall skipifsilent nowait
-
-; Option to launch after install (unified)
-Filename: "{app}\ProjectKestrel\ProjectKestrel.exe"; Description: "Launch Project Kestrel"; Flags: nowait postinstall skipifsilent unchecked
+; Option to launch after install
+Filename: "{app}\LingjianLite\LingjianLite.exe"; Description: "启动翎鉴 Lite"; Flags: nowait postinstall skipifsilent unchecked
 
 [Code]
 // WebView2 installer integration removed to avoid forcing downloads during setup.

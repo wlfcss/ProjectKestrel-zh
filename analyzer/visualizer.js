@@ -1534,6 +1534,7 @@
     let sceneZoomScale = 5;   // adjustable via scroll or slider
     let zoomLastX = 0, zoomLastY = 0; // last mouse pos for slider re-apply
     const sceneRawCache = new Map();   // unique row key -> blob URL
+    const _SCENE_RAW_CACHE_MAX = 30;  // LRU limit to prevent memory bloat
     const sceneRawLoading = new Set(); // (rootPath|filename) currently being fetched
 
     function getSceneRawCacheKey(row) {
@@ -1618,6 +1619,13 @@
         }
         if (res && res.success && res.data) {
           const url = _base64ToBlobUrl(res.data, res.mime || 'image/jpeg');
+          // LRU eviction: drop oldest entry when cache is full
+          if (sceneRawCache.size >= _SCENE_RAW_CACHE_MAX) {
+            const oldest = sceneRawCache.keys().next().value;
+            const oldUrl = sceneRawCache.get(oldest);
+            if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            sceneRawCache.delete(oldest);
+          }
           sceneRawCache.set(key, url);
           // 如果当前行仍是激活中的缩放行，则升级预览图源
           if (sceneZoomActive && sceneZoomRow === row) {
