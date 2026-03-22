@@ -50,6 +50,10 @@ jobs:
           echo "release_name=LingjianLite-${VER}" >> "$GITHUB_OUTPUT"
           echo "Version: $VER"
 
+      - name: Install Inno Setup
+        shell: cmd
+        run: choco install innosetup -y --no-progress
+
       - name: Build with PyInstaller
         shell: cmd
         env:
@@ -59,6 +63,16 @@ jobs:
           call .venv\Scripts\activate.bat
           call packaging\build_installer_headless.bat
           if %ERRORLEVEL% NEQ 0 exit /b 1
+
+      - name: Create ZIP archive
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cd analyzer/dist
+          7z a "../../artifact/LingjianLite-Windows.zip" "LingjianLite/" -r
+          cd ../..
+          echo "ZIP artifact:"
+          ls -lh artifact/
 
       - name: Build Inno Setup installer
         shell: cmd
@@ -70,16 +84,11 @@ jobs:
           call packaging\build_installer_headless_part2.bat
           if %ERRORLEVEL% NEQ 0 exit /b 1
 
-      - name: Create ZIP archive
+      - name: Collect installer artifact
         shell: bash
         run: |
-          mkdir -p artifact
-          cd analyzer/dist
-          7z a "../../artifact/LingjianLite-Windows.zip" "LingjianLite/" -r
-          cd ../..
-          # Copy installer exe to artifact
           cp dist/installer/*.exe artifact/ 2>/dev/null || true
-          echo "Artifacts:"
+          echo "All artifacts:"
           ls -lh artifact/
 
       - name: Upload installer artifact
