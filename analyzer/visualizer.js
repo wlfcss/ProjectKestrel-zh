@@ -6550,11 +6550,19 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
       const destPath = document.getElementById('exportDestPath');
       const destSection = document.getElementById('exportDestSection');
 
+      // 导出进行中标记 — 阻止 Escape 关闭
+      let _exporting = false;
+      dlg.addEventListener('cancel', (e) => { if (_exporting) e.preventDefault(); });
+
       // 更新摘要
       updateExportSummary();
 
       // 监听模式切换
       dlg.querySelectorAll('input[name="exportMode"]').forEach(radio => {
+        radio.onchange = updateExportSummary;
+      });
+      // 监听星级子选项切换
+      dlg.querySelectorAll('input[name="starsScope"]').forEach(radio => {
         radio.onchange = updateExportSummary;
       });
       if (destPick) {
@@ -6579,10 +6587,15 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
           const accepted = rows.filter(r => r.culled === 'accepted');
           if (summary) summary.textContent = `将导出 ${accepted.length} 张已接受的照片`;
         } else if (mode === 'stars') {
+          const scope = dlg.querySelector('input[name="starsScope"]:checked')?.value || 'manual';
           const rated = rows.filter(r => {
-            const rp = r.__rootPath || rootPath;
-            const ratings = _scenedata[rp]?.image_ratings || {};
-            return (ratings[r.filename] || 0) > 0;
+            if (scope === 'manual') {
+              const rp = r.__rootPath || rootPath;
+              const ratings = _scenedata[rp]?.image_ratings || {};
+              return (ratings[r.filename] || 0) > 0;
+            } else {
+              return getRating(r) > 0;
+            }
           });
           if (summary) summary.textContent = `将按星级分文件夹导出 ${rated.length} 张有评分的照片`;
         } else if (mode === 'xmp') {
@@ -6602,9 +6615,30 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
         }
       }
 
+      // 重置对话框到初始状态
+      function resetExportDialog() {
+        const progressEl = document.getElementById('exportProgress');
+        const progressFill = document.getElementById('exportProgressFill');
+        const resultEl = document.getElementById('exportResult');
+        const startBtn = document.getElementById('exportStart');
+        const cancelBtn = document.getElementById('exportCancel');
+        const doneBtn = document.getElementById('exportDone');
+        if (progressEl) progressEl.classList.add('hidden');
+        if (progressFill) progressFill.style.width = '0%';
+        if (resultEl) resultEl.classList.add('hidden');
+        if (startBtn) { startBtn.classList.remove('hidden'); startBtn.disabled = false; }
+        if (cancelBtn) { cancelBtn.classList.remove('hidden'); cancelBtn.disabled = false; }
+        if (doneBtn) doneBtn.classList.add('hidden');
+        updateExportStartButton();
+      }
+
       // 取消
       const cancelBtn = document.getElementById('exportCancel');
-      if (cancelBtn) cancelBtn.onclick = () => dlg.close();
+      if (cancelBtn) cancelBtn.onclick = () => { resetExportDialog(); dlg.close(); };
+
+      // 完成按钮
+      const doneBtn = document.getElementById('exportDone');
+      if (doneBtn) doneBtn.onclick = () => { resetExportDialog(); dlg.close(); };
 
       // 开始导出
       const startBtn = document.getElementById('exportStart');
@@ -6633,12 +6667,14 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
           const progressEl = document.getElementById('exportProgress');
           const progressLabel = document.getElementById('exportProgressLabel');
           const progressFill = document.getElementById('exportProgressFill');
-          if (progressEl) progressEl.classList.remove('hidden');
-          startBtn.disabled = true;
+          const resultEl = document.getElementById('exportResult');
+          const resultIcon = document.getElementById('exportResultIcon');
+          const resultTitle = document.getElementById('exportResultTitle');
+          const resultDetail = document.getElementById('exportResultDetail');
 
+          // 先收集所有待导出文件，计算总量
           const loadedPaths = [...new Set(rows.map(r => r.__rootPath).filter(Boolean))];
-          let totalCopied = 0, totalErrors = 0;
-
+          const folderTasks = [];
           for (const rp of loadedPaths) {
             const folderRows = rows.filter(r => r.__rootPath === rp);
             let filenames = [];
@@ -6647,47 +6683,99 @@ let _queueCountsTimer = null; // 从队列刷新文件夹计数的定时器
             if (mode === 'accepted') {
               filenames = folderRows.filter(r => r.culled === 'accepted').map(r => r.filename);
             } else if (mode === 'stars') {
-              const ratings = _scenedata[rp]?.image_ratings || {};
+              const scope = dlg.querySelector('input[name="starsScope"]:checked')?.value || 'manual';
               for (const r of folderRows) {
-                const rating = ratings[r.filename] || 0;
+                let rating = 0;
+                if (scope === 'manual') {
+                  const ratings = _scenedata[rp]?.image_ratings || {};
+                  rating = ratings[r.filename] || 0;
+                } else {
+                  rating = getRating(r);
+                }
                 if (rating > 0) {
                   filenames.push(r.filename);
                   starRatings[r.filename] = rating;
                 }
               }
             }
+            if (filenames.length) folderTasks.push({ rp, filenames, starRatings });
+          }
 
-            if (!filenames.length) continue;
+          const totalFiles = folderTasks.reduce((s, t) => s + t.filenames.length, 0);
+          if (!totalFiles) {
+            showToast('没有符合条件的照片可导出', 3000);
+            return;
+          }
 
-            if (progressLabel) progressLabel.textContent = `导出中… ${folderBaseName(rp)}`;
+          // 显示进度，隐藏其他区域
+          _exporting = true;
+          if (progressEl) progressEl.classList.remove('hidden');
+          if (resultEl) resultEl.classList.add('hidden');
+          if (progressFill) progressFill.style.width = '0%';
+          startBtn.disabled = true;
+          startBtn.classList.add('hidden');
+          if (cancelBtn) cancelBtn.disabled = true;
+
+          let totalCopied = 0, totalErrors = 0, totalSkipped = 0;
+          let processedFiles = 0;
+
+          for (const task of folderTasks) {
+            if (progressLabel) progressLabel.textContent = `导出中… ${folderBaseName(task.rp)} (${processedFiles}/${totalFiles})`;
 
             try {
               const res = await window.pywebview.api.copy_photos_to_directory(
-                rp,
-                JSON.stringify(filenames),
+                task.rp,
+                JSON.stringify(task.filenames),
                 dest,
                 mode === 'stars',
-                mode === 'stars' ? JSON.stringify(starRatings) : null
+                mode === 'stars' ? JSON.stringify(task.starRatings) : null
               );
-              if (res) {
+              if (res && res.success !== false) {
                 totalCopied += (res.copied || 0);
                 totalErrors += (res.errors || 0);
+                totalSkipped += (res.skipped || 0);
+              } else {
+                console.error('Export API error for', task.rp, res?.error);
+                totalErrors += task.filenames.length;
               }
             } catch (e) {
-              console.error('Export error for', rp, e);
-              totalErrors++;
+              console.error('Export error for', task.rp, e);
+              totalErrors += task.filenames.length;
+            }
+
+            processedFiles += task.filenames.length;
+            const pct = Math.round((processedFiles / totalFiles) * 100);
+            if (progressFill) progressFill.style.width = pct + '%';
+          }
+
+          // 完成：隐藏进度条，显示结果
+          _exporting = false;
+          if (progressEl) progressEl.classList.add('hidden');
+          if (resultEl) {
+            resultEl.classList.remove('hidden', 'has-errors', 'has-failure');
+            if (totalErrors > 0 && totalCopied === 0) {
+              resultEl.classList.add('has-failure');
+              resultIcon.textContent = '\u2717';
+              resultTitle.textContent = '导出失败';
+              resultDetail.textContent = `${totalErrors} 个文件复制出错`;
+            } else if (totalErrors > 0) {
+              resultEl.classList.add('has-errors');
+              resultIcon.textContent = '\u26A0';
+              resultTitle.textContent = `导出完成（有警告）`;
+              resultDetail.textContent = `成功 ${totalCopied} 张` +
+                (totalSkipped ? `，跳过 ${totalSkipped} 张` : '') +
+                `，失败 ${totalErrors} 张`;
+            } else {
+              resultIcon.textContent = '\u2713';
+              resultTitle.textContent = '导出成功';
+              resultDetail.textContent = `已将 ${totalCopied} 张照片导出至目标文件夹` +
+                (totalSkipped ? `（跳过 ${totalSkipped} 张不存在的文件）` : '');
             }
           }
 
-          if (progressFill) progressFill.style.width = '100%';
-          if (progressLabel) progressLabel.textContent = `导出完成：${totalCopied} 张照片`;
-          showToast(`导出完成：${totalCopied} 张照片${totalErrors ? '，' + totalErrors + ' 个错误' : ''}`, 5000);
-          setTimeout(() => {
-            dlg.close();
-            if (progressEl) progressEl.classList.add('hidden');
-            if (progressFill) progressFill.style.width = '0%';
-            startBtn.disabled = false;
-          }, 1500);
+          // 显示完成按钮，隐藏开始和取消
+          if (doneBtn) doneBtn.classList.remove('hidden');
+          if (cancelBtn) cancelBtn.classList.add('hidden');
         };
       }
 

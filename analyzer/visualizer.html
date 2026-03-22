@@ -507,13 +507,33 @@
             <span class="export-option-desc">导出所有标记为"接受"的照片</span>
           </div>
         </label>
-        <label class="export-option">
-          <input type="radio" name="exportMode" value="stars" />
-          <div class="export-option-text">
-            <span class="export-option-title">按星级分文件夹导出</span>
-            <span class="export-option-desc">创建 star-1 至 star-5 子文件夹</span>
+        <div class="export-option-group">
+          <label class="export-option">
+            <input type="radio" name="exportMode" value="stars" />
+            <div class="export-option-text">
+              <span class="export-option-title">按星级分文件夹导出</span>
+              <span class="export-option-desc">创建 star-1 至 star-5 子文件夹</span>
+            </div>
+          </label>
+          <div class="export-stars-sub" id="exportStarsSub">
+            <div class="export-stars-sub-inner">
+              <label class="export-sub-option">
+                <input type="radio" name="starsScope" value="manual" checked />
+                <div class="export-sub-text">
+                  <span class="export-sub-label">仅人工评分</span>
+                  <span class="export-sub-desc">导出手动标记星级的照片</span>
+                </div>
+              </label>
+              <label class="export-sub-option">
+                <input type="radio" name="starsScope" value="all" />
+                <div class="export-sub-text">
+                  <span class="export-sub-label">包含自动评分</span>
+                  <span class="export-sub-desc">含系统自动评分，均有时以人工为准</span>
+                </div>
+              </label>
+            </div>
           </div>
-        </label>
+        </div>
         <label class="export-option">
           <input type="radio" name="exportMode" value="xmp" />
           <div class="export-option-text">
@@ -538,9 +558,17 @@
           </div>
         </div>
       </div>
+      <div class="export-result hidden" id="exportResult">
+        <div class="export-result-icon" id="exportResultIcon"></div>
+        <div class="export-result-body">
+          <div class="export-result-title" id="exportResultTitle"></div>
+          <div class="export-result-detail" id="exportResultDetail"></div>
+        </div>
+      </div>
       <div class="export-dlg-footer">
         <button id="exportCancel">取消</button>
         <button id="exportStart" class="primary" disabled>开始导出</button>
+        <button id="exportDone" class="primary hidden">完成</button>
       </div>
     </div>
   </dialog>

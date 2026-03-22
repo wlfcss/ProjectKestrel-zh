@@ -2052,6 +2052,48 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
 
 .export-progress.hidden { display: none; }
 
+.export-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-md);
+  background: var(--ok-dim);
+  border: 1px solid rgba(111,207,151,0.25);
+}
+.export-result.has-errors {
+  background: var(--warn-dim);
+  border-color: rgba(242,201,76,0.25);
+}
+.export-result.has-failure {
+  background: var(--danger-dim);
+  border-color: rgba(235,87,87,0.25);
+}
+.export-result.hidden { display: none; }
+.export-result-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.export-result-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.export-result-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.export-result-detail {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.export-dlg-footer .hidden { display: none; }
+
 .export-dlg-footer {
   display: flex;
   justify-content: flex-end;
@@ -2071,6 +2113,87 @@ button.primary:disabled { opacity: 0.35; pointer-events: none; }
 .export-dlg-footer button.primary { background: var(--accent-dim); color: var(--accent); border-color: rgba(106,173,255,0.25); }
 .export-dlg-footer button.primary:hover { background: var(--accent-hover); }
 .export-dlg-footer button:disabled { opacity: 0.3; pointer-events: none; }
+
+/* Stars sub-options: collapsed by default, expands when parent is selected */
+.export-option-group {
+  display: flex;
+  flex-direction: column;
+}
+.export-option-group .export-option {
+  border-radius: var(--r-md);
+  transition: background 0.15s, border-color 0.15s, border-radius 0.15s;
+}
+.export-option-group:has(input[name="exportMode"]:checked) .export-option {
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  border-bottom-color: transparent;
+}
+.export-stars-sub {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.25s ease, opacity 0.2s ease;
+  opacity: 0;
+  overflow: hidden;
+  background: rgba(106,173,255,0.08);
+  border: 1px solid rgba(106,173,255,0.25);
+  border-top: none;
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+.export-stars-sub-inner {
+  min-height: 0;
+  display: flex;
+  gap: 6px;
+  padding: 0 10px;
+}
+.export-option-group:has(input[name="exportMode"]:checked) .export-stars-sub {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.export-option-group:has(input[name="exportMode"]:checked) .export-stars-sub-inner {
+  padding: 10px;
+}
+.export-sub-option {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.15s, border-color 0.15s;
+}
+.export-sub-option:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+}
+.export-sub-option:has(input:checked) {
+  background: rgba(106,173,255,0.12);
+  border-color: rgba(106,173,255,0.30);
+}
+.export-sub-option input[type="radio"] {
+  accent-color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.export-sub-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.export-sub-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.export-sub-option:has(input:checked) .export-sub-label {
+  color: var(--accent);
+}
+.export-sub-desc {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
 
 /* ── 17. Toast ───────────────────────────────────────────── */
 .toast {
