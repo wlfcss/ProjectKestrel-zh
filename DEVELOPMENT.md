@@ -55,17 +55,19 @@ ProjectKestrel-zh/
 │           └── quality.py       # 画质评估 (Keras)
 │
 ├── packaging/                   # PyInstaller 打包配置
-│   ├── ProjectKestrel-macos.spec # macOS 打包规格
-│   ├── ProjectKestrel.spec      # Windows 打包规格
+│   ├── LingjianLite-macos.spec   # macOS 打包规格
+│   ├── LingjianLite.spec         # Windows 打包规格
 │   ├── build_app_headless.sh    # macOS 构建脚本
 │   ├── build_installer.bat      # Windows 构建脚本
 │   └── kestrel_installer.iss    # InnoSetup 安装程序 (Windows)
 │
 ├── .github/workflows/
-│   └── build-macos.yml          # macOS CI: 自动构建 DMG/ZIP
+│   ├── build-macos.yml          # macOS CI: 自动构建 DMG/ZIP
+│   └── build-windows.yml        # Windows CI: 自动构建 EXE/ZIP
 │
 ├── scripts/                     # 工具脚本
-├── requirements.txt             # Python 依赖
+├── requirements.txt             # Python 依赖 (跨平台)
+├── requirements-win.txt         # Python 依赖 (Windows, 含 DirectML)
 └── README.md
 ```
 
@@ -224,23 +226,30 @@ bash build_app_headless.sh
 
 或使用 PyInstaller spec：
 ```bash
-pyinstaller packaging/ProjectKestrel-macos.spec
+pyinstaller analyzer/LingjianLite-macos.spec
 ```
 
 ### 构建 Windows 应用
 
 ```bash
-pyinstaller packaging/ProjectKestrel.spec
+pip install -r requirements-win.txt
+pyinstaller analyzer/LingjianLite.spec
 ```
 
 ### CI 自动构建
 
-推送 `v*` 标签到 GitHub 会自动触发 `.github/workflows/build-macos.yml`，生成 DMG 和 ZIP 并发布到 GitHub Releases。
+推送 `v*` 标签到 GitHub 会自动触发两个 CI 工作流：
+- `.github/workflows/build-macos.yml` → 生成 DMG + ZIP
+- `.github/workflows/build-windows.yml` → 生成 Inno Setup EXE + ZIP
+
+两个工作流都会自动创建 GitHub Release 并上传产物。
 
 ```bash
-git tag v1.1.1
+git tag v1.1.2
 git push origin main --tags
 ```
+
+Windows 构建使用 `requirements-win.txt`（含 `onnxruntime-directml`、`tensorflow==2.19.0` 等 Windows 专用依赖）。
 
 ## 测试
 

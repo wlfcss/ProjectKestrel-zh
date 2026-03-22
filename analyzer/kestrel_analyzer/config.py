@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = "1.1.2"
 
 ANALYZER_DIR = Path(__file__).resolve().parents[1]
 MODELS_DIR = ANALYZER_DIR / "models"

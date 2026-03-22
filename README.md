@@ -29,8 +29,8 @@ A Chinese-localized fork of [Project Kestrel](https://github.com/SanjaySoniLV/Pr
 | 分类数据 Taxonomy | English species names | 中文鸟种名 Chinese (IOC 15.1) |
 | 应用入口 Entry | Separate GUI + Visualizer | Unified PyWebView app |
 | 检测模型 Detection | Mask R-CNN | YOLO26x-seg 实例分割 |
-| 硬件加速 Acceleration | CPU / CUDA | MPS (Apple Silicon) / CUDA / CPU |
-| 处理速度 Speed | ~4s/张 | ~1s/张 (Apple Silicon MPS) |
+| 硬件加速 Acceleration | CPU / CUDA | MPS (Apple Silicon) / DirectML (Windows) / CPU |
+| 处理速度 Speed | ~4s/张 | ~1s/张 (MPS) / ~1s/张 (Windows CPU) |
 | 导出功能 Export | 无 | 按星级分文件夹导出 + XMP 写入 |
 | 遥测 Telemetry | 匿名使用统计 Anonymous telemetry | 已移除 Removed |
 
@@ -108,6 +108,7 @@ ProjectKestrel-zh/
 │   ├── folder_inspector.py      # 文件夹扫描 Folder inspector
 │   ├── settings_utils.py        # 设置持久化 Settings persistence
 │   ├── editor_launch.py         # 外部编辑器 External editor
+│   ├── taxonomy_utils.py        # 分类学工具 Taxonomy utils
 │   ├── i18n.js                  # 前端国际化 Frontend i18n
 │   ├── taxonomy.js              # 前端分类数据 Taxonomy data
 │   ├── taxonomy_zh_cn.json      # 中文鸟种名 Chinese bird names
@@ -130,7 +131,9 @@ ProjectKestrel-zh/
 │           ├── bird_species.py  # 物种分类 Species classifier
 │           └── quality.py       # 画质评估 Quality model
 ├── packaging/                   # PyInstaller 打包 Packaging
-├── requirements.txt             # Python 依赖 Dependencies
+├── .github/workflows/           # CI: macOS + Windows 自动构建
+├── requirements.txt             # Python 依赖 (跨平台)
+├── requirements-win.txt         # Python 依赖 (Windows, 含 DirectML)
 └── README.md
 ```
 
@@ -152,7 +155,7 @@ Canon `.cr2` `.cr3` | Nikon `.nef` | Sony `.arw` | Adobe `.dng` | Olympus `.orf`
 | 平台 Platform | 检测模型 Detection | 物种分类 Species | 画质评估 Quality |
 |------|------|------|------|
 | **macOS (Apple Silicon)** | MPS → CoreML → CPU | CPU | CPU |
-| **Windows (NVIDIA)** | CUDA | DirectML | CUDA |
+| **Windows (NVIDIA/AMD/Intel)** | CPU | DirectML | CPU (oneDNN) |
 | **CPU 模式** | CPU | CPU | CPU |
 
 > macOS 上 YOLO 优先使用 MPS 加速（约 1s/张），自动回退至 CoreML 或 CPU。
