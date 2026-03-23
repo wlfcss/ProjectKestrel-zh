@@ -101,8 +101,6 @@ jobs:
           echo "  OK"
 
       - name: Build Inno Setup installer
-        id: inno
-        continue-on-error: true
         shell: cmd
         env:
           RELEASE_NAME: ${{ steps.version.outputs.release_name }}
@@ -124,8 +122,13 @@ jobs:
         if: always()
         shell: bash
         run: |
+          echo "=== Searching for Setup.exe ==="
+          find . -name "*Setup*.exe" -o -name "*.exe" 2>/dev/null | grep -iv python | grep -iv venv | head -20
+          echo "=== dist/installer/ contents ==="
+          ls -lhR dist/installer/ 2>/dev/null || echo "dist/installer/ not found"
+          echo "=== Copying to artifact/ ==="
           cp dist/installer/*.exe artifact/ 2>/dev/null || true
-          echo "All artifacts:"
+          echo "=== Final artifact/ contents ==="
           ls -lh artifact/
 
       - name: Upload installer artifact
