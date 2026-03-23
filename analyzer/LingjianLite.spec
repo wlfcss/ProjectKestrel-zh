@@ -16,7 +16,6 @@ datas = [
     ('culling.html', '.'),
     ('logo.png', '.'),
     ('logo.ico', '.'),
-    ('sample_sets', 'sample_sets'),
     # Python modules loaded dynamically or via imports
     ('settings_utils.py', '.'),
     ('editor_launch.py', '.'),

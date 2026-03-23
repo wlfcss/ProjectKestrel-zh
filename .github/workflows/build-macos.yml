@@ -53,6 +53,7 @@ jobs:
 
           mkdir -p artifact
 
+          # Create DMG with nice layout (uncompressed initially)
           create-dmg \
             --volname "翎鉴 Lite" \
             --window-size 540 380 \
@@ -60,10 +61,16 @@ jobs:
             --icon "翎鉴 Lite.app" 140 190 \
             --app-drop-link 400 190 \
             --hide-extension "翎鉴 Lite.app" \
-            "artifact/LingjianLite.dmg" \
+            "artifact/LingjianLite-raw.dmg" \
             "$APP_PATH"
 
-          echo "DMG created:"
+          # Re-compress with zlib for smaller download size
+          hdiutil convert "artifact/LingjianLite-raw.dmg" \
+            -format UDZO -imagekey zlib-level=9 \
+            -o "artifact/LingjianLite.dmg"
+          rm "artifact/LingjianLite-raw.dmg"
+
+          echo "DMG created (compressed):"
           ls -lh artifact/
 
       - name: Create zip archive
