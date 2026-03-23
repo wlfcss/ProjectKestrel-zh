@@ -107,16 +107,26 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.app_version }}
         run: |
           if not exist "dist\installer" mkdir "dist\installer"
-          echo === Running ISCC with verbose output ===
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /V9 ^
-            /DReleaseName="%RELEASE_NAME%" ^
-            /DAppVersion="%APP_VERSION%" ^
-            "packaging\kestrel_installer.iss"
+          echo === ISCC environment ===
+          echo RELEASE_NAME=%RELEASE_NAME%
+          echo APP_VERSION=%APP_VERSION%
+          echo CD=%CD%
+          echo === Checking ISS source files ===
+          if exist "analyzer\dist\LingjianLite" (echo [OK] PyInstaller output found) else (echo [MISSING] analyzer\dist\LingjianLite)
+          if exist "LICENSE" (echo [OK] LICENSE found) else (echo [MISSING] LICENSE)
+          if exist "assets\logo.png" (echo [OK] logo.png found) else (echo [MISSING] assets\logo.png)
+          dir "C:\Program Files (x86)\Inno Setup 6\Languages\Chinese*" 2>nul || echo [WARNING] Chinese language files not found
+          echo === Running ISCC ===
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /V9 /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" "packaging\kestrel_installer.iss"
           if %ERRORLEVEL% NEQ 0 (
             echo.
-            echo [ERROR] Inno Setup build failed with exit code %ERRORLEVEL%
+            echo [ERROR] ISCC exited with code %ERRORLEVEL%
+            echo === Checking output ===
+            dir /s dist\installer 2>nul || echo No files in dist\installer
             exit /b 1
           )
+          echo === ISCC completed successfully ===
+          dir dist\installer\*.exe
 
       - name: Collect installer artifact
         if: always()
