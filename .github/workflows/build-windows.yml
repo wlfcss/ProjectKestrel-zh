@@ -50,20 +50,6 @@ jobs:
           echo "release_name=LingjianLite" >> "$GITHUB_OUTPUT"
           echo "Version: $VER"
 
-      - name: Verify Inno Setup installation
-        shell: bash
-        run: |
-          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
-          if [ -f "$ISCC" ]; then
-            echo "ISCC found at: $ISCC"
-            "$ISCC" /? 2>&1 | head -5 || true
-          else
-            echo "ISCC not found at default path, searching..."
-            find "/c/Program Files" "/c/Program Files (x86)" -name "ISCC.exe" 2>/dev/null
-            echo "Installing via Chocolatey..."
-            choco install innosetup -y --no-progress
-          fi
-
       - name: Build with PyInstaller
         shell: cmd
         env:
@@ -84,22 +70,6 @@ jobs:
           echo "ZIP artifact created:"
           ls -lh artifact/
 
-      - name: Verify Inno Setup inputs
-        shell: bash
-        run: |
-          echo "=== Checking ISS source files ==="
-          echo "PyInstaller output:"
-          ls -d analyzer/dist/LingjianLite/ && echo "  OK" || echo "  MISSING!"
-          echo "README.md:"
-          ls LICENSE && echo "  OK" || echo "  MISSING!"
-          echo "Logo files:"
-          ls assets/logo.png assets/logo.ico && echo "  OK" || echo "  MISSING!"
-          echo "ISS languages dir:"
-          ls "/c/Program Files (x86)/Inno Setup 6/Languages/ChineseSimplified.isl" 2>/dev/null && echo "  OK" || echo "  ChineseSimplified.isl NOT FOUND!"
-          echo "Output dir:"
-          mkdir -p dist/installer
-          echo "  OK"
-
       - name: Build Inno Setup installer
         shell: cmd
         env:
@@ -107,57 +77,35 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.app_version }}
         run: |
           if not exist "dist\installer" mkdir "dist\installer"
-          echo === ISCC environment ===
-          echo RELEASE_NAME=%RELEASE_NAME%
-          echo APP_VERSION=%APP_VERSION%
-          echo CD=%CD%
-          echo === Checking ISS source files ===
-          if exist "analyzer\dist\LingjianLite" (echo [OK] PyInstaller output found) else (echo [MISSING] analyzer\dist\LingjianLite)
-          if exist "LICENSE" (echo [OK] LICENSE found) else (echo [MISSING] LICENSE)
-          if exist "assets\logo.png" (echo [OK] logo.png found) else (echo [MISSING] assets\logo.png)
-          dir "C:\Program Files (x86)\Inno Setup 6\Languages\Chinese*" 2>nul || echo [WARNING] Chinese language files not found
-          echo === Running ISCC ===
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /V9 /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" "packaging\kestrel_installer.iss"
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" "packaging\kestrel_installer.iss"
           if %ERRORLEVEL% NEQ 0 (
-            echo.
             echo [ERROR] ISCC exited with code %ERRORLEVEL%
-            echo === Checking output ===
-            dir /s dist\installer 2>nul || echo No files in dist\installer
             exit /b 1
           )
-          echo === ISCC completed successfully ===
+          echo [OK] Inno Setup build complete
           dir dist\installer\*.exe
 
       - name: Collect installer artifact
-        if: always()
         shell: bash
         run: |
-          echo "=== Searching for Setup.exe ==="
-          find . -name "*Setup*.exe" -o -name "*.exe" 2>/dev/null | grep -iv python | grep -iv venv | head -20
-          echo "=== dist/installer/ contents ==="
-          ls -lhR dist/installer/ 2>/dev/null || echo "dist/installer/ not found"
-          echo "=== Copying to artifact/ ==="
-          cp dist/installer/*.exe artifact/ 2>/dev/null || true
-          echo "=== Final artifact/ contents ==="
+          cp dist/installer/*.exe artifact/
+          echo "All artifacts:"
           ls -lh artifact/
 
       - name: Upload installer artifact
-        if: always()
         uses: actions/upload-artifact@v4
-        continue-on-error: true
         with:
           name: windows-installer
           path: artifact/*-Setup.exe
 
       - name: Upload ZIP artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-zip
           path: artifact/LingjianLite-Windows.zip
 
       - name: Create GitHub Release
-        if: always() && startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
