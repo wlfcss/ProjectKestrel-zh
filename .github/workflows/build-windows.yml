@@ -47,12 +47,22 @@ jobs:
             VER="alpha-$(date +%Y.%m.%d.%H.%M)"
           fi
           echo "app_version=$VER" >> "$GITHUB_OUTPUT"
-          echo "release_name=LingjianLite-${VER}" >> "$GITHUB_OUTPUT"
+          echo "release_name=LingjianLite" >> "$GITHUB_OUTPUT"
           echo "Version: $VER"
 
-      - name: Install Inno Setup
-        shell: cmd
-        run: choco install innosetup -y --no-progress
+      - name: Verify Inno Setup installation
+        shell: bash
+        run: |
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ -f "$ISCC" ]; then
+            echo "ISCC found at: $ISCC"
+            "$ISCC" /? 2>&1 | head -5 || true
+          else
+            echo "ISCC not found at default path, searching..."
+            find "/c/Program Files" "/c/Program Files (x86)" -name "ISCC.exe" 2>/dev/null
+            echo "Installing via Chocolatey..."
+            choco install innosetup -y --no-progress
+          fi
 
       - name: Build with PyInstaller
         shell: cmd
@@ -71,20 +81,47 @@ jobs:
           cd analyzer/dist
           7z a "../../artifact/LingjianLite-Windows.zip" "LingjianLite/" -r
           cd ../..
-          echo "ZIP artifact:"
+          echo "ZIP artifact created:"
           ls -lh artifact/
 
+      - name: Verify Inno Setup inputs
+        shell: bash
+        run: |
+          echo "=== Checking ISS source files ==="
+          echo "PyInstaller output:"
+          ls -d analyzer/dist/LingjianLite/ && echo "  OK" || echo "  MISSING!"
+          echo "README.md:"
+          ls LICENSE && echo "  OK" || echo "  MISSING!"
+          echo "Logo files:"
+          ls assets/logo.png assets/logo.ico && echo "  OK" || echo "  MISSING!"
+          echo "ISS languages dir:"
+          ls "/c/Program Files (x86)/Inno Setup 6/Languages/ChineseSimplified.isl" 2>/dev/null && echo "  OK" || echo "  ChineseSimplified.isl NOT FOUND!"
+          echo "Output dir:"
+          mkdir -p dist/installer
+          echo "  OK"
+
       - name: Build Inno Setup installer
+        id: inno
+        continue-on-error: true
         shell: cmd
         env:
           RELEASE_NAME: ${{ steps.version.outputs.release_name }}
           APP_VERSION: ${{ steps.version.outputs.app_version }}
         run: |
-          call .venv\Scripts\activate.bat
-          call packaging\build_installer_headless_part2.bat
-          if %ERRORLEVEL% NEQ 0 exit /b 1
+          if not exist "dist\installer" mkdir "dist\installer"
+          echo === Running ISCC with verbose output ===
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /V9 ^
+            /DReleaseName="%RELEASE_NAME%" ^
+            /DAppVersion="%APP_VERSION%" ^
+            "packaging\kestrel_installer.iss"
+          if %ERRORLEVEL% NEQ 0 (
+            echo.
+            echo [ERROR] Inno Setup build failed with exit code %ERRORLEVEL%
+            exit /b 1
+          )
 
       - name: Collect installer artifact
+        if: steps.inno.outcome == 'success'
         shell: bash
         run: |
           cp dist/installer/*.exe artifact/ 2>/dev/null || true
@@ -92,6 +129,7 @@ jobs:
           ls -lh artifact/
 
       - name: Upload installer artifact
+        if: steps.inno.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer

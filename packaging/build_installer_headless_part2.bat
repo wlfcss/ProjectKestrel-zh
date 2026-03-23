@@ -14,7 +14,17 @@ echo ========================================
 echo.
 
 set PROJECT_ROOT=%~dp0..
-set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+
+REM Try environment variable first (set by CI), then standard paths
+if defined ISCC_PATH (
+    set INNO_COMPILER="%ISCC_PATH%"
+) else if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" (
+    set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+) else if exist "C:\Program Files\Inno Setup 6\ISCC.exe" (
+    set INNO_COMPILER="C:\Program Files\Inno Setup 6\ISCC.exe"
+) else (
+    set INNO_COMPILER="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+)
 
 REM Allow caller to inject version strings; otherwise auto-generate
 if not defined RELEASE_TS (
@@ -75,7 +85,9 @@ echo Building Inno Setup installer ...
 echo ========================================
 echo.
 
+echo Running: %INNO_COMPILER% /V9 /DReleaseName="%RELEASE_NAME%" /DAppVersion="%APP_VERSION%" "packaging\kestrel_installer.iss"
 %INNO_COMPILER% ^
+    /V9 ^
     /DReleaseName="%RELEASE_NAME%" ^
     /DAppVersion="%APP_VERSION%" ^
     "packaging\kestrel_installer.iss"
